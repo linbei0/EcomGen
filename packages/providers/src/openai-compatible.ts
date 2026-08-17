@@ -1,0 +1,103 @@
+import type { ModelCapabilities } from "@ecomgen/contracts";
+
+export interface ProviderConnection {
+  baseUrl: string;
+  apiKey: string;
+}
+
+export interface ImageGenerationInput {
+  model: string;
+  prompt: string;
+  size?: string;
+  quality?: "low" | "medium" | "high";
+  images?: Array<{ data: Buffer; filename: string; mimeType: string }>;
+}
+
+export interface ImageGenerationResult {
+  image: Buffer;
+  mimeType: string;
+  providerTaskId?: string;
+}
+
+export interface ProviderProbeResult { latencyMs: number; models: string[] | null; }
+
+export class OpenAiCompatibleImageProvider {
+  public constructor(private readonly connection: ProviderConnection) {}
+
+  public async generate(input: ImageGenerationInput): Promise<ImageGenerationResult> {
+    if (input.images?.length) return this.edit(input);
+    const response = await fetch(new URL("images/generations", this.baseUrl()), {
+      method: "POST",
+      headers: this.headers({ "content-type": "application/json" }),
+      body: JSON.stringify({
+        model: input.model,
+        prompt: input.prompt,
+        size: input.size,
+        quality: input.quality,
+        response_format: "b64_json",
+        n: 1
+      })
+    });
+    return this.readImageResponse(response);
+  }
+
+  public async probe(): Promise<ProviderProbeResult> {
+    // 只读取 /models，不调用生图接口，避免“测试连接”产生模型费用或副作用。
+    const started = Date.now();
+    const response = await fetch(new URL("models", this.baseUrl()), { headers: this.headers() });
+    if (!response.ok) throw new ProviderError(`Provider models endpoint returned HTTP ${response.status}`, response.status);
+    const body = await response.json() as { data?: Array<{ id?: string }> };
+    return { latencyMs: Date.now() - started, models: Array.isArray(body.data) ? body.data.flatMap((entry) => typeof entry.id === "string" ? [entry.id] : []) : null };
+  }
+
+  private async edit(input: ImageGenerationInput): Promise<ImageGenerationResult> {
+    const form = new FormData();
+    form.set("model", input.model);
+    form.set("prompt", input.prompt);
+    form.set("response_format", "b64_json");
+    if (input.size) form.set("size", input.size);
+    if (input.quality) form.set("quality", input.quality);
+    for (const image of input.images ?? []) {
+      form.append("image", new Blob([new Uint8Array(image.data)], { type: image.mimeType }), image.filename);
+    }
+    const response = await fetch(new URL("images/edits", this.baseUrl()), {
+      method: "POST",
+      headers: this.headers(),
+      body: form
+    });
+    return this.readImageResponse(response);
+  }
+
+  private async readImageResponse(response: Response): Promise<ImageGenerationResult> {
+    if (!response.ok) throw new ProviderError(await response.text(), response.status);
+    const body = await response.json() as { data?: Array<{ b64_json?: string; url?: string }>; task_id?: string; id?: string };
+    const result = body.data?.[0];
+    if (result?.b64_json) return { image: Buffer.from(result.b64_json, "base64"), mimeType: "image/png", providerTaskId: body.task_id ?? body.id };
+    if (result?.url) {
+      const imageResponse = await fetch(result.url);
+      if (!imageResponse.ok) throw new ProviderError("Provider returned an unreadable image URL", imageResponse.status);
+      const mimeType = imageResponse.headers.get("content-type")?.split(";")[0] ?? "image/png";
+      return { image: Buffer.from(await imageResponse.arrayBuffer()), mimeType, providerTaskId: body.task_id ?? body.id };
+    }
+    throw new ProviderError("Provider response does not contain an image", 502);
+  }
+
+  private baseUrl(): string {
+    return this.connection.baseUrl.endsWith("/") ? this.connection.baseUrl : `${this.connection.baseUrl}/`;
+  }
+
+  private headers(extra: Record<string, string> = {}): Record<string, string> {
+    return { authorization: `Bearer ${this.connection.apiKey}`, ...extra };
+  }
+}
+
+export class ProviderError extends Error {
+  public constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "ProviderError";
+  }
+}
+
+export function supportsImageGeneration(capabilities: ModelCapabilities): boolean {
+  return capabilities.imageApiKind !== null;
+}

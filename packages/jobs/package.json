@@ -1,0 +1,13 @@
+{
+  "name": "@ecomgen/jobs",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": { "build": "tsc -p tsconfig.json", "test": "vitest run --passWithNoTests" },
+  "dependencies": {
+    "@ecomgen/contracts": "workspace:*",
+    "bullmq": "^6.1.2",
+    "ioredis": "^5.6.1"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@ecomgen/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": { "build": "tsc -p tsconfig.json", "test": "vitest run" },
+  "dependencies": {
+    "@ecomgen/contracts": "workspace:*",
+    "archiver": "^7.0.1",
+    "better-sqlite3": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/better-sqlite3": "^7.6.13"
+  }
+}

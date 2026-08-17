@@ -1,0 +1,20 @@
+{
+  "name": "ecomgen",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev:api": "pnpm --filter @ecomgen/api dev",
+    "dev:worker": "pnpm --filter @ecomgen/worker dev",
+    "test": "pnpm -r test",
+    "test:e2e:mock": "node scripts/e2e-mock.mjs",
+    "test:contracts": "pnpm --filter @ecomgen/contracts test",
+    "lint:openapi": "npx --yes @redocly/cli lint docs/openapi.yaml --skip-rule operation-summary --skip-rule operation-4xx-response --skip-rule info-license --skip-rule no-server-example.com"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

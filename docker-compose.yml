@@ -1,0 +1,40 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      REDIS_URL: redis://redis:6379
+      ECOMGEN_DATA_DIR: /app/data
+      ECOMGEN_MASTER_KEY: ${ECOMGEN_MASTER_KEY:?Set a base64-encoded 32-byte key in .env}
+    ports:
+      - "8787:8787"
+    volumes:
+      - ecomgen_data:/app/data
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["node", "apps/worker/dist/worker.js"]
+    depends_on:
+      - redis
+    environment:
+      REDIS_URL: redis://redis:6379
+      ECOMGEN_DATA_DIR: /app/data
+      ECOMGEN_MASTER_KEY: ${ECOMGEN_MASTER_KEY:?Set a base64-encoded 32-byte key in .env}
+      WORKER_CONCURRENCY: 2
+    volumes:
+      - ecomgen_data:/app/data
+
+volumes:
+  ecomgen_data:
+  redis_data:

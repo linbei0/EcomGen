@@ -1,0 +1,19 @@
+{
+  "name": "@ecomgen/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "tsx watch src/server.ts", "build": "tsc -p tsconfig.json", "test": "vitest run --passWithNoTests", "start": "node dist/server.js" },
+  "dependencies": {
+    "@ecomgen/contracts": "workspace:*",
+    "@ecomgen/core": "workspace:*",
+    "@ecomgen/ecom-skill": "workspace:*",
+    "@ecomgen/jobs": "workspace:*",
+    "@ecomgen/providers": "workspace:*",
+    "@fastify/cors": "^11.1.0",
+    "@fastify/multipart": "^9.1.0",
+    "@fastify/sse": "^0.6.0",
+    "@fastify/type-provider-typebox": "^5.2.0",
+    "fastify": "^5.12.0"
+  }
+}
