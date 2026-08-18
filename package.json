@@ -6,6 +6,7 @@
     "build": "pnpm -r build",
     "dev:api": "pnpm --filter @ecomgen/api dev",
     "dev:worker": "pnpm --filter @ecomgen/worker dev",
+    "dev:web": "pnpm --filter @ecomgen/web dev",
     "test": "pnpm -r test",
     "test:e2e:mock": "node scripts/e2e-mock.mjs",
     "test:contracts": "pnpm --filter @ecomgen/contracts test",

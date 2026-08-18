@@ -1,0 +1,178 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.headerMeta {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.card {
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-2);
+  padding: 14px 16px;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-1);
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.baseUrl {
+  margin: 8px 0 0;
+  color: var(--text-2);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.metaText {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.emptyBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-l);
+  padding: 32px 28px;
+  background: var(--bg-1);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--text-1);
+}
+
+.emptyHint {
+  margin: 0 0 12px;
+  max-width: 44ch;
+  color: var(--text-2);
+  line-height: 1.7;
+}
+
+/* ---- 表单 ---- */
+
+.modelsHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 4px 0 8px;
+}
+
+.modelsLabel {
+  color: var(--text-1);
+  font-size: 13px;
+}
+
+.modelsHint {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.modelList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modelRow {
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-2);
+  padding: 10px 12px;
+}
+
+.modelRowMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modelRowMain :global(.ant-form-item) {
+  margin-bottom: 0;
+}
+
+.modelId {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.switchItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.kindSelect {
+  width: 132px;
+}
+
+.testOk,
+.testFail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+.testOk {
+  color: var(--success);
+}
+
+.testFail {
+  color: var(--danger);
+}
+
+.formFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-1);
+}

@@ -15,8 +15,12 @@ data-e2e-*/
 *.sqlite-shm
 *.sqlite-wal
 *.log
+*.zip
+*.tsbuildinfo
 .eslintcache
 .cache/
 .turbo/
+.vite/
 Thumbs.db
+desktop.ini
 .DS_Store

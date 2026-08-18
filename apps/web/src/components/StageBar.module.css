@@ -1,0 +1,60 @@
+.bar {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-1);
+  overflow: hidden;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  font: inherit;
+}
+
+.item + .item {
+  border-left: 1px solid var(--line-1);
+}
+
+.item:hover {
+  color: var(--text-1);
+}
+
+.item[data-active="true"] {
+  color: var(--text-1);
+}
+
+.item[data-done="true"] .index {
+  color: var(--accent);
+}
+
+.indicator {
+  position: absolute;
+  inset: 0;
+  background: var(--accent-subtle);
+  pointer-events: none;
+}
+
+.index {
+  position: relative;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.label {
+  position: relative;
+  font-size: 12px;
+  white-space: nowrap;
+}

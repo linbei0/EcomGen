@@ -6,4 +6,5 @@ allowBuilds:
   better-sqlite3: true
   esbuild: true
   msgpackr-extract: true
+  msw: false
   protobufjs: false

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "tsx watch src/worker.ts", "build": "tsc -p tsconfig.json", "test": "vitest run --passWithNoTests", "start": "node dist/worker.js" },
+  "scripts": { "dev": "tsx watch --env-file=../../.env src/worker.ts", "build": "tsc -p tsconfig.json", "test": "vitest run --passWithNoTests", "start": "node dist/worker.js" },
   "dependencies": {
     "@ecomgen/agent": "workspace:*",
     "@ecomgen/contracts": "workspace:*",

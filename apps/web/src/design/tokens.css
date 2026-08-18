@@ -1,0 +1,50 @@
+/* EcomGen 暗房设计 tokens。唯一事实来源：docs/09-前端设计文档.md 6.1。
+   纪律：最多 1 个强调色（钨丝琥珀，饱和度 <80%）；禁纯黑 #000 / 纯白 #fff；语义色仅表状态。 */
+:root {
+  /* 背景：暖调 off-black 阶梯 */
+  --bg-0: #0d0d0f; /* 应用基底（暗房） */
+  --bg-1: #131316; /* 面板 */
+  --bg-2: #1a1a1e; /* 抬升面（卡片、输入） */
+  --bg-3: #222227; /* 悬停/覆盖 */
+  --bg-lightbox: #17171a; /* 灯箱模式中栏基底（提亮一档） */
+
+  /* 描边 */
+  --line-1: rgba(237, 236, 230, 0.08);
+  --line-2: rgba(237, 236, 230, 0.16);
+
+  /* 文本：暖调 off-white。text-3 需在 bg-0 上 ≥4.5:1（WCAG AA 小字） */
+  --text-1: #edece6;
+  --text-2: #a6a49c;
+  --text-3: #807e77;
+
+  /* 唯一强调色：钨丝琥珀 HSL(39,66%,55%) */
+  --accent: #d9a441;
+  --accent-hover: #e4b45a;
+  --accent-active: #c2902f;
+  --accent-subtle: rgba(217, 164, 65, 0.12);
+  --accent-line: rgba(217, 164, 65, 0.4);
+
+  /* 语义色（全部降饱和） */
+  --success: #5fa87c;
+  --warning: #d98e41;
+  --danger: #d95f4e;
+  --info: var(--accent);
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+  --shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.5);
+
+  /* 字体栈：展示字体自托管（见 public/fonts/README.md），缺文件时回退系统中文字体 */
+  --font-display: "Smiley Sans", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-body:
+    system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+
+  /* z-index 尺度（文档 6.6，禁止随意加码） */
+  --z-sticky: 10;
+  --z-overlay: 100;
+  --z-drawer: 500;
+  --z-modal: 600;
+  --z-toast: 700;
+}

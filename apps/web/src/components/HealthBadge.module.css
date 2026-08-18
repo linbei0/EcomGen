@@ -1,0 +1,40 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1;
+  user-select: none;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.up {
+  color: var(--text-2);
+}
+
+.up .dot {
+  background: var(--success);
+}
+
+.down {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+.down .dot {
+  background: var(--danger);
+}
+
+.connecting .dot {
+  background: var(--warning);
+}

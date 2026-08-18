@@ -1,0 +1,18 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.badge[data-mode="PIXEL_PROTECTED"] {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}

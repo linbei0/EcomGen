@@ -5,6 +5,7 @@
 EcomGen 是面向个人卖家的电商 AI 生成套图工具。当前后端优先，桌面优先，本机 Windows 开发；前后端分离，后端由 API、Worker 和共享包组成。
 
 - `apps/api`：Fastify HTTP API、文件上传、Provider 配置、SSE 事件。
+- `apps/web`：React + Vite 桌面优先工作台；经 `VITE_API_BASE_URL` 访问 API，不直连 Redis/SQLite/Provider。
 - `apps/worker`：BullMQ 消费者、Pi Agent 分镜规划、OpenAI 兼容生图、审核结果和 ZIP 导出。
 - `packages/core`：SQLite 持久化、本地文件存储、密钥加密、任务指纹。
 - `packages/agent`：Pi Agent 规划适配器。
@@ -31,6 +32,7 @@ pnpm install
 pnpm build
 pnpm dev:api
 pnpm dev:worker
+pnpm dev:web
 pnpm test
 pnpm test:e2e:mock
 pnpm lint:openapi
