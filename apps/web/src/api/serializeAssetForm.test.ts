@@ -21,4 +21,10 @@ describe("serializeAssetForm", () => {
     expect(form.get("role")).toBe("PACKAGING");
     expect(form.get("variantId")).toBe("variant-1");
   });
+
+  it("role 与 variantId 先于 file 写入", () => {
+    const file = new File(["img"], "truth.png", { type: "image/png" });
+    const form = serializeAssetForm({ file, role: "PRODUCT_TRUTH", variantId: "variant-1" });
+    expect(Array.from(form.keys())).toEqual(["role", "variantId", "file"]);
+  });
 });

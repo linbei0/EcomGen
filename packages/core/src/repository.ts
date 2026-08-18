@@ -113,6 +113,14 @@ export class EcomRepository {
     return record;
   }
 
+  /** 先查后删：返回被删记录供 API 删除存储文件；不存在返回 undefined。 */
+  public deleteAsset(id: string): AssetRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM assets WHERE id=?").get(id);
+    if (!row) return undefined;
+    this.db.prepare("DELETE FROM assets WHERE id=?").run(id);
+    return mapAsset(row as Row);
+  }
+
   public getStoryboard(projectId: string): StoryboardRecord | undefined { const row = this.db.prepare("SELECT * FROM storyboards WHERE project_id=?").get(projectId); return row ? mapStoryboard(row as Row) : undefined; }
   public saveStoryboard(projectId: string, campaignStyleLock: string, status: StoryboardRecord["status"], items: Array<Omit<StoryboardItemRecord, "id" | "projectId" | "storyboardVersion" | "createdAt" | "updatedAt">>): StoryboardRecord {
     const previous = this.getStoryboard(projectId);

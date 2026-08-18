@@ -1,9 +1,9 @@
-import { App, Image, Select } from "antd";
-import { ShieldCheck, Upload as UploadIcon } from "lucide-react";
-import { useMemo, useState, type ChangeEvent, type DragEvent } from "react";
+import { App, Image, Popconfirm, Select } from "antd";
+import { ShieldCheck, Trash2, Upload as UploadIcon } from "lucide-react";
+import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
 
 import type { Asset, AssetRole, ProjectDetail } from "../../api/adapters/projectDetail";
-import { useUploadAsset } from "../../api/hooks/useAssets";
+import { useDeleteAsset, useUploadAsset } from "../../api/hooks/useAssets";
 import { errorText } from "../../lib/errorText";
 import { ASSET_ROLE_META, ASSET_ROLE_ORDER } from "../../lib/roles";
 import styles from "./workbench.module.css";
@@ -16,18 +16,14 @@ export function AssetsStage({ detail }: { detail: ProjectDetail }) {
   const [owner, setOwner] = useState(COMMON_OWNER);
   const [dragOver, setDragOver] = useState(false);
   const upload = useUploadAsset();
+  const removeAsset = useDeleteAsset();
   const grouped = useMemo(() => groupAssets(detail.assets), [detail.assets]);
   const ownerOptions = [
     { value: COMMON_OWNER, label: "通用（全 SKU）" },
     ...detail.variants.map((variant) => ({ value: variant.id, label: variant.name })),
   ];
 
-  const sendFiles = (files: FileList | File[]) => {
-    const images = Array.from(files).filter((file) => file.type.startsWith("image/"));
-    if (images.length === 0) {
-      notification.error({ title: "只支持图片文件" });
-      return;
-    }
+  const uploadFiles = (images: File[]) => {
     for (const file of images) {
       void upload
         .mutateAsync({
@@ -42,6 +38,29 @@ export function AssetsStage({ detail }: { detail: ProjectDetail }) {
     }
   };
 
+  const sendFiles = (files: FileList | File[]) => {
+    const images = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    if (images.length === 0) {
+      notification.error({ title: "只支持图片文件" });
+      return;
+    }
+    uploadFiles(images);
+  };
+
+  /** 粘贴上传：剪贴板文件常见无 MIME，空类型也按当前 role 上传，由后端兜底校验。 */
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const images = Array.from(event.clipboardData?.files ?? []).filter(
+        (file) => file.type.startsWith("image/") || file.type === "",
+      );
+      if (images.length === 0) return;
+      event.preventDefault();
+      uploadFiles(images);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  });
+
   const onDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     setDragOver(false);
@@ -51,6 +70,12 @@ export function AssetsStage({ detail }: { detail: ProjectDetail }) {
   const onPick = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) sendFiles(event.target.files);
     event.target.value = "";
+  };
+
+  const onDelete = (asset: Asset) => {
+    void removeAsset.mutateAsync({ assetId: asset.id, projectId: detail.id }).catch((error: unknown) => {
+      notification.error({ title: "删除失败", description: errorText(error) });
+    });
   };
 
   return (
@@ -76,7 +101,7 @@ export function AssetsStage({ detail }: { detail: ProjectDetail }) {
         <UploadIcon size={20} strokeWidth={1.5} aria-hidden />
         <p className={styles.dropTitle}>拖入商品图</p>
         <p className={styles.dropHint}>
-          商品真实性图用于像素保护；风格/竞品图只影响感觉，不会被复制。
+          商品真实性图用于像素保护；风格/竞品图只影响感觉，不会被复制。也可以直接粘贴。
         </p>
       </label>
 
@@ -121,6 +146,7 @@ export function AssetsStage({ detail }: { detail: ProjectDetail }) {
                     asset={asset}
                     variantName={detail.variants.find((variant) => variant.id === asset.variantId)?.name}
                     showShield={detail.defaultMode === "PIXEL_PROTECTED" && asset.role === "PRODUCT_TRUTH"}
+                    onDelete={() => onDelete(asset)}
                   />
                 ))}
               </Image.PreviewGroup>
@@ -136,10 +162,12 @@ function AssetCard({
   asset,
   variantName,
   showShield,
+  onDelete,
 }: {
   asset: Asset;
   variantName?: string;
   showShield: boolean;
+  onDelete: () => void;
 }) {
   return (
     <article className={styles.assetCard}>
@@ -150,7 +178,18 @@ function AssetCard({
           className={styles.thumb}
           loading="lazy"
         />
-        {showShield ? <ShieldCheck className={styles.shield} size={16} strokeWidth={1.75} aria-label="像素保护素材" /> : null}
+        {showShield ? (
+          <ShieldCheck className={styles.shield} size={16} strokeWidth={1.75} aria-label="像素保护素材" />
+        ) : null}
+        <Popconfirm title="删除这张素材？" okText="删除" cancelText="取消" onConfirm={onDelete}>
+          <button
+            type="button"
+            className={styles.assetDelete}
+            aria-label={`删除素材 ${ASSET_ROLE_META[asset.role].label}`}
+          >
+            <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+          </button>
+        </Popconfirm>
       </div>
       <div className={styles.assetMeta}>
         <span className={styles.assetRole}>{ASSET_ROLE_META[asset.role].label}</span>

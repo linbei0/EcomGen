@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { adaptProject, adaptProjectDetail, type CreateProjectInput } from "../adapters/projectDetail";
+import { adaptProject, adaptProjectDetail, type CreateProjectInput, type UpdateProjectInput } from "../adapters/projectDetail";
 import { api, unwrap } from "../client";
 import { qk } from "../queryKeys";
 
@@ -37,6 +37,18 @@ export function useCreateProject() {
     onSuccess: (project) => {
       void queryClient.invalidateQueries({ queryKey: qk.projects });
       void queryClient.invalidateQueries({ queryKey: qk.project(project.id) });
+    },
+  });
+}
+
+export function useUpdateProject(projectId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateProjectInput) =>
+      unwrap(api.PATCH("/projects/{projectId}", { params: { path: { projectId: projectId! } }, body })),
+    onSuccess: (project) => {
+      void queryClient.invalidateQueries({ queryKey: qk.project(project.id) });
+      void queryClient.invalidateQueries({ queryKey: qk.projects });
     },
   });
 }

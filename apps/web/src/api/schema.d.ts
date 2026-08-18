@@ -170,7 +170,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["deleteAsset"];
         options?: never;
         head?: never;
         patch: operations["updateAsset"];
@@ -1175,6 +1175,27 @@ export interface operations {
                     "application/json": components["schemas"]["Asset"];
                 };
             };
+        };
+    };
+    deleteAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: components["parameters"]["AssetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Asset deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     updateAsset: {

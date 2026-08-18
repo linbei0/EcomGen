@@ -1,23 +1,53 @@
-import { Button } from "antd";
+import { App, Button } from "antd";
 import { Aperture, Images, PlugZap, Plus, Settings2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { useNavigate } from "react-router";
 
-import { useProjects } from "../../api/hooks/useProjects";
+import { useCreateProject, useProjects } from "../../api/hooks/useProjects";
+import { useProviders } from "../../api/hooks/useProviders";
 import { HealthBadge } from "../../components/HealthBadge";
 import { fadeUp, staggerContainer } from "../../design/motion";
 import { errorText } from "../../lib/errorText";
-import { CreateProjectWizard } from "../projects/CreateProjectWizard";
+import { pickDefaultModels } from "../../lib/modelOptions";
 import { ProjectCard } from "../projects/ProjectCard";
 import { SettingsDrawer } from "../providers/SettingsDrawer";
 import styles from "./HomePage.module.css";
 
 export function HomePage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
+  const { notification } = App.useApp();
+  const navigate = useNavigate();
   const projects = useProjects();
+  const providers = useProviders();
+  const createProject = useCreateProject();
   const items = projects.data?.items ?? [];
   const empty = !projects.isPending && items.length === 0;
+
+  /** 一键创建：凑齐一对模型才 POST，缺一对就引导去设置，不产生建不出来的项目。 */
+  const create = async () => {
+    const pair = pickDefaultModels(providers.data?.items ?? []);
+    if (!pair) {
+      notification.warning({ title: "请先配置 Provider", description: "需要至少一个推理模型和一个生图模型。" });
+      setSettingsOpen(true);
+      return;
+    }
+    try {
+      const project = await createProject.mutateAsync({
+        name: "未命名项目",
+        category: null,
+        productDescription: null,
+        verifiedFacts: [],
+        prohibitedClaims: [],
+        platformTargets: ["DOMESTIC"],
+        defaultMode: "CREATIVE",
+        ...pair,
+      });
+      void navigate(`/projects/${project.id}?stage=assets`);
+    } catch (error) {
+      notification.error({ title: "创建失败", description: errorText(error) });
+    }
+  };
 
   return (
     <div className={styles.page}>
@@ -51,7 +81,9 @@ export function HomePage() {
               type="primary"
               size="large"
               icon={<Plus size={16} strokeWidth={1.75} />}
-              onClick={() => setWizardOpen(true)}
+              loading={createProject.isPending}
+              disabled={providers.isPending}
+              onClick={() => void create()}
             >
               新建项目
             </Button>
@@ -85,7 +117,6 @@ export function HomePage() {
       </motion.main>
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <CreateProjectWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
     </div>
   );
 }

@@ -10,9 +10,10 @@ import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus } 
 import type { AssetRole, ModelDefinition, OutputReviewDecision, PlatformTarget, StoryboardMode } from "@ecomgen/contracts";
 import { OpenAiCompatibleImageProvider, ProviderError } from "@ecomgen/providers";
 
+import { ApiError } from "./errors.js";
+import { applyModelFields } from "./projectPatch.js";
+
 export interface ApiOptions { dataDir: string; redisUrl: string; masterKey: string; }
-type ApiErrorCode = "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT" | "CAPABILITY_UNSUPPORTED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "PROVIDER_ERROR";
-class ApiError extends Error { public constructor(public readonly statusCode: number, public readonly code: ApiErrorCode, message: string, public readonly details: Array<{ path: string; reason: string }> = []) { super(message); } }
 
 export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: true, genReqId: () => randomUUID() });
@@ -79,6 +80,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (body.brandGuidelines !== undefined) update.brandGuidelines = objectOfStrings(body.brandGuidelines, "brandGuidelines");
     if (body.platformTargets !== undefined) update.platformTargets = enumArray<PlatformTarget>(body.platformTargets, ["DOMESTIC", "AMAZON"], "platformTargets");
     if (body.defaultMode !== undefined) update.defaultMode = enumValue<StoryboardMode>(body.defaultMode, ["CREATIVE", "PIXEL_PROTECTED"], "defaultMode");
+    applyModelFields(body, update, (providerId, modelId, kind) => verifyModel(repository, providerId, modelId, kind));
     return repository.updateProject(id, update) as object;
   });
   app.post("/api/v1/projects/:projectId/variants", async (request) => {
@@ -94,6 +96,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const stored = await storage.putAsset(projectId, data.filename, await data.toBuffer());
     return repository.createAsset({ projectId, variantId, role, storagePath: stored.path, hash: stored.hash, originalName: data.filename, mimeType: data.mimetype, width: null, height: null });
   });
+  // 先删文件再删行：行删了就找不到 storagePath；不级联分镜/输出/任务（契约 deleteAsset）
+  app.delete("/api/v1/assets/:assetId", async (request, reply) => { const id = parameter(request, "assetId"); const asset = repository.getAsset(id); if (!asset) missing("asset", id); await storage.delete(asset.storagePath); repository.deleteAsset(id); return reply.code(204).send(); });
   app.post("/api/v1/projects/:projectId/planning-jobs", async (request, reply) => {
     const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = object(request.body ?? {}, "body");
     const requestedTypes = optionalStringArray(body.requestedTypes); if (requestedTypes?.length && resolveTemplates(requestedTypes).length !== requestedTypes.length) throw new ApiError(400, "VALIDATION_ERROR", "requestedTypes contains an unknown ecom-details-image template ID or alias");

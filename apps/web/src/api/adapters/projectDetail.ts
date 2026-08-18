@@ -11,6 +11,7 @@ export type StoryboardItem = components["schemas"]["StoryboardItem"];
 export type Output = components["schemas"]["Output"];
 export type Job = components["schemas"]["Job"];
 export type CreateProjectInput = components["schemas"]["CreateProjectInput"];
+export type UpdateProjectInput = components["schemas"]["UpdateProjectInput"];
 export type CreateVariantInput = components["schemas"]["CreateVariantInput"];
 
 /**

@@ -23,4 +23,16 @@ describe("EcomRepository", () => {
     expect(repository.reviewOutput(output.id, "SELECTED", "approved")?.reviewDecision).toBe("SELECTED");
     database.close();
   });
+
+  it("deletes an asset row and reports missing ids", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = repository.saveProvider({ name: "test", baseUrl: "https://example.test/v1", encryptedApiKey: "encrypted", models: [{ id: "reasoner", supportsVision: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null }, { id: "image", supportsVision: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" }] });
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["DOMESTIC"], reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE" });
+    const asset = repository.createAsset({ projectId: project.id, variantId: null, role: "PRODUCT_TRUTH", storagePath: "assets/cup.png", hash: "hash", originalName: "cup.png", mimeType: "image/png", width: null, height: null });
+    expect(repository.deleteAsset(asset.id)?.id).toBe(asset.id);
+    expect(repository.getAsset(asset.id)).toBeUndefined();
+    expect(repository.deleteAsset(asset.id)).toBeUndefined();
+    database.close();
+  });
 });

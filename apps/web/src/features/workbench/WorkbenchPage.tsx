@@ -12,12 +12,13 @@ import { ModeBadge } from "../../components/ModeBadge";
 import { StageBar } from "../../components/StageBar";
 import { completedStages, deriveStage, parseStage, type Stage } from "../../lib/stages";
 import { errorText } from "../../lib/errorText";
-import { PLATFORM_LABEL } from "../../lib/roles";
 import { SettingsDrawer } from "../providers/SettingsDrawer";
 import { AssetsStage } from "./AssetsStage";
 import { ExportStage } from "./ExportStage";
 import { GenerateStage } from "./GenerateStage";
 import { PlanStage } from "./PlanStage";
+import { ProjectInspector } from "./ProjectInspector";
+import { ProjectMetaPanel } from "./ProjectMetaPanel";
 import { ReviewStage } from "./ReviewStage";
 import { StoryboardInspector } from "./StoryboardInspector";
 import { StoryboardStage } from "./StoryboardStage";
@@ -85,7 +86,6 @@ export function WorkbenchPage() {
   }
 
   const detail = project.data;
-  const platforms = detail.platformTargets.map((item) => PLATFORM_LABEL[item]).join(" / ");
 
   return (
     <div className={styles.page}>
@@ -106,12 +106,7 @@ export function WorkbenchPage() {
 
       <div className={styles.shell}>
         <aside className={styles.left}>
-          <p className={styles.sectionTitle}>SPU</p>
-          <h1 className={styles.spuName}>{detail.name}</h1>
-          <p className={styles.spuMeta}>
-            {platforms}
-            {detail.category ? ` · ${detail.category}` : ""}
-          </p>
+          <ProjectMetaPanel detail={detail} />
           <VariantPanel projectId={detail.id} variants={detail.variants} />
         </aside>
 
@@ -148,12 +143,7 @@ export function WorkbenchPage() {
               locked={Boolean(locked)}
             />
           ) : (
-            <div className={styles.inspector}>
-              <p className={styles.sectionTitle}>检视</p>
-              <p>{detail.productDescription || "还没有商品描述。"}</p>
-              <p>已核验事实 {detail.verifiedFacts?.length ?? 0} 条</p>
-              <p>禁止宣称 {detail.prohibitedClaims?.length ?? 0} 条</p>
-            </div>
+            <ProjectInspector detail={detail} />
           )}
         </aside>
       </div>

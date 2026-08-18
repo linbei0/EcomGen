@@ -69,7 +69,7 @@ describe("工作台 · 生成阶段", () => {
     );
 
     renderGenerate();
-    expect(await screen.findByRole("heading", { name: "无线耳机 SPU" })).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("无线耳机 SPU")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /生成 2 张/ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "全选未生成" }));

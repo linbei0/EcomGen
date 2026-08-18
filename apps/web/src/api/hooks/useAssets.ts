@@ -41,3 +41,16 @@ export function useUploadAsset() {
     },
   });
 }
+
+/** 204 无响应体，不经过 unwrap；成功后 invalidate 项目详情重新拉取素材列表。 */
+export function useDeleteAsset() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ assetId }: { assetId: string; projectId: string }) => {
+      await api.DELETE("/assets/{assetId}", { params: { path: { assetId } } });
+    },
+    onSuccess: (_result, { projectId }) => {
+      void queryClient.invalidateQueries({ queryKey: qk.project(projectId) });
+    },
+  });
+}

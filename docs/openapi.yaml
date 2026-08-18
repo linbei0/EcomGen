@@ -272,6 +272,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Asset'
+    delete:
+      operationId: deleteAsset
+      responses:
+        '204': { description: Asset deleted. }
+        '404': { $ref: '#/components/responses/NotFound' }
   /projects/{projectId}/planning-jobs:
     parameters:
       - $ref: '#/components/parameters/ProjectId'

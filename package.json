@@ -4,6 +4,7 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "build": "pnpm -r build",
+    "dev": "concurrently -n api,worker,web -c cyan,magenta,green \"pnpm dev:api\" \"pnpm dev:worker\" \"pnpm dev:web\"",
     "dev:api": "pnpm --filter @ecomgen/api dev",
     "dev:worker": "pnpm --filter @ecomgen/worker dev",
     "dev:web": "pnpm --filter @ecomgen/web dev",
@@ -14,6 +15,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
+    "concurrently": "^9.2.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vitest": "^3.1.2"

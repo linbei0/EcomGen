@@ -32,7 +32,7 @@ describe("工作台 · 规划阶段", () => {
     );
 
     renderPlan();
-    expect(await screen.findByRole("heading", { name: "无线耳机 SPU" })).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("无线耳机 SPU")).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "白底/纯色底产品主图" }));
     await user.click(screen.getByRole("button", { name: "开始规划" }));
 

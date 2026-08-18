@@ -47,7 +47,7 @@ export const PROVIDER_FIXTURE = {
 
 /** 严格按 docs/openapi.yaml 手写；契约变更时先改 handlers 再改组件。 */
 export const handlers = [
-  http.get(`${BASE}/health`, () => HttpResponse.json({ status: "ok" })),
+  http.get("http://127.0.0.1:8787/health", () => HttpResponse.json({ status: "ok" })),
 
   http.get(`${BASE}/providers`, () =>
     HttpResponse.json({ items: [PROVIDER_FIXTURE], nextCursor: null }),
@@ -108,6 +108,13 @@ export const handlers = [
   http.get(`${BASE}/projects/:projectId`, ({ params }) =>
     HttpResponse.json(projectDetailPayload({ id: params.projectId as string })),
   ),
+
+  http.patch(`${BASE}/projects/:projectId`, async ({ request, params }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ ...PROJECT_FIXTURE, id: params.projectId as string, ...body });
+  }),
+
+  http.delete(`${BASE}/assets/:assetId`, () => new HttpResponse(null, { status: 204 })),
 
   http.post(`${BASE}/projects/:projectId/variants`, async ({ request, params }) => {
     const body = (await request.json()) as { name: string; attributes?: Record<string, string> };
