@@ -43,7 +43,7 @@ export function HomePage() {
         defaultMode: "CREATIVE",
         ...pair,
       });
-      void navigate(`/projects/${project.id}?stage=assets`);
+      void navigate(`/projects/${project.id}?view=setup`);
     } catch (error) {
       notification.error({ title: "创建失败", description: errorText(error) });
     }

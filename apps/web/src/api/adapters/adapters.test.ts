@@ -21,7 +21,7 @@ describe("adapters", () => {
     expect(adapted.categoryTips.electronics).toBe("轮廓");
   });
 
-  it("素材无 url 时回退 files 路径", () => {
+  it("素材无 url 时回退 files 路径，并补 kind", () => {
     const asset = adaptAsset({
       id: "asset-1",
       projectId: "p1",
@@ -31,9 +31,10 @@ describe("adapters", () => {
       storagePath: "local/path.png",
     });
     expect(asset?.url).toBe("http://127.0.0.1:8787/api/v1/files/assets/asset-1");
+    expect(asset?.kind).toBe("PRODUCT");
   });
 
-  it("项目详情读取并列嵌套字段", () => {
+  it("项目详情读取并列嵌套字段并补默认出图参数", () => {
     const detail = adaptProjectDetail({
       id: "p1",
       name: "耳机",
@@ -45,7 +46,6 @@ describe("adapters", () => {
       defaultMode: "CREATIVE",
       createdAt: "2026-08-01T00:00:00.000Z",
       updatedAt: "2026-08-01T00:00:00.000Z",
-      variants: [{ id: "v1", projectId: "p1", name: "黑", createdAt: "2026-08-01T00:00:00.000Z" }],
       assets: [
         {
           id: "a1",
@@ -59,12 +59,15 @@ describe("adapters", () => {
       outputs: [],
       jobs: [],
     });
-    expect(detail.variants).toHaveLength(1);
+    expect(detail.imageResolution).toBe("1K");
+    expect(detail.imageAspectRatio).toBe("AUTO");
+    expect(detail.candidatesPerType).toBe(1);
     expect(detail.assets[0]?.url).toContain("/files/assets/a1");
+    expect(detail.assets[0]?.kind).toBe("PRODUCT");
     expect(detail.storyboard).toBeNull();
   });
 
-  it("分镜接口把并列 items 填回 storyboard", () => {
+  it("分镜接口把并列 items 填回 storyboard，忽略 variantScope", () => {
     const bundle = adaptStoryboardBundle({
       storyboard: {
         projectId: "p1",
@@ -76,18 +79,21 @@ describe("adapters", () => {
         {
           id: "item-1",
           assetType: "hero-image",
-          variantScope: "COMMON",
+          displayName: "白底/纯色底产品主图",
+          candidateCount: 2,
           mode: "CREATIVE",
           status: "DRAFT",
           promptInstruction: "白底主图",
-          factClaims: [{ claim: "续航 8 小时" }],
+          factClaims: ["续航 8 小时"],
           riskFlags: ["angle"],
         },
       ],
     });
     expect(bundle.storyboard?.version).toBe(2);
     expect(bundle.items).toHaveLength(1);
-    expect(bundle.storyboard?.items[0]?.assetType).toBe("hero-image");
+    expect(bundle.storyboard?.items?.[0]?.displayName).toBe("白底/纯色底产品主图");
+    expect(bundle.items[0]?.candidateCount).toBe(2);
+    expect(bundle.items[0]?.factClaims).toEqual(["续航 8 小时"]);
     expect(bundle.items[0]?.riskFlags).toEqual(["angle"]);
   });
 

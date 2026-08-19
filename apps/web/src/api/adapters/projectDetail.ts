@@ -3,24 +3,20 @@ import { API_BASE_URL } from "../../config/env";
 import type { components } from "../schema.d.ts";
 
 export type Project = components["schemas"]["Project"];
-export type Variant = components["schemas"]["Variant"];
 export type Asset = components["schemas"]["Asset"];
 export type AssetRole = components["schemas"]["AssetRole"];
+export type UserAssetKind = components["schemas"]["UserAssetKind"];
+export type ImageResolution = components["schemas"]["ImageResolution"];
+export type ImageAspectRatio = components["schemas"]["ImageAspectRatio"];
+export type PlanningMode = components["schemas"]["PlanningMode"];
 export type Storyboard = components["schemas"]["Storyboard"];
 export type StoryboardItem = components["schemas"]["StoryboardItem"];
 export type Output = components["schemas"]["Output"];
 export type Job = components["schemas"]["Job"];
 export type CreateProjectInput = components["schemas"]["CreateProjectInput"];
 export type UpdateProjectInput = components["schemas"]["UpdateProjectInput"];
-export type CreateVariantInput = components["schemas"]["CreateVariantInput"];
 
-/**
- * 运行时项目详情（缺口 13.2）：GET /projects/{id} 实际返回
- * Project + variants/assets/storyboard/items/outputs/jobs。
- * storyboard 无内嵌 items，与 items 平级。
- */
 export interface ProjectDetail extends Project {
-  variants: Variant[];
   assets: Asset[];
   storyboard: Storyboard | null;
   items: StoryboardItem[];
@@ -34,6 +30,9 @@ const ASSET_ROLES = new Set<AssetRole>([
   "STYLE_REFERENCE",
   "LAYOUT_REFERENCE",
 ]);
+
+const RESOLUTIONS = new Set<ImageResolution>(["1K", "2K", "4K"]);
+const ASPECTS = new Set<ImageAspectRatio>(["AUTO", "1:1", "3:4", "4:3", "16:9"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -52,19 +51,8 @@ function asStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string");
 }
 
-export function adaptVariant(raw: unknown): Variant | null {
-  if (!isRecord(raw)) return null;
-  const id = asString(raw.id);
-  const projectId = asString(raw.projectId);
-  const name = asString(raw.name);
-  const createdAt = asString(raw.createdAt);
-  if (!id || !projectId || !name || !createdAt) return null;
-  const attributes = isRecord(raw.attributes)
-    ? Object.fromEntries(
-        Object.entries(raw.attributes).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
-      )
-    : undefined;
-  return { id, projectId, name, createdAt, attributes };
+function kindFromRole(role: AssetRole): UserAssetKind {
+  return role === "PRODUCT_TRUTH" ? "PRODUCT" : "REFERENCE";
 }
 
 export function adaptAsset(raw: unknown): Asset | null {
@@ -75,16 +63,20 @@ export function adaptAsset(raw: unknown): Asset | null {
   const mimeType = asString(raw.mimeType) ?? "application/octet-stream";
   const createdAt = asString(raw.createdAt);
   if (!id || !projectId || !role || !ASSET_ROLES.has(role as AssetRole) || !createdAt) return null;
-  const variantId = raw.variantId === null || raw.variantId === undefined ? null : asString(raw.variantId);
+  const typedRole = role as AssetRole;
+  const kind = asString(raw.kind) === "PRODUCT" || asString(raw.kind) === "REFERENCE"
+    ? (raw.kind as UserAssetKind)
+    : kindFromRole(typedRole);
   return {
     id,
     projectId,
-    role: role as AssetRole,
+    role: typedRole,
+    kind,
     mimeType,
     createdAt,
-    variantId: variantId ?? null,
     width: asNumber(raw.width) ?? null,
     height: asNumber(raw.height) ?? null,
+    storagePath: asString(raw.storagePath),
     url: assetPreviewUrl({ id, url: asString(raw.url) }),
   };
 }
@@ -97,11 +89,27 @@ function adaptOutput(raw: unknown): Output | null {
   const review = asString(raw.reviewDecision);
   if (!id || !storyboardItemId || !createdAt) return null;
   if (review !== "SELECTED" && review !== "REJECTED" && review !== "NEEDS_REVIEW") return null;
+  const snapshot = isRecord(raw.generationSnapshot)
+    ? {
+        resolution: RESOLUTIONS.has(raw.generationSnapshot.resolution as ImageResolution)
+          ? (raw.generationSnapshot.resolution as ImageResolution)
+          : undefined,
+        aspectRatio: ASPECTS.has(raw.generationSnapshot.aspectRatio as ImageAspectRatio)
+          ? (raw.generationSnapshot.aspectRatio as ImageAspectRatio)
+          : undefined,
+        size: asString(raw.generationSnapshot.size),
+        candidateIndex: asNumber(raw.generationSnapshot.candidateIndex),
+      }
+    : null;
   return {
     id,
     storyboardItemId,
     createdAt,
     reviewDecision: review,
+    reviewNote: asString(raw.reviewNote) ?? null,
+    candidateIndex: asNumber(raw.candidateIndex),
+    generationSnapshot: snapshot,
+    storagePath: asString(raw.storagePath),
     url: outputPreviewUrl({ id, url: asString(raw.url) }),
   };
 }
@@ -110,7 +118,6 @@ export { adaptOutput };
 
 export type Export = components["schemas"]["Export"];
 
-/** GET /exports/{id} 的下载地址：优先 downloadUrl，空则回退 /files/exports/{id}（缺口 13.6）。 */
 export function exportDownloadUrl(record: Pick<Export, "id" | "downloadUrl">): string {
   if (typeof record.downloadUrl === "string" && record.downloadUrl.length > 0) {
     return record.downloadUrl;
@@ -133,11 +140,12 @@ export function adaptExport(raw: unknown): Export | null {
     projectId,
     status,
     createdAt,
+    jobId: asString(raw.jobId),
+    storagePath: asString(raw.storagePath) ?? null,
     downloadUrl: typeof raw.downloadUrl === "string" ? raw.downloadUrl : null,
   };
 }
 
-/** POST /export-jobs 运行时实际返回 { job, export }，与 OpenAPI 裸 Job 不一致。 */
 export interface ExportJobBundle {
   job: Job | null;
   export: Export | null;
@@ -205,25 +213,26 @@ export function adaptStoryboardItem(raw: unknown): StoryboardItem | null {
   if (!isRecord(raw)) return null;
   const id = asString(raw.id);
   const assetType = asString(raw.assetType);
-  const variantScope = asString(raw.variantScope);
   const mode = asString(raw.mode);
   const status = asString(raw.status);
   const promptInstruction = asString(raw.promptInstruction);
-  if (!id || !assetType || !variantScope || !promptInstruction) return null;
+  if (!id || !assetType || !promptInstruction) return null;
   if (mode !== "CREATIVE" && mode !== "PIXEL_PROTECTED") return null;
   if (status !== "DRAFT" && status !== "CONFIRMED" && status !== "GENERATING" && status !== "GENERATED") {
     return null;
   }
+  const candidateCount = asNumber(raw.candidateCount) ?? 1;
   return {
     id,
     assetType,
-    variantScope,
+    displayName: asString(raw.displayName) ?? assetType,
+    templateVariant: asString(raw.templateVariant) ?? null,
+    candidateCount: Math.min(4, Math.max(1, candidateCount)),
+    referencedAssets: asStringArray(raw.referencedAssets),
     mode,
     status,
     promptInstruction,
-    factClaims: Array.isArray(raw.factClaims)
-      ? raw.factClaims.filter(isRecord).map((item) => item as NonNullable<StoryboardItem["factClaims"]>[number])
-      : [],
+    factClaims: asStringArray(raw.factClaims),
     riskFlags: asStringArray(raw.riskFlags),
   };
 }
@@ -260,6 +269,9 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
         Object.entries(raw.brandGuidelines).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
       )
     : undefined;
+  const resolution = asString(raw.imageResolution);
+  const aspect = asString(raw.imageAspectRatio);
+  const candidates = asNumber(raw.candidatesPerType) ?? 1;
   return {
     id,
     name,
@@ -269,6 +281,9 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
     imageProviderId,
     imageModelId,
     defaultMode,
+    imageResolution: RESOLUTIONS.has(resolution as ImageResolution) ? (resolution as ImageResolution) : "1K",
+    imageAspectRatio: ASPECTS.has(aspect as ImageAspectRatio) ? (aspect as ImageAspectRatio) : "AUTO",
+    candidatesPerType: Math.min(4, Math.max(1, candidates)),
     createdAt,
     updatedAt,
     category: asString(raw.category) ?? null,
@@ -283,7 +298,6 @@ export function adaptProject(raw: unknown): Project | null {
   return isRecord(raw) ? adaptProjectCore(raw) : null;
 }
 
-/** GET /storyboard 运行时是 { storyboard, items }，不是 OpenAPI 的内嵌 items。 */
 export interface StoryboardBundle {
   storyboard: Storyboard | null;
   items: StoryboardItem[];
@@ -309,9 +323,6 @@ export function adaptProjectDetail(raw: unknown): ProjectDetail {
   }
   return {
     ...project,
-    variants: Array.isArray(raw.variants)
-      ? raw.variants.map(adaptVariant).filter((item): item is Variant => item !== null)
-      : [],
     assets: Array.isArray(raw.assets)
       ? raw.assets.map(adaptAsset).filter((item): item is Asset => item !== null)
       : [],

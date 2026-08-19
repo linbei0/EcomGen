@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { adaptAsset, type AssetRole } from "../adapters/projectDetail";
+import { adaptAsset, type UserAssetKind } from "../adapters/projectDetail";
 import { api, unwrap } from "../client";
 import { ApiError } from "../errors";
 import { qk } from "../queryKeys";
@@ -9,24 +9,22 @@ import { serializeAssetForm } from "../serializeAssetForm";
 export interface UploadAssetInput {
   projectId: string;
   file: File;
-  role: AssetRole;
-  variantId?: string | null;
+  kind: UserAssetKind;
 }
 
 export function useUploadAsset() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ projectId, file, role, variantId }: UploadAssetInput) => {
+    mutationFn: async ({ projectId, file, kind }: UploadAssetInput) => {
       const raw = await unwrap(
         api.POST("/projects/{projectId}/assets", {
           params: { path: { projectId } },
           body: {
             file: file as unknown as string,
-            role,
-            variantId: variantId ?? null,
+            kind,
           },
           bodySerializer(body) {
-            return serializeAssetForm({ file, role: body.role, variantId: body.variantId });
+            return serializeAssetForm({ file, kind: body.kind ?? kind });
           },
         }),
       );
@@ -42,7 +40,6 @@ export function useUploadAsset() {
   });
 }
 
-/** 204 无响应体，不经过 unwrap；成功后 invalidate 项目详情重新拉取素材列表。 */
 export function useDeleteAsset() {
   const queryClient = useQueryClient();
   return useMutation({

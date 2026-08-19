@@ -40,11 +40,11 @@ function renderExport(outputs: OutputFixture[] = [{ ...OUTPUT_FIXTURE, reviewDec
     <Routes>
       <Route path="/projects/:projectId" element={<WorkbenchPage />} />
     </Routes>,
-    { initialEntries: [`/projects/${PROJECT_ID}?stage=export`] },
+    { initialEntries: [`/projects/${PROJECT_ID}?view=results`] },
   );
 }
 
-describe("工作台 · 导出阶段", () => {
+describe("工作台 · 导出", () => {
   it("只统计 SELECTED，并显式提交 outputIds", async () => {
     const user = userEvent.setup();
     let captured: unknown;
@@ -58,9 +58,7 @@ describe("工作台 · 导出阶段", () => {
       { ...OUTPUT_FIXTURE, reviewDecision: "SELECTED" },
       { ...OUTPUT_B_FIXTURE, reviewDecision: "REJECTED" },
     ]);
-    expect(await screen.findByText("可导出 1 张")).toBeInTheDocument();
-    expect(screen.queryByText(/约/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "导出 ZIP" }));
+    await user.click(await screen.findByRole("button", { name: /下载已选入/ }));
     await waitFor(() => {
       expect(captured).toMatchObject({
         outputIds: [OUTPUT_ID],
@@ -71,14 +69,10 @@ describe("工作台 · 导出阶段", () => {
   });
 
   it("成功后提供下载，优先 downloadUrl", async () => {
+    const user = userEvent.setup();
     server.use(
-      http.get(`${BASE}/projects/:projectId`, () =>
-        HttpResponse.json(
-          projectDetailPayload({
-            outputs: [{ ...OUTPUT_FIXTURE, reviewDecision: "SELECTED" }],
-            jobs: [{ ...EXPORT_JOB_FIXTURE, status: "SUCCEEDED", progress: 100 }],
-          }),
-        ),
+      http.post(`${BASE}/projects/:projectId/export-jobs`, () =>
+        HttpResponse.json({ job: EXPORT_JOB_FIXTURE, export: EXPORT_FIXTURE }, { status: 202 }),
       ),
       http.get(`${BASE}/exports/:exportId`, () =>
         HttpResponse.json({
@@ -88,12 +82,9 @@ describe("工作台 · 导出阶段", () => {
         }),
       ),
     );
-    renderWithProviders(
-      <Routes>
-        <Route path="/projects/:projectId" element={<WorkbenchPage />} />
-      </Routes>,
-      { initialEntries: [`/projects/${PROJECT_ID}?stage=export`] },
-    );
-    expect(await screen.findByText("可导出 1 张")).toBeInTheDocument();
+    renderExport();
+    await user.click(await screen.findByRole("button", { name: /下载已选入/ }));
+    const link = await screen.findByRole("link", { name: "打开 ZIP" });
+    expect(link).toHaveAttribute("href", "https://files.local/pack.zip");
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean } } } | undefined, errorMessage: undefined as string | undefined }));
+const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean } } } | undefined, prompt: "", errorMessage: undefined as string | undefined }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
@@ -10,9 +10,10 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
       captured.options = options;
     }
 
-    public async prompt(): Promise<void> {
+    public async prompt(message: string): Promise<void> {
       if (captured.errorMessage) return;
-      this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify({ campaignStyleLock: "clean", items: [{ assetType: "hero-image", templateVariant: null, variantScope: "COMMON", mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: 0 }] }) }] }];
+      captured.prompt = message;
+      this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify({ campaignStyleLock: "clean", items: [{ assetType: "hero-image", displayName: "整机斜侧展示首图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: 0 }] }) }] }];
     }
   },
 }));
@@ -39,9 +40,10 @@ const input: PlannerInput = {
   brandGuidelines: {},
   platformTargets: ["DOMESTIC"],
   defaultMode: "CREATIVE",
-  variants: [],
   assets: [],
+  planningMode: "AI",
   requestedTypes: ["hero-image"],
+  candidatesPerType: 1,
 };
 
 describe("planStoryboard", () => {
@@ -51,6 +53,16 @@ describe("planStoryboard", () => {
 
     expect(captured.options?.initialState?.thinkingLevel).toBe("medium");
     expect(captured.options?.initialState?.model?.compat).toMatchObject({ maxTokensField: "max_tokens", thinkingFormat: "qwen", supportsDeveloperRole: false });
+  });
+
+  it("uses the reasoning model for manual selections and marks them as authoritative", async () => {
+    captured.errorMessage = undefined;
+    captured.prompt = "";
+    await planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: ["hero-image"] });
+
+    expect(captured.prompt).toContain("Manual selection is authoritative");
+    const result = await planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: ["hero-image"] });
+    expect(result.items[0]?.displayName).toBe("整机斜侧展示首图");
   });
 
   it("preserves the Agent error when no assistant text is produced", async () => {

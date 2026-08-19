@@ -12,7 +12,8 @@ function item(overrides: Partial<StoryboardItem>): StoryboardItem {
   return {
     id: "i",
     assetType: "hero-image",
-    variantScope: "COMMON",
+    displayName: "白底/纯色底产品主图",
+    candidateCount: 1,
     mode: "CREATIVE",
     status: "CONFIRMED",
     promptInstruction: "x",

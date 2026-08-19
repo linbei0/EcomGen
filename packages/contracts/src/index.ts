@@ -8,6 +8,51 @@ export const AssetRole = Type.Enum({
   STYLE_REFERENCE: "STYLE_REFERENCE",
   LAYOUT_REFERENCE: "LAYOUT_REFERENCE"
 });
+/** 用户可见入口：产品图。内部仍写入 PRODUCT_TRUTH。 */
+export const USER_ASSET_KIND_PRODUCT = "PRODUCT" as const;
+/** 用户可见入口：参考图。内部默认写入 STYLE_REFERENCE。 */
+export const USER_ASSET_KIND_REFERENCE = "REFERENCE" as const;
+export const UserAssetKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE" });
+export const ImageResolution = Type.Enum({ K1: "1K", K2: "2K", K4: "4K" });
+export const ImageAspectRatio = Type.Enum({
+  AUTO: "AUTO",
+  SQUARE: "1:1",
+  PORTRAIT: "3:4",
+  LANDSCAPE: "4:3",
+  WIDE: "16:9"
+});
+export const PlanningMode = Type.Enum({ AI: "AI", MANUAL: "MANUAL" });
+export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
+export const IMAGE_ASPECT_RATIOS = ["AUTO", "1:1", "3:4", "4:3", "16:9"] as const;
+export const MAX_CANDIDATES_PER_TYPE = 4;
+export const DEFAULT_IMAGE_RESOLUTION = "1K" as const;
+export const DEFAULT_IMAGE_ASPECT_RATIO = "AUTO" as const;
+export const DEFAULT_CANDIDATES_PER_TYPE = 1;
+
+/**
+ * 项目级允许值映射到当前 OpenAI-compatible Images 尺寸。
+ * 2K/4K 仍走 1024 家族，避免按模型名猜测更大尺寸。
+ */
+export function resolveImageSize(
+  resolution: Static<typeof ImageResolution>,
+  aspectRatio: Static<typeof ImageAspectRatio>,
+  templateDefault: string
+): string {
+  void resolution;
+  if (aspectRatio === "1:1") return "1024x1024";
+  if (aspectRatio === "3:4") return "1024x1536";
+  if (aspectRatio === "4:3" || aspectRatio === "16:9") return "1536x1024";
+  return templateDefault;
+}
+
+export function userAssetKindForRole(role: Static<typeof AssetRole>): Static<typeof UserAssetKind> {
+  return role === "PRODUCT_TRUTH" ? "PRODUCT" : "REFERENCE";
+}
+
+export function roleForUserAssetKind(kind: Static<typeof UserAssetKind>): Static<typeof AssetRole> {
+  return kind === "PRODUCT" ? "PRODUCT_TRUTH" : "STYLE_REFERENCE";
+}
+
 export const JobType = Type.Enum({ PLAN: "PLAN", GENERATE: "GENERATE", EXPORT: "EXPORT" });
 export const JobStatus = Type.Enum({
   QUEUED: "QUEUED",
@@ -76,6 +121,10 @@ export const EventEnvelope = Type.Object({
 export type PlatformTarget = Static<typeof PlatformTarget>;
 export type StoryboardMode = Static<typeof StoryboardMode>;
 export type AssetRole = Static<typeof AssetRole>;
+export type UserAssetKind = Static<typeof UserAssetKind>;
+export type ImageResolution = Static<typeof ImageResolution>;
+export type ImageAspectRatio = Static<typeof ImageAspectRatio>;
+export type PlanningMode = Static<typeof PlanningMode>;
 export type JobType = Static<typeof JobType>;
 export type JobStatus = Static<typeof JobStatus>;
 export type ReasoningProtocolProfile = Static<typeof ReasoningProtocolProfile>;

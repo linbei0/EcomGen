@@ -55,7 +55,7 @@ docker compose up -d --build
 - REST 是状态真相；SSE 只用于通知前端失效并重新查询，不在前端依赖事件历史恢复状态。
 - 任务创建应提供稳定请求指纹；重复请求应复用 `QUEUED`、`RUNNING` 或 `SUCCEEDED` 任务。
 - 不绕过 `ecom-skill` 模板校验，不把未知模板 ID 静默当作普通 Prompt。
-- `PIXEL_PROTECTED` 必须使用同一 Variant scope 的 `PRODUCT_TRUTH` 素材；不能用虚假的成功结果掩盖缺少输入或 Provider 失败。
+- `PIXEL_PROTECTED` 必须使用当前项目上的 `PRODUCT_TRUTH` 素材；不能用虚假的成功结果掩盖缺少输入或 Provider 失败。
 
 ## 注释规则
 

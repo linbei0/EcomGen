@@ -1,6 +1,5 @@
 export const PROVIDER_ID = "7d0b0d1e-4b1c-4c2d-9a3e-2f5b6c7d8e9f";
 export const PROJECT_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-export const VARIANT_ID = "11111111-2222-4333-8444-555555555555";
 export const ASSET_ID = "99999999-8888-4777-8666-555555555555";
 export const PLAN_JOB_ID = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
 export const GENERATE_JOB_ID = "ffffffff-aaaa-4bbb-8ccc-dddddddddddd";
@@ -21,23 +20,18 @@ export const PROJECT_FIXTURE = {
   imageProviderId: PROVIDER_ID,
   imageModelId: "gpt-image-1",
   defaultMode: "CREATIVE" as const,
+  imageResolution: "1K" as const,
+  imageAspectRatio: "AUTO" as const,
+  candidatesPerType: 1,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
-};
-
-export const VARIANT_FIXTURE = {
-  id: VARIANT_ID,
-  projectId: PROJECT_ID,
-  name: "黑色",
-  attributes: { color: "black" },
-  createdAt: "2026-08-01T00:00:00.000Z",
 };
 
 export const ASSET_FIXTURE = {
   id: ASSET_ID,
   projectId: PROJECT_ID,
-  variantId: null,
   role: "PRODUCT_TRUTH" as const,
+  kind: "PRODUCT" as const,
   storagePath: `projects/${PROJECT_ID}/assets/${ASSET_ID}.png`,
   hash: "abc",
   originalName: "product.png",
@@ -101,7 +95,7 @@ export const PLAN_JOB_FIXTURE = {
   status: "QUEUED" as const,
   progress: 0,
   retryable: false,
-  input: { requestedTypes: ["hero-image"] },
+  input: { requestedTypes: ["hero-image"], planningMode: "AI" },
   requestFingerprint: "fp-plan",
   providerId: PROVIDER_ID,
   modelId: "gpt-4o",
@@ -146,6 +140,7 @@ export const OUTPUT_FIXTURE = {
   hash: "out-a",
   reviewDecision: "NEEDS_REVIEW" as const,
   reviewNote: null,
+  candidateIndex: 1,
   createdAt: "2026-08-01T00:30:00.000Z",
 };
 
@@ -200,14 +195,16 @@ export const STORYBOARD_ITEM_FIXTURE = {
   projectId: PROJECT_ID,
   storyboardVersion: 1,
   assetType: "hero-image",
+  displayName: "白底/纯色底产品主图",
   templateVariant: null,
-  variantScope: "COMMON",
+  candidateCount: 1,
+  referencedAssets: [] as string[],
   mode: "CREATIVE" as const,
   status: "DRAFT" as const,
   promptInstruction: "白底主图，突出金属质感",
   compiledPrompt: null,
-  factClaims: [{ claim: "续航 8 小时" }],
-  riskFlags: [],
+  factClaims: ["续航 8 小时"],
+  riskFlags: [] as string[],
   sortOrder: 0,
   createdAt: "2026-08-01T00:12:00.000Z",
   updatedAt: "2026-08-01T00:12:00.000Z",
@@ -217,11 +214,11 @@ export const STORYBOARD_ITEM_B_FIXTURE = {
   ...STORYBOARD_ITEM_FIXTURE,
   id: ITEM_ID_B,
   assetType: "lifestyle-scene",
-  variantScope: VARIANT_ID,
+  displayName: "场景化生活图",
   mode: "PIXEL_PROTECTED" as const,
   promptInstruction: "生活场景，保留主体像素",
-  factClaims: [],
-  riskFlags: ["缺少同范围真实性素材"],
+  factClaims: [] as string[],
+  riskFlags: ["缺少产品图"],
   sortOrder: 1,
 };
 
@@ -235,7 +232,6 @@ export function storyboardPayload(
 export function projectDetailPayload(overrides: Record<string, unknown> = {}) {
   return {
     ...PROJECT_FIXTURE,
-    variants: [VARIANT_FIXTURE],
     assets: [ASSET_FIXTURE],
     storyboard: undefined,
     items: [],

@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 const root = resolve(import.meta.dirname, "..");
 const dataDir = join(root, "data-e2e-mock");
 const onePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL7WQAAAABJRU5ErkJggg==";
-const plan = { campaignStyleLock: "fixed deep green #1A3A2E and clean off-white #FFFFFF ecommerce system", items: [{ assetType: "hero-image", templateVariant: "luxury", variantScope: "COMMON", mode: "PIXEL_PROTECTED", promptInstruction: "Show the verified stainless travel cup with a premium material-focused hero composition.", factClaims: ["304 stainless steel body"], riskFlags: [], sortOrder: 0 }] };
+const plan = { campaignStyleLock: "fixed deep green #1A3A2E and clean off-white #FFFFFF ecommerce system", items: [{ assetType: "hero-image", displayName: "白底/纯色底产品主图", templateVariant: "luxury", candidateCount: 1, referencedAssets: [], mode: "PIXEL_PROTECTED", promptInstruction: "Show the verified stainless travel cup with a premium material-focused hero composition.", factClaims: ["304 stainless steel body"], riskFlags: [], sortOrder: 0 }] };
 const observed = { planningPrompt: "", imagePrompt: "" };
 const children = [];
 let mock;
@@ -81,14 +81,17 @@ try {
     reasoningModelId: "mock-reasoner",
     imageProviderId: provider.id,
     imageModelId: "mock-image",
-    defaultMode: "PIXEL_PROTECTED"
+    defaultMode: "PIXEL_PROTECTED",
+    imageResolution: "1K",
+    imageAspectRatio: "AUTO",
+    candidatesPerType: 1
   });
   const form = new FormData();
   form.append("role", "PRODUCT_TRUTH");
   form.append("file", new Blob([Buffer.from(onePixelPng, "base64")], { type: "image/png" }), "cup.png");
   const assetResponse = await fetch(`${base}/projects/${project.id}/assets`, { method: "POST", body: form });
   assert.equal(assetResponse.status, 200, await assetResponse.text());
-  await requestJson(`${base}/projects/${project.id}/planning-jobs`, "POST", { requestedTypes: ["hero-image"], requestedCount: 1 });
+  await requestJson(`${base}/projects/${project.id}/planning-jobs`, "POST", { planningMode: "AI", requestedTypes: ["hero-image"], candidatesPerType: 1 });
   const planningJob = await waitForJob(base, project.id, "PLAN");
   assert.equal(planningJob.status, "SUCCEEDED");
   assert.match(observed.planningPrompt, /product photography/);
@@ -97,6 +100,7 @@ try {
   assert.equal(storyboard.items.length, 1);
   assert.equal(storyboard.items[0].assetType, "hero-image");
   assert.equal(storyboard.items[0].templateVariant, "luxury");
+  assert.equal(storyboard.items[0].displayName, "白底/纯色底产品主图");
   await requestJson(`${base}/projects/${project.id}/storyboard/confirm`, "POST", {});
   const generation = await requestJson(`${base}/projects/${project.id}/generation-jobs`, "POST", { storyboardItemIds: [storyboard.items[0].id], revision: "initial" });
   const duplicateGeneration = await requestJson(`${base}/projects/${project.id}/generation-jobs`, "POST", { storyboardItemIds: [storyboard.items[0].id], revision: "initial" });

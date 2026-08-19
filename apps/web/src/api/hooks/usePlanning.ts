@@ -7,10 +7,12 @@ import { qk } from "../queryKeys";
 import type { PlanningJobInput } from "../serializePlanningBody";
 import { serializePlanningBody } from "../serializePlanningBody";
 
+export type PlanningJobResult = Job & { reused: boolean };
+
 export function useCreatePlanningJob(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: PlanningJobInput): Promise<Job> => {
+    mutationFn: async (input: PlanningJobInput): Promise<PlanningJobResult> => {
       const { data, response } = await api.POST("/projects/{projectId}/planning-jobs", {
         params: { path: { projectId } },
         body: input,
@@ -21,7 +23,7 @@ export function useCreatePlanningJob(projectId: string) {
       if (!job) {
         throw new ApiError({ code: "UNKNOWN", message: "规划任务响应无法解析", status: response.status });
       }
-      return job;
+      return { ...job, reused: response.status === 200 };
     },
     onSuccess: (job) => {
       queryClient.setQueryData(qk.job(job.id), job);

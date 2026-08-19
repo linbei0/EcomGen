@@ -10,17 +10,17 @@ import { server } from "../../test/msw/server";
 import { renderWithProviders } from "../../test/render";
 import { WorkbenchPage } from "./WorkbenchPage";
 
-function renderPlan() {
+function renderSetup() {
   return renderWithProviders(
     <Routes>
       <Route path="/projects/:projectId" element={<WorkbenchPage />} />
     </Routes>,
-    { initialEntries: [`/projects/${PROJECT_ID}?stage=plan`] },
+    { initialEntries: [`/projects/${PROJECT_ID}?view=setup`] },
   );
 }
 
-describe("工作台 · 规划阶段", () => {
-  it("提交规划时双写 imageTypes 与 requestedTypes", async () => {
+describe("工作台 · 规划", () => {
+  it("手动选择后提交规划方式和 requestedTypes", async () => {
     const user = userEvent.setup();
     let captured: unknown;
     server.use(
@@ -31,19 +31,46 @@ describe("工作台 · 规划阶段", () => {
       }),
     );
 
-    renderPlan();
+    renderSetup();
     expect(await screen.findByDisplayValue("无线耳机 SPU")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "手动选择" }));
     await user.click(await screen.findByRole("button", { name: "白底/纯色底产品主图" }));
-    await user.click(screen.getByRole("button", { name: "开始规划" }));
+    await user.click(screen.getByRole("button", { name: "生成分镜" }));
 
     await waitFor(() => {
       expect(captured).toMatchObject({
+        planningMode: "MANUAL",
         imageTypes: ["hero-image"],
         requestedTypes: ["hero-image"],
-        allowAgentRecommendations: true,
+        candidatesPerType: 1,
+        imageResolution: "1K",
+        imageAspectRatio: "AUTO",
       });
     });
-    expect(await screen.findByText("Pi 正在规划分镜")).toBeInTheDocument();
+    expect(await screen.findByText("排队中")).toBeInTheDocument();
+  });
+
+  it("AI 智能规划不提交手动选择的图片类型", async () => {
+    const user = userEvent.setup();
+    let captured: Record<string, unknown> | undefined;
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
+      http.post(`${BASE}/projects/:projectId/planning-jobs`, async ({ request }) => {
+        captured = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 8 });
+      }),
+    );
+
+    renderSetup();
+    await screen.findByDisplayValue("无线耳机 SPU");
+    await user.click(screen.getByRole("button", { name: "手动选择" }));
+    await user.click(await screen.findByRole("button", { name: "白底/纯色底产品主图" }));
+    await user.click(screen.getByRole("button", { name: "AI 智能规划" }));
+    await user.click(screen.getByRole("button", { name: "生成分镜" }));
+
+    await waitFor(() => expect(captured).toMatchObject({ planningMode: "AI" }));
+    expect(captured).not.toHaveProperty("requestedTypes");
+    expect(captured).not.toHaveProperty("imageTypes");
   });
 
   it("失败任务展示错误并可重试", async () => {
@@ -87,7 +114,7 @@ describe("工作台 · 规划阶段", () => {
       }),
     );
 
-    renderPlan();
+    renderSetup();
     expect(await screen.findByText("模型超时（请求 ID：req-9）")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "重试规划" }));
     await waitFor(() => {
@@ -95,15 +122,13 @@ describe("工作台 · 规划阶段", () => {
     });
   });
 
-  it("无素材时提示像素保护需要真实性图", async () => {
+  it("像素保护且无产品图时给出失败提示", async () => {
     server.use(
       http.get(`${BASE}/projects/:projectId`, () =>
-        HttpResponse.json(projectDetailPayload({ assets: [] })),
+        HttpResponse.json(projectDetailPayload({ defaultMode: "PIXEL_PROTECTED", assets: [] })),
       ),
     );
-    renderPlan();
-    expect(
-      await screen.findByText("未上传素材也可以规划，但像素保护分镜需要 PRODUCT_TRUTH 素材才能生成。"),
-    ).toBeInTheDocument();
+    renderSetup();
+    expect(await screen.findByText("像素保护需要至少一张产品图，否则生成会失败。")).toBeInTheDocument();
   });
 });

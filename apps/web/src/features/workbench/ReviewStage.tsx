@@ -5,9 +5,10 @@ import { useMemo, useState } from "react";
 import type { Output, ProjectDetail, StoryboardItem } from "../../api/adapters/projectDetail";
 import { useReviewOutput } from "../../api/hooks/useReview";
 import { useStoryboard } from "../../api/hooks/useStoryboard";
+import { useTemplates } from "../../api/hooks/useTemplates";
 import { ModeBadge } from "../../components/ModeBadge";
 import { errorText } from "../../lib/errorText";
-import { scopeLabel } from "../../lib/factClaims";
+import { itemDisplayName } from "../../lib/itemName";
 import { groupOutputsByItem, REVIEW_LABEL, type ReviewDecision } from "../../lib/review";
 import styles from "./workbench.module.css";
 
@@ -21,6 +22,7 @@ export function ReviewStage({
   const { notification } = App.useApp();
   const board = useStoryboard(detail.id);
   const review = useReviewOutput(detail.id);
+  const templates = useTemplates();
   const items = board.data?.items ?? detail.items;
   const groups = useMemo(() => groupOutputsByItem(items, detail.outputs), [detail.outputs, items]);
   const [picked, setPicked] = useState<string[]>([]);
@@ -43,7 +45,7 @@ export function ReviewStage({
     return (
       <div className={styles.placeholder}>
         <h2>还没有成图</h2>
-        <p>回到生成阶段勾选分镜出图后再审。</p>
+        <p>确认分镜并生成后再查看结果。</p>
       </div>
     );
   }
@@ -53,8 +55,8 @@ export function ReviewStage({
       {groups.map((group) => (
         <section key={group.item.id} className={styles.reviewGroup}>
           <h2 className={styles.reviewGroupTitle}>
-            {group.item.assetType}
-            <span>{scopeLabel(group.item.variantScope, detail.variants)}</span>
+            {itemDisplayName(group.item, templates.data ?? [])}
+            <span>{group.outputs.length} 张</span>
           </h2>
           <div className={styles.reviewGrid}>
             {group.outputs.map((output) => (
@@ -100,7 +102,7 @@ export function ReviewStage({
       <LightboxModal
         output={lightbox}
         item={lightboxItem}
-        variants={detail.variants}
+        label={lightboxItem ? itemDisplayName(lightboxItem, templates.data ?? []) : ""}
         onClose={() => setLightboxId(null)}
         onDecide={(decision) => {
           if (lightbox) decide(lightbox.id, decision);
@@ -157,14 +159,14 @@ function ReviewCard({
 function LightboxModal({
   output,
   item,
-  variants,
+  label,
   onClose,
   onDecide,
   onRetry,
 }: {
   output: Output | undefined;
   item: StoryboardItem | undefined;
-  variants: ProjectDetail["variants"];
+  label: string;
   onClose: () => void;
   onDecide: (decision: ReviewDecision) => void;
   onRetry: () => void;
@@ -173,11 +175,10 @@ function LightboxModal({
     <Modal open={Boolean(output)} onCancel={onClose} footer={null} width={920} title="灯箱">
       {output && item ? (
         <div className={styles.lightboxBody}>
-          <Image src={output.url} alt={item.assetType} />
+          <Image src={output.url} alt={label} />
           <div className={styles.lightboxMeta}>
-            <p className={styles.shotType}>{item.assetType}</p>
+            <p className={styles.shotType}>{label}</p>
             <ModeBadge mode={item.mode} />
-            <p>{scopeLabel(item.variantScope, variants)}</p>
             <p className={styles.promptPreview}>{item.promptInstruction}</p>
             <Segmented
               value={output.reviewDecision}

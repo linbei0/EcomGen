@@ -14,7 +14,147 @@ export function openDatabase(filename: string): SqliteDatabase {
   return database;
 }
 
+function tableNames(database: SqliteDatabase): Set<string> {
+  const rows = database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>;
+  return new Set(rows.map((row) => row.name));
+}
+
+function columnNames(database: SqliteDatabase, table: string): Set<string> {
+  const rows = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return new Set(rows.map((row) => row.name));
+}
+
+/**
+ * 开发数据一次性重建：去掉 SKU variants / variant_id / variant_scope，
+ * 并补齐项目出图参数、分镜展示字段与输出候选快照。不保留运行时兼容分支。
+ */
+function rebuildWithoutSku(database: SqliteDatabase): void {
+  database.pragma("foreign_keys = OFF");
+  database.exec(`
+    CREATE TABLE projects_new (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT,
+      product_description TEXT,
+      verified_facts_json TEXT NOT NULL DEFAULT '[]',
+      prohibited_claims_json TEXT NOT NULL DEFAULT '[]',
+      brand_guidelines_json TEXT NOT NULL DEFAULT '{}',
+      platform_targets_json TEXT NOT NULL,
+      reasoning_provider_id TEXT NOT NULL,
+      reasoning_model_id TEXT NOT NULL,
+      image_provider_id TEXT NOT NULL,
+      image_model_id TEXT NOT NULL,
+      default_mode TEXT NOT NULL,
+      image_resolution TEXT NOT NULL DEFAULT '1K',
+      image_aspect_ratio TEXT NOT NULL DEFAULT 'AUTO',
+      candidates_per_type INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (reasoning_provider_id) REFERENCES providers(id),
+      FOREIGN KEY (image_provider_id) REFERENCES providers(id)
+    );
+    INSERT INTO projects_new (
+      id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,
+      platform_targets_json,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,
+      image_resolution,image_aspect_ratio,candidates_per_type,created_at,updated_at
+    )
+    SELECT
+      id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,
+      platform_targets_json,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,
+      '1K','AUTO',1,created_at,updated_at
+    FROM projects;
+
+    CREATE TABLE assets_new (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      storage_path TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      width INTEGER,
+      height INTEGER,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+    INSERT INTO assets_new (id,project_id,role,storage_path,hash,original_name,mime_type,width,height,created_at)
+    SELECT id,project_id,role,storage_path,hash,original_name,mime_type,width,height,created_at FROM assets;
+
+    CREATE TABLE storyboard_items_new (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      storyboard_version INTEGER NOT NULL,
+      asset_type TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      template_variant TEXT,
+      candidate_count INTEGER NOT NULL DEFAULT 1,
+      referenced_assets_json TEXT NOT NULL DEFAULT '[]',
+      mode TEXT NOT NULL,
+      status TEXT NOT NULL,
+      prompt_instruction TEXT NOT NULL,
+      compiled_prompt TEXT,
+      fact_claims_json TEXT NOT NULL,
+      risk_flags_json TEXT NOT NULL,
+      sort_order INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+    INSERT INTO storyboard_items_new (
+      id,project_id,storyboard_version,asset_type,display_name,template_variant,candidate_count,referenced_assets_json,
+      mode,status,prompt_instruction,compiled_prompt,fact_claims_json,risk_flags_json,sort_order,created_at,updated_at
+    )
+    SELECT
+      id,project_id,storyboard_version,asset_type,asset_type,template_variant,1,'[]',
+      mode,status,prompt_instruction,compiled_prompt,fact_claims_json,risk_flags_json,sort_order,created_at,updated_at
+    FROM storyboard_items;
+
+    CREATE TABLE outputs_new (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      storyboard_item_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      candidate_index INTEGER NOT NULL DEFAULT 1,
+      generation_snapshot_json TEXT,
+      storage_path TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      review_decision TEXT NOT NULL,
+      review_note TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (storyboard_item_id) REFERENCES storyboard_items(id) ON DELETE CASCADE,
+      FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+    );
+    INSERT INTO outputs_new (
+      id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,review_decision,review_note,created_at
+    )
+    SELECT id,project_id,storyboard_item_id,job_id,1,NULL,storage_path,hash,review_decision,review_note,created_at FROM outputs;
+
+    DROP TABLE outputs;
+    DROP TABLE assets;
+    DROP TABLE storyboard_items;
+    DROP TABLE IF EXISTS variants;
+    DROP TABLE projects;
+    ALTER TABLE projects_new RENAME TO projects;
+    ALTER TABLE assets_new RENAME TO assets;
+    ALTER TABLE storyboard_items_new RENAME TO storyboard_items;
+    ALTER TABLE outputs_new RENAME TO outputs;
+  `);
+  database.pragma("foreign_keys = ON");
+}
+
 function migrate(database: SqliteDatabase): void {
+  const tables = tableNames(database);
+  const needsRebuild =
+    tables.has("projects") &&
+    (tables.has("variants") ||
+      (tables.has("assets") && columnNames(database, "assets").has("variant_id")) ||
+      (tables.has("storyboard_items") && columnNames(database, "storyboard_items").has("variant_scope")) ||
+      !columnNames(database, "projects").has("image_resolution"));
+  if (needsRebuild) {
+    rebuildWithoutSku(database);
+  }
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
@@ -45,23 +185,17 @@ function migrate(database: SqliteDatabase): void {
       image_provider_id TEXT NOT NULL,
       image_model_id TEXT NOT NULL,
       default_mode TEXT NOT NULL,
+      image_resolution TEXT NOT NULL DEFAULT '1K',
+      image_aspect_ratio TEXT NOT NULL DEFAULT 'AUTO',
+      candidates_per_type INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (reasoning_provider_id) REFERENCES providers(id),
       FOREIGN KEY (image_provider_id) REFERENCES providers(id)
     );
-    CREATE TABLE IF NOT EXISTS variants (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      attributes_json TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-    );
     CREATE TABLE IF NOT EXISTS assets (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
-      variant_id TEXT,
       role TEXT NOT NULL,
       storage_path TEXT NOT NULL,
       hash TEXT NOT NULL,
@@ -70,8 +204,7 @@ function migrate(database: SqliteDatabase): void {
       width INTEGER,
       height INTEGER,
       created_at TEXT NOT NULL,
-      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-      FOREIGN KEY (variant_id) REFERENCES variants(id) ON DELETE SET NULL
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS storyboards (
       project_id TEXT PRIMARY KEY,
@@ -87,8 +220,10 @@ function migrate(database: SqliteDatabase): void {
       project_id TEXT NOT NULL,
       storyboard_version INTEGER NOT NULL,
       asset_type TEXT NOT NULL,
+      display_name TEXT NOT NULL,
       template_variant TEXT,
-      variant_scope TEXT NOT NULL,
+      candidate_count INTEGER NOT NULL DEFAULT 1,
+      referenced_assets_json TEXT NOT NULL DEFAULT '[]',
       mode TEXT NOT NULL,
       status TEXT NOT NULL,
       prompt_instruction TEXT NOT NULL,
@@ -127,6 +262,8 @@ function migrate(database: SqliteDatabase): void {
       project_id TEXT NOT NULL,
       storyboard_item_id TEXT NOT NULL,
       job_id TEXT NOT NULL,
+      candidate_index INTEGER NOT NULL DEFAULT 1,
+      generation_snapshot_json TEXT,
       storage_path TEXT NOT NULL,
       hash TEXT NOT NULL,
       review_decision TEXT NOT NULL,
@@ -148,8 +285,8 @@ function migrate(database: SqliteDatabase): void {
       FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
     );
   `);
-  const providerColumns = database.prepare("PRAGMA table_info(providers)").all() as Array<{ name: string }>;
-  if (!providerColumns.some((column) => column.name === "reasoning_protocol")) {
+  const providerColumns = columnNames(database, "providers");
+  if (!providerColumns.has("reasoning_protocol")) {
     database.exec("ALTER TABLE providers ADD COLUMN reasoning_protocol TEXT NOT NULL DEFAULT 'openai'");
   }
 }

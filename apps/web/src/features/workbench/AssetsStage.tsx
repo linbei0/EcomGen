@@ -1,40 +1,32 @@
-import { App, Image, Popconfirm, Select } from "antd";
+import { App, Image, Popconfirm } from "antd";
 import { ShieldCheck, Trash2, Upload as UploadIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
 
-import type { Asset, AssetRole, ProjectDetail } from "../../api/adapters/projectDetail";
+import type { Asset, ProjectDetail, UserAssetKind } from "../../api/adapters/projectDetail";
 import { useDeleteAsset, useUploadAsset } from "../../api/hooks/useAssets";
 import { errorText } from "../../lib/errorText";
-import { ASSET_ROLE_META, ASSET_ROLE_ORDER } from "../../lib/roles";
+import { kindForRole, USER_ASSET_KIND_META, USER_ASSET_KIND_ORDER } from "../../lib/roles";
 import styles from "./workbench.module.css";
 
-const COMMON_OWNER = "__common__";
-
-export function AssetsStage({ detail }: { detail: ProjectDetail }) {
+export function AssetsStage({
+  detail,
+  compact = false,
+}: {
+  detail: ProjectDetail;
+  compact?: boolean;
+}) {
   const { notification } = App.useApp();
-  const [role, setRole] = useState<AssetRole>("PRODUCT_TRUTH");
-  const [owner, setOwner] = useState(COMMON_OWNER);
+  const [kind, setKind] = useState<UserAssetKind>("PRODUCT");
   const [dragOver, setDragOver] = useState(false);
   const upload = useUploadAsset();
   const removeAsset = useDeleteAsset();
   const grouped = useMemo(() => groupAssets(detail.assets), [detail.assets]);
-  const ownerOptions = [
-    { value: COMMON_OWNER, label: "通用（全 SKU）" },
-    ...detail.variants.map((variant) => ({ value: variant.id, label: variant.name })),
-  ];
 
   const uploadFiles = (images: File[]) => {
     for (const file of images) {
-      void upload
-        .mutateAsync({
-          projectId: detail.id,
-          file,
-          role,
-          variantId: owner === COMMON_OWNER ? null : owner,
-        })
-        .catch((error: unknown) => {
-          notification.error({ title: "上传失败", description: errorText(error) });
-        });
+      void upload.mutateAsync({ projectId: detail.id, file, kind }).catch((error: unknown) => {
+        notification.error({ title: "上传失败", description: errorText(error) });
+      });
     }
   };
 
@@ -47,7 +39,6 @@ export function AssetsStage({ detail }: { detail: ProjectDetail }) {
     uploadFiles(images);
   };
 
-  /** 粘贴上传：剪贴板文件常见无 MIME，空类型也按当前 role 上传，由后端兜底校验。 */
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       const images = Array.from(event.clipboardData?.files ?? []).filter(
@@ -80,6 +71,19 @@ export function AssetsStage({ detail }: { detail: ProjectDetail }) {
 
   return (
     <div>
+      <div className={styles.kindToggle} role="group" aria-label="素材类型">
+        {USER_ASSET_KIND_ORDER.map((item) => (
+          <button
+            key={item}
+            type="button"
+            data-active={kind === item}
+            onClick={() => setKind(item)}
+          >
+            {USER_ASSET_KIND_META[item].label}
+          </button>
+        ))}
+      </div>
+
       <label
         className={styles.dropzone}
         data-over={dragOver}
@@ -99,53 +103,26 @@ export function AssetsStage({ detail }: { detail: ProjectDetail }) {
           onChange={onPick}
         />
         <UploadIcon size={20} strokeWidth={1.5} aria-hidden />
-        <p className={styles.dropTitle}>拖入商品图</p>
-        <p className={styles.dropHint}>
-          商品真实性图用于像素保护；风格/竞品图只影响感觉，不会被复制。也可以直接粘贴。
-        </p>
+        <p className={styles.dropTitle}>拖入{USER_ASSET_KIND_META[kind].label}</p>
+        <p className={styles.dropHint}>{USER_ASSET_KIND_META[kind].hint}。也可以直接粘贴。</p>
       </label>
 
-      <div className={styles.uploadMeta}>
-        <label>
-          素材角色
-          <Select
-            value={role}
-            onChange={setRole}
-            style={{ width: "100%", marginTop: 6 }}
-            options={ASSET_ROLE_ORDER.map((item) => ({
-              value: item,
-              label: ASSET_ROLE_META[item].label,
-            }))}
-          />
-        </label>
-        <label>
-          归属
-          <Select
-            value={owner}
-            onChange={setOwner}
-            style={{ width: "100%", marginTop: 6 }}
-            options={ownerOptions}
-          />
-        </label>
-      </div>
-
-      {ASSET_ROLE_ORDER.map((item) => {
+      {USER_ASSET_KIND_ORDER.map((item) => {
         const assets = grouped.get(item) ?? [];
         if (assets.length === 0) return null;
         return (
           <section key={item} className={styles.groups}>
             <div className={styles.groupHeader}>
-              <span>{ASSET_ROLE_META[item].label}</span>
+              <span>{USER_ASSET_KIND_META[item].label}</span>
               <span>{assets.length}</span>
             </div>
-            <div className={styles.assetGrid}>
+            <div className={compact ? styles.assetGridCompact : styles.assetGrid}>
               <Image.PreviewGroup>
                 {assets.map((asset) => (
                   <AssetCard
                     key={asset.id}
                     asset={asset}
-                    variantName={detail.variants.find((variant) => variant.id === asset.variantId)?.name}
-                    showShield={detail.defaultMode === "PIXEL_PROTECTED" && asset.role === "PRODUCT_TRUTH"}
+                    showShield={detail.defaultMode === "PIXEL_PROTECTED" && kindForRole(asset.role) === "PRODUCT"}
                     onDelete={() => onDelete(asset)}
                   />
                 ))}
@@ -160,21 +137,20 @@ export function AssetsStage({ detail }: { detail: ProjectDetail }) {
 
 function AssetCard({
   asset,
-  variantName,
   showShield,
   onDelete,
 }: {
   asset: Asset;
-  variantName?: string;
   showShield: boolean;
   onDelete: () => void;
 }) {
+  const kind = kindForRole(asset.role);
   return (
     <article className={styles.assetCard}>
       <div className={styles.thumbWrap}>
         <Image
           src={asset.url}
-          alt={ASSET_ROLE_META[asset.role].label}
+          alt={USER_ASSET_KIND_META[kind].label}
           className={styles.thumb}
           loading="lazy"
         />
@@ -185,15 +161,14 @@ function AssetCard({
           <button
             type="button"
             className={styles.assetDelete}
-            aria-label={`删除素材 ${ASSET_ROLE_META[asset.role].label}`}
+            aria-label={`删除素材 ${USER_ASSET_KIND_META[kind].label}`}
           >
             <Trash2 size={14} strokeWidth={1.75} aria-hidden />
           </button>
         </Popconfirm>
       </div>
       <div className={styles.assetMeta}>
-        <span className={styles.assetRole}>{ASSET_ROLE_META[asset.role].label}</span>
-        <span className={styles.assetOwner}>{variantName ?? "通用"}</span>
+        <span className={styles.assetRole}>{USER_ASSET_KIND_META[kind].label}</span>
         {asset.width && asset.height ? (
           <span className={styles.assetSize}>
             {asset.width}×{asset.height}
@@ -204,12 +179,13 @@ function AssetCard({
   );
 }
 
-function groupAssets(assets: Asset[]): Map<AssetRole, Asset[]> {
-  const groups = new Map<AssetRole, Asset[]>();
+function groupAssets(assets: Asset[]): Map<UserAssetKind, Asset[]> {
+  const groups = new Map<UserAssetKind, Asset[]>();
   for (const asset of assets) {
-    const list = groups.get(asset.role) ?? [];
+    const kind = kindForRole(asset.role);
+    const list = groups.get(kind) ?? [];
     list.push(asset);
-    groups.set(asset.role, list);
+    groups.set(kind, list);
   }
   return groups;
 }

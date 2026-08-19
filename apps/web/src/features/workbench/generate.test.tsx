@@ -4,7 +4,6 @@ import { http, HttpResponse } from "msw";
 import { Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { COST_UNKNOWN_TEXT } from "../../lib/cost";
 import {
   GENERATE_JOB_FIXTURE,
   ITEM_ID,
@@ -29,17 +28,17 @@ const confirmedBoard = {
   ],
 };
 
-function renderGenerate() {
+function renderBoard() {
   return renderWithProviders(
     <Routes>
       <Route path="/projects/:projectId" element={<WorkbenchPage />} />
     </Routes>,
-    { initialEntries: [`/projects/${PROJECT_ID}?stage=generate`] },
+    { initialEntries: [`/projects/${PROJECT_ID}?view=storyboard`] },
   );
 }
 
-describe("工作台 · 生成阶段", () => {
-  it("确认弹窗数量等于勾选项，费用未知，提交显式 storyboardItemIds", async () => {
+describe("工作台 · 确认并生成", () => {
+  it("已确认分镜一次提交全部 itemId", async () => {
     const user = userEvent.setup();
     let captured: unknown;
     server.use(
@@ -68,32 +67,18 @@ describe("工作台 · 生成阶段", () => {
       }),
     );
 
-    renderGenerate();
-    expect(await screen.findByDisplayValue("无线耳机 SPU")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /生成 2 张/ })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "全选未生成" }));
-    expect(await screen.findByRole("button", { name: "生成 2 张" })).toBeInTheDocument();
-    expect(screen.getByText(COST_UNKNOWN_TEXT)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "生成 2 张" }));
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认生成 2 张" })).toBeInTheDocument();
-    expect(screen.getAllByText(COST_UNKNOWN_TEXT).length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText("作为修订重新出图")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "确认生成 2 张" }));
+    renderBoard();
+    expect(await screen.findByRole("button", { name: "开始生成" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "开始生成" }));
     await waitFor(() => {
       expect(captured).toMatchObject({
-        storyboardItemIds: [ITEM_ID, ITEM_ID_B].sort(),
+        storyboardItemIds: [ITEM_ID, ITEM_ID_B],
       });
     });
-    expect((captured as { revision?: string }).revision).toBeUndefined();
   });
 
-  it("含已生成分镜时出现修订选项，失败任务可重试", async () => {
+  it("失败任务可在结果区重试，不展示虚假百分比", async () => {
     const user = userEvent.setup();
-    let captured: unknown;
     let retried = false;
     const items = [
       { ...STORYBOARD_ITEM_FIXTURE, status: "GENERATED" as const },
@@ -114,6 +99,7 @@ describe("工作台 · 生成阶段", () => {
                 error: { message: "生图失败", requestId: "gen-1" },
               },
             ],
+            outputs: [],
           }),
         ),
       ),
@@ -129,10 +115,6 @@ describe("工作台 · 生成阶段", () => {
           error: { message: "生图失败", requestId: "gen-1" },
         }),
       ),
-      http.post(`${BASE}/projects/:projectId/generation-jobs`, async ({ request }) => {
-        captured = await request.json();
-        return HttpResponse.json({ jobs: [GENERATE_JOB_FIXTURE] }, { status: 202 });
-      }),
       http.post(`${BASE}/jobs/:jobId/retry`, () => {
         retried = true;
         return HttpResponse.json({
@@ -146,24 +128,17 @@ describe("工作台 · 生成阶段", () => {
       }),
     );
 
-    renderGenerate();
+    renderWithProviders(
+      <Routes>
+        <Route path="/projects/:projectId" element={<WorkbenchPage />} />
+      </Routes>,
+      { initialEntries: [`/projects/${PROJECT_ID}?view=results`] },
+    );
     expect(await screen.findByText("生图失败（请求 ID：gen-1）")).toBeInTheDocument();
+    expect(screen.queryByText("30%")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "重试生成" }));
     await waitFor(() => {
       expect(retried).toBe(true);
-    });
-
-    await user.click(screen.getByRole("checkbox", { name: "选择 hero-image" }));
-    await user.click(screen.getByRole("button", { name: "生成 1 张" }));
-    expect(await screen.findByLabelText("作为修订重新出图")).toBeInTheDocument();
-    await user.click(screen.getByLabelText("作为修订重新出图"));
-    await user.type(screen.getByLabelText("修订说明"), "换冷白");
-    await user.click(screen.getByRole("button", { name: "确认生成 1 张" }));
-    await waitFor(() => {
-      expect(captured).toMatchObject({
-        storyboardItemIds: [ITEM_ID],
-        revision: "换冷白",
-      });
     });
   });
 });

@@ -1,33 +1,33 @@
 import { motion } from "motion/react";
 
-import { STAGE_META, STAGES, type Stage } from "../lib/stages";
+import { VIEW_META, VIEWS, type WorkbenchView } from "../lib/stages";
 import styles from "./StageBar.module.css";
 
 interface Props {
-  current: Stage;
-  completed: ReadonlySet<Stage>;
-  onChange: (stage: Stage) => void;
+  current: WorkbenchView;
+  completed: ReadonlySet<WorkbenchView>;
+  onChange: (view: WorkbenchView) => void;
 }
 
 export function StageBar({ current, completed, onChange }: Props) {
   return (
     <nav className={styles.bar} aria-label="工作阶段">
-      {STAGES.map((stage) => {
-        const active = stage === current;
-        const done = completed.has(stage);
+      {VIEWS.map((view) => {
+        const active = view === current;
+        const done = completed.has(view);
         return (
           <button
-            key={stage}
+            key={view}
             type="button"
             className={styles.item}
             data-active={active}
             data-done={done}
             aria-current={active ? "step" : undefined}
-            onClick={() => onChange(stage)}
+            onClick={() => onChange(view)}
           >
             {active ? <motion.span layoutId="stage-indicator" className={styles.indicator} /> : null}
-            <span className={styles.index}>{STAGE_META[stage].index + 1}</span>
-            <span className={styles.label}>{STAGE_META[stage].label}</span>
+            <span className={styles.index}>{VIEW_META[view].index + 1}</span>
+            <span className={styles.label}>{VIEW_META[view].label}</span>
           </button>
         );
       })}

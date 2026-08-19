@@ -5,7 +5,6 @@ import { Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import {
-  ITEM_ID,
   PROJECT_ID,
   STORYBOARD_FIXTURE,
   STORYBOARD_ITEM_B_FIXTURE,
@@ -23,7 +22,7 @@ function renderBoard() {
     <Routes>
       <Route path="/projects/:projectId" element={<WorkbenchPage />} />
     </Routes>,
-    { initialEntries: [`/projects/${PROJECT_ID}?stage=storyboard&item=${ITEM_ID}`] },
+    { initialEntries: [`/projects/${PROJECT_ID}?view=storyboard`] },
   );
 }
 
@@ -32,8 +31,9 @@ const detailWithBoard = projectDetailPayload({
   items: [STORYBOARD_ITEM_FIXTURE, STORYBOARD_ITEM_B_FIXTURE],
 });
 
-describe("工作台 · 分镜阶段", () => {
-  it("渲染分镜卡、变体范围与风险角标", async () => {
+describe("工作台 · 分镜", () => {
+  it("卡片显示中文名称，点击后弹窗编辑", async () => {
+    const user = userEvent.setup();
     server.use(
       http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(detailWithBoard)),
       http.get(`${BASE}/projects/:projectId/storyboard`, () =>
@@ -41,14 +41,16 @@ describe("工作台 · 分镜阶段", () => {
       ),
     );
     renderBoard();
-    expect(await screen.findByText("hero-image")).toBeInTheDocument();
-    expect(screen.getByText("lifestyle-scene")).toBeInTheDocument();
-    expect(screen.getByText("通用")).toBeInTheDocument();
-    expect(screen.getAllByText("黑色").length).toBeGreaterThan(0);
+    expect(await screen.findByRole("button", { name: "白底/纯色底产品主图 分镜" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "场景化生活图 分镜" })).toBeInTheDocument();
+    expect(screen.queryByText("hero-image")).not.toBeInTheDocument();
+    expect(screen.queryByText("通用")).not.toBeInTheDocument();
     expect(screen.getByLabelText("1 条风险")).toBeInTheDocument();
-    expect(screen.getByText("2 个分镜 · 创意 1 / 像素保护 1")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("白底主图，突出金属质感")).toBeInTheDocument();
-    expect(screen.getByText("续航 8 小时")).toBeInTheDocument();
+    expect(screen.getByText("2 个分镜 · 预计 2 张候选")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "白底/纯色底产品主图 分镜" }));
+    expect(await screen.findByDisplayValue("白底主图，突出金属质感")).toBeInTheDocument();
+    expect(screen.getAllByText("续航 8 小时").length).toBeGreaterThanOrEqual(1);
   });
 
   it("确认 409 时提示冲突并重新拉取分镜", async () => {
@@ -75,9 +77,9 @@ describe("工作台 · 分镜阶段", () => {
     );
 
     renderBoard();
-    await screen.findByRole("button", { name: "确认分镜" });
+    await screen.findByRole("button", { name: "确认并生成" });
     const before = storyboardGets;
-    await user.click(screen.getByRole("button", { name: "确认分镜" }));
+    await user.click(screen.getByRole("button", { name: "确认并生成" }));
     expect(await screen.findByText("分镜已被其他操作更新")).toBeInTheDocument();
     await waitFor(() => {
       expect(storyboardGets).toBeGreaterThan(before);

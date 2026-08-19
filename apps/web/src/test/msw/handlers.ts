@@ -12,7 +12,6 @@ import {
   STORYBOARD_ITEM_B_FIXTURE,
   STORYBOARD_ITEM_FIXTURE,
   TEMPLATE_FIXTURES,
-  VARIANT_FIXTURE,
   projectDetailPayload,
   storyboardPayload,
 } from "./fixtures";
@@ -115,17 +114,6 @@ export const handlers = [
   }),
 
   http.delete(`${BASE}/assets/:assetId`, () => new HttpResponse(null, { status: 204 })),
-
-  http.post(`${BASE}/projects/:projectId/variants`, async ({ request, params }) => {
-    const body = (await request.json()) as { name: string; attributes?: Record<string, string> };
-    return HttpResponse.json({
-      ...VARIANT_FIXTURE,
-      id: "22222222-3333-4444-8555-666666666666",
-      projectId: params.projectId as string,
-      name: body.name,
-      attributes: body.attributes ?? {},
-    });
-  }),
 
   http.post(`${BASE}/projects/:projectId/assets`, ({ params }) =>
     HttpResponse.json({

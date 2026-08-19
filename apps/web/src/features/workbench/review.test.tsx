@@ -5,6 +5,7 @@ import { Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import {
+  ITEM_ID,
   OUTPUT_B_FIXTURE,
   OUTPUT_FIXTURE,
   PROJECT_ID,
@@ -27,17 +28,17 @@ const confirmed = {
   ],
 };
 
-function renderReview() {
+function renderResults() {
   return renderWithProviders(
     <Routes>
       <Route path="/projects/:projectId" element={<WorkbenchPage />} />
     </Routes>,
-    { initialEntries: [`/projects/${PROJECT_ID}?stage=review`] },
+    { initialEntries: [`/projects/${PROJECT_ID}?view=results`] },
   );
 }
 
-describe("工作台 · 审核阶段", () => {
-  it("按分镜分组展示成图，选入时双写 decision 与 reviewDecision", async () => {
+describe("工作台 · 结果审核", () => {
+  it("按中文分镜名分组，选入时双写 decision 与 reviewDecision", async () => {
     const user = userEvent.setup();
     let captured: unknown;
     server.use(
@@ -58,9 +59,10 @@ describe("工作台 · 审核阶段", () => {
       }),
     );
 
-    renderReview();
-    expect(await screen.findByText("hero-image")).toBeInTheDocument();
-    expect(screen.getByText("lifestyle-scene")).toBeInTheDocument();
+    renderResults();
+    expect(await screen.findByRole("heading", { name: /白底\/纯色底产品主图/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /场景化生活图/ })).toBeInTheDocument();
+    expect(screen.queryByText("hero-image")).not.toBeInTheDocument();
     await user.click(screen.getAllByRole("button", { name: "选入" })[0]!);
     await waitFor(() => {
       expect(captured).toMatchObject({ decision: "SELECTED", reviewDecision: "SELECTED" });
@@ -73,13 +75,14 @@ describe("工作台 · 审核阶段", () => {
         HttpResponse.json(projectDetailPayload({ ...confirmed, outputs: [] })),
       ),
     );
-    renderReview();
+    renderResults();
     expect(await screen.findByText("还没有成图")).toBeInTheDocument();
     expect(screen.queryByLabelText("选入")).not.toBeInTheDocument();
   });
 
-  it("灯箱可跳回生成并预选该分镜", async () => {
+  it("灯箱可重新生成该分镜", async () => {
     const user = userEvent.setup();
+    let captured: unknown;
     server.use(
       http.get(`${BASE}/projects/:projectId`, () =>
         HttpResponse.json(
@@ -92,10 +95,16 @@ describe("工作台 · 审核阶段", () => {
       http.get(`${BASE}/projects/:projectId/storyboard`, () =>
         HttpResponse.json(storyboardPayload(confirmed.storyboard, confirmed.items)),
       ),
+      http.post(`${BASE}/projects/:projectId/generation-jobs`, async ({ request }) => {
+        captured = await request.json();
+        return HttpResponse.json({ jobs: [] }, { status: 202 });
+      }),
     );
-    renderReview();
+    renderResults();
     await user.click(await screen.findByRole("button", { name: "灯箱" }));
     await user.click(await screen.findByRole("button", { name: "用此分镜重新生成" }));
-    expect(await screen.findByLabelText("选择 hero-image")).toBeChecked();
+    await waitFor(() => {
+      expect(captured).toMatchObject({ storyboardItemIds: [ITEM_ID], revision: "retry" });
+    });
   });
 });

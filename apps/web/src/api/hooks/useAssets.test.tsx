@@ -19,9 +19,10 @@ describe("useUploadAsset", () => {
     const asset = await result.current.mutateAsync({
       projectId: PROJECT_ID,
       file: new File(["img"], "truth.png", { type: "image/png" }),
-      role: "PRODUCT_TRUTH",
+      kind: "PRODUCT",
     });
     expect(asset.role).toBe("PRODUCT_TRUTH");
+    expect(asset.kind).toBe("PRODUCT");
     expect(asset.url).toContain("/files/assets/");
   });
 });

@@ -1,8 +1,8 @@
-import { App, Input, Select, Segmented } from "antd";
+import { App, Input, Segmented, Tag } from "antd";
 import { ShieldCheck, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import type { StoryboardItem, Variant } from "../../api/adapters/projectDetail";
+import type { StoryboardItem } from "../../api/adapters/projectDetail";
 import type { EcomTemplate } from "../../api/adapters/templates";
 import { useUpdateStoryboardItem, type UpdateStoryboardItemInput } from "../../api/hooks/useStoryboard";
 import { errorText } from "../../lib/errorText";
@@ -13,7 +13,8 @@ const DEBOUNCE_MS = 600;
 
 interface Draft {
   assetType: string;
-  variantScope: string;
+  displayName: string;
+  candidateCount: number;
   mode: StoryboardItem["mode"];
   promptInstruction: string;
 }
@@ -22,13 +23,11 @@ export function StoryboardInspector({
   projectId,
   item,
   templates,
-  variants,
   locked,
 }: {
   projectId: string;
   item: StoryboardItem;
   templates: EcomTemplate[];
-  variants: Variant[];
   locked: boolean;
 }) {
   const { notification } = App.useApp();
@@ -66,39 +65,21 @@ export function StoryboardInspector({
 
   const claims = factClaimRows(item.factClaims);
   const readOnly = locked || item.status === "CONFIRMED" || item.status === "GENERATING" || item.status === "GENERATED";
+  const templateName = templates.find((template) => template.id === draft.assetType)?.name ?? draft.assetType;
 
   return (
     <div className={styles.inspector}>
-      <p className={styles.sectionTitle}>分镜</p>
       <p className={styles.saveHint}>
         {readOnly ? "已锁定" : saveState === "saving" ? "保存中" : saveState === "saved" ? "已保存" : "编辑后自动保存"}
       </p>
 
-      <label className={styles.fieldLabel} htmlFor="item-type">
-        图片类型
-      </label>
-      <Select
-        id="item-type"
-        value={draft.assetType}
-        disabled={readOnly}
-        options={templates.map((template) => ({ value: template.id, label: template.name }))}
-        onChange={(assetType) => setDraft((current) => ({ ...current, assetType }))}
-      />
-
-      <label className={styles.fieldLabel} htmlFor="item-scope">
-        变体范围
-      </label>
-      <Select
-        id="item-scope"
-        value={draft.variantScope}
-        disabled={readOnly}
-        options={[
-          { value: "COMMON", label: "通用（全 SKU）" },
-          ...variants.map((variant) => ({ value: variant.id, label: variant.name })),
-        ]}
-        onChange={(variantScope) => setDraft((current) => ({ ...current, variantScope }))}
-      />
-      <p className={styles.hint}>分镜必须声明归属，禁止跨 SKU 混图。</p>
+      {templateName !== draft.displayName ? (
+        <div className={styles.assetTypeRow}>
+          <Tag className={styles.assetTypeTag} title="规划模板">
+            {templateName}
+          </Tag>
+        </div>
+      ) : null}
 
       <p className={styles.fieldLabel}>模式</p>
       <Segmented
@@ -113,9 +94,28 @@ export function StoryboardInspector({
       {draft.mode === "PIXEL_PROTECTED" ? (
         <p className={styles.protectHint}>
           <ShieldCheck size={14} strokeWidth={1.75} aria-hidden />
-          仅使用同范围 PRODUCT_TRUTH 素材，保留主体像素。
+          使用项目上的产品图，保留主体像素。
         </p>
       ) : null}
+
+      <div className={styles.stepper}>
+        <span>候选数</span>
+        <button
+          type="button"
+          disabled={readOnly || draft.candidateCount <= 1}
+          onClick={() => setDraft((current) => ({ ...current, candidateCount: current.candidateCount - 1 }))}
+        >
+          −
+        </button>
+        <strong>{draft.candidateCount}</strong>
+        <button
+          type="button"
+          disabled={readOnly || draft.candidateCount >= 4}
+          onClick={() => setDraft((current) => ({ ...current, candidateCount: current.candidateCount + 1 }))}
+        >
+          +
+        </button>
+      </div>
 
       <label className={styles.fieldLabel} htmlFor="item-prompt">
         Prompt
@@ -157,7 +157,8 @@ export function StoryboardInspector({
 function toDraft(item: StoryboardItem): Draft {
   return {
     assetType: item.assetType,
-    variantScope: item.variantScope,
+    displayName: item.displayName,
+    candidateCount: item.candidateCount,
     mode: item.mode,
     promptInstruction: item.promptInstruction,
   };
@@ -166,7 +167,8 @@ function toDraft(item: StoryboardItem): Draft {
 function patchFrom(item: StoryboardItem, draft: Draft): UpdateStoryboardItemInput | null {
   const body: UpdateStoryboardItemInput = {};
   if (draft.assetType !== item.assetType) body.assetType = draft.assetType;
-  if (draft.variantScope !== item.variantScope) body.variantScope = draft.variantScope;
+  if (draft.displayName !== item.displayName) body.displayName = draft.displayName;
+  if (draft.candidateCount !== item.candidateCount) body.candidateCount = draft.candidateCount;
   if (draft.mode !== item.mode) body.mode = draft.mode;
   if (draft.promptInstruction !== item.promptInstruction) body.promptInstruction = draft.promptInstruction;
   return Object.keys(body).length > 0 ? body : null;

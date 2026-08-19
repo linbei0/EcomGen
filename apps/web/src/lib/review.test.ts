@@ -11,7 +11,8 @@ function item(id: string, assetType = "hero-image"): StoryboardItem {
   return {
     id,
     assetType,
-    variantScope: "COMMON",
+    displayName: assetType === "hero-image" ? "白底/纯色底产品主图" : "场景化生活图",
+    candidateCount: 1,
     mode: "CREATIVE",
     status: "CONFIRMED",
     promptInstruction: "p",

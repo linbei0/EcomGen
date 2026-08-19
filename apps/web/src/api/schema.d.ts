@@ -122,24 +122,6 @@ export interface paths {
         patch: operations["updateProject"];
         trace?: never;
     };
-    "/projects/{projectId}/variants": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        get: operations["listVariants"];
-        put?: never;
-        post: operations["createVariant"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/projects/{projectId}/assets": {
         parameters: {
             query?: never;
@@ -242,7 +224,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["deleteStoryboardItem"];
         options?: never;
         head?: never;
         patch: operations["updateStoryboardItem"];
@@ -467,6 +449,7 @@ export interface components {
             name: string;
             /** Format: uri */
             baseUrl: string;
+            /** @enum {string} */
             reasoningProtocol: "openai" | "dashscope_qwen";
             hasApiKey: boolean;
             models: components["schemas"]["ModelCapability"][];
@@ -488,6 +471,7 @@ export interface components {
             name: string;
             /** Format: uri */
             baseUrl: string;
+            /** @enum {string} */
             reasoningProtocol: "openai" | "dashscope_qwen";
             apiKey: string;
             models: components["schemas"]["ModelCapability"][];
@@ -497,6 +481,14 @@ export interface components {
             items: components["schemas"]["ProviderConfig"][];
             nextCursor: string | null;
         };
+        /** @enum {string} */
+        ImageResolution: "1K" | "2K" | "4K";
+        /** @enum {string} */
+        ImageAspectRatio: "AUTO" | "1:1" | "3:4" | "4:3" | "16:9";
+        /** @enum {string} */
+        PlanningMode: "AI" | "MANUAL";
+        /** @enum {string} */
+        UserAssetKind: "PRODUCT" | "REFERENCE";
         Project: {
             /** Format: uuid */
             id: string;
@@ -517,10 +509,20 @@ export interface components {
             imageModelId: string;
             /** @enum {string} */
             defaultMode: "CREATIVE" | "PIXEL_PROTECTED";
+            imageResolution: components["schemas"]["ImageResolution"];
+            imageAspectRatio: components["schemas"]["ImageAspectRatio"];
+            candidatesPerType: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        ProjectDetail: components["schemas"]["Project"] & {
+            assets: components["schemas"]["Asset"][];
+            storyboard: Record<string, never> | null;
+            items: components["schemas"]["StoryboardItem"][];
+            outputs: components["schemas"]["Output"][];
+            jobs: components["schemas"]["Job"][];
         };
         ModelRef: {
             /** Format: uuid */
@@ -545,6 +547,9 @@ export interface components {
             imageModelId: string;
             /** @enum {string} */
             defaultMode: "CREATIVE" | "PIXEL_PROTECTED";
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            candidatesPerType?: number;
         };
         UpdateProjectInput: {
             name?: string;
@@ -560,31 +565,12 @@ export interface components {
             imageModel?: components["schemas"]["ModelRef"];
             /** @enum {string} */
             defaultMode?: "CREATIVE" | "PIXEL_PROTECTED";
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            candidatesPerType?: number;
         };
         ProjectList: {
             items: components["schemas"]["Project"][];
-            nextCursor: string | null;
-        };
-        Variant: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            projectId: string;
-            name: string;
-            attributes?: {
-                [key: string]: string;
-            };
-            /** Format: date-time */
-            createdAt: string;
-        };
-        CreateVariantInput: {
-            name: string;
-            attributes?: {
-                [key: string]: string;
-            };
-        };
-        VariantList: {
-            items: components["schemas"]["Variant"][];
             nextCursor: string | null;
         };
         /** @enum {string} */
@@ -594,10 +580,10 @@ export interface components {
             id: string;
             /** Format: uuid */
             projectId: string;
-            /** Format: uuid */
-            variantId?: string | null;
             role: components["schemas"]["AssetRole"];
-            url: string;
+            kind?: components["schemas"]["UserAssetKind"];
+            url?: string;
+            storagePath?: string;
             mimeType: string;
             width?: number | null;
             height?: number | null;
@@ -609,10 +595,14 @@ export interface components {
             nextCursor: string | null;
         };
         CreatePlanningJobInput: {
-            imageTypes: string[];
-            /** @default false */
-            allowAgentRecommendations: boolean;
+            planningMode?: components["schemas"]["PlanningMode"];
+            requestedTypes?: string[];
+            imageTypes?: string[];
             userInstruction?: string;
+            candidatesPerType?: number;
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            regenerationKey?: string;
         };
         Storyboard: {
             /** Format: uuid */
@@ -621,25 +611,34 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "CONFIRMED";
             campaignStyleLock: string;
+            items?: components["schemas"]["StoryboardItem"][];
+        };
+        StoryboardBundle: {
+            storyboard: Record<string, never> | null;
             items: components["schemas"]["StoryboardItem"][];
         };
         StoryboardItem: {
             /** Format: uuid */
             id: string;
             assetType: string;
-            /** @description COMMON or a Variant UUID */
-            variantScope: string;
+            displayName: string;
+            templateVariant?: string | null;
+            candidateCount: number;
+            referencedAssets?: string[];
             /** @enum {string} */
             mode: "CREATIVE" | "PIXEL_PROTECTED";
             /** @enum {string} */
             status: "DRAFT" | "CONFIRMED" | "GENERATING" | "GENERATED";
             promptInstruction: string;
-            factClaims?: Record<string, never>[];
+            factClaims?: string[];
             riskFlags: string[];
         };
         UpdateStoryboardItemInput: {
             assetType?: string;
-            variantScope?: string;
+            displayName?: string;
+            templateVariant?: string | null;
+            candidateCount?: number;
+            referencedAssets?: string[];
             /** @enum {string} */
             mode?: "CREATIVE" | "PIXEL_PROTECTED";
             promptInstruction?: string;
@@ -671,15 +670,25 @@ export interface components {
             id: string;
             /** Format: uuid */
             storyboardItemId: string;
-            url: string;
+            candidateIndex?: number;
+            generationSnapshot?: {
+                resolution?: components["schemas"]["ImageResolution"];
+                aspectRatio?: components["schemas"]["ImageAspectRatio"];
+                size?: string;
+                candidateIndex?: number;
+            } | null;
+            url?: string;
+            storagePath?: string;
             /** @enum {string} */
             reviewDecision: "SELECTED" | "REJECTED" | "NEEDS_REVIEW";
+            reviewNote?: string | null;
             /** Format: date-time */
             createdAt: string;
         };
         CreateExportJobInput: {
-            outputIds: string[];
-            platformTargets: ("DOMESTIC" | "AMAZON")[];
+            outputIds?: string[];
+            filenamePrefix?: string;
+            platformTargets?: ("DOMESTIC" | "AMAZON")[];
             /** @default false */
             includeDetailPageSlices: boolean;
         };
@@ -688,11 +697,18 @@ export interface components {
             id: string;
             /** Format: uuid */
             projectId: string;
+            /** Format: uuid */
+            jobId?: string;
             /** @enum {string} */
             status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+            storagePath?: string | null;
             downloadUrl?: string | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        ExportJobBundle: {
+            job: components["schemas"]["Job"];
+            export: Record<string, never> | null;
         };
     };
     responses: {
@@ -1026,7 +1042,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Project"];
+                    "application/json": components["schemas"]["ProjectDetail"];
                 };
             };
             404: components["responses"]["NotFound"];
@@ -1078,54 +1094,6 @@ export interface operations {
             };
         };
     };
-    listVariants: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Variants. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VariantList"];
-                };
-            };
-        };
-    };
-    createVariant: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateVariantInput"];
-            };
-        };
-        responses: {
-            /** @description Variant created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Variant"];
-                };
-            };
-        };
-    };
     listAssets: {
         parameters: {
             query?: never;
@@ -1162,15 +1130,14 @@ export interface operations {
                 "multipart/form-data": {
                     /** Format: binary */
                     file: string;
-                    role: components["schemas"]["AssetRole"];
-                    /** Format: uuid */
-                    variantId?: string | null;
+                    role?: components["schemas"]["AssetRole"];
+                    kind?: components["schemas"]["UserAssetKind"];
                 };
             };
         };
         responses: {
             /** @description Asset uploaded. */
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1214,8 +1181,7 @@ export interface operations {
             content: {
                 "application/json": {
                     role?: components["schemas"]["AssetRole"];
-                    /** Format: uuid */
-                    variantId?: string | null;
+                    kind?: components["schemas"]["UserAssetKind"];
                 };
             };
         };
@@ -1275,7 +1241,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Storyboard"];
+                    "application/json": components["schemas"]["StoryboardBundle"];
                 };
             };
         };
@@ -1289,10 +1255,10 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "application/json": {
-                    version: number;
+                    version?: number;
                 };
             };
         };
@@ -1333,6 +1299,27 @@ export interface operations {
                     "application/json": components["schemas"]["StoryboardItem"];
                 };
             };
+        };
+    };
+    deleteStoryboardItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["StoryboardItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft storyboard item deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: components["responses"]["Conflict"];
         };
     };
     createGenerationJobs: {
@@ -1446,7 +1433,10 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    decision: "SELECTED" | "REJECTED" | "NEEDS_REVIEW";
+                    reviewDecision?: "SELECTED" | "REJECTED" | "NEEDS_REVIEW";
+                    reviewNote?: string;
+                    /** @enum {string} */
+                    decision?: "SELECTED" | "REJECTED" | "NEEDS_REVIEW";
                     note?: string;
                 };
             };
@@ -1484,7 +1474,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Job"];
+                    "application/json": components["schemas"]["ExportJobBundle"];
                 };
             };
         };

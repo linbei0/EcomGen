@@ -46,6 +46,19 @@ export function useUpdateStoryboardItem(projectId: string) {
   });
 }
 
+export function useDeleteStoryboardItem(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (itemId: string) => {
+      await api.DELETE("/storyboard-items/{itemId}", { params: { path: { itemId } } });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: qk.storyboard(projectId) });
+      void queryClient.invalidateQueries({ queryKey: qk.project(projectId) });
+    },
+  });
+}
+
 export function useConfirmStoryboard(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({

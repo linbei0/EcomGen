@@ -171,7 +171,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Project'
+                $ref: '#/components/schemas/ProjectDetail'
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       operationId: updateProject
@@ -192,33 +192,6 @@ paths:
       operationId: deleteProject
       responses:
         '204': { description: Project deleted. }
-  /projects/{projectId}/variants:
-    parameters:
-      - $ref: '#/components/parameters/ProjectId'
-    get:
-      operationId: listVariants
-      responses:
-        '200':
-          description: Variants.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VariantList'
-    post:
-      operationId: createVariant
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateVariantInput'
-      responses:
-        '201':
-          description: Variant created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Variant'
   /projects/{projectId}/assets:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -239,13 +212,13 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file, role]
+              required: [file]
               properties:
                 file: { type: string, format: binary }
                 role: { $ref: '#/components/schemas/AssetRole' }
-                variantId: { type: [string, 'null'], format: uuid }
+                kind: { $ref: '#/components/schemas/UserAssetKind' }
       responses:
-        '201':
+        '200':
           description: Asset uploaded.
           content:
             application/json:
@@ -263,8 +236,8 @@ paths:
             schema:
               type: object
               properties:
-                role: { $ref: '#/components/schemas/AssetRole' }
-                variantId: { type: [string, 'null'], format: uuid }
+                 role: { $ref: '#/components/schemas/AssetRole' }
+                 kind: { $ref: '#/components/schemas/UserAssetKind' }
       responses:
         '200':
           description: Asset updated.
@@ -305,21 +278,20 @@ paths:
         '200':
           description: Current storyboard.
           content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Storyboard'
+             application/json:
+               schema:
+                 $ref: '#/components/schemas/StoryboardBundle'
   /projects/{projectId}/storyboard/confirm:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     post:
       operationId: confirmStoryboard
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               type: object
-              required: [version]
               properties:
                 version: { type: integer, minimum: 1 }
       responses:
@@ -348,6 +320,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StoryboardItem'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      operationId: deleteStoryboardItem
+      responses:
+        '204':
+          description: Draft storyboard item deleted.
+        '409':
+          $ref: '#/components/responses/Conflict'
   /projects/{projectId}/generation-jobs:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -426,8 +407,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [decision]
               properties:
+                reviewDecision: { type: string, enum: [SELECTED, REJECTED, NEEDS_REVIEW] }
+                reviewNote: { type: string, maxLength: 1000 }
                 decision: { type: string, enum: [SELECTED, REJECTED, NEEDS_REVIEW] }
                 note: { type: string, maxLength: 1000 }
       responses:
@@ -454,7 +436,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Job'
+                $ref: '#/components/schemas/ExportJobBundle'
   /exports/{exportId}:
     parameters:
       - $ref: '#/components/parameters/ExportId'
@@ -586,9 +568,13 @@ components:
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/ProviderConfig' } }
         nextCursor: { type: [string, 'null'] }
+    ImageResolution: { type: string, enum: [1K, 2K, 4K] }
+    ImageAspectRatio: { type: string, enum: [AUTO, '1:1', '3:4', '4:3', '16:9'] }
+    PlanningMode: { type: string, enum: [AI, MANUAL] }
+    UserAssetKind: { type: string, enum: [PRODUCT, REFERENCE] }
     Project:
       type: object
-      required: [id, name, platformTargets, reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, defaultMode, createdAt, updatedAt]
+      required: [id, name, platformTargets, reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, defaultMode, imageResolution, imageAspectRatio, candidatesPerType, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -603,8 +589,22 @@ components:
         imageProviderId: { type: string, format: uuid }
         imageModelId: { type: string }
         defaultMode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
+        imageResolution: { $ref: '#/components/schemas/ImageResolution' }
+        imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
+        candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    ProjectDetail:
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          required: [assets, storyboard, items, outputs, jobs]
+          properties:
+            assets: { type: array, items: { $ref: '#/components/schemas/Asset' } }
+            storyboard: { type: [object, 'null'] }
+            items: { type: array, items: { $ref: '#/components/schemas/StoryboardItem' } }
+            outputs: { type: array, items: { $ref: '#/components/schemas/Output' } }
+            jobs: { type: array, items: { $ref: '#/components/schemas/Job' } }
     ModelRef:
       type: object
       required: [providerId, modelId]
@@ -627,6 +627,9 @@ components:
         imageProviderId: { type: string, format: uuid }
         imageModelId: { type: string }
         defaultMode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
+        imageResolution: { $ref: '#/components/schemas/ImageResolution' }
+        imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
+        candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
     UpdateProjectInput:
       type: object
       properties:
@@ -640,43 +643,26 @@ components:
         reasoningModel: { $ref: '#/components/schemas/ModelRef' }
         imageModel: { $ref: '#/components/schemas/ModelRef' }
         defaultMode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
+        imageResolution: { $ref: '#/components/schemas/ImageResolution' }
+        imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
+        candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
     ProjectList:
       type: object
       required: [items, nextCursor]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/Project' } }
         nextCursor: { type: [string, 'null'] }
-    Variant:
-      type: object
-      required: [id, projectId, name, createdAt]
-      properties:
-        id: { type: string, format: uuid }
-        projectId: { type: string, format: uuid }
-        name: { type: string }
-        attributes: { type: object, additionalProperties: { type: string } }
-        createdAt: { type: string, format: date-time }
-    CreateVariantInput:
-      type: object
-      required: [name]
-      properties:
-        name: { type: string, minLength: 1 }
-        attributes: { type: object, additionalProperties: { type: string } }
-    VariantList:
-      type: object
-      required: [items, nextCursor]
-      properties:
-        items: { type: array, items: { $ref: '#/components/schemas/Variant' } }
-        nextCursor: { type: [string, 'null'] }
     AssetRole: { type: string, enum: [PRODUCT_TRUTH, PACKAGING, STYLE_REFERENCE, LAYOUT_REFERENCE] }
     Asset:
       type: object
-      required: [id, projectId, role, url, mimeType, createdAt]
+      required: [id, projectId, role, mimeType, createdAt]
       properties:
         id: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
-        variantId: { type: [string, 'null'], format: uuid }
         role: { $ref: '#/components/schemas/AssetRole' }
+        kind: { $ref: '#/components/schemas/UserAssetKind' }
         url: { type: string }
+        storagePath: { type: string }
         mimeType: { type: string }
         width: { type: [integer, 'null'] }
         height: { type: [integer, 'null'] }
@@ -689,37 +675,53 @@ components:
         nextCursor: { type: [string, 'null'] }
     CreatePlanningJobInput:
       type: object
-      required: [imageTypes]
       properties:
-        imageTypes: { type: array, minItems: 1, items: { type: string } }
-        allowAgentRecommendations: { type: boolean, default: false }
+        planningMode: { $ref: '#/components/schemas/PlanningMode' }
+        requestedTypes: { type: array, items: { type: string } }
+        imageTypes: { type: array, items: { type: string } }
         userInstruction: { type: string, maxLength: 4000 }
+        candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
+        imageResolution: { $ref: '#/components/schemas/ImageResolution' }
+        imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
+        regenerationKey: { type: string, minLength: 1, description: Unique key for an intentional re-planning run. }
     Storyboard:
       type: object
-      required: [projectId, version, status, campaignStyleLock, items]
+      required: [projectId, version, status, campaignStyleLock]
       properties:
         projectId: { type: string, format: uuid }
         version: { type: integer, minimum: 1 }
         status: { type: string, enum: [DRAFT, CONFIRMED] }
         campaignStyleLock: { type: string }
         items: { type: array, items: { $ref: '#/components/schemas/StoryboardItem' } }
+    StoryboardBundle:
+      type: object
+      required: [storyboard, items]
+      properties:
+        storyboard: { type: [object, 'null'] }
+        items: { type: array, items: { $ref: '#/components/schemas/StoryboardItem' } }
     StoryboardItem:
       type: object
-      required: [id, assetType, variantScope, mode, status, promptInstruction, riskFlags]
+      required: [id, assetType, displayName, candidateCount, mode, status, promptInstruction, riskFlags]
       properties:
         id: { type: string, format: uuid }
-        assetType: { type: string }
-        variantScope: { type: string, description: COMMON or a Variant UUID }
+        assetType: { type: string, description: Immutable ecom-details-image template ID; it cannot be changed after planning. }
+        displayName: { type: string }
+        templateVariant: { type: [string, 'null'] }
+        candidateCount: { type: integer, minimum: 1, maximum: 4 }
+        referencedAssets: { type: array, items: { type: string, format: uuid } }
         mode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
         status: { type: string, enum: [DRAFT, CONFIRMED, GENERATING, GENERATED] }
         promptInstruction: { type: string }
-        factClaims: { type: array, items: { type: object } }
+        factClaims: { type: array, items: { type: string } }
         riskFlags: { type: array, items: { type: string } }
     UpdateStoryboardItemInput:
       type: object
       properties:
-        assetType: { type: string }
-        variantScope: { type: string }
+        assetType: { type: string, description: Immutable ecom-details-image template ID; it cannot be changed after planning. }
+        displayName: { type: string }
+        templateVariant: { type: [string, 'null'] }
+        candidateCount: { type: integer, minimum: 1, maximum: 4 }
+        referencedAssets: { type: array, items: { type: string, format: uuid } }
         mode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
         promptInstruction: { type: string, maxLength: 4000 }
     Job:
@@ -742,19 +744,29 @@ components:
         updatedAt: { type: string, format: date-time }
     Output:
       type: object
-      required: [id, storyboardItemId, url, reviewDecision, createdAt]
+      required: [id, storyboardItemId, reviewDecision, createdAt]
       properties:
         id: { type: string, format: uuid }
         storyboardItemId: { type: string, format: uuid }
+        candidateIndex: { type: integer, minimum: 1 }
+        generationSnapshot:
+          type: [object, 'null']
+          properties:
+            resolution: { $ref: '#/components/schemas/ImageResolution' }
+            aspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
+            size: { type: string }
+            candidateIndex: { type: integer, minimum: 1 }
         url: { type: string }
+        storagePath: { type: string }
         reviewDecision: { type: string, enum: [SELECTED, REJECTED, NEEDS_REVIEW] }
+        reviewNote: { type: [string, 'null'] }
         createdAt: { type: string, format: date-time }
     CreateExportJobInput:
       type: object
-      required: [outputIds, platformTargets]
       properties:
-        outputIds: { type: array, minItems: 1, items: { type: string, format: uuid } }
-        platformTargets: { type: array, minItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        outputIds: { type: array, items: { type: string, format: uuid } }
+        filenamePrefix: { type: string }
+        platformTargets: { type: array, items: { type: string, enum: [DOMESTIC, AMAZON] } }
         includeDetailPageSlices: { type: boolean, default: false }
     Export:
       type: object
@@ -762,6 +774,14 @@ components:
       properties:
         id: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
+        jobId: { type: string, format: uuid }
         status: { type: string, enum: [QUEUED, RUNNING, SUCCEEDED, FAILED] }
+        storagePath: { type: [string, 'null'] }
         downloadUrl: { type: [string, 'null'] }
         createdAt: { type: string, format: date-time }
+    ExportJobBundle:
+      type: object
+      required: [job, export]
+      properties:
+        job: { $ref: '#/components/schemas/Job' }
+        export: { type: [object, 'null'] }

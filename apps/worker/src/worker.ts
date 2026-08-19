@@ -3,8 +3,9 @@ import { resolve } from "node:path";
 import { Worker } from "bullmq";
 import archiver from "archiver";
 import { planStoryboard } from "@ecomgen/agent";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type JobRecord, type ProjectRecord, type StoryboardItemRecord } from "@ecomgen/core";
 import { getTemplate, templatePromptContract } from "@ecomgen/ecom-skill";
+import { resolveImageSize, userAssetKindForRole, type ImageAspectRatio, type ImageResolution, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel } from "@ecomgen/providers";
 
@@ -51,10 +52,36 @@ async function executePlan(job: JobRecord): Promise<void> {
   const project = projectFor(job); const provider = providerFor(project.reasoningProviderId); const model = provider.models.find((candidate) => candidate.id === project.reasoningModelId);
   if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
   await updateJob(job, { progress: 25 });
-  const assets = repository.listAssets(project.id); const imageAssets = assets.filter((asset) => asset.mimeType.startsWith("image/")).slice(0, 4);
-  const referenceImages = model.supportsVision ? await Promise.all(imageAssets.map(async (asset) => ({ type: "image" as const, mimeType: asset.mimeType, data: (await storage.read(asset.storagePath)).toString("base64") }))) : undefined;
-  const input = job.input as { requestedTypes?: string[]; requestedCount?: number };
-  const plan = await planStoryboard({ model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }), apiKey: secrets.decrypt(provider.encryptedApiKey), projectName: project.name, productCategory: project.category, productDescription: project.productDescription, verifiedFacts: project.verifiedFacts, prohibitedClaims: project.prohibitedClaims, brandGuidelines: project.brandGuidelines, platformTargets: project.platformTargets, defaultMode: project.defaultMode, variants: repository.listVariants(project.id), assets: assets.map((asset) => ({ id: asset.id, role: asset.role, variantId: asset.variantId, name: asset.originalName, mimeType: asset.mimeType })), referenceImages, requestedTypes: input.requestedTypes, requestedCount: input.requestedCount });
+  const assets = repository.listAssets(project.id);
+  const productImages = assets.filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/")).slice(0, 4);
+  const referenceImages = model.supportsVision ? await Promise.all(productImages.map(async (asset) => ({ type: "image" as const, mimeType: asset.mimeType, data: (await storage.read(asset.storagePath)).toString("base64") }))) : undefined;
+  const input = job.input as { planningMode?: PlanningMode; requestedTypes?: string[]; userInstruction?: string; candidatesPerType?: number; imageResolution?: ImageResolution; imageAspectRatio?: ImageAspectRatio };
+  if (input.imageResolution || input.imageAspectRatio || input.candidatesPerType) {
+    repository.updateProject(project.id, {
+      imageResolution: input.imageResolution ?? project.imageResolution,
+      imageAspectRatio: input.imageAspectRatio ?? project.imageAspectRatio,
+      candidatesPerType: input.candidatesPerType ?? project.candidatesPerType
+    });
+  }
+  const plannerAssets = assets.map((asset) => ({ id: asset.id, role: asset.role, kind: userAssetKindForRole(asset.role), name: asset.originalName, mimeType: asset.mimeType }));
+  const plan = await planStoryboard({
+      model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
+      apiKey: secrets.decrypt(provider.encryptedApiKey),
+      projectName: project.name,
+      productCategory: project.category,
+      productDescription: project.productDescription,
+      verifiedFacts: project.verifiedFacts,
+      prohibitedClaims: project.prohibitedClaims,
+      brandGuidelines: project.brandGuidelines,
+      platformTargets: project.platformTargets,
+      defaultMode: project.defaultMode,
+      assets: plannerAssets,
+      referenceImages,
+      planningMode: input.planningMode ?? "AI",
+      requestedTypes: input.requestedTypes,
+      userInstruction: input.userInstruction,
+      candidatesPerType: input.candidatesPerType ?? project.candidatesPerType
+    });
   throwIfCancelled(job);
   const storyboard = repository.saveStoryboard(project.id, plan.campaignStyleLock, "DRAFT", plan.items.map((item) => ({ ...item, status: "DRAFT", compiledPrompt: null })));
   await updateJob(job, { progress: 90 }); await events.publish(project.id, "storyboard.updated", { storyboard, items: repository.listStoryboardItems(project.id) });
@@ -65,16 +92,33 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   if (!job.storyboardItemId) throw new Error("Generation job has no storyboard item");
   const project = projectFor(job); const item = repository.getStoryboardItem(job.storyboardItemId); if (!item || item.projectId !== project.id) throw new Error("Storyboard item is missing or belongs to another project");
   const provider = providerFor(project.imageProviderId); const model = provider.models.find((candidate) => candidate.id === project.imageModelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images") throw new Error("Only OpenAI-compatible Images API models are currently executable");
-  const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`); const inputs = generationAssets(project, item.variantScope, item.mode);
-  if (item.mode === "PIXEL_PROTECTED" && inputs.length === 0) throw new Error("PIXEL_PROTECTED generation requires a PRODUCT_TRUTH image for the selected variant or COMMON scope");
-  const revision = typeof job.input.revision === "string" ? job.input.revision : undefined; const prompt = compilePrompt(project, storyboard.campaignStyleLock, item, templatePromptContract(template, project.platformTargets, item.templateVariant, project.category), revision);
+  const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`);
+  const inputs = generationAssets(project, item.mode);
+  if (item.mode === "PIXEL_PROTECTED" && inputs.length === 0) throw new Error("PIXEL_PROTECTED generation requires a PRODUCT_TRUTH image on the project");
+  const revision = typeof job.input.revision === "string" ? job.input.revision : undefined;
+  const candidateIndex = typeof job.input.candidateIndex === "number" ? job.input.candidateIndex : 1;
+  const resolution = (typeof job.input.imageResolution === "string" ? job.input.imageResolution : project.imageResolution) as ImageResolution;
+  const aspectRatio = (typeof job.input.imageAspectRatio === "string" ? job.input.imageAspectRatio : project.imageAspectRatio) as ImageAspectRatio;
+  const size = resolveImageSize(resolution, aspectRatio, template.defaultSize);
+  const prompt = compilePrompt(project, storyboard.campaignStyleLock, item, templatePromptContract(template, project.platformTargets, item.templateVariant, project.category), revision);
   repository.updateStoryboardItem(item.id, { status: "GENERATING", compiledPrompt: prompt }); await updateJob(job, { progress: 30 });
   const images = template.supports_image_reference ? await Promise.all(inputs.map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType }))) : [];
-  const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }); const result = await generator.generate({ model: model.id, prompt, size: template.defaultSize, quality: "high", images: images.length ? images : undefined });
+  const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }); const result = await generator.generate({ model: model.id, prompt, size, quality: "high", images: images.length ? images : undefined });
   throwIfCancelled(job);
   await updateJob(job, { progress: 80, providerTaskId: result.providerTaskId ?? null }); const stored = await storage.putOutput(project.id, result.image, extensionForMime(result.mimeType));
   throwIfCancelled(job);
-  const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, storagePath: stored.path, hash: stored.hash, reviewDecision: "NEEDS_REVIEW", reviewNote: null }); repository.updateStoryboardItem(item.id, { status: "GENERATED" }); await events.publish(project.id, "output.created", { output });
+  const output = repository.createOutput({
+    projectId: project.id,
+    storyboardItemId: item.id,
+    jobId: job.id,
+    candidateIndex,
+    generationSnapshot: { resolution, aspectRatio, size, candidateIndex },
+    storagePath: stored.path,
+    hash: stored.hash,
+    reviewDecision: "NEEDS_REVIEW",
+    reviewNote: null
+  });
+  repository.updateStoryboardItem(item.id, { status: "GENERATED" }); await events.publish(project.id, "output.created", { output });
 }
 
 async function executeExport(job: JobRecord): Promise<void> {
@@ -83,15 +127,26 @@ async function executeExport(job: JobRecord): Promise<void> {
   const outputs = repository.listOutputs(project.id).filter((output) => !outputIds || outputIds.includes(output.id)); if (outputs.length === 0) throw new Error("No outputs are available for export");
   const exportRecord = repository.getExportByJobId(job.id); await updateJob(job, { progress: 25 }); const imageFiles = await Promise.all(outputs.map(async (output, index) => ({ name: exportFileName(project, output, index), content: await storage.read(output.storagePath) })));
   // manifest 让导出包可追溯到事实、模板、Prompt、审核结果和输出内容 hash。
-  const manifest = { version: 1, generatedAt: new Date().toISOString(), project: { id: project.id, name: project.name, platforms: project.platformTargets, category: project.category }, facts: { verified: project.verifiedFacts, prohibited: project.prohibitedClaims, brandGuidelines: project.brandGuidelines }, storyboard: outputs.map((output) => { const item = repository.getStoryboardItem(output.storyboardItemId); return { outputId: output.id, jobId: output.jobId, assetType: item?.assetType ?? null, templateVariant: item?.templateVariant ?? null, mode: item?.mode ?? null, variantScope: item?.variantScope ?? null, prompt: item?.compiledPrompt ?? null, reviewDecision: output.reviewDecision, sha256: output.hash }; }) };
+  const manifest = { version: 1, generatedAt: new Date().toISOString(), project: { id: project.id, name: project.name, platforms: project.platformTargets, category: project.category, imageResolution: project.imageResolution, imageAspectRatio: project.imageAspectRatio }, facts: { verified: project.verifiedFacts, prohibited: project.prohibitedClaims, brandGuidelines: project.brandGuidelines }, storyboard: outputs.map((output) => { const item = repository.getStoryboardItem(output.storyboardItemId); return { outputId: output.id, jobId: output.jobId, assetType: item?.assetType ?? null, displayName: item?.displayName ?? null, templateVariant: item?.templateVariant ?? null, mode: item?.mode ?? null, candidateIndex: output.candidateIndex, generationSnapshot: output.generationSnapshot, prompt: item?.compiledPrompt ?? null, reviewDecision: output.reviewDecision, sha256: output.hash }; }) };
   const archive = await createZip([...imageFiles, { name: "manifest.json", content: Buffer.from(JSON.stringify(manifest, null, 2), "utf8") }]); const stored = await storage.putExport(project.id, archive);
   const target = exportRecord ?? repository.createExport({ projectId: project.id, jobId: job.id, status: "QUEUED", storagePath: null }); const updated = repository.updateExport(target.id, { status: "SUCCEEDED", storagePath: stored.path }); await events.publish(project.id, "export.updated", { export: updated });
 }
 
 function projectFor(job: JobRecord): ProjectRecord { const project = repository.getProject(job.projectId); if (!project) throw new Error(`Project not found for job ${job.id}`); return project; }
 function providerFor(id: string) { const provider = repository.getProvider(id); if (!provider) throw new Error(`Configured provider not found: ${id}`); return provider; }
-function generationAssets(project: ProjectRecord, variantScope: string, mode: string): AssetRecord[] { const all = repository.listAssets(project.id).filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/")); return all.filter((asset) => asset.variantId === (variantScope === "COMMON" ? null : variantScope)).slice(0, mode === "PIXEL_PROTECTED" ? undefined : 4); }
-function compilePrompt(project: ProjectRecord, styleLock: string, item: { assetType: string; variantScope: string; mode: string; promptInstruction: string }, templateContract: string, revision?: string): string { const preserve = item.mode === "PIXEL_PROTECTED" ? "Use the provided product reference as a pixel-preserved cutout. Preserve its exact color, label, logo, shape, texture, and visible pose. Only create the environment, background, typography-free composition, and auxiliary visual elements around it. Do not invent unseen product sides or angles." : "Use provided product references as product truth. Keep identity consistent; never make factual claims that are not supplied."; const facts = project.verifiedFacts.length ? `Use only these verified product facts when a claim is needed: ${project.verifiedFacts.join(" | ")}.` : "No verified product facts were supplied; use visual placeholders instead of factual claims."; const prohibited = project.prohibitedClaims.length ? `Never claim: ${project.prohibitedClaims.join(" | ")}.` : ""; const brand = Object.keys(project.brandGuidelines).length ? `Brand guidelines: ${Object.entries(project.brandGuidelines).map(([key, value]) => `${key}=${value}`).join("; ")}.` : ""; return `Campaign Style Lock (repeat this visual contract exactly): ${styleLock}. ${templateContract} ${brand} Create one ${item.assetType} e-commerce image for ${project.platformTargets.join(" + ")}. Variant scope: ${item.variantScope}. ${preserve} ${facts} ${prohibited} Direction: ${item.promptInstruction}${revision ? ` Revision request: ${revision}` : ""} Do not place price, unsupported claims, certification marks, dimensions, or readable promotional copy in the image. Negative constraints: no props unless explicitly requested, no hands, no watermarks, no fake logos, no extra text, no decorative gradients.`; }
+function generationAssets(project: ProjectRecord, mode: string): AssetRecord[] {
+  const all = repository.listAssets(project.id).filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/"));
+  return mode === "PIXEL_PROTECTED" ? all : all.slice(0, 4);
+}
+function compilePrompt(project: ProjectRecord, styleLock: string, item: Pick<StoryboardItemRecord, "assetType" | "displayName" | "mode" | "promptInstruction">, templateContract: string, revision?: string): string {
+  const preserve = item.mode === "PIXEL_PROTECTED"
+    ? "Use the provided product reference as a pixel-preserved cutout. Preserve its exact color, label, logo, shape, texture, and visible pose. Only create the environment, background, typography-free composition, and auxiliary visual elements around it. Do not invent unseen product sides or angles."
+    : "Use provided product references as product truth. Keep identity consistent; never make factual claims that are not supplied.";
+  const facts = project.verifiedFacts.length ? `Use only these verified product facts when a claim is needed: ${project.verifiedFacts.join(" | ")}.` : "No verified product facts were supplied; use visual placeholders instead of factual claims.";
+  const prohibited = project.prohibitedClaims.length ? `Never claim: ${project.prohibitedClaims.join(" | ")}.` : "";
+  const brand = Object.keys(project.brandGuidelines).length ? `Brand guidelines: ${Object.entries(project.brandGuidelines).map(([key, value]) => `${key}=${value}`).join("; ")}.` : "";
+  return `Campaign Style Lock (repeat this visual contract exactly): ${styleLock}. ${templateContract} ${brand} Create one ${item.displayName} e-commerce image for ${project.platformTargets.join(" + ")}. ${preserve} ${facts} ${prohibited} Direction: ${item.promptInstruction}${revision ? ` Revision request: ${revision}` : ""} Do not place price, unsupported claims, certification marks, dimensions, or readable promotional copy in the image. Negative constraints: no props unless explicitly requested, no hands, no watermarks, no fake logos, no extra text, no decorative gradients.`;
+}
 async function updateJob(job: JobRecord, patch: Parameters<EcomRepository["updateJob"]>[1]): Promise<void> { const updated = repository.updateJob(job.id, patch); if (updated) await events.publish(job.projectId, "job.updated", updated); }
 class JobCancelled extends Error {}
 function throwIfCancelled(job: JobRecord): void { const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") throw new JobCancelled(`Job ${job.id} was cancelled`); }

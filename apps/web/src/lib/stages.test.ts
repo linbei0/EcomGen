@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProjectDetail } from "../api/adapters/projectDetail";
-import { completedStages, deriveStage, parseStage } from "./stages";
+import { completedViews, deriveView, parseView } from "./stages";
 
 function detail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
   return {
@@ -13,9 +13,11 @@ function detail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     imageProviderId: "i",
     imageModelId: "img",
     defaultMode: "CREATIVE",
+    imageResolution: "1K",
+    imageAspectRatio: "AUTO",
+    candidatesPerType: 1,
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-08-01T00:00:00.000Z",
-    variants: [],
     assets: [],
     storyboard: null,
     items: [],
@@ -25,38 +27,44 @@ function detail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
   };
 }
 
-describe("stages", () => {
-  it("非法 stage 回退到 fallback", () => {
-    expect(parseStage("nope", "plan")).toBe("plan");
-    expect(parseStage("review", "assets")).toBe("review");
+describe("views", () => {
+  it("兼容旧 stage 参数并回退未知值", () => {
+    expect(parseView("nope", "setup")).toBe("setup");
+    expect(parseView("assets", "results")).toBe("setup");
+    expect(parseView("plan", "results")).toBe("setup");
+    expect(parseView("storyboard", "setup")).toBe("storyboard");
+    expect(parseView("generate", "setup")).toBe("results");
+    expect(parseView("review", "setup")).toBe("results");
+    expect(parseView("export", "setup")).toBe("results");
   });
 
-  it("按数据推导当前阶段与已完成集合", () => {
-    expect(deriveStage(detail())).toBe("assets");
-    expect(deriveStage(detail({ assets: [{ id: "a" } as ProjectDetail["assets"][number]] }))).toBe("assets");
+  it("按数据推导当前视图与已完成集合", () => {
+    expect(deriveView(detail())).toBe("setup");
+    expect(deriveView(detail({ assets: [{ id: "a" } as ProjectDetail["assets"][number]] }))).toBe("setup");
     expect(
-      deriveStage(
+      deriveView(
         detail({
           storyboard: { projectId: "p1", version: 1, status: "DRAFT", campaignStyleLock: "", items: [] },
         }),
       ),
-    ).toBe("plan");
+    ).toBe("storyboard");
     expect(
-      deriveStage(
+      deriveView(
         detail({
-          storyboard: { projectId: "p1", version: 1, status: "CONFIRMED", campaignStyleLock: "", items: [] },
+          outputs: [{ id: "o" } as ProjectDetail["outputs"][number]],
         }),
       ),
-    ).toBe("storyboard");
+    ).toBe("results");
 
-    const done = completedStages(
+    const done = completedViews(
       detail({
         assets: [{ id: "a" } as ProjectDetail["assets"][number]],
+        storyboard: { projectId: "p1", version: 1, status: "DRAFT", campaignStyleLock: "", items: [] },
         outputs: [{ reviewDecision: "SELECTED" } as ProjectDetail["outputs"][number]],
       }),
     );
-    expect(done.has("assets")).toBe(true);
-    expect(done.has("generate")).toBe(true);
-    expect(done.has("review")).toBe(true);
+    expect(done.has("setup")).toBe(true);
+    expect(done.has("storyboard")).toBe(true);
+    expect(done.has("results")).toBe(true);
   });
 });

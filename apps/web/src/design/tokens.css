@@ -14,8 +14,8 @@
 
   /* 文本：暖调 off-white。text-3 需在 bg-0 上 ≥4.5:1（WCAG AA 小字） */
   --text-1: #edece6;
-  --text-2: #a6a49c;
-  --text-3: #807e77;
+  --text-2: #b3b1a9;
+  --text-3: #8b897f;
 
   /* 唯一强调色：钨丝琥珀 HSL(39,66%,55%) */
   --accent: #d9a441;

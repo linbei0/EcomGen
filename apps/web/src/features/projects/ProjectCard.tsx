@@ -9,7 +9,7 @@ import styles from "./ProjectCard.module.css";
 export function ProjectCard({ project }: { project: Project }) {
   const platforms = project.platformTargets.map((item) => PLATFORM_LABEL[item]).join(" / ");
   return (
-    <Link to={`/projects/${project.id}?stage=assets`} className={styles.card}>
+    <Link to={`/projects/${project.id}?view=setup`} className={styles.card}>
       <div className={styles.cover} aria-hidden>
         <span className={styles.coverMark}>{project.name.slice(0, 1)}</span>
       </div>

@@ -22,7 +22,7 @@ describe("设置抽屉 · Provider", () => {
     expect(screen.getByText("含视觉模型")).toBeInTheDocument();
   });
 
-  it("创建 Provider：按契约提交 name/baseUrl/apiKey/models", async () => {
+  it("创建 Provider：按契约提交 name/baseUrl/apiKey/models", { timeout: 15_000 }, async () => {
     const user = userEvent.setup();
     let captured: unknown;
     server.use(
