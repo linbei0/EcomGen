@@ -25,6 +25,7 @@ function migrate(database: SqliteDatabase): void {
       prohibited_claims_json TEXT NOT NULL DEFAULT '[]',
       brand_guidelines_json TEXT NOT NULL DEFAULT '{}',
       base_url TEXT NOT NULL,
+      reasoning_protocol TEXT NOT NULL DEFAULT 'openai',
       encrypted_api_key TEXT NOT NULL,
       models_json TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -147,4 +148,8 @@ function migrate(database: SqliteDatabase): void {
       FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
     );
   `);
+  const providerColumns = database.prepare("PRAGMA table_info(providers)").all() as Array<{ name: string }>;
+  if (!providerColumns.some((column) => column.name === "reasoning_protocol")) {
+    database.exec("ALTER TABLE providers ADD COLUMN reasoning_protocol TEXT NOT NULL DEFAULT 'openai'");
+  }
 }

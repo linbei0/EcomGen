@@ -21,7 +21,9 @@ try {
       observed.planningPrompt = body.toString("utf8");
       response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
       response.write(`data: ${JSON.stringify({ id: "mock-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(plan) }, finish_reason: null }] })}\n\n`);
-      response.end("data: [DONE]\n\n");
+      response.write(`data: ${JSON.stringify({ id: "mock-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+      response.write("data: [DONE]\n\n");
+      response.end();
       return;
     }
     if (request.url === "/v1/models") {
@@ -56,12 +58,15 @@ try {
   const provider = await requestJson(`${base}/providers`, "POST", {
     name: "Mock OpenAI provider",
     baseUrl: `http://127.0.0.1:${mockPort}/v1`,
+    reasoningProtocol: "openai",
     apiKey: "mock-key",
     models: [
-      { id: "mock-reasoner", supportsVision: false, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
-      { id: "mock-image", supportsVision: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" }
+      { id: "mock-reasoner", supportsVision: false, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
+      { id: "mock-image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" }
     ]
   });
+  const reasoningProbe = await requestJson(`${base}/providers/${provider.id}/test`, "POST", { modelId: "mock-reasoner", kind: "reasoning" });
+  assert.equal(reasoningProbe.ok, true);
   const probe = await requestJson(`${base}/providers/${provider.id}/test`, "POST", { modelId: "mock-image", kind: "image" });
   assert.equal(probe.modelAvailable, true);
   const project = await requestJson(`${base}/projects`, "POST", {

@@ -208,6 +208,9 @@ importers:
 
   packages/providers:
     dependencies:
+      '@earendil-works/pi-ai':
+        specifier: ^0.84.2
+        version: 0.84.2(supports-color@10.2.2)(ws@8.21.3)
       '@ecomgen/contracts':
         specifier: workspace:*
         version: link:../contracts

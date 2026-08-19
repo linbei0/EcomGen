@@ -7,8 +7,8 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type ProviderRecord } from "@ecomgen/core";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus } from "@ecomgen/jobs";
-import type { AssetRole, ModelDefinition, OutputReviewDecision, PlatformTarget, StoryboardMode } from "@ecomgen/contracts";
-import { OpenAiCompatibleImageProvider, ProviderError } from "@ecomgen/providers";
+import type { AssetRole, ModelDefinition, OutputReviewDecision, PlatformTarget, ReasoningProtocolProfile, StoryboardMode } from "@ecomgen/contracts";
+import { OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
 import { applyModelFields } from "./projectPatch.js";
@@ -42,13 +42,15 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const body = object(request.body, "body");
     const models = requireModels(body.models);
     const apiKey = string(body.apiKey, "apiKey");
-    const record = repository.saveProvider({ name: string(body.name, "name"), baseUrl: string(body.baseUrl, "baseUrl"), encryptedApiKey: secrets.encrypt(apiKey), models });
+    const reasoningProtocol = enumValue<ReasoningProtocolProfile>(body.reasoningProtocol ?? "openai", ["openai", "dashscope_qwen"], "reasoningProtocol");
+    const record = repository.saveProvider({ name: string(body.name, "name"), baseUrl: string(body.baseUrl, "baseUrl"), reasoningProtocol, encryptedApiKey: secrets.encrypt(apiKey), models });
     await events.publish("system", "provider.updated", publicProvider(record)); return reply.code(201).send(publicProvider(record));
   });
   app.patch("/api/v1/providers/:providerId", async (request) => {
     const id = parameter(request, "providerId"); const current = repository.getProvider(id); if (!current) missing("provider", id);
     const body = object(request.body, "body");
-    const record = repository.saveProvider({ id, name: optionalString(body.name) ?? current.name, baseUrl: optionalString(body.baseUrl) ?? current.baseUrl, encryptedApiKey: body.apiKey ? secrets.encrypt(string(body.apiKey, "apiKey")) : current.encryptedApiKey, models: body.models ? requireModels(body.models) : current.models });
+    const reasoningProtocol = body.reasoningProtocol === undefined ? current.reasoningProtocol : enumValue<ReasoningProtocolProfile>(body.reasoningProtocol, ["openai", "dashscope_qwen"], "reasoningProtocol");
+    const record = repository.saveProvider({ id, name: optionalString(body.name) ?? current.name, baseUrl: optionalString(body.baseUrl) ?? current.baseUrl, reasoningProtocol, encryptedApiKey: body.apiKey ? secrets.encrypt(string(body.apiKey, "apiKey")) : current.encryptedApiKey, models: body.models ? requireModels(body.models) : current.models });
     await events.publish("system", "provider.updated", publicProvider(record)); return publicProvider(record);
   });
   app.post("/api/v1/providers/:providerId/test", async (request) => {
@@ -56,7 +58,14 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const body = object(request.body, "body"); const modelId = string(body.modelId, "modelId"); const kind = enumValue<"reasoning" | "image">(body.kind ?? "image", ["reasoning", "image"], "kind");
     const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new ApiError(400, "VALIDATION_ERROR", "modelId is not declared by the selected provider");
     if (kind === "image" && !model.imageApiKind) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected image model has no image API configured");
-    try { const probe = await new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }).probe(); return { ok: true, providerId, modelId, kind, ...probe, modelAvailable: probe.models === null ? null : probe.models.includes(modelId) }; }
+    try {
+      if (kind === "reasoning") {
+        const probeModel = model;
+        const probe = await probeReasoning({ providerId, modelId, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: probeModel.supportsVision, supportsThinking: probeModel.supportsThinking, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+        return { ok: true, providerId, modelId, kind, latencyMs: probe.latencyMs, models: null, modelAvailable: true };
+      }
+      const probe = await new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }).probe(); return { ok: true, providerId, modelId, kind, ...probe, modelAvailable: probe.models === null ? null : probe.models.includes(modelId) };
+    }
     catch (error) { if (error instanceof ProviderError) throw new ApiError(502, "PROVIDER_ERROR", error.message); throw error; }
   });
   app.delete("/api/v1/providers/:providerId", async (request, reply) => { const id = parameter(request, "providerId"); const result = repository.deleteProvider(id); if (result === "missing") missing("provider", id); if (result === "in_use") throw new ApiError(409, "CONFLICT", "Provider is used by a project and cannot be deleted"); return reply.code(204).send(); });
@@ -157,6 +166,6 @@ function optionalStringArray(value: unknown): string[] | undefined { return valu
 function enumValue<T extends string>(value: unknown, allowed: readonly T[], path: string): T { const item = string(value, path) as T; if (!allowed.includes(item)) throw new ApiError(400, "VALIDATION_ERROR", `${path} must be one of ${allowed.join(", ")}`); return item; }
 function enumArray<T extends string>(value: unknown, allowed: readonly T[], path: string): T[] { const items = stringArray(value, path).map((item) => enumValue<T>(item, allowed, path)); return [...new Set(items)]; }
 function objectOfStrings(value: unknown, path: string): Record<string, string> { const result = object(value, path); for (const [key, item] of Object.entries(result)) if (typeof item !== "string") throw new ApiError(400, "VALIDATION_ERROR", `${path}.${key} must be a string`); return result as Record<string, string>; }
-function requireModels(value: unknown): ModelDefinition[] { if (!Array.isArray(value) || value.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "models must contain at least one model"); return value.map((model, index) => { const entry = object(model, `models[${index}]`); return { id: string(entry.id, `models[${index}].id`), supportsVision: Boolean(entry.supportsVision), supportsTools: Boolean(entry.supportsTools), supportsStructuredOutput: Boolean(entry.supportsStructuredOutput), imageApiKind: entry.imageApiKind === "openai_images" || entry.imageApiKind === "custom" ? entry.imageApiKind : null }; }); }
+function requireModels(value: unknown): ModelDefinition[] { if (!Array.isArray(value) || value.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "models must contain at least one model"); return value.map((model, index) => { const entry = object(model, `models[${index}]`); return { id: string(entry.id, `models[${index}].id`), supportsVision: Boolean(entry.supportsVision), supportsThinking: Boolean(entry.supportsThinking), supportsTools: Boolean(entry.supportsTools), supportsStructuredOutput: Boolean(entry.supportsStructuredOutput), imageApiKind: entry.imageApiKind === "openai_images" || entry.imageApiKind === "custom" ? entry.imageApiKind : null }; }); }
 async function sendStored(reply: FastifyReply, storage: LocalAssetStore, record: { storagePath: string | null; mimeType?: string } | undefined, name: string): Promise<unknown> { if (!record || !record.storagePath) missing(name, "unknown"); return reply.type(record.mimeType ?? mimeForPath(record.storagePath)).send(await storage.read(record.storagePath)); }
 function mimeForPath(path: string): string { if (path.endsWith(".png")) return "image/png"; if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg"; if (path.endsWith(".webp")) return "image/webp"; if (path.endsWith(".zip")) return "application/zip"; return "application/octet-stream"; }

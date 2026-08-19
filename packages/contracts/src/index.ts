@@ -16,6 +16,7 @@ export const JobStatus = Type.Enum({
   FAILED: "FAILED",
   CANCELLED: "CANCELLED"
 });
+export const ReasoningProtocolProfile = Type.Enum({ OPENAI: "openai", DASHSCOPE_QWEN: "dashscope_qwen" });
 export const OutputReviewDecision = Type.Enum({
   SELECTED: "SELECTED",
   REJECTED: "REJECTED",
@@ -33,6 +34,7 @@ export const ErrorCode = Type.Enum({
 
 export const ModelCapabilities = Type.Object({
   supportsVision: Type.Boolean(),
+  supportsThinking: Type.Boolean(),
   supportsTools: Type.Boolean(),
   supportsStructuredOutput: Type.Boolean(),
   imageApiKind: Type.Union([Type.Literal("openai_images"), Type.Literal("custom"), Type.Null()])
@@ -76,6 +78,7 @@ export type StoryboardMode = Static<typeof StoryboardMode>;
 export type AssetRole = Static<typeof AssetRole>;
 export type JobType = Static<typeof JobType>;
 export type JobStatus = Static<typeof JobStatus>;
+export type ReasoningProtocolProfile = Static<typeof ReasoningProtocolProfile>;
 export type OutputReviewDecision = Static<typeof OutputReviewDecision>;
 export type ModelCapabilities = Static<typeof ModelCapabilities>;
 export type ModelDefinition = Static<typeof ModelDefinition>;

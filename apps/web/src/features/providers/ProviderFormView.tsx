@@ -18,6 +18,7 @@ type ImageApiKindValue = NonNullable<ModelCapability["imageApiKind"]>;
 interface ModelFormRow {
   id: string;
   supportsVision: boolean;
+  supportsThinking: boolean;
   supportsTools: boolean;
   supportsStructuredOutput: boolean;
   /** 表单哨兵值："" 表示推理模型（提交时转 null） */
@@ -27,6 +28,7 @@ interface ModelFormRow {
 interface ProviderFormValues {
   name: string;
   baseUrl: string;
+  reasoningProtocol: "openai" | "dashscope_qwen";
   apiKey: string;
   models: ModelFormRow[];
 }
@@ -39,6 +41,7 @@ type TestRowState =
 const EMPTY_MODEL_ROW: ModelFormRow = {
   id: "",
   supportsVision: false,
+  supportsThinking: false,
   supportsTools: false,
   supportsStructuredOutput: false,
   imageApiKind: "",
@@ -48,6 +51,7 @@ function toModelCapability(row: ModelFormRow): ModelCapability {
   return {
     id: row.id.trim(),
     supportsVision: row.supportsVision,
+    supportsThinking: row.supportsThinking,
     supportsTools: row.supportsTools,
     supportsStructuredOutput: row.supportsStructuredOutput,
     imageApiKind: row.imageApiKind === "" ? null : row.imageApiKind,
@@ -72,21 +76,24 @@ export function ProviderFormView({ view, onDone }: Props) {
     ? {
         name: editing.name,
         baseUrl: editing.baseUrl,
+        reasoningProtocol: editing.reasoningProtocol,
         apiKey: "",
         models: editing.models.map((m) => ({
           id: m.id,
           supportsVision: m.supportsVision,
+          supportsThinking: m.supportsThinking,
           supportsTools: m.supportsTools,
           supportsStructuredOutput: m.supportsStructuredOutput,
           imageApiKind: m.imageApiKind ?? "",
         })),
       }
-    : { name: "", baseUrl: "", apiKey: "", models: [EMPTY_MODEL_ROW] };
+    : { name: "", baseUrl: "", reasoningProtocol: "openai", apiKey: "", models: [EMPTY_MODEL_ROW] };
 
   const handleFinish = async (values: ProviderFormValues) => {
     const body: CreateProviderInput = {
       name: values.name.trim(),
       baseUrl: values.baseUrl.trim(),
+      reasoningProtocol: values.reasoningProtocol,
       apiKey: values.apiKey,
       models: values.models.map(toModelCapability),
     };
@@ -163,6 +170,15 @@ export function ProviderFormView({ view, onDone }: Props) {
         <Input placeholder="https://api.openai.com/v1" className="font-mono" />
       </Form.Item>
 
+      <Form.Item name="reasoningProtocol" label="推理协议">
+        <Select
+          options={[
+            { value: "openai", label: "OpenAI Completions" },
+            { value: "dashscope_qwen", label: "DashScope Qwen" },
+          ]}
+        />
+      </Form.Item>
+
       <Form.Item
         name="apiKey"
         label="API Key"
@@ -201,6 +217,12 @@ export function ProviderFormView({ view, onDone }: Props) {
                         <Switch size="small" />
                       </Form.Item>
                       <span>视觉</span>
+                    </label>
+                    <label className={styles.switchItem}>
+                      <Form.Item name={[field.name, "supportsThinking"]} valuePropName="checked" noStyle>
+                        <Switch size="small" />
+                      </Form.Item>
+                      <span>思考</span>
                     </label>
                     <label className={styles.switchItem}>
                       <Form.Item name={[field.name, "supportsTools"]} valuePropName="checked" noStyle>

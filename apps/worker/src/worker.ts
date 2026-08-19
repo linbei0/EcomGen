@@ -3,14 +3,15 @@ import { resolve } from "node:path";
 import { Worker } from "bullmq";
 import archiver from "archiver";
 import { planStoryboard } from "@ecomgen/agent";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, type AssetRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
 import { getTemplate, templatePromptContract } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
-import { OpenAiCompatibleImageProvider, ProviderError } from "@ecomgen/providers";
+import { OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel } from "@ecomgen/providers";
 
 const masterKey = process.env.ECOMGEN_MASTER_KEY;
 if (!masterKey) throw new Error("ECOMGEN_MASTER_KEY must be a base64-encoded 32-byte key");
-const dataDir = resolve(process.env.ECOMGEN_DATA_DIR ?? "data");
+const projectRoot = resolve(import.meta.dirname, "../../..");
+const dataDir = resolveDataDir(process.env.ECOMGEN_DATA_DIR, projectRoot);
 const repository = new EcomRepository(openDatabase(resolve(dataDir, "ecomgen.sqlite")));
 const storage = new LocalAssetStore(dataDir); await storage.initialize();
 const secrets = new SecretBox(masterKey);
@@ -53,7 +54,7 @@ async function executePlan(job: JobRecord): Promise<void> {
   const assets = repository.listAssets(project.id); const imageAssets = assets.filter((asset) => asset.mimeType.startsWith("image/")).slice(0, 4);
   const referenceImages = model.supportsVision ? await Promise.all(imageAssets.map(async (asset) => ({ type: "image" as const, mimeType: asset.mimeType, data: (await storage.read(asset.storagePath)).toString("base64") }))) : undefined;
   const input = job.input as { requestedTypes?: string[]; requestedCount?: number };
-  const plan = await planStoryboard({ providerId: provider.id, baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey), modelId: model.id, supportsVision: model.supportsVision, projectName: project.name, productCategory: project.category, productDescription: project.productDescription, verifiedFacts: project.verifiedFacts, prohibitedClaims: project.prohibitedClaims, brandGuidelines: project.brandGuidelines, platformTargets: project.platformTargets, defaultMode: project.defaultMode, variants: repository.listVariants(project.id), assets: assets.map((asset) => ({ id: asset.id, role: asset.role, variantId: asset.variantId, name: asset.originalName, mimeType: asset.mimeType })), referenceImages, requestedTypes: input.requestedTypes, requestedCount: input.requestedCount });
+  const plan = await planStoryboard({ model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }), apiKey: secrets.decrypt(provider.encryptedApiKey), projectName: project.name, productCategory: project.category, productDescription: project.productDescription, verifiedFacts: project.verifiedFacts, prohibitedClaims: project.prohibitedClaims, brandGuidelines: project.brandGuidelines, platformTargets: project.platformTargets, defaultMode: project.defaultMode, variants: repository.listVariants(project.id), assets: assets.map((asset) => ({ id: asset.id, role: asset.role, variantId: asset.variantId, name: asset.originalName, mimeType: asset.mimeType })), referenceImages, requestedTypes: input.requestedTypes, requestedCount: input.requestedCount });
   throwIfCancelled(job);
   const storyboard = repository.saveStoryboard(project.id, plan.campaignStyleLock, "DRAFT", plan.items.map((item) => ({ ...item, status: "DRAFT", compiledPrompt: null })));
   await updateJob(job, { progress: 90 }); await events.publish(project.id, "storyboard.updated", { storyboard, items: repository.listStoryboardItems(project.id) });
@@ -73,7 +74,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   throwIfCancelled(job);
   await updateJob(job, { progress: 80, providerTaskId: result.providerTaskId ?? null }); const stored = await storage.putOutput(project.id, result.image, extensionForMime(result.mimeType));
   throwIfCancelled(job);
-  const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, storagePath: stored.path, hash: stored.hash, reviewDecision: "NEEDS_REVIEW", reviewNote: null }); repository.updateStoryboardItem(item.id, { status: "COMPLETED" }); await events.publish(project.id, "output.created", { output });
+  const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, storagePath: stored.path, hash: stored.hash, reviewDecision: "NEEDS_REVIEW", reviewNote: null }); repository.updateStoryboardItem(item.id, { status: "GENERATED" }); await events.publish(project.id, "output.created", { output });
 }
 
 async function executeExport(job: JobRecord): Promise<void> {

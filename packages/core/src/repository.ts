@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { AssetRole, JobStatus, JobType, ModelDefinition, OutputReviewDecision, PlatformTarget, StoryboardMode } from "@ecomgen/contracts";
+import type { AssetRole, JobStatus, JobType, ModelDefinition, OutputReviewDecision, PlatformTarget, ReasoningProtocolProfile, StoryboardMode } from "@ecomgen/contracts";
 import type { SqliteDatabase } from "./database.js";
 
 export interface ProviderRecord {
   id: string;
   name: string;
   baseUrl: string;
+  reasoningProtocol: ReasoningProtocolProfile;
   encryptedApiKey: string;
   models: ModelDefinition[];
   createdAt: string;
@@ -38,7 +39,7 @@ export interface AssetRecord {
 export interface StoryboardRecord { projectId: string; version: number; status: "DRAFT" | "CONFIRMED"; campaignStyleLock: string; createdAt: string; updatedAt: string; }
 export interface StoryboardItemRecord {
   id: string; projectId: string; storyboardVersion: number; assetType: string; templateVariant: string | null; variantScope: string; mode: StoryboardMode;
-  status: "DRAFT" | "READY" | "GENERATING" | "COMPLETED"; promptInstruction: string; compiledPrompt: string | null;
+  status: "DRAFT" | "CONFIRMED" | "GENERATING" | "GENERATED"; promptInstruction: string; compiledPrompt: string | null;
   factClaims: string[]; riskFlags: string[]; sortOrder: number; createdAt: string; updatedAt: string;
 }
 export interface JobRecord {
@@ -66,9 +67,9 @@ export class EcomRepository {
   public saveProvider(input: Omit<ProviderRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }): ProviderRecord {
     const existing = input.id ? this.getProvider(input.id) : undefined;
     const record: ProviderRecord = { ...input, id: input.id ?? randomUUID(), createdAt: existing?.createdAt ?? now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO providers (id,name,base_url,encrypted_api_key,models_json,created_at,updated_at)
-      VALUES (@id,@name,@baseUrl,@encryptedApiKey,@models,@createdAt,@updatedAt)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name,base_url=excluded.base_url,encrypted_api_key=excluded.encrypted_api_key,models_json=excluded.models_json,updated_at=excluded.updated_at`)
+    this.db.prepare(`INSERT INTO providers (id,name,base_url,reasoning_protocol,encrypted_api_key,models_json,created_at,updated_at)
+      VALUES (@id,@name,@baseUrl,@reasoningProtocol,@encryptedApiKey,@models,@createdAt,@updatedAt)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,base_url=excluded.base_url,reasoning_protocol=excluded.reasoning_protocol,encrypted_api_key=excluded.encrypted_api_key,models_json=excluded.models_json,updated_at=excluded.updated_at`)
       .run({ ...record, models: json(record.models) });
     return record;
   }
@@ -141,7 +142,15 @@ export class EcomRepository {
     this.db.prepare(`UPDATE storyboard_items SET asset_type=@assetType,template_variant=@templateVariant,variant_scope=@variantScope,mode=@mode,status=@status,prompt_instruction=@promptInstruction,compiled_prompt=@compiledPrompt,fact_claims_json=@factClaims,risk_flags_json=@riskFlags,sort_order=@sortOrder,updated_at=@updatedAt WHERE id=@id`)
       .run({ ...next, factClaims: json(next.factClaims), riskFlags: json(next.riskFlags) }); return next;
   }
-  public confirmStoryboard(projectId: string): StoryboardRecord | undefined { const current = this.getStoryboard(projectId); if (!current) return undefined; this.db.prepare("UPDATE storyboards SET status='CONFIRMED',updated_at=? WHERE project_id=?").run(now(), projectId); return this.getStoryboard(projectId); }
+  public confirmStoryboard(projectId: string): StoryboardRecord | undefined {
+    const current = this.getStoryboard(projectId); if (!current) return undefined;
+    const updatedAt = now();
+    const write = this.db.transaction(() => {
+      this.db.prepare("UPDATE storyboards SET status='CONFIRMED',updated_at=? WHERE project_id=?").run(updatedAt, projectId);
+      this.db.prepare("UPDATE storyboard_items SET status='CONFIRMED',updated_at=? WHERE project_id=? AND status='DRAFT'").run(updatedAt, projectId);
+    });
+    write(); return this.getStoryboard(projectId);
+  }
 
   public createJob(input: Omit<JobRecord, "createdAt" | "updatedAt" | "progress" | "status" | "retryable" | "providerTaskId" | "error" | "requestFingerprint" | "providerId" | "modelId" | "estimatedCost" | "actualCost" | "cancelRequested"> & Partial<Pick<JobRecord, "status" | "progress" | "retryable" | "providerTaskId" | "error" | "requestFingerprint" | "providerId" | "modelId" | "estimatedCost" | "actualCost" | "cancelRequested">>): JobRecord {
     const record: JobRecord = { ...input, status: input.status ?? "QUEUED", progress: input.progress ?? 0, retryable: input.retryable ?? true, requestFingerprint: input.requestFingerprint ?? null, providerId: input.providerId ?? null, modelId: input.modelId ?? null, estimatedCost: input.estimatedCost ?? null, actualCost: input.actualCost ?? null, cancelRequested: input.cancelRequested ?? false, providerTaskId: input.providerTaskId ?? null, error: input.error ?? null, createdAt: now(), updatedAt: now() };
@@ -169,7 +178,7 @@ export class EcomRepository {
   public updateExport(id: string, patch: Partial<Pick<ExportRecord, "status" | "storagePath">>): ExportRecord | undefined { const current = this.getExport(id); if (!current) return undefined; const next = { ...current, ...patch, updatedAt: now() }; this.db.prepare("UPDATE exports SET status=@status,storage_path=@storagePath,updated_at=@updatedAt WHERE id=@id").run(next); return next; }
 }
 
-function mapProvider(row: Row): ProviderRecord { return { id: String(row.id), name: String(row.name), baseUrl: String(row.base_url), encryptedApiKey: String(row.encrypted_api_key), models: parse(row.models_json), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapProvider(row: Row): ProviderRecord { return { id: String(row.id), name: String(row.name), baseUrl: String(row.base_url), reasoningProtocol: row.reasoning_protocol as ReasoningProtocolProfile, encryptedApiKey: String(row.encrypted_api_key), models: parse(row.models_json), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapProject(row: Row): ProjectRecord { return { id: String(row.id), name: String(row.name), category: row.category ? String(row.category) : null, productDescription: row.product_description ? String(row.product_description) : null, verifiedFacts: parse(row.verified_facts_json ?? "[]"), prohibitedClaims: parse(row.prohibited_claims_json ?? "[]"), brandGuidelines: parse(row.brand_guidelines_json ?? "{}"), platformTargets: parse(row.platform_targets_json), reasoningProviderId: String(row.reasoning_provider_id), reasoningModelId: String(row.reasoning_model_id), imageProviderId: String(row.image_provider_id), imageModelId: String(row.image_model_id), defaultMode: row.default_mode as StoryboardMode, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapVariant(row: Row): VariantRecord { return { id: String(row.id), projectId: String(row.project_id), name: String(row.name), attributes: parse(row.attributes_json), createdAt: String(row.created_at) }; }
 function mapAsset(row: Row): AssetRecord { return { id: String(row.id), projectId: String(row.project_id), variantId: row.variant_id ? String(row.variant_id) : null, role: row.role as AssetRole, storagePath: String(row.storage_path), hash: String(row.hash), originalName: String(row.original_name), mimeType: String(row.mime_type), width: row.width === null ? null : Number(row.width), height: row.height === null ? null : Number(row.height), createdAt: String(row.created_at) }; }

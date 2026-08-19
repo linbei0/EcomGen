@@ -467,6 +467,7 @@ export interface components {
             name: string;
             /** Format: uri */
             baseUrl: string;
+            reasoningProtocol: "openai" | "dashscope_qwen";
             hasApiKey: boolean;
             models: components["schemas"]["ModelCapability"][];
             /** Format: date-time */
@@ -477,6 +478,7 @@ export interface components {
         ModelCapability: {
             id: string;
             supportsVision: boolean;
+            supportsThinking: boolean;
             supportsTools: boolean;
             supportsStructuredOutput: boolean;
             /** @enum {string|null} */
@@ -486,6 +488,7 @@ export interface components {
             name: string;
             /** Format: uri */
             baseUrl: string;
+            reasoningProtocol: "openai" | "dashscope_qwen";
             apiKey: string;
             models: components["schemas"]["ModelCapability"][];
         };

@@ -5,11 +5,8 @@ import type { PlatformTarget, StoryboardMode } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates, templatePromptContract } from "@ecomgen/ecom-skill";
 
 export interface PlannerInput {
-  providerId: string;
-  baseUrl: string;
+  model: Model<"openai-completions">;
   apiKey: string;
-  modelId: string;
-  supportsVision: boolean;
   projectName: string;
   productCategory: string | null;
   productDescription: string | null;
@@ -48,25 +45,22 @@ Critical rules:
 - The campaignStyleLock must be concise and reusable across all images.`;
 
 export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryboard> {
-  const model: Model<"openai-completions"> = {
-    id: input.modelId, name: input.modelId, api: "openai-completions", provider: input.providerId as never,
-    baseUrl: input.baseUrl, reasoning: true, input: input.supportsVision ? ["text", "image"] : ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128_000, maxTokens: 8_000
-  };
   const agent = new Agent({
     streamFn: openAICompletionsApi().stream,
     getApiKey: () => input.apiKey,
-    initialState: { model, systemPrompt: SYSTEM_PROMPT, thinkingLevel: "medium", tools: [] }
+    initialState: { model: input.model, systemPrompt: SYSTEM_PROMPT, thinkingLevel: input.model.reasoning ? "medium" : "off", tools: [] }
   });
   const selectedTemplates = resolveTemplates(input.requestedTypes);
   const payload = {
     ...input,
     apiKey: undefined,
+    model: undefined,
     referenceImages: undefined,
     upstream: ECOM_DETAILS_IMAGE_SOURCE,
     allowedTemplates: (selectedTemplates.length ? selectedTemplates : ECOM_TEMPLATES).map((template) => ({ id: template.id, name: template.name, keywords: template.keywords, triggerPhrases: template.trigger_phrases, promptTemplate: template.prompt_template, defaults: template.defaults, variants: template.variants, categoryTips: template.category_tips, examples: template.examples, antiAiTips: template.anti_ai_tips, supportsImageReference: template.supports_image_reference, promptContract: templatePromptContract(template, input.platformTargets) }))
   };
-  await agent.prompt(`Plan this project. Return {"campaignStyleLock":string,"items":[{"assetType":string,"templateVariant":string|null,"variantScope":string,"mode":"CREATIVE"|"PIXEL_PROTECTED","promptInstruction":string,"factClaims":string[],"riskFlags":string[],"sortOrder":number}]}.\n${JSON.stringify(payload)}`, input.supportsVision ? input.referenceImages : undefined);
+  await agent.prompt(`Plan this project. Return {"campaignStyleLock":string,"items":[{"assetType":string,"templateVariant":string|null,"variantScope":string,"mode":"CREATIVE"|"PIXEL_PROTECTED","promptInstruction":string,"factClaims":string[],"riskFlags":string[],"sortOrder":number}]}.\n${JSON.stringify(payload)}`, input.model.input.includes("image") ? input.referenceImages : undefined);
+  if (agent.state.errorMessage) throw new Error(`Planning model request failed: ${agent.state.errorMessage}`);
   const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
   const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n") : "";
   if (!text) throw new Error("Planning model returned no text");
