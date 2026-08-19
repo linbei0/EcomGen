@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "gen:api": "openapi-typescript ../../docs/openapi.yaml -o src/api/schema.d.ts"
+    "gen:api": "openapi-typescript ../../openapi.yaml -o src/api/schema.d.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",

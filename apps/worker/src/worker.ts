@@ -2,9 +2,9 @@ import { PassThrough } from "node:stream";
 import { resolve } from "node:path";
 import { Worker } from "bullmq";
 import archiver from "archiver";
-import { planStoryboard } from "@ecomgen/agent";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type JobRecord, type ProjectRecord, type StoryboardItemRecord } from "@ecomgen/core";
-import { getTemplate, templatePromptContract } from "@ecomgen/ecom-skill";
+import { planStoryboard, reviseImagePrompt } from "@ecomgen/agent";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
+import { getTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, type ImageAspectRatio, type ImageResolution, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel } from "@ecomgen/providers";
@@ -95,12 +95,19 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`);
   const inputs = generationAssets(project, item.mode);
   if (item.mode === "PIXEL_PROTECTED" && inputs.length === 0) throw new Error("PIXEL_PROTECTED generation requires a PRODUCT_TRUTH image on the project");
-  const revision = typeof job.input.revision === "string" ? job.input.revision : undefined;
+  const revision = typeof job.input.revision === "string" ? job.input.revision.trim() : "";
   const candidateIndex = typeof job.input.candidateIndex === "number" ? job.input.candidateIndex : 1;
   const resolution = (typeof job.input.imageResolution === "string" ? job.input.imageResolution : project.imageResolution) as ImageResolution;
   const aspectRatio = (typeof job.input.imageAspectRatio === "string" ? job.input.imageAspectRatio : project.imageAspectRatio) as ImageAspectRatio;
   const size = resolveImageSize(resolution, aspectRatio, template.defaultSize);
-  const prompt = compilePrompt(project, storyboard.campaignStyleLock, item, templatePromptContract(template, project.platformTargets, item.templateVariant, project.category), revision);
+  const basePrompt = item.promptInstruction.trim();
+  if (!basePrompt) throw new Error("Storyboard item has no final image prompt; re-plan the storyboard before generating");
+  if (/upstream template|template fields|anti-ai guidance|category guidance|promptcontract/i.test(basePrompt)) {
+    throw new Error("This storyboard contains an old internal template prompt; re-plan the storyboard before generating");
+  }
+  const prompt = revision
+    ? await reviseGenerationPrompt(project, basePrompt, revision)
+    : basePrompt;
   repository.updateStoryboardItem(item.id, { status: "GENERATING", compiledPrompt: prompt }); await updateJob(job, { progress: 30 });
   const images = template.supports_image_reference ? await Promise.all(inputs.map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType }))) : [];
   const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }); const result = await generator.generate({ model: model.id, prompt, size, quality: "high", images: images.length ? images : undefined });
@@ -138,14 +145,16 @@ function generationAssets(project: ProjectRecord, mode: string): AssetRecord[] {
   const all = repository.listAssets(project.id).filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/"));
   return mode === "PIXEL_PROTECTED" ? all : all.slice(0, 4);
 }
-function compilePrompt(project: ProjectRecord, styleLock: string, item: Pick<StoryboardItemRecord, "assetType" | "displayName" | "mode" | "promptInstruction">, templateContract: string, revision?: string): string {
-  const preserve = item.mode === "PIXEL_PROTECTED"
-    ? "Use the provided product reference as a pixel-preserved cutout. Preserve its exact color, label, logo, shape, texture, and visible pose. Only create the environment, background, typography-free composition, and auxiliary visual elements around it. Do not invent unseen product sides or angles."
-    : "Use provided product references as product truth. Keep identity consistent; never make factual claims that are not supplied.";
-  const facts = project.verifiedFacts.length ? `Use only these verified product facts when a claim is needed: ${project.verifiedFacts.join(" | ")}.` : "No verified product facts were supplied; use visual placeholders instead of factual claims.";
-  const prohibited = project.prohibitedClaims.length ? `Never claim: ${project.prohibitedClaims.join(" | ")}.` : "";
-  const brand = Object.keys(project.brandGuidelines).length ? `Brand guidelines: ${Object.entries(project.brandGuidelines).map(([key, value]) => `${key}=${value}`).join("; ")}.` : "";
-  return `Campaign Style Lock (repeat this visual contract exactly): ${styleLock}. ${templateContract} ${brand} Create one ${item.displayName} e-commerce image for ${project.platformTargets.join(" + ")}. ${preserve} ${facts} ${prohibited} Direction: ${item.promptInstruction}${revision ? ` Revision request: ${revision}` : ""} Do not place price, unsupported claims, certification marks, dimensions, or readable promotional copy in the image. Negative constraints: no props unless explicitly requested, no hands, no watermarks, no fake logos, no extra text, no decorative gradients.`;
+async function reviseGenerationPrompt(project: ProjectRecord, prompt: string, revision: string): Promise<string> {
+  const provider = providerFor(project.reasoningProviderId);
+  const model = provider.models.find((candidate) => candidate.id === project.reasoningModelId);
+  if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
+  return reviseImagePrompt({
+    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
+    apiKey: secrets.decrypt(provider.encryptedApiKey),
+    prompt,
+    revision
+  });
 }
 async function updateJob(job: JobRecord, patch: Parameters<EcomRepository["updateJob"]>[1]): Promise<void> { const updated = repository.updateJob(job.id, patch); if (updated) await events.publish(job.projectId, "job.updated", updated); }
 class JobCancelled extends Error {}

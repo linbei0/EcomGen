@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 const root = resolve(import.meta.dirname, "..");
 const dataDir = join(root, "data-e2e-mock");
 const onePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL7WQAAAABJRU5ErkJggg==";
-const plan = { campaignStyleLock: "fixed deep green #1A3A2E and clean off-white #FFFFFF ecommerce system", items: [{ assetType: "hero-image", displayName: "白底/纯色底产品主图", templateVariant: "luxury", candidateCount: 1, referencedAssets: [], mode: "PIXEL_PROTECTED", promptInstruction: "Show the verified stainless travel cup with a premium material-focused hero composition.", factClaims: ["304 stainless steel body"], riskFlags: [], sortOrder: 0 }] };
+const plan = { campaignStyleLock: "fixed deep green #1A3A2E and clean off-white #FFFFFF ecommerce system", items: [{ assetType: "hero-image", displayName: "通勤杯质感首图", templateVariant: "luxury", candidateCount: 1, referencedAssets: [], mode: "PIXEL_PROTECTED", promptInstruction: "Create a premium e-commerce hero image of the verified green insulated travel cup. Keep the exact supplied product geometry and visible details. Use a clean off-white background, centered three-quarter product composition, Rembrandt lighting, and restrained deep green accents. Preserve generous whitespace and reserve a blank price-overlay zone without generating readable price, logo, or promotional text. Use the verified fact 304 stainless steel body only as visual material guidance; do not claim keeps hot for 24 hours. No extra props, hands, watermarks, fake logos, or invented product details.", factClaims: ["304 stainless steel body"], riskFlags: [], sortOrder: 0 }] };
 const observed = { planningPrompt: "", imagePrompt: "" };
 const children = [];
 let mock;
@@ -18,6 +18,16 @@ try {
   mock = createServer(async (request, response) => {
     const body = await readBody(request);
     if (request.url === "/v1/chat/completions") {
+      const requestBody = JSON.parse(body.toString("utf8"));
+      const userText = requestBody.messages?.at(-1)?.content ?? "";
+      if (typeof userText === "string" && userText.includes("Existing final prompt:")) {
+        response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        response.write(`data: ${JSON.stringify({ id: "mock-revision", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: plan.items[0].promptInstruction + " Revision applied: initial." }, finish_reason: null }] })}\n\n`);
+        response.write(`data: ${JSON.stringify({ id: "mock-revision", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+        response.write("data: [DONE]\n\n");
+        response.end();
+        return;
+      }
       observed.planningPrompt = body.toString("utf8");
       response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
       response.write(`data: ${JSON.stringify({ id: "mock-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(plan) }, finish_reason: null }] })}\n\n`);
@@ -94,13 +104,13 @@ try {
   await requestJson(`${base}/projects/${project.id}/planning-jobs`, "POST", { planningMode: "AI", requestedTypes: ["hero-image"], candidatesPerType: 1 });
   const planningJob = await waitForJob(base, project.id, "PLAN");
   assert.equal(planningJob.status, "SUCCEEDED");
-  assert.match(observed.planningPrompt, /product photography/);
+  assert.match(observed.planningPrompt, /allowedTemplateIds/);
   assert.match(observed.planningPrompt, /304 stainless steel body/);
   const storyboard = await requestJson(`${base}/projects/${project.id}/storyboard`, "GET");
   assert.equal(storyboard.items.length, 1);
   assert.equal(storyboard.items[0].assetType, "hero-image");
   assert.equal(storyboard.items[0].templateVariant, "luxury");
-  assert.equal(storyboard.items[0].displayName, "白底/纯色底产品主图");
+  assert.equal(storyboard.items[0].displayName, "通勤杯质感首图");
   await requestJson(`${base}/projects/${project.id}/storyboard/confirm`, "POST", {});
   const generation = await requestJson(`${base}/projects/${project.id}/generation-jobs`, "POST", { storyboardItemIds: [storyboard.items[0].id], revision: "initial" });
   const duplicateGeneration = await requestJson(`${base}/projects/${project.id}/generation-jobs`, "POST", { storyboardItemIds: [storyboard.items[0].id], revision: "initial" });
@@ -111,6 +121,7 @@ try {
   assert.match(observed.imagePrompt, /304 stainless steel body/);
   assert.match(observed.imagePrompt, /keeps hot for 24 hours/);
   assert.match(observed.imagePrompt, /price-overlay zone/);
+  assert.doesNotMatch(observed.imagePrompt, /Upstream template|Template fields/);
   const outputs = await requestJson(`${base}/projects/${project.id}/outputs`, "GET");
   assert.equal(outputs.length, 1);
   await requestJson(`${base}/outputs/${outputs[0].id}/review`, "PATCH", { reviewDecision: "SELECTED" });

@@ -1,6 +1,6 @@
 /**
  * 契约错误规范化。后端统一返回 { error: { code, message, details?, requestId } }，
- * 前端只按 code 分支处理（docs/09 8.4）；非契约响应体降级为 UNKNOWN，不猜测结构。
+ * 前端只按 code 分支处理；非契约响应体降级为 UNKNOWN，不猜测结构。
  */
 export const API_ERROR_CODES = [
   "VALIDATION_ERROR",

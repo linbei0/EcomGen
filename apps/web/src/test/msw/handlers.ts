@@ -44,7 +44,7 @@ export const PROVIDER_FIXTURE = {
   updatedAt: "2026-08-01T00:00:00.000Z",
 };
 
-/** 严格按 docs/openapi.yaml 手写；契约变更时先改 handlers 再改组件。 */
+/** 严格按根目录 openapi.yaml 手写；契约变更时先改契约，再同步 handlers 和组件。 */
 export const handlers = [
   http.get("http://127.0.0.1:8787/health", () => HttpResponse.json({ status: "ok" })),
 

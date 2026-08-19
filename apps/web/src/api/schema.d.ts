@@ -602,6 +602,7 @@ export interface components {
             candidatesPerType?: number;
             imageResolution?: components["schemas"]["ImageResolution"];
             imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            /** @description Unique key for an intentional re-planning run. */
             regenerationKey?: string;
         };
         Storyboard: {
@@ -620,6 +621,7 @@ export interface components {
         StoryboardItem: {
             /** Format: uuid */
             id: string;
+            /** @description Immutable ecom-details-image template ID; it cannot be changed after planning. */
             assetType: string;
             displayName: string;
             templateVariant?: string | null;
@@ -629,11 +631,13 @@ export interface components {
             mode: "CREATIVE" | "PIXEL_PROTECTED";
             /** @enum {string} */
             status: "DRAFT" | "CONFIRMED" | "GENERATING" | "GENERATED";
+            /** @description Final image-generation prompt produced by Pi Agent; Worker sends this text to the image model without template concatenation. */
             promptInstruction: string;
             factClaims?: string[];
             riskFlags: string[];
         };
         UpdateStoryboardItemInput: {
+            /** @description Immutable ecom-details-image template ID; it cannot be changed after planning. */
             assetType?: string;
             displayName?: string;
             templateVariant?: string | null;
@@ -641,6 +645,7 @@ export interface components {
             referencedAssets?: string[];
             /** @enum {string} */
             mode?: "CREATIVE" | "PIXEL_PROTECTED";
+            /** @description Editable final image-generation prompt; the saved value is sent as-is to the image model. */
             promptInstruction?: string;
         };
         Job: {
@@ -1275,6 +1280,27 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    deleteStoryboardItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["StoryboardItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft storyboard item deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: components["responses"]["Conflict"];
+        };
+    };
     updateStoryboardItem: {
         parameters: {
             query?: never;
@@ -1298,26 +1324,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["StoryboardItem"];
                 };
-            };
-        };
-    };
-    deleteStoryboardItem: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                itemId: components["parameters"]["StoryboardItemId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Draft storyboard item deleted. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             409: components["responses"]["Conflict"];
         };

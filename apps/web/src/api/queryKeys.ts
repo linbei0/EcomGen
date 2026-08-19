@@ -1,4 +1,4 @@
-/** 统一 query key 工厂（docs/09 8.3），SSE 事件失效映射也以此为准。 */
+/** 统一 query key 工厂，SSE 事件失效映射也以此为准。 */
 export const qk = {
   health: ["health"] as const,
   templates: ["ecom-templates"] as const,

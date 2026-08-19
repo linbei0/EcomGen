@@ -1,6 +1,5 @@
 /**
- * 成本展示规约（docs/09 7 通用纪律）。契约缺口 13.5：Job.estimatedCost/actualCost
- * 仅 object|null 未细化。除"明确 KNOWN 金额结构"外，一律展示未知文案，
+ * Job.estimatedCost/actualCost 目前仅约束为 object|null。除“明确 KNOWN 金额结构”外，一律展示未知文案，
  * 禁止展示推测金额与"约 ¥0.00"式假精确数字。
  */
 export const COST_UNKNOWN_TEXT = "费用由 Provider 决定，当前无法预估";

@@ -711,7 +711,7 @@ components:
         referencedAssets: { type: array, items: { type: string, format: uuid } }
         mode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
         status: { type: string, enum: [DRAFT, CONFIRMED, GENERATING, GENERATED] }
-        promptInstruction: { type: string }
+        promptInstruction: { type: string, description: Final image-generation prompt produced by Pi Agent; Worker sends this text to the image model without template concatenation. }
         factClaims: { type: array, items: { type: string } }
         riskFlags: { type: array, items: { type: string } }
     UpdateStoryboardItemInput:
@@ -723,7 +723,7 @@ components:
         candidateCount: { type: integer, minimum: 1, maximum: 4 }
         referencedAssets: { type: array, items: { type: string, format: uuid } }
         mode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
-        promptInstruction: { type: string, maxLength: 4000 }
+        promptInstruction: { type: string, maxLength: 4000, description: Editable final image-generation prompt; the saved value is sent as-is to the image model. }
     Job:
       type: object
       required: [id, type, status, progress, retryable, createdAt]

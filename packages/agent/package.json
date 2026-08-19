@@ -6,6 +6,7 @@
   "types": "./dist/index.d.ts",
   "scripts": { "build": "tsc -p tsconfig.json", "test": "vitest run --passWithNoTests" },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.33",
     "@ecomgen/contracts": "workspace:*",
     "@ecomgen/ecom-skill": "workspace:*",
     "@earendil-works/pi-agent-core": "^0.84.2",

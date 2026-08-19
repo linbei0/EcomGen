@@ -75,6 +75,27 @@ export function defaultTemplateSequence(driver: ConversionDriver): EcomTemplate[
   const ids = driver === "PAIN_POINT" ? ["hero-image", "infographic", "before-after", "lifestyle-scene", "packaging"] : driver === "EMOTIONAL" ? ["lifestyle-scene", "model-showcase", "hero-image", "ugc-style", "poster-banner"] : ["hero-image", "detail-macro", "lifestyle-scene", "before-after", "poster-banner"];
   return ids.map((id) => getTemplate(id)).filter((template): template is EcomTemplate => Boolean(template));
 }
+export interface TemplateGuidance {
+  visualFields: Record<string, string>;
+  productOccupancy: string;
+  whitespace: string;
+  camera: string;
+  platformReservations: string[];
+  categoryGuidance: string | null;
+  antiAiTips: string;
+}
+export function templateGuidance(template: EcomTemplate, platformTargets: readonly string[], variantName?: string | null, category?: string | null): TemplateGuidance {
+  const variant = variantName ? template.variants[variantName] : undefined;
+  return {
+    visualFields: { ...template.prompt_template, ...template.defaults, ...(variant?.overrides ?? {}) },
+    productOccupancy: template.productOccupancy,
+    whitespace: template.whitespace,
+    camera: template.camera,
+    platformReservations: platformTargets.includes("DOMESTIC") ? ["预留顶部居中的价格叠加区", "预留左上角 Logo 区", "不要生成价格、Logo 或促销文字"] : [],
+    categoryGuidance: category ? template.category_tips[category] ?? null : null,
+    antiAiTips: template.anti_ai_tips
+  };
+}
 export function templatePromptContract(template: EcomTemplate, platformTargets: readonly string[], variantName?: string | null, category?: string | null): string {
   const variant = variantName ? template.variants[variantName] : undefined;
   const categoryTip = category ? template.category_tips[category] : undefined;

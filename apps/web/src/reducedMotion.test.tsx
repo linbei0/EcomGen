@@ -7,7 +7,7 @@ import type { WorkbenchView } from "./lib/stages";
 import { renderWithProviders } from "./test/render";
 
 // renderWithProviders 已用 MotionConfig reducedMotion="always"（模拟系统减弱动态）。
-// 断言：动效组件不抛错、内容即时呈现、交互仍可用（docs/09 测试清单第 10 项）。
+// Reduced Motion 下动效组件仍须即时呈现内容并保持交互可用。
 describe("reduced-motion 降级", () => {
   it("动效组件即时呈现且交互可用", async () => {
     const user = userEvent.setup();

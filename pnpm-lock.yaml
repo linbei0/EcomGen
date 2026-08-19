@@ -166,6 +166,9 @@ importers:
       '@ecomgen/ecom-skill':
         specifier: workspace:*
         version: link:../ecom-skill
+      '@sinclair/typebox':
+        specifier: ^0.34.33
+        version: 0.34.52
 
   packages/contracts:
     dependencies:

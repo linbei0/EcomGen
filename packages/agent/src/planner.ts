@@ -3,7 +3,8 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import type { ImageContent, Model } from "@earendil-works/pi-ai";
 import type { PlanningMode, PlatformTarget, StoryboardMode } from "@ecomgen/contracts";
 import { MAX_CANDIDATES_PER_TYPE } from "@ecomgen/contracts";
-import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates, templatePromptContract } from "@ecomgen/ecom-skill";
+import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
+import { createPlanningTools } from "./tools.js";
 
 export interface PlannerInput {
   model: Model<"openai-completions">;
@@ -49,15 +50,19 @@ Critical rules:
 - displayName is a human-facing Chinese scene title generated from the actual product, viewpoint, setting, and conversion purpose. Keep it concise (usually 4-12 Chinese characters), specific, and distinct for each item. Do not copy the catalog template name, internal template ID, generic labels such as “分镜/场景图/产品主图”, numbered labels, platform names, or unsupported product facts. The title may describe the visual treatment, such as “整机斜侧展示首图”, while assetType remains the exact template ID.
 - candidateCount is how many image candidates to generate for that type; keep it between 1 and the supplied candidatesPerType.
 - referencedAssets lists asset IDs this item should consider. Prefer PRODUCT assets as product truth and REFERENCE assets only as style or layout hints.
-- When planningMode is MANUAL, requestedTypes is the exact deliverable list: include every requested template exactly once, do not add, remove, or substitute types. Still use each selected template's prompt contract and project context to write its promptInstruction.
+- When planningMode is MANUAL, requestedTypes is the exact deliverable list: include every requested template exactly once, do not add, remove, or substitute types. Read each selected template with read_ecom_template before writing its final prompt.
+- promptInstruction is the FINAL prompt sent to the image model. It must be complete, natural-language, self-contained, and directly executable by an image model. Do not leave planning notes for another worker to compile.
+- Use read_ecom_template and read_platform_guidance as business knowledge tools. Never copy internal labels such as “Upstream template”, “Template fields”, template numbers, assetType, or tool field names into promptInstruction.
+- The final prompt must include the relevant product truth, target market/platform treatment, composition, camera, lighting, text/blank-area rules, pixel-protection rules when needed, and negative constraints. Do not merely summarize the template.
 - riskFlags are only for material product-specific uncertainties that require human review; do not repeat generic template guidance or anti-AI style tips, and return an empty array when no material uncertainty exists.
 - The campaignStyleLock must be concise and reusable across all images.`;
 
 export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryboard> {
+  const tools = createPlanningTools(input.platformTargets);
   const agent = new Agent({
     streamFn: openAICompletionsApi().stream,
     getApiKey: () => input.apiKey,
-    initialState: { model: input.model, systemPrompt: SYSTEM_PROMPT, thinkingLevel: input.model.reasoning ? "medium" : "off", tools: [] }
+    initialState: { model: input.model, systemPrompt: SYSTEM_PROMPT, thinkingLevel: input.model.reasoning ? "medium" : "off", tools }
   });
   const selectedTemplates = resolveTemplates(input.requestedTypes);
   const payload = {
@@ -66,10 +71,10 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
     model: undefined,
     referenceImages: undefined,
     upstream: ECOM_DETAILS_IMAGE_SOURCE,
-    allowedTemplates: (selectedTemplates.length ? selectedTemplates : ECOM_TEMPLATES).map((template) => ({ id: template.id, name: template.name, keywords: template.keywords, triggerPhrases: template.trigger_phrases, promptTemplate: template.prompt_template, defaults: template.defaults, variants: template.variants, categoryTips: template.category_tips, examples: template.examples, antiAiTips: template.anti_ai_tips, supportsImageReference: template.supports_image_reference, promptContract: templatePromptContract(template, input.platformTargets) }))
+    allowedTemplateIds: (selectedTemplates.length ? selectedTemplates : ECOM_TEMPLATES).map((template) => template.id)
   };
   const modeInstruction = input.planningMode === "MANUAL"
-    ? "Manual selection is authoritative: generate one planned item for every requested type, in the requested order, and use the selected template's full prompt contract to write each promptInstruction."
+    ? "Manual selection is authoritative: generate one planned item for every requested type, in the requested order. Read the matching template and platform guidance with the business tools, then write each promptInstruction as the final image-model prompt."
     : "Use the catalog and project context to choose a conversion-oriented storyboard.";
   await agent.prompt(`Plan this project. ${modeInstruction} Return {"campaignStyleLock":string,"items":[{"assetType":string,"displayName":string,"templateVariant":string|null,"candidateCount":number,"referencedAssets":string[],"mode":"CREATIVE"|"PIXEL_PROTECTED","promptInstruction":string,"factClaims":string[],"riskFlags":string[],"sortOrder":number}]}.\n${JSON.stringify(payload)}`, input.model.input.includes("image") ? input.referenceImages : undefined);
   if (agent.state.errorMessage) throw new Error(`Planning model request failed: ${agent.state.errorMessage}`);
@@ -77,6 +82,32 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
   const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n") : "";
   if (!text) throw new Error("Planning model returned no text");
   return validatePlan(JSON.parse(stripJsonFence(text)) as PlannedStoryboard, input);
+}
+
+export interface PromptRevisionInput {
+  model: Model<"openai-completions">;
+  apiKey: string;
+  prompt: string;
+  revision: string;
+}
+
+export async function reviseImagePrompt(input: PromptRevisionInput): Promise<string> {
+  const agent = new Agent({
+    streamFn: openAICompletionsApi().stream,
+    getApiKey: () => input.apiKey,
+    initialState: {
+      model: input.model,
+      systemPrompt: "You revise an existing final image-generation prompt. Return only the complete final prompt text, with no Markdown, planning notes, template metadata, or explanations. Preserve all existing product-truth and safety constraints unless the revision explicitly changes the visual direction.",
+      thinkingLevel: input.model.reasoning ? "medium" : "off",
+      tools: []
+    }
+  });
+  await agent.prompt(`Existing final prompt:\n${input.prompt}\n\nRevision request:\n${input.revision}\n\nReturn the complete final prompt that will be sent directly to the image model.`);
+  if (agent.state.errorMessage) throw new Error(`Prompt revision model request failed: ${agent.state.errorMessage}`);
+  const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
+  const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n").trim() : "";
+  if (!text) throw new Error("Prompt revision model returned no text");
+  return assertFinalPrompt(stripJsonFence(text));
 }
 
 function stripJsonFence(value: string): string { return value.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, ""); }
@@ -98,6 +129,7 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
     if (item.templateVariant !== null && item.templateVariant !== undefined && !template.variants[item.templateVariant]) throw new Error(`Planning model returned an invalid variant for ${item.assetType}: ${item.templateVariant}`);
     if (item.mode !== "CREATIVE" && item.mode !== "PIXEL_PROTECTED") throw new Error("Planning model returned an invalid storyboard mode");
     if (!item.assetType || !item.promptInstruction || typeof item.displayName !== "string" || !item.displayName.trim()) throw new Error("Planning model returned an incomplete storyboard item");
+    assertFinalPrompt(item.promptInstruction);
     const displayName = item.displayName.trim();
     if (displayName === template.name || displayName === item.assetType) throw new Error(`Planning model returned a generic storyboard display name for ${item.assetType}`);
     const referencedAssets = Array.isArray(item.referencedAssets) ? item.referencedAssets.filter((id) => knownAssetIds.has(id)) : [];
@@ -116,6 +148,15 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
   });
   if (new Set(items.map((item) => item.displayName)).size !== items.length) throw new Error("Planning model returned duplicate storyboard display names");
   return { campaignStyleLock: plan.campaignStyleLock, items };
+}
+
+function assertFinalPrompt(prompt: string): string {
+  const value = prompt.trim();
+  if (!value) throw new Error("Planning model returned an empty final image prompt");
+  if (/upstream template|template fields|anti-ai guidance|category guidance|promptcontract/i.test(value)) {
+    throw new Error("Planning model exposed internal template metadata in the final image prompt; please regenerate the storyboard");
+  }
+  return value;
 }
 
 function clampCandidates(value: number): number {

@@ -16,7 +16,7 @@ const VIEW_TITLE: Record<ProviderView["kind"], string> = {
   edit: "编辑 Provider",
 };
 
-/** 全局设置抽屉（docs/09 7.0）：Provider CRUD + 连通性测试，密钥永不回显。 */
+/** 全局设置抽屉：Provider CRUD + 连通性测试，密钥永不回显。 */
 export function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [view, setView] = useState<ProviderView>({ kind: "list" });
 

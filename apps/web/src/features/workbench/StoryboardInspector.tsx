@@ -118,7 +118,7 @@ export function StoryboardInspector({
       </div>
 
       <label className={styles.fieldLabel} htmlFor="item-prompt">
-        Prompt
+        生图 Prompt
       </label>
       <Input.TextArea
         id="item-prompt"

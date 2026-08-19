@@ -14,7 +14,7 @@ EcomGen 是面向个人卖家的电商 AI 生成套图工具。当前后端优�
 - `packages/contracts`：跨应用共享的领域类型。
 - `packages/jobs`：Redis、BullMQ 队列和 Redis Pub/Sub 事件总线。
 
-接口契约以 [`docs/openapi.yaml`](docs/openapi.yaml) 为准，前端交接顺序见 [`docs/07-后端实现与前端交接.md`](docs/07-后端实现与前端交接.md)。
+接口契约以 [`openapi.yaml`](openapi.yaml) 为准；运行时架构和长期维护规则见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
 
 ## 环境要求
 
@@ -73,7 +73,7 @@ docker compose up -d --build
 ## 测试要求
 
 - 修改领域逻辑或持久化：补充对应 package 的 Vitest 测试。
-- 修改 API 契约：同步 `docs/openapi.yaml`，运行 `pnpm lint:openapi`。
+- 修改 API 契约：同步根目录 `openapi.yaml`，运行 `pnpm lint:openapi`。
 - 修改任务编排、Provider 或导出：运行 `pnpm test:e2e:mock`。
 - 提交前至少运行 `pnpm build`、`pnpm test`、`pnpm lint:openapi`；涉及完整链路时额外运行 Mock E2E。
 - 测试失败时修复根因，不通过吞错、伪造成功状态或静默降级隐藏失败。
@@ -96,8 +96,11 @@ docker compose up -d --build
 
 ## 文档参考
 
+- [运行时架构与不变量](ARCHITECTURE.md)
+- [Pi Agent 适配器](packages/agent/README.md)
+- [Worker 生图执行](apps/worker/README.md)
 - [AGENTS.md 规范](https://agents.md/)
 - [TypeScript JSDoc 支持](https://www.typescriptlang.org/docs/handbook/jsdoc-supported-types.html)
 - [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html)
-- [API 契约](docs/openapi.yaml)
-- [ecom-details-image 适配说明](docs/08-ecom-details-image-适配说明.md)
+- [API 契约](openapi.yaml)
+- [运行时架构与不变量](ARCHITECTURE.md)
