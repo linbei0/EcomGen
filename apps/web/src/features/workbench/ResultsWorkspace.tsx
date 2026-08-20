@@ -60,7 +60,6 @@ export function ResultsWorkspace({
         <aside className={styles.jobCard} aria-live="polite">
           <p className={styles.jobStatus}>{JOB_STATUS_LABEL[active[0]!.status]}</p>
           <h2>{active.length} 张正在出图</h2>
-          <p>只显示真实状态，不估算百分比。</p>
           <Button
             disabled={active[0]!.cancelRequested || cancelJob.isPending}
             onClick={() => void cancelJob.mutateAsync(active[0]!.id)}
@@ -118,8 +117,8 @@ export function ResultsWorkspace({
 
       <ReviewStage
         detail={detail}
-        onRetryItem={(itemId) => {
-          void generate.mutateAsync({ storyboardItemIds: [itemId], revision: "retry" }).catch((error: unknown) => {
+        onRetryItem={(itemId, generationConfig) => {
+          void generate.mutateAsync({ storyboardItemIds: [itemId], revision: "retry", generationConfig }).catch((error: unknown) => {
             notification.error({ title: "重新生成失败", description: errorText(error) });
           });
         }}

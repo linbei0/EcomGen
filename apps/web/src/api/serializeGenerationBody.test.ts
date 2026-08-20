@@ -16,4 +16,27 @@ describe("serializeGenerationBody", () => {
     expect(withRev.revision).toBe("再试");
     expect(empty.revision).toBeUndefined();
   });
+
+  it("序列化本次重生成配置并保留候选数", () => {
+    const body = JSON.parse(serializeGenerationBody({
+      storyboardItemIds: ["a"],
+      revision: "retry",
+      generationConfig: {
+        imageResolution: "2K",
+        imageAspectRatio: "3:4",
+        candidateCount: 3,
+        imageModel: { providerId: "p1", modelId: "image-2" },
+      },
+    }));
+    expect(body).toEqual({
+      storyboardItemIds: ["a"],
+      revision: "retry",
+      generationConfig: {
+        imageResolution: "2K",
+        imageAspectRatio: "3:4",
+        candidateCount: 3,
+        imageModel: { providerId: "p1", modelId: "image-2" },
+      },
+    });
+  });
 });

@@ -1,9 +1,10 @@
-import { App, Button, Checkbox, Image, Modal, Segmented } from "antd";
+import { App, Button, Checkbox, Image, InputNumber, Modal, Segmented, Select } from "antd";
 import { CircleSlash, Maximize2, SquareCheckBig } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { Output, ProjectDetail, StoryboardItem } from "../../api/adapters/projectDetail";
 import { useReviewOutput } from "../../api/hooks/useReview";
+import { useProviders } from "../../api/hooks/useProviders";
 import { useStoryboard } from "../../api/hooks/useStoryboard";
 import { useTemplates } from "../../api/hooks/useTemplates";
 import { ModeBadge } from "../../components/ModeBadge";
@@ -11,13 +12,16 @@ import { errorText } from "../../lib/errorText";
 import { itemDisplayName } from "../../lib/itemName";
 import { groupOutputsByItem, REVIEW_LABEL, type ReviewDecision } from "../../lib/review";
 import styles from "./workbench.module.css";
+import type { GenerationJobInput } from "../../api/serializeGenerationBody";
+import { ASPECT_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
+import { modelOptions } from "../../lib/modelOptions";
 
 export function ReviewStage({
   detail,
   onRetryItem,
 }: {
   detail: ProjectDetail;
-  onRetryItem: (itemId: string) => void;
+  onRetryItem: (itemId: string, generationConfig: NonNullable<GenerationJobInput["generationConfig"]>) => void;
 }) {
   const { notification } = App.useApp();
   const board = useStoryboard(detail.id);
@@ -107,8 +111,8 @@ export function ReviewStage({
         onDecide={(decision) => {
           if (lightbox) decide(lightbox.id, decision);
         }}
-        onRetry={() => {
-          if (lightboxItem) onRetryItem(lightboxItem.id);
+        onRetry={(generationConfig) => {
+          if (lightboxItem) onRetryItem(lightboxItem.id, generationConfig);
         }}
       />
     </div>
@@ -169,9 +173,31 @@ function LightboxModal({
   label: string;
   onClose: () => void;
   onDecide: (decision: ReviewDecision) => void;
-  onRetry: () => void;
+  onRetry: (generationConfig: NonNullable<GenerationJobInput["generationConfig"]>) => void;
 }) {
+  const providers = useProviders();
+  const [retryOpen, setRetryOpen] = useState(false);
+  const [resolution, setResolution] = useState<NonNullable<GenerationJobInput["generationConfig"]>["imageResolution"]>(item?.imageResolution ?? "1K");
+  const [aspectRatio, setAspectRatio] = useState<NonNullable<GenerationJobInput["generationConfig"]>["imageAspectRatio"]>(item?.imageAspectRatio ?? "AUTO");
+  const [candidateCount, setCandidateCount] = useState(item?.candidateCount ?? 1);
+  const [modelKey, setModelKey] = useState(item?.imageProviderId && item.imageModelId ? `${item.imageProviderId}::${item.imageModelId}` : undefined);
+  const imageOptions = modelOptions(providers.data?.items ?? [], "image");
+  const openRetry = () => {
+    setResolution(item?.imageResolution ?? "1K");
+    setAspectRatio(item?.imageAspectRatio ?? "AUTO");
+    setCandidateCount(item?.candidateCount ?? 1);
+    setModelKey(item?.imageProviderId && item.imageModelId ? `${item.imageProviderId}::${item.imageModelId}` : imageOptions[0]?.value);
+    setRetryOpen(true);
+  };
+  const submitRetry = () => {
+    if (!modelKey) return;
+    const [providerId, modelId] = modelKey.split("::");
+    if (!providerId || !modelId) return;
+    onRetry({ imageResolution: resolution, imageAspectRatio: aspectRatio, candidateCount, imageModel: { providerId, modelId } });
+    setRetryOpen(false);
+  };
   return (
+    <>
     <Modal open={Boolean(output)} onCancel={onClose} footer={null} width={920} title="灯箱">
       {output && item ? (
         <div className={styles.lightboxBody}>
@@ -189,10 +215,19 @@ function LightboxModal({
               ]}
               onChange={(value) => onDecide(value as ReviewDecision)}
             />
-            <Button onClick={onRetry}>用此分镜重新生成</Button>
+            <Button onClick={openRetry}>用此分镜重新生成</Button>
           </div>
         </div>
       ) : null}
     </Modal>
+    <Modal open={retryOpen} title="重新生成配置" okText="开始生成" cancelText="取消" onOk={submitRetry} onCancel={() => setRetryOpen(false)} okButtonProps={{ disabled: !modelKey }}>
+      <div className={styles.inspectorSettingGrid}>
+        <label className={styles.fieldLabel}>图片比例<Select value={aspectRatio} options={Object.entries(ASPECT_LABEL).map(([value, label]) => ({ value, label }))} onChange={setAspectRatio} /></label>
+        <label className={styles.fieldLabel}>分辨率<Select value={resolution} options={Object.entries(RESOLUTION_LABEL).map(([value, label]) => ({ value, label }))} onChange={setResolution} /></label>
+        <label className={styles.fieldLabel}>候选数<InputNumber min={1} max={4} value={candidateCount} onChange={(value) => setCandidateCount(value ?? 1)} /></label>
+        <label className={styles.fieldLabel}>生图模型<Select value={modelKey} options={imageOptions} placeholder="选择生图模型" onChange={setModelKey} /></label>
+      </div>
+    </Modal>
+    </>
   );
 }

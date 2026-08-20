@@ -9,6 +9,7 @@ import {
   OUTPUT_B_FIXTURE,
   OUTPUT_FIXTURE,
   PROJECT_ID,
+  PROVIDER_ID,
   STORYBOARD_FIXTURE,
   STORYBOARD_ITEM_B_FIXTURE,
   STORYBOARD_ITEM_FIXTURE,
@@ -103,8 +104,19 @@ describe("工作台 · 结果审核", () => {
     renderResults();
     await user.click(await screen.findByRole("button", { name: "灯箱" }));
     await user.click(await screen.findByRole("button", { name: "用此分镜重新生成" }));
+    expect(await screen.findByText("重新生成配置")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "开始生成" }));
     await waitFor(() => {
-      expect(captured).toMatchObject({ storyboardItemIds: [ITEM_ID], revision: "retry" });
+      expect(captured).toMatchObject({
+        storyboardItemIds: [ITEM_ID],
+        revision: "retry",
+        generationConfig: {
+          imageResolution: "1K",
+          imageAspectRatio: "AUTO",
+          candidateCount: 1,
+          imageModel: { providerId: PROVIDER_ID, modelId: "gpt-image-1" },
+        },
+      });
     });
   });
 });

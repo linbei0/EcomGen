@@ -1662,6 +1662,16 @@ export interface operations {
                 "application/json": {
                     storyboardItemIds: string[];
                     revision?: string;
+                    generationConfig?: {
+                        imageResolution?: components["schemas"]["ImageResolution"];
+                        imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+                        candidateCount?: number;
+                        imageModel?: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                        };
+                    };
                 };
             };
         };

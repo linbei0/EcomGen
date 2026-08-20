@@ -435,6 +435,18 @@ paths:
                   minItems: 1
                   items: { type: string, format: uuid }
                 revision: { type: string, maxLength: 2000 }
+                generationConfig:
+                  type: object
+                  properties:
+                    imageResolution: { $ref: '#/components/schemas/ImageResolution' }
+                    imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
+                    candidateCount: { type: integer, minimum: 1, maximum: 4 }
+                    imageModel:
+                      type: object
+                      required: [providerId, modelId]
+                      properties:
+                        providerId: { type: string, format: uuid }
+                        modelId: { type: string, minLength: 1 }
       responses:
         '202':
           description: Generation job queued.

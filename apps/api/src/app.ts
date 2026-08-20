@@ -254,21 +254,29 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.post("/api/v1/projects/:projectId/generation-jobs", async (request, reply) => {
     const projectId = parameter(request, "projectId"); const storyboard = repository.getStoryboard(projectId); if (!storyboard || storyboard.status !== "CONFIRMED") throw new ApiError(409, "CONFLICT", "Confirm the storyboard before generation");
     const body = object(request.body, "body"); const itemIds = stringArray(body.storyboardItemIds, "storyboardItemIds"); if (itemIds.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "At least one storyboardItemId is required");
+    const config = body.generationConfig === undefined ? null : object(body.generationConfig, "generationConfig");
+    const overrideResolution = config?.imageResolution === undefined ? undefined : enumValue<ImageResolution>(config.imageResolution, IMAGE_RESOLUTIONS, "generationConfig.imageResolution");
+    const overrideAspect = config?.imageAspectRatio === undefined ? undefined : enumValue<ImageAspectRatio>(config.imageAspectRatio, IMAGE_ASPECT_RATIOS, "generationConfig.imageAspectRatio");
+    const overrideCandidates = config?.candidateCount === undefined ? undefined : candidatesPerType(config.candidateCount);
+    const overrideModel = config?.imageModel === undefined ? undefined : object(config.imageModel, "generationConfig.imageModel");
+    const overrideProviderId = overrideModel ? string(overrideModel.providerId, "generationConfig.imageModel.providerId") : undefined;
+    const overrideModelId = overrideModel ? string(overrideModel.modelId, "generationConfig.imageModel.modelId") : undefined;
+    if (overrideProviderId && overrideModelId) verifyModel(repository, overrideProviderId, overrideModelId, "image");
     const project = repository.getProject(projectId); if (!project) missing("project", projectId);
     const jobs = itemIds.flatMap((itemId) => {
       const item = repository.getStoryboardItem(itemId); if (!item || item.projectId !== projectId) throw new ApiError(400, "VALIDATION_ERROR", "Storyboard item does not belong to this project");
-      const candidateCount = clampCandidates(item.candidateCount);
+      const candidateCount = overrideCandidates ?? clampCandidates(item.candidateCount);
       return Array.from({ length: candidateCount }, (_, index) => {
         const input = {
           revision: optionalString(body.revision),
           candidateIndex: index + 1,
-          imageResolution: item.imageResolution,
-          imageAspectRatio: item.imageAspectRatio
+          imageResolution: overrideResolution ?? item.imageResolution,
+          imageAspectRatio: overrideAspect ?? item.imageAspectRatio
         };
         const fingerprint = requestFingerprint({ type: "GENERATE", projectId, itemId, storyboardVersion: storyboard.version, itemUpdatedAt: item.updatedAt, input, idempotencyKey: request.headers["idempotency-key"] ?? null });
         const existing = repository.findJobByFingerprint(projectId, fingerprint);
         if (existing) return existing;
-        return repository.createJob({ id: randomUUID(), projectId, storyboardItemId: itemId, type: "GENERATE", input, requestFingerprint: fingerprint, providerId: item.imageProviderId, modelId: item.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+        return repository.createJob({ id: randomUUID(), projectId, storyboardItemId: itemId, type: "GENERATE", input, requestFingerprint: fingerprint, providerId: overrideProviderId ?? item.imageProviderId, modelId: overrideModelId ?? item.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
       });
     });
     await Promise.all(jobs.map((job) => enqueue(queue, { jobId: job.id, kind: "generate" }))); return reply.code(202).send({ jobs });
