@@ -27,6 +27,11 @@ export function useProject(projectId: string | undefined) {
       );
       return adaptProjectDetail(raw);
     },
+    // SSE 是即时通知，但连接建立或重连期间可能错过事件；生成中时轮询确保状态最终收敛。
+    refetchInterval: (query) => {
+      const jobs = query.state.data?.jobs ?? [];
+      return jobs.some((job) => job.status === "QUEUED" || job.status === "RUNNING") ? 2000 : false;
+    },
   });
 }
 

@@ -15,6 +15,7 @@ import { jobErrorText } from "../../lib/jobError";
 import { modelOptions } from "../../lib/modelOptions";
 import { canResubmitPlan, isActiveJob, latestPlanJob } from "../../lib/planJob";
 import { ASPECT_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
+import { DEFAULT_TARGET_IMAGE_COUNT, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import styles from "./workbench.module.css";
 
 function toLines(value: string[] | null | undefined): string {
@@ -60,6 +61,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const [facts, setFacts] = useState(toLines(detail.verifiedFacts));
   const [claims, setClaims] = useState(toLines(detail.prohibitedClaims));
   const [planningMode, setPlanningMode] = useState<PlanningMode>("AI");
+  const [targetImageCount, setTargetImageCount] = useState(DEFAULT_TARGET_IMAGE_COUNT);
   const [selected, setSelected] = useState<string[]>(stored);
   const [instruction, setInstruction] = useState("");
   const [activeJobId, setActiveJobId] = useState<string | undefined>(undefined);
@@ -142,6 +144,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
         requestedTypes: planningMode === "MANUAL" ? selected : undefined,
         userInstruction: instruction.trim() || undefined,
         candidatesPerType: detail.candidatesPerType,
+        ...(planningMode === "AI" ? { targetImageCount } : {}),
         imageResolution: detail.imageResolution,
         imageAspectRatio: detail.imageAspectRatio,
         regenerationKey: seedJob?.status === "SUCCEEDED" ? crypto.randomUUID() : undefined,
@@ -366,7 +369,29 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
             })}
           </div>
         ) : (
-          <p className={styles.hint}>Agent 会根据卖点和素材自动选择一组有转化逻辑的图片类型。</p>
+          <>
+            <p className={styles.hint}>Agent 会根据卖点和素材自动选择一组有转化逻辑的图片类型。</p>
+            <div className={styles.stepper}>
+              <span>规划图片数</span>
+              <button
+                type="button"
+                aria-label="减少规划图片数"
+                disabled={targetImageCount <= MIN_TARGET_IMAGE_COUNT}
+                onClick={() => setTargetImageCount((count) => count - 1)}
+              >
+                −
+              </button>
+              <strong>{targetImageCount}</strong>
+              <button
+                type="button"
+                aria-label="增加规划图片数"
+                disabled={targetImageCount >= MAX_TARGET_IMAGE_COUNT}
+                onClick={() => setTargetImageCount((count) => count + 1)}
+              >
+                +
+              </button>
+            </div>
+          </>
         )}
         <Input.TextArea
           aria-label="补充说明"

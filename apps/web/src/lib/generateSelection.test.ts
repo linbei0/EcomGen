@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Job, StoryboardItem } from "../api/adapters/projectDetail";
 import {
   activeGenerateJobs,
+  isGenerationLocked,
   isSelectableItem,
   modeCounts,
   ungeneratedItems,
@@ -32,6 +33,13 @@ describe("generateSelection", () => {
     expect(isSelectableItem(generated)).toBe(true);
     expect(ungeneratedItems([draft, confirmed, generated]).map((entry) => entry.id)).toEqual(["c"]);
     expect(modeCounts([confirmed, generated])).toEqual({ creative: 1, protected: 1 });
+  });
+
+  it("仅生成中或已生成的分镜冻结，已确认但未生成的分镜仍可修改", () => {
+    expect(isGenerationLocked(item({ status: "DRAFT" }))).toBe(false);
+    expect(isGenerationLocked(item({ status: "CONFIRMED" }))).toBe(false);
+    expect(isGenerationLocked(item({ status: "GENERATING" }))).toBe(true);
+    expect(isGenerationLocked(item({ status: "GENERATED" }))).toBe(true);
   });
 
   it("进行中的生成任务不含已结束项", () => {

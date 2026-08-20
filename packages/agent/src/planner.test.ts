@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", errorMessage: undefined as string | undefined, simulateResearchFailure: false }));
+const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1 }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
@@ -17,7 +17,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
         const researchTool = captured.options?.initialState?.tools?.find((tool) => tool.name === "research_visual_direction");
         try { await researchTool?.execute("research-call", { query: "product photography lighting" }); } catch { /* Pi 将工具错误返回给模型并继续规划。 */ }
       }
-      this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify({ campaignStyleLock: "clean", items: [{ assetType: "hero-image", displayName: "整机斜侧展示首图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: 0 }] }) }] }];
+      this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify({ campaignStyleLock: "clean", items: Array.from({ length: captured.itemCount }, (_, index) => ({ assetType: "hero-image", displayName: index === 0 ? "整机斜侧展示首图" : `展示场景${index + 1}`, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: index })) }) }] }];
     }
   },
 }));
@@ -50,6 +50,7 @@ const input: PlannerInput = {
   planningMode: "AI",
   requestedTypes: ["hero-image"],
   candidatesPerType: 1,
+  targetImageCount: 1,
 };
 
 describe("planStoryboard", () => {
@@ -69,6 +70,18 @@ describe("planStoryboard", () => {
     expect(captured.prompt).toContain("Manual selection is authoritative");
     const result = await planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: ["hero-image"] });
     expect(result.items[0]?.displayName).toBe("整机斜侧展示首图");
+  });
+
+  it("要求 AI 返回指定数量的分镜，并拒绝数量不符的结果", async () => {
+    captured.errorMessage = undefined;
+    captured.prompt = "";
+    captured.itemCount = 2;
+    const result = await planStoryboard({ ...input, targetImageCount: 2 });
+    expect(captured.prompt).toContain("exactly 2 planned items");
+    expect(result.items).toHaveLength(2);
+
+    captured.itemCount = 1;
+    await expect(planStoryboard({ ...input, targetImageCount: 2 })).rejects.toThrow("AI planning must return exactly 2 storyboard items");
   });
 
   it("passes the resolved market guidance into the Pi planning context", async () => {

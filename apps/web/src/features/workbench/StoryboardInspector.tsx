@@ -64,7 +64,7 @@ export function StoryboardInspector({
   }, [draft, item.id, locked, notification, persist]);
 
   const claims = factClaimRows(item.factClaims);
-  const readOnly = locked || item.status === "CONFIRMED" || item.status === "GENERATING" || item.status === "GENERATED";
+  const readOnly = locked;
   const templateName = templates.find((template) => template.id === draft.assetType)?.name ?? draft.assetType;
 
   return (

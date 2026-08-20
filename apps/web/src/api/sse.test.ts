@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { qk } from "./queryKeys";
-import { invalidateKeysForEvent } from "./sse";
+import { eventJobId, invalidateKeysForEvent } from "./sse";
+
+describe("eventJobId", () => {
+  it("从 SSE envelope 提取任务 ID，异常数据返回 undefined", () => {
+    expect(eventJobId(JSON.stringify({ data: { id: "j1" } }))).toBe("j1");
+    expect(eventJobId(JSON.stringify({ data: { id: 42 } }))).toBeUndefined();
+    expect(eventJobId("not-json")).toBeUndefined();
+  });
+});
 
 describe("invalidateKeysForEvent", () => {
   it("六个已知事件映射到精确 key，未知事件不动作", () => {

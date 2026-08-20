@@ -701,6 +701,7 @@ export interface components {
             imageTypes?: string[];
             userInstruction?: string;
             candidatesPerType?: number;
+            targetImageCount?: number;
             imageResolution?: components["schemas"]["ImageResolution"];
             imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
             /** @description Unique key for an intentional re-planning run. */

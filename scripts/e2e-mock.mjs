@@ -106,7 +106,7 @@ try {
   form.append("file", new Blob([Buffer.from(onePixelPng, "base64")], { type: "image/png" }), "cup.png");
   const assetResponse = await fetch(`${base}/projects/${project.id}/assets`, { method: "POST", body: form });
   assert.equal(assetResponse.status, 200, await assetResponse.text());
-  await requestJson(`${base}/projects/${project.id}/planning-jobs`, "POST", { planningMode: "AI", requestedTypes: ["hero-image"], candidatesPerType: 1 });
+  await requestJson(`${base}/projects/${project.id}/planning-jobs`, "POST", { planningMode: "AI", requestedTypes: ["hero-image"], candidatesPerType: 1, targetImageCount: 1 });
   const planningJob = await waitForJob(base, project.id, "PLAN");
   assert.equal(planningJob.status, "SUCCEEDED");
   assert.match(observed.planningPrompt, /allowedTemplateIds/);

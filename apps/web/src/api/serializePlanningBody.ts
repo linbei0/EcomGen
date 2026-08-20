@@ -10,6 +10,7 @@ export function serializePlanningBody(input: PlanningJobInput): string {
     imageTypes: types,
     userInstruction: input.userInstruction,
     candidatesPerType: input.candidatesPerType,
+    targetImageCount: input.targetImageCount,
     imageResolution: input.imageResolution,
     imageAspectRatio: input.imageAspectRatio,
     regenerationKey: input.regenerationKey,

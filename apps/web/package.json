@@ -11,6 +11,7 @@
     "gen:api": "openapi-typescript ../../openapi.yaml -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@ecomgen/contracts": "workspace:*",
     "@tanstack/react-query": "^5.101.4",
     "antd": "^6.6.0",
     "lucide-react": "^1.31.0",

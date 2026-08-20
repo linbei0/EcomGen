@@ -4,6 +4,11 @@ export function isSelectableItem(item: StoryboardItem): boolean {
   return item.status === "CONFIRMED" || item.status === "GENERATED";
 }
 
+/** 只有已经进入或完成生图的分镜不能再修改；CONFIRMED 仍可等待后续生成。 */
+export function isGenerationLocked(item: StoryboardItem): boolean {
+  return item.status === "GENERATING" || item.status === "GENERATED";
+}
+
 export function ungeneratedItems(items: readonly StoryboardItem[]): StoryboardItem[] {
   return items.filter((item) => item.status === "CONFIRMED");
 }

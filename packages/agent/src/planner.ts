@@ -2,7 +2,7 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { ImageContent, Model } from "@earendil-works/pi-ai";
 import type { PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
-import { MAX_CANDIDATES_PER_TYPE } from "@ecomgen/contracts";
+import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createPlanningTools, readPlatformGuidance, type WebResearchConfig } from "./tools.js";
 export type { WebResearchConfig } from "./tools.js";
@@ -26,6 +26,7 @@ export interface PlannerInput {
   requestedTypes?: string[];
   userInstruction?: string;
   candidatesPerType?: number;
+  targetImageCount?: number;
   webResearch?: WebResearchConfig;
 }
 
@@ -85,9 +86,10 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
     upstream: ECOM_DETAILS_IMAGE_SOURCE,
     allowedTemplateIds: (selectedTemplates.length ? selectedTemplates : ECOM_TEMPLATES).map((template) => template.id)
   };
+  const targetImageCount = input.planningMode === "AI" ? requiredTargetImageCount(input.targetImageCount) : undefined;
   const modeInstruction = input.planningMode === "MANUAL"
     ? "Manual selection is authoritative: generate one planned item for every requested type, in the requested order. Read the matching template and platform guidance with the business tools, then write each promptInstruction as the final image-model prompt."
-    : "Use the catalog and project context to choose a conversion-oriented storyboard. Read the current market and platform guidance with the business tool before writing final prompts.";
+    : `Use the catalog and project context to choose a conversion-oriented storyboard with exactly ${targetImageCount} planned items. Read the current market and platform guidance with the business tool before writing final prompts.`;
   await agent.prompt(`Plan this project. ${modeInstruction} Return {"campaignStyleLock":string,"items":[{"assetType":string,"displayName":string,"templateVariant":string|null,"candidateCount":number,"referencedAssets":string[],"mode":"CREATIVE"|"PIXEL_PROTECTED","promptInstruction":string,"factClaims":string[],"riskFlags":string[],"sortOrder":number}]}.\n${JSON.stringify(payload)}`, input.model.input.includes("image") ? input.referenceImages : undefined);
   if (agent.state.errorMessage) throw new Error(`Planning model request failed: ${agent.state.errorMessage}`);
   const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
@@ -133,6 +135,8 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
     if (expected.length === 0 || actual.length !== expected.length || new Set(actual).size !== actual.length || actual.some((id) => !expected.includes(id))) {
       throw new Error("Manual planning must return exactly one item for each requested template");
     }
+  } else if (plan.items.length !== requiredTargetImageCount(input.targetImageCount)) {
+    throw new Error(`AI planning must return exactly ${requiredTargetImageCount(input.targetImageCount)} storyboard items`);
   }
   const knownAssetIds = new Set(input.assets.map((asset) => asset.id));
   const defaultCandidates = clampCandidates(input.candidatesPerType ?? 1);
@@ -160,6 +164,14 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
   });
   if (new Set(items.map((item) => item.displayName)).size !== items.length) throw new Error("Planning model returned duplicate storyboard display names");
   return { campaignStyleLock: plan.campaignStyleLock, items };
+}
+
+function requiredTargetImageCount(value: number | undefined): number {
+  const count = value ?? DEFAULT_TARGET_IMAGE_COUNT;
+  if (!Number.isInteger(count) || count < MIN_TARGET_IMAGE_COUNT || count > MAX_TARGET_IMAGE_COUNT) {
+    throw new Error(`targetImageCount must be an integer between ${MIN_TARGET_IMAGE_COUNT} and ${MAX_TARGET_IMAGE_COUNT}`);
+  }
+  return count;
 }
 
 function assertFinalPrompt(prompt: string): string {

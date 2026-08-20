@@ -48,6 +48,7 @@ describe("工作台 · 规划", () => {
       });
     });
     expect(await screen.findByText("排队中")).toBeInTheDocument();
+    expect(captured).not.toHaveProperty("targetImageCount");
   });
 
   it("AI 智能规划不提交手动选择的图片类型", async () => {
@@ -68,9 +69,34 @@ describe("工作台 · 规划", () => {
     await user.click(screen.getByRole("button", { name: "AI 智能规划" }));
     await user.click(screen.getByRole("button", { name: "生成分镜" }));
 
-    await waitFor(() => expect(captured).toMatchObject({ planningMode: "AI" }));
+    await waitFor(() => expect(captured).toMatchObject({ planningMode: "AI", targetImageCount: 6 }));
     expect(captured).not.toHaveProperty("requestedTypes");
     expect(captured).not.toHaveProperty("imageTypes");
+  });
+
+  it("AI 规划图片数在 1 到 12 之间调整并随请求提交", async () => {
+    const user = userEvent.setup();
+    let captured: Record<string, unknown> | undefined;
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
+      http.post(`${BASE}/projects/:projectId/planning-jobs`, async ({ request }) => {
+        captured = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 8 });
+      }),
+    );
+
+    renderSetup();
+    await screen.findByDisplayValue("无线耳机 SPU");
+    const increase = screen.getByRole("button", { name: "增加规划图片数" });
+    for (let index = 0; index < 6; index += 1) await user.click(increase);
+    expect(increase).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "生成分镜" }));
+
+    await waitFor(() => expect(captured).toMatchObject({ planningMode: "AI", targetImageCount: 12 }));
+
+    const decrease = screen.getByRole("button", { name: "减少规划图片数" });
+    for (let index = 0; index < 11; index += 1) await user.click(decrease);
+    expect(decrease).toBeDisabled();
   });
 
   it("搜索服务可用时保存联网视觉研究开关", async () => {

@@ -792,6 +792,7 @@ components:
         imageTypes: { type: array, items: { type: string } }
         userInstruction: { type: string, maxLength: 4000 }
         candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
+        targetImageCount: { type: integer, minimum: 1, maximum: 12 }
         imageResolution: { $ref: '#/components/schemas/ImageResolution' }
         imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         regenerationKey: { type: string, minLength: 1, description: Unique key for an intentional re-planning run. }

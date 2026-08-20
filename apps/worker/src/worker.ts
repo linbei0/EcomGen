@@ -55,7 +55,7 @@ async function executePlan(job: JobRecord): Promise<void> {
   const assets = repository.listAssets(project.id);
   const productImages = assets.filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/")).slice(0, 4);
   const referenceImages = model.supportsVision ? await Promise.all(productImages.map(async (asset) => ({ type: "image" as const, mimeType: asset.mimeType, data: (await storage.read(asset.storagePath)).toString("base64") }))) : undefined;
-  const input = job.input as { planningMode?: PlanningMode; requestedTypes?: string[]; userInstruction?: string; candidatesPerType?: number; imageResolution?: ImageResolution; imageAspectRatio?: ImageAspectRatio };
+  const input = job.input as { planningMode?: PlanningMode; requestedTypes?: string[]; userInstruction?: string; candidatesPerType?: number; targetImageCount?: number; imageResolution?: ImageResolution; imageAspectRatio?: ImageAspectRatio };
   if (input.imageResolution || input.imageAspectRatio || input.candidatesPerType) {
     repository.updateProject(project.id, {
       imageResolution: input.imageResolution ?? project.imageResolution,
@@ -85,6 +85,7 @@ async function executePlan(job: JobRecord): Promise<void> {
       requestedTypes: input.requestedTypes,
       userInstruction: input.userInstruction,
       candidatesPerType: input.candidatesPerType ?? project.candidatesPerType,
+      targetImageCount: input.targetImageCount,
       webResearch: webResearch ? {
         ...webResearch,
         audit: {

@@ -82,6 +82,30 @@ describe("工作台 · 分镜", () => {
     expect(screen.getAllByText("续航 8 小时").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("已确认但未生成的分镜仍可编辑和删除，已生成分镜保持冻结", async () => {
+    const user = userEvent.setup();
+    const confirmed = { ...STORYBOARD_ITEM_FIXTURE, status: "CONFIRMED" as const };
+    const generated = { ...STORYBOARD_ITEM_B_FIXTURE, status: "GENERATED" as const };
+    const confirmedBoard = { ...STORYBOARD_FIXTURE, status: "CONFIRMED" as const };
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () =>
+        HttpResponse.json(projectDetailPayload({ storyboard: confirmedBoard, items: [confirmed, generated] })),
+      ),
+      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
+        HttpResponse.json({ storyboard: confirmedBoard, items: [confirmed, generated] }),
+      ),
+    );
+
+    renderBoard();
+    await user.click(await screen.findByRole("button", { name: "白底/纯色底产品主图 分镜" }));
+    expect(screen.getByDisplayValue(confirmed.promptInstruction)).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "删除白底/纯色底产品主图" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "场景化生活图 分镜" }));
+    expect(screen.getByDisplayValue(generated.promptInstruction)).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "删除场景化生活图" })).not.toBeInTheDocument();
+  });
+
   it("确认 409 时提示冲突并重新拉取分镜", async () => {
     const user = userEvent.setup();
     let storyboardGets = 0;

@@ -2,11 +2,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { API_BASE_URL } from "../../config/env";
-import { invalidateKeysForEvent, SSE_EVENT_NAMES } from "../sse";
+import { eventJobId, invalidateKeysForEvent, SSE_EVENT_NAMES } from "../sse";
 
 export type EventConnection = "idle" | "open" | "retrying";
 
-/** 工作台挂载时订阅 SSE；只按事件名失效缓存，不解析 payload。 */
+/** 工作台挂载时订阅 SSE；事件只负责触发查询失效，REST 响应仍是状态真相。 */
 export function useProjectEvents(projectId: string | undefined): EventConnection {
   const queryClient = useQueryClient();
   const [connection, setConnection] = useState<EventConnection>("idle");
@@ -18,13 +18,13 @@ export function useProjectEvents(projectId: string | undefined): EventConnection
 
     const onOpen = () => setConnection("open");
     const onError = () => setConnection("retrying");
-    const onNamed = (event: Event) => {
+    const onNamed = (event: MessageEvent<string>) => {
       const type = event.type;
       if (type === "connected") {
         setConnection("open");
         return;
       }
-      for (const key of invalidateKeysForEvent(projectId, type)) {
+      for (const key of invalidateKeysForEvent(projectId, type, eventJobId(event.data))) {
         void queryClient.invalidateQueries({ queryKey: [...key] });
       }
     };

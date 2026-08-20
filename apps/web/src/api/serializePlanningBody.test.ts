@@ -10,6 +10,7 @@ describe("serializePlanningBody", () => {
         requestedTypes: ["hero-image", "flat-lay"],
         userInstruction: "偏冷白",
         candidatesPerType: 2,
+        targetImageCount: 6,
         imageResolution: "2K",
         imageAspectRatio: "1:1",
         regenerationKey: "run-1",
@@ -20,6 +21,7 @@ describe("serializePlanningBody", () => {
     expect(parsed.requestedTypes).toEqual(["hero-image", "flat-lay"]);
     expect(parsed.userInstruction).toBe("偏冷白");
     expect(parsed.candidatesPerType).toBe(2);
+    expect(parsed.targetImageCount).toBe(6);
     expect(parsed.imageResolution).toBe("2K");
     expect(parsed.imageAspectRatio).toBe("1:1");
     expect(parsed.regenerationKey).toBe("run-1");

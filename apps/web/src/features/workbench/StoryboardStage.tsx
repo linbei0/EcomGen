@@ -13,6 +13,7 @@ import { transition } from "../../design/motion";
 import { errorText } from "../../lib/errorText";
 import { ITEM_STATUS_LABEL } from "../../lib/factClaims";
 import { itemDisplayName } from "../../lib/itemName";
+import { isGenerationLocked } from "../../lib/generateSelection";
 import { StoryboardInspector } from "./StoryboardInspector";
 import styles from "./workbench.module.css";
 
@@ -114,7 +115,7 @@ export function StoryboardStage({
               label={label}
               selected={item.id === editingId}
               checked={selectedIds.includes(item.id)}
-              deletable={!locked && item.status === "DRAFT"}
+              deletable={!isGenerationLocked(item)}
               deleting={remove.isPending}
               onSelect={() => setEditingId(item.id)}
               onToggle={() => toggleSelection(item.id)}
@@ -147,7 +148,7 @@ export function StoryboardStage({
 
       <Modal
         open={Boolean(editing)}
-        title={editing ? <StoryboardTitleEditor item={editing} editable={!locked && editing.status === "DRAFT"} onSave={(displayName) => update.mutateAsync({ itemId: editing.id, body: { displayName } })} /> : "编辑分镜"}
+        title={editing ? <StoryboardTitleEditor item={editing} editable={!isGenerationLocked(editing)} onSave={(displayName) => update.mutateAsync({ itemId: editing.id, body: { displayName } })} /> : "编辑分镜"}
         footer={null}
         onCancel={() => setEditingId(null)}
         width={560}
@@ -158,7 +159,7 @@ export function StoryboardStage({
             projectId={detail.id}
             item={editing}
             templates={templates.data ?? []}
-            locked={Boolean(locked)}
+            locked={editing ? isGenerationLocked(editing) : true}
           />
         ) : null}
       </Modal>

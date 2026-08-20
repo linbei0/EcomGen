@@ -8,7 +8,7 @@ import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFinger
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus } from "@ecomgen/jobs";
 import type { AssetRole, ImageAspectRatio, ImageResolution, ModelDefinition, OutputReviewDecision, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind } from "@ecomgen/contracts";
-import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, roleForUserAssetKind } from "@ecomgen/contracts";
+import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, roleForUserAssetKind } from "@ecomgen/contracts";
 import { OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -160,11 +160,16 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const requestedTypes = optionalStringArray(body.requestedTypes ?? body.imageTypes); if (requestedTypes?.length && resolveTemplates(requestedTypes).length !== requestedTypes.length) throw new ApiError(400, "VALIDATION_ERROR", "requestedTypes contains an unknown ecom-details-image template ID or alias");
     const planningMode = body.planningMode === undefined ? "AI" : enumValue<PlanningMode>(body.planningMode, ["AI", "MANUAL"], "planningMode");
     if (planningMode === "MANUAL" && !requestedTypes?.length) throw new ApiError(400, "VALIDATION_ERROR", "MANUAL planning requires requestedTypes");
+    if (planningMode === "MANUAL" && body.targetImageCount !== undefined) throw new ApiError(400, "VALIDATION_ERROR", "targetImageCount is only supported for AI planning");
+    const targetImageCount = planningMode === "AI"
+      ? body.targetImageCount === undefined ? DEFAULT_TARGET_IMAGE_COUNT : planningImageCount(body.targetImageCount)
+      : undefined;
     const input = {
       planningMode,
       requestedTypes,
       userInstruction: optionalString(body.userInstruction),
       candidatesPerType: body.candidatesPerType === undefined ? undefined : candidatesPerType(body.candidatesPerType),
+      targetImageCount,
       imageResolution: body.imageResolution === undefined ? undefined : enumValue<ImageResolution>(body.imageResolution, IMAGE_RESOLUTIONS, "imageResolution"),
       imageAspectRatio: body.imageAspectRatio === undefined ? undefined : enumValue<ImageAspectRatio>(body.imageAspectRatio, IMAGE_ASPECT_RATIOS, "imageAspectRatio"),
       regenerationKey: optionalString(body.regenerationKey)
@@ -178,6 +183,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.patch("/api/v1/storyboard-items/:itemId", async (request) => {
     const itemId = parameter(request, "itemId"); const current = repository.getStoryboardItem(itemId); if (!current) missing("storyboard item", itemId); const body = object(request.body, "body");
+    if (current.status === "GENERATING" || current.status === "GENERATED") {
+      throw new ApiError(409, "CONFLICT", "Generated or generating storyboard items cannot be updated");
+    }
     const patch: Record<string, unknown> = {};
     if (body.assetType !== undefined) {
       const templateId = string(body.assetType, "assetType");
@@ -201,7 +209,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const itemId = parameter(request, "itemId");
     const current = repository.getStoryboardItem(itemId);
     if (!current) missing("storyboard item", itemId);
-    if (current.status !== "DRAFT") throw new ApiError(409, "CONFLICT", "Only draft storyboard items can be deleted");
+    if (current.status === "GENERATING" || current.status === "GENERATED") {
+      throw new ApiError(409, "CONFLICT", "Generated or generating storyboard items cannot be deleted");
+    }
     repository.deleteStoryboardItem(itemId);
     return reply.code(204).send();
   });
@@ -255,6 +265,11 @@ function parseAssetRole(value: unknown): AssetRole {
 function candidatesPerType(value: unknown): number {
   const count = typeof value === "number" ? value : Number(value);
   if (!Number.isInteger(count) || count < 1 || count > MAX_CANDIDATES_PER_TYPE) throw new ApiError(400, "VALIDATION_ERROR", `candidatesPerType must be an integer between 1 and ${MAX_CANDIDATES_PER_TYPE}`);
+  return count;
+}
+function planningImageCount(value: unknown): number {
+  const count = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(count) || count < MIN_TARGET_IMAGE_COUNT || count > MAX_TARGET_IMAGE_COUNT) throw new ApiError(400, "VALIDATION_ERROR", `targetImageCount must be an integer between ${MIN_TARGET_IMAGE_COUNT} and ${MAX_TARGET_IMAGE_COUNT}`);
   return count;
 }
 function clampCandidates(value: number): number {
