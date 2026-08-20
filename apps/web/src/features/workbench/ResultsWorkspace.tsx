@@ -1,5 +1,5 @@
-import { App, Button } from "antd";
-import { Download } from "lucide-react";
+import { App, Button, Tooltip } from "antd";
+import { Download, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { exportDownloadUrl, type ProjectDetail } from "../../api/adapters/projectDetail";
@@ -74,11 +74,24 @@ export function ResultsWorkspace({
         <aside key={job.id} className={styles.jobCard} data-status="FAILED">
           <p className={styles.jobStatus}>{JOB_STATUS_LABEL.FAILED}</p>
           {jobErrorText(job) ? <p className={styles.jobError}>{jobErrorText(job)}</p> : null}
-          {job.retryable ? (
-            <Button loading={retryJob.isPending} onClick={() => void retryJob.mutateAsync(job.id)}>
-              重试生成
-            </Button>
-          ) : null}
+          <div className={styles.jobActions}>
+            {job.retryable ? (
+              <Button loading={retryJob.isPending} onClick={() => void retryJob.mutateAsync(job.id)}>
+                重试生成
+              </Button>
+            ) : null}
+          </div>
+          <Tooltip title="关闭失败提示">
+            <Button
+              className={styles.jobDismiss}
+              type="text"
+              size="small"
+              icon={<X size={16} strokeWidth={1.75} />}
+              loading={cancelJob.isPending}
+              aria-label="关闭失败提示"
+              onClick={() => void cancelJob.mutateAsync(job.id)}
+            />
+          </Tooltip>
         </aside>
       ))}
 

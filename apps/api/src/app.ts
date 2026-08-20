@@ -239,7 +239,20 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     await Promise.all(jobs.map((job) => enqueue(queue, { jobId: job.id, kind: "generate" }))); return reply.code(202).send({ jobs });
   });
   app.get("/api/v1/jobs/:jobId", async (request) => { const job = repository.getJob(parameter(request, "jobId")); if (!job) missing("job", parameter(request, "jobId")); return job; });
-  app.post("/api/v1/jobs/:jobId/cancel", async (request) => { const id = parameter(request, "jobId"); const current = repository.getJob(id); if (!current) missing("job", id); const queued = await queue.getJob(id); const state = queued ? await queued.getState() : "unknown"; if (queued && ["waiting", "delayed", "prioritized"].includes(state)) { await queued.remove(); return repository.updateJob(id, { status: "CANCELLED", cancelRequested: true }); } return repository.updateJob(id, { cancelRequested: true }); });
+  app.post("/api/v1/jobs/:jobId/cancel", async (request) => {
+    const id = parameter(request, "jobId");
+    const current = repository.getJob(id);
+    if (!current) missing("job", id);
+    // 已失败任务没有可中断的队列工作，将其标记为已取消以关闭失败提示，同时保留审计记录。
+    if (current.status === "FAILED") return repository.updateJob(id, { status: "CANCELLED", cancelRequested: true });
+    const queued = await queue.getJob(id);
+    const state = queued ? await queued.getState() : "unknown";
+    if (queued && ["waiting", "delayed", "prioritized"].includes(state)) {
+      await queued.remove();
+      return repository.updateJob(id, { status: "CANCELLED", cancelRequested: true });
+    }
+    return repository.updateJob(id, { cancelRequested: true });
+  });
   app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => { const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id); if (!job.retryable) throw new ApiError(409, "CONFLICT", "This job cannot be retried"); const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input: job.input }); await enqueue(queue, { jobId: retry.id, kind: retry.type.toLowerCase() as "plan" | "generate" | "export" }); return reply.code(202).send(retry); });
   app.get("/api/v1/projects/:projectId/outputs", async (request) => repository.listOutputs(parameter(request, "projectId")));
   app.patch("/api/v1/outputs/:outputId/review", async (request) => { const body = object(request.body, "body"); const result = repository.reviewOutput(parameter(request, "outputId"), enumValue<OutputReviewDecision>(body.reviewDecision ?? body.decision, ["SELECTED", "REJECTED", "NEEDS_REVIEW"], "reviewDecision"), optionalString(body.reviewNote ?? body.note) ?? null); if (!result) missing("output", parameter(request, "outputId")); return result; });

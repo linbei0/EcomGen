@@ -171,4 +171,42 @@ describe("工作台 · 确认并生成", () => {
       expect(retried).toBe(true);
     });
   });
+
+  it("失败任务可关闭，不再常驻结果区", async () => {
+    const user = userEvent.setup();
+    let closed = false;
+    const failedJob = {
+      ...GENERATE_JOB_FIXTURE,
+      status: "FAILED" as const,
+      progress: 30,
+      retryable: true,
+      error: { message: "生图失败", requestId: "gen-1" },
+    };
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () =>
+        HttpResponse.json(projectDetailPayload({
+          storyboard: confirmedBoard.storyboard,
+          items: confirmedBoard.items,
+          jobs: closed ? [{ ...failedJob, status: "CANCELLED" as const, cancelRequested: true }] : [failedJob],
+          outputs: [],
+        })),
+      ),
+      http.post(`${BASE}/jobs/:jobId/cancel`, () => {
+        closed = true;
+        return HttpResponse.json({ ...failedJob, status: "CANCELLED", cancelRequested: true });
+      }),
+    );
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/projects/:projectId" element={<WorkbenchPage />} />
+      </Routes>,
+      { initialEntries: [`/projects/${PROJECT_ID}?view=results`] },
+    );
+    expect(await screen.findByText("生图失败（请求 ID：gen-1）")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "关闭失败提示" }));
+    await waitFor(() => {
+      expect(screen.queryByText("生图失败（请求 ID：gen-1）")).not.toBeInTheDocument();
+    });
+  });
 });

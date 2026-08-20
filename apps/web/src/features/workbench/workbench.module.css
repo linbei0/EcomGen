@@ -616,6 +616,32 @@
   font-size: 13px;
 }
 
+.jobCard[data-status="FAILED"] {
+  position: relative;
+  min-height: 0;
+  padding: 14px 48px 14px 16px;
+  gap: 8px;
+}
+
+.jobActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.jobDismiss {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 28px;
+  height: 28px;
+  color: var(--text-2);
+}
+
+.jobDismiss:hover {
+  color: var(--text-1) !important;
+}
+
 .fieldLabel {
   display: flex;
   flex-direction: column;
