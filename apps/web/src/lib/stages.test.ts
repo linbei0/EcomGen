@@ -8,6 +8,8 @@ function detail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     id: "p1",
     name: "demo",
     platformTargets: ["DOMESTIC"],
+    targetMarket: null,
+    copyLanguage: null,
     reasoningProviderId: "r",
     reasoningModelId: "m",
     imageProviderId: "i",

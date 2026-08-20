@@ -39,7 +39,9 @@ export function HomePage() {
         productDescription: null,
         verifiedFacts: [],
         prohibitedClaims: [],
-        platformTargets: ["DOMESTIC"],
+        platformTargets: [],
+        targetMarket: null,
+        copyLanguage: null,
         defaultMode: "CREATIVE",
         ...pair,
       });

@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../../config/env";
 import type { components } from "../schema.d.ts";
 
 export type Project = components["schemas"]["Project"];
+export type TargetMarket = Project["targetMarket"];
 export type ProjectCover = components["schemas"]["ProjectCover"];
 export type Asset = components["schemas"]["Asset"];
 export type AssetRole = components["schemas"]["AssetRole"];
@@ -33,6 +34,10 @@ const ASSET_ROLES = new Set<AssetRole>([
 ]);
 
 const RESOLUTIONS = new Set<ImageResolution>(["1K", "2K", "4K"]);
+const TARGET_MARKETS = new Set<Exclude<TargetMarket, null>>([
+  "CHINA_MAINLAND", "HONG_KONG", "MACAU", "TAIWAN", "UNITED_STATES", "UNITED_KINGDOM",
+  "GERMANY", "FRANCE", "ITALY", "SPAIN", "JAPAN", "SOUTH_KOREA",
+]);
 const ASPECTS = new Set<ImageAspectRatio>(["AUTO", "1:1", "3:4", "4:3", "16:9"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -276,8 +281,7 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
     !imageProviderId ||
     !imageModelId ||
     !createdAt ||
-    !updatedAt ||
-    platforms.length === 0
+    !updatedAt
   ) {
     return null;
   }
@@ -295,6 +299,8 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
     id,
     name,
     platformTargets: platforms,
+    targetMarket: TARGET_MARKETS.has(raw.targetMarket as Exclude<TargetMarket, null>) ? raw.targetMarket as Exclude<TargetMarket, null> : null,
+    copyLanguage: asString(raw.copyLanguage) ?? null,
     reasoningProviderId,
     reasoningModelId,
     imageProviderId,

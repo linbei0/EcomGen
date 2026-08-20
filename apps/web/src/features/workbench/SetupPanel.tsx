@@ -1,8 +1,8 @@
-import { App, Button, Input, Select, Switch, Tooltip } from "antd";
-import { ChevronDown, Globe2, Layers3, Package, SlidersHorizontal, Sparkles } from "lucide-react";
+import { App, AutoComplete, Button, Input, Select, Switch, Tooltip } from "antd";
+import { ChevronDown, Globe2, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import type { PlanningMode, ProjectDetail, UpdateProjectInput } from "../../api/adapters/projectDetail";
+import type { PlanningMode, ProjectDetail, TargetMarket, UpdateProjectInput } from "../../api/adapters/projectDetail";
 import { useCreatePlanningJob } from "../../api/hooks/usePlanning";
 import { useJob, useRetryJob } from "../../api/hooks/useJobs";
 import { useHealth } from "../../api/hooks/useHealth";
@@ -28,6 +28,23 @@ function splitLines(value: string): string[] {
     .filter(Boolean);
 }
 
+const MARKET_OPTIONS: Array<{ value: Exclude<TargetMarket, null>; label: string }> = [
+  { value: "CHINA_MAINLAND", label: "中国大陆" }, { value: "HONG_KONG", label: "香港" },
+  { value: "MACAU", label: "澳门" }, { value: "TAIWAN", label: "台湾" },
+  { value: "UNITED_STATES", label: "美国" }, { value: "UNITED_KINGDOM", label: "英国" },
+  { value: "GERMANY", label: "德国" }, { value: "FRANCE", label: "法国" },
+  { value: "ITALY", label: "意大利" }, { value: "SPAIN", label: "西班牙" },
+  { value: "JAPAN", label: "日本" }, { value: "SOUTH_KOREA", label: "韩国" },
+];
+
+const COPY_LANGUAGE_OPTIONS = [
+  { value: "zh-Hans", label: "简体中文 (zh-Hans)" }, { value: "zh-Hant", label: "繁体中文 (zh-Hant)" },
+  { value: "en-US", label: "English (US)" }, { value: "en-GB", label: "English (UK)" },
+  { value: "de-DE", label: "Deutsch" }, { value: "fr-FR", label: "Francais" },
+  { value: "it-IT", label: "Italiano" }, { value: "es-ES", label: "Espanol" },
+  { value: "ja-JP", label: "日本語" }, { value: "ko-KR", label: "한국어" },
+];
+
 export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const { notification } = App.useApp();
   const updateProject = useUpdateProject(detail.id);
@@ -46,6 +63,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const [selected, setSelected] = useState<string[]>(stored);
   const [instruction, setInstruction] = useState("");
   const [activeJobId, setActiveJobId] = useState<string | undefined>(undefined);
+  const [copyLanguage, setCopyLanguage] = useState(detail.copyLanguage ?? "");
+  const [savedCopyLanguage, setSavedCopyLanguage] = useState(detail.copyLanguage ?? "");
 
   useEffect(() => setName(detail.name), [detail.name]);
   useEffect(() => {
@@ -53,6 +72,11 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
     setFacts(toLines(detail.verifiedFacts));
     setClaims(toLines(detail.prohibitedClaims));
   }, [detail.productDescription, detail.verifiedFacts, detail.prohibitedClaims]);
+  useEffect(() => {
+    const next = detail.copyLanguage ?? "";
+    setCopyLanguage(next);
+    setSavedCopyLanguage(next);
+  }, [detail.copyLanguage]);
   useEffect(() => {
     if (selected.length > 0 || catalog.length === 0 || stored.length > 0) return;
     setSelected([catalog[0]!.id]);
@@ -73,6 +97,14 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       return;
     }
     await save({ name: trimmed }, "保存名称失败");
+  };
+
+  const commitCopyLanguage = (value: string) => {
+    const next = value.trim();
+    if (next === savedCopyLanguage) return;
+    setCopyLanguage(next);
+    setSavedCopyLanguage(next);
+    void save({ copyLanguage: next || null }, "保存文案语种失败");
   };
 
   const seedJob = latestPlanJob(detail.jobs);
@@ -141,32 +173,60 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
         onChange={(event) => setName(event.target.value)}
         onBlur={() => void commitName()}
       />
-      <div className={styles.compactFields}>
-        <label className={styles.fieldLabel}>
-          目标平台
-          <Select
-            aria-label="目标平台"
-            value={detail.platformTargets[0]}
-            options={[
-              { value: "DOMESTIC", label: "国内平台" },
-              { value: "AMAZON", label: "Amazon" },
-            ]}
-            onChange={(value: "DOMESTIC" | "AMAZON") => void save({ platformTargets: [value] }, "保存平台失败")}
-          />
-        </label>
-        <label className={styles.fieldLabel}>
-          默认模式
-          <Select
-            aria-label="默认模式"
-            value={detail.defaultMode}
-            options={[
-              { value: "CREATIVE", label: "创意模式 · 允许场景创作" },
-              { value: "PIXEL_PROTECTED", label: "像素保护 · 保留主体像素" },
-            ]}
-            onChange={(value) => void save({ defaultMode: value }, "保存模式失败")}
-          />
-        </label>
-      </div>
+      <Section title="市场与创作" icon={<Globe2 size={14} strokeWidth={1.75} aria-hidden />}>
+        <div className={styles.compactFields}>
+          <label className={styles.fieldLabel}>
+            <span className={styles.fieldLabelTitle}><Store size={13} strokeWidth={1.75} aria-hidden />目标平台</span>
+            <Select
+              aria-label="目标平台"
+              allowClear
+              placeholder="请选择目标平台"
+              value={detail.platformTargets[0]}
+              options={[{ value: "DOMESTIC", label: "大陆电商" }, { value: "AMAZON", label: "Amazon" }]}
+              onChange={(value: "DOMESTIC" | "AMAZON" | undefined) => void save({ platformTargets: value ? [value] : [] }, "保存平台失败")}
+            />
+          </label>
+          <label className={styles.fieldLabel}>
+            <span className={styles.fieldLabelTitle}><MapPin size={13} strokeWidth={1.75} aria-hidden />目标市场</span>
+            <Select
+              aria-label="目标市场"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="请选择目标市场"
+              value={detail.targetMarket ?? undefined}
+              options={MARKET_OPTIONS}
+              onChange={(value: Exclude<TargetMarket, null> | undefined) => void save({ targetMarket: value ?? null }, "保存目标市场失败")}
+            />
+          </label>
+          <label className={styles.fieldLabel}>
+            <span className={styles.fieldLabelTitle}><Languages size={13} strokeWidth={1.75} aria-hidden />文案语种</span>
+            <AutoComplete
+              aria-label="文案语种"
+              allowClear
+              value={copyLanguage || undefined}
+              options={COPY_LANGUAGE_OPTIONS}
+              placeholder="请选择或输入文案语种"
+              onChange={(value) => setCopyLanguage(value)}
+              onSelect={(value) => commitCopyLanguage(value)}
+              onBlur={() => commitCopyLanguage(copyLanguage)}
+              onClear={() => commitCopyLanguage("")}
+            />
+          </label>
+          <label className={styles.fieldLabel}>
+            <span className={styles.fieldLabelTitle}><Sparkles size={13} strokeWidth={1.75} aria-hidden />默认模式</span>
+            <Select
+              aria-label="默认模式"
+              value={detail.defaultMode}
+              options={[
+                { value: "CREATIVE", label: "创意模式 · 允许场景创作" },
+                { value: "PIXEL_PROTECTED", label: "像素保护 · 保留主体像素" },
+              ]}
+              onChange={(value) => void save({ defaultMode: value }, "保存模式失败")}
+            />
+          </label>
+        </div>
+      </Section>
 
       <Section title="核心卖点" icon={<Sparkles size={14} strokeWidth={1.75} aria-hidden />}>
         <label className={styles.fieldLabel}>

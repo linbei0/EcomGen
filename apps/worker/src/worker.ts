@@ -76,6 +76,8 @@ async function executePlan(job: JobRecord): Promise<void> {
       prohibitedClaims: project.prohibitedClaims,
       brandGuidelines: project.brandGuidelines,
       platformTargets: project.platformTargets,
+      targetMarket: project.targetMarket,
+      copyLanguage: project.copyLanguage,
       defaultMode: project.defaultMode,
       assets: plannerAssets,
       referenceImages,

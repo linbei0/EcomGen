@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { openDatabase } from "./database.js";
 import { EcomRepository } from "./repository.js";
 
@@ -16,6 +19,51 @@ function seedProvider(repository: EcomRepository) {
 }
 
 describe("EcomRepository", () => {
+  it("migrates existing projects with empty market and copy language while preserving platform selection", () => {
+    const directory = mkdtempSync(join(tmpdir(), "ecomgen-migration-"));
+    const filename = join(directory, "ecomgen.db");
+    try {
+      const database = openDatabase(filename);
+      database.exec("DROP TABLE projects");
+      database.exec(`
+        CREATE TABLE projects (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          category TEXT,
+          product_description TEXT,
+          verified_facts_json TEXT NOT NULL DEFAULT '[]',
+          prohibited_claims_json TEXT NOT NULL DEFAULT '[]',
+          brand_guidelines_json TEXT NOT NULL DEFAULT '{}',
+          platform_targets_json TEXT NOT NULL,
+          reasoning_provider_id TEXT NOT NULL,
+          reasoning_model_id TEXT NOT NULL,
+          image_provider_id TEXT NOT NULL,
+          image_model_id TEXT NOT NULL,
+          default_mode TEXT NOT NULL,
+          image_resolution TEXT NOT NULL DEFAULT '1K',
+          image_aspect_ratio TEXT NOT NULL DEFAULT 'AUTO',
+          candidates_per_type INTEGER NOT NULL DEFAULT 1,
+          web_research_enabled INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        INSERT INTO projects VALUES (
+          'legacy-project', 'legacy', NULL, NULL, '[]', '[]', '{}', '["DOMESTIC"]',
+          'reasoning', 'reasoner', 'image', 'image-model', 'CREATIVE', '1K', 'AUTO', 1, 0,
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+        );
+      `);
+      database.close();
+
+      const migrated = openDatabase(filename);
+      const project = new EcomRepository(migrated).getProject("legacy-project");
+      expect(project).toMatchObject({ platformTargets: ["DOMESTIC"], targetMarket: null, copyLanguage: null });
+      migrated.close();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("persists search sources in ascending priority order without exposing a key through the record mapper", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
@@ -40,6 +88,8 @@ describe("EcomRepository", () => {
       prohibitedClaims: ["keeps hot for 24 hours"],
       brandGuidelines: { accent: "#1A3A2E" },
       platformTargets: ["DOMESTIC"],
+      targetMarket: null,
+      copyLanguage: null,
       reasoningProviderId: provider.id,
       reasoningModelId: "reasoner",
       imageProviderId: provider.id,
@@ -129,6 +179,8 @@ describe("EcomRepository", () => {
       prohibitedClaims: [],
       brandGuidelines: {},
       platformTargets: ["DOMESTIC"],
+      targetMarket: null,
+      copyLanguage: null,
       reasoningProviderId: provider.id,
       reasoningModelId: "reasoner",
       imageProviderId: provider.id,
@@ -157,6 +209,8 @@ describe("EcomRepository", () => {
       prohibitedClaims: [] as string[],
       brandGuidelines: {} as Record<string, string>,
       platformTargets: ["DOMESTIC"] as Array<"DOMESTIC" | "AMAZON">,
+      targetMarket: null,
+      copyLanguage: null,
       reasoningProviderId: provider.id,
       reasoningModelId: "reasoner",
       imageProviderId: provider.id,

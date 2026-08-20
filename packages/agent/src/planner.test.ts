@@ -43,6 +43,8 @@ const input: PlannerInput = {
   prohibitedClaims: [],
   brandGuidelines: {},
   platformTargets: ["DOMESTIC"],
+  targetMarket: null,
+  copyLanguage: null,
   defaultMode: "CREATIVE",
   assets: [],
   planningMode: "AI",
@@ -67,6 +69,16 @@ describe("planStoryboard", () => {
     expect(captured.prompt).toContain("Manual selection is authoritative");
     const result = await planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: ["hero-image"] });
     expect(result.items[0]?.displayName).toBe("整机斜侧展示首图");
+  });
+
+  it("passes the resolved market guidance into the Pi planning context", async () => {
+    captured.errorMessage = undefined;
+    captured.prompt = "";
+    await planStoryboard({ ...input, platformTargets: ["AMAZON"], targetMarket: "JAPAN", copyLanguage: null });
+
+    expect(captured.prompt).toContain("platformGuidance");
+    expect(captured.prompt).toContain("ja-JP");
+    expect(captured.prompt).toContain("日本");
   });
 
   it("preserves the Agent error when no assistant text is produced", async () => {

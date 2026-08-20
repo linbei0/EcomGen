@@ -92,7 +92,9 @@ describe("首页 · 一键创建", () => {
     await waitFor(() => {
       expect(captured).toMatchObject({
         name: "未命名项目",
-        platformTargets: ["DOMESTIC"],
+        platformTargets: [],
+        targetMarket: null,
+        copyLanguage: null,
         defaultMode: "CREATIVE",
         reasoningModelId: "gpt-4o",
         imageModelId: "gpt-image-1",

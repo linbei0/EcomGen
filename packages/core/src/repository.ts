@@ -10,7 +10,8 @@ import type {
   PlatformTarget,
   ReasoningProtocolProfile,
   SearchSourceKind,
-  StoryboardMode
+  StoryboardMode,
+  TargetMarket
 } from "@ecomgen/contracts";
 import type { SqliteDatabase } from "./database.js";
 
@@ -46,6 +47,8 @@ export interface ProjectRecord {
   prohibitedClaims: string[];
   brandGuidelines: Record<string, string>;
   platformTargets: PlatformTarget[];
+  targetMarket: TargetMarket | null;
+  copyLanguage: string | null;
   reasoningProviderId: string;
   reasoningModelId: string;
   imageProviderId: string;
@@ -276,15 +279,15 @@ export class EcomRepository {
   public getProject(id: string): ProjectRecord | undefined { const row = this.db.prepare("SELECT * FROM projects WHERE id = ?").get(id); return row ? mapProject(row as Row) : undefined; }
   public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled"> & Partial<Pick<ProjectRecord, "webResearchEnabled">>): ProjectRecord {
     const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,created_at,updated_at)
-      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@createdAt,@updatedAt)`)
+    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,created_at,updated_at)
+      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@createdAt,@updatedAt)`)
       .run({ ...record, webResearchEnabled: record.webResearchEnabled ? 1 : 0, platformTargets: json(record.platformTargets), verifiedFacts: json(record.verifiedFacts), prohibitedClaims: json(record.prohibitedClaims), brandGuidelines: json(record.brandGuidelines) });
     return record;
   }
   public updateProject(id: string, patch: Partial<Omit<ProjectRecord, "id" | "createdAt">>): ProjectRecord | undefined {
     const current = this.getProject(id); if (!current) return undefined;
     const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,updated_at=@updatedAt WHERE id=@id`)
+    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,updated_at=@updatedAt WHERE id=@id`)
       .run({ ...next, webResearchEnabled: next.webResearchEnabled ? 1 : 0, platformTargets: json(next.platformTargets), verifiedFacts: json(next.verifiedFacts), prohibitedClaims: json(next.prohibitedClaims), brandGuidelines: json(next.brandGuidelines) });
     return next;
   }
@@ -415,6 +418,8 @@ function mapProject(row: Row): ProjectRecord {
     prohibitedClaims: parse(row.prohibited_claims_json ?? "[]"),
     brandGuidelines: parse(row.brand_guidelines_json ?? "{}"),
     platformTargets: parse(row.platform_targets_json),
+    targetMarket: row.target_market ? row.target_market as TargetMarket : null,
+    copyLanguage: row.copy_language ? String(row.copy_language) : null,
     reasoningProviderId: String(row.reasoning_provider_id),
     reasoningModelId: String(row.reasoning_model_id),
     imageProviderId: String(row.image_provider_id),

@@ -586,6 +586,9 @@ export interface components {
                 [key: string]: string;
             };
             platformTargets: ("DOMESTIC" | "AMAZON")[];
+            /** @enum {string|null} */
+            targetMarket: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
+            copyLanguage: string | null;
             /** Format: uuid */
             reasoningProviderId: string;
             reasoningModelId: string;
@@ -626,7 +629,10 @@ export interface components {
             brandGuidelines?: {
                 [key: string]: string;
             };
-            platformTargets: ("DOMESTIC" | "AMAZON")[];
+            platformTargets?: ("DOMESTIC" | "AMAZON")[];
+            /** @enum {string|null} */
+            targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
+            copyLanguage?: string | null;
             /** Format: uuid */
             reasoningProviderId: string;
             reasoningModelId: string;
@@ -651,6 +657,9 @@ export interface components {
                 [key: string]: string;
             };
             platformTargets?: ("DOMESTIC" | "AMAZON")[];
+            /** @enum {string|null} */
+            targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
+            copyLanguage?: string | null;
             reasoningModel?: components["schemas"]["ModelRef"];
             imageModel?: components["schemas"]["ModelRef"];
             /** @enum {string} */

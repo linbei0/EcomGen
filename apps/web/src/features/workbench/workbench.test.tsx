@@ -90,6 +90,36 @@ describe("工作台 · 配置", () => {
 });
 
 describe("工作台 · 左栏编辑", () => {
+  it("市场与创作默认展开，支持选择、清除与折叠", async () => {
+    const user = userEvent.setup();
+    const patches: Record<string, unknown>[] = [];
+    server.use(
+      http.patch(`${BASE}/projects/:projectId`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        patches.push(body);
+        return HttpResponse.json({ ...PROJECT_FIXTURE, ...body });
+      }),
+    );
+    renderWorkbench();
+
+    const section = await screen.findByRole("button", { name: /市场与创作/ });
+    expect(section).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(screen.getByLabelText("目标市场"));
+    await user.click(await screen.findByText("美国"));
+    await waitFor(() => expect(patches.at(-1)).toMatchObject({ targetMarket: "UNITED_STATES" }));
+
+    const language = screen.getByLabelText("文案语种");
+    await user.click(language);
+    await user.type(language, "pt-BR");
+    fireEvent.blur(language);
+    await waitFor(() => expect(patches.at(-1)).toMatchObject({ copyLanguage: "pt-BR" }));
+
+    await user.click(section);
+    expect(section).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("目标市场")).not.toBeInTheDocument();
+  });
+
   it("名称失焦提交，平台与模式点击即提交", async () => {
     const user = userEvent.setup();
     const patches: Record<string, unknown>[] = [];

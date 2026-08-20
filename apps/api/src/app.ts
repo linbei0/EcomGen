@@ -7,7 +7,7 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus } from "@ecomgen/jobs";
-import type { AssetRole, ImageAspectRatio, ImageResolution, ModelDefinition, OutputReviewDecision, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, UserAssetKind } from "@ecomgen/contracts";
+import type { AssetRole, ImageAspectRatio, ImageResolution, ModelDefinition, OutputReviewDecision, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind } from "@ecomgen/contracts";
 import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, roleForUserAssetKind } from "@ecomgen/contracts";
 import { OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
@@ -100,7 +100,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     };
   });
   app.post("/api/v1/projects", async (request, reply) => {
-    const body = object(request.body, "body"); const platformTargets = enumArray<PlatformTarget>(body.platformTargets, ["DOMESTIC", "AMAZON"], "platformTargets");
+    const body = object(request.body, "body"); const platformTargets = platformTargetsValue(body.platformTargets);
     const reasoningProviderId = string(body.reasoningProviderId, "reasoningProviderId"); const imageProviderId = string(body.imageProviderId, "imageProviderId");
     verifyModel(repository, reasoningProviderId, string(body.reasoningModelId, "reasoningModelId"), "reasoning"); verifyModel(repository, imageProviderId, string(body.imageModelId, "imageModelId"), "image");
     return reply.code(201).send(repository.createProject({
@@ -111,6 +111,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       prohibitedClaims: optionalStringArray(body.prohibitedClaims) ?? [],
       brandGuidelines: body.brandGuidelines === undefined ? {} : objectOfStrings(body.brandGuidelines, "brandGuidelines"),
       platformTargets,
+      targetMarket: targetMarketValue(body.targetMarket),
+      copyLanguage: copyLanguageValue(body.copyLanguage),
       reasoningProviderId,
       reasoningModelId: string(body.reasoningModelId, "reasoningModelId"),
       imageProviderId,
@@ -132,7 +134,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (body.verifiedFacts !== undefined) update.verifiedFacts = stringArray(body.verifiedFacts, "verifiedFacts");
     if (body.prohibitedClaims !== undefined) update.prohibitedClaims = stringArray(body.prohibitedClaims, "prohibitedClaims");
     if (body.brandGuidelines !== undefined) update.brandGuidelines = objectOfStrings(body.brandGuidelines, "brandGuidelines");
-    if (body.platformTargets !== undefined) update.platformTargets = enumArray<PlatformTarget>(body.platformTargets, ["DOMESTIC", "AMAZON"], "platformTargets");
+    if (body.platformTargets !== undefined) update.platformTargets = platformTargetsValue(body.platformTargets);
+    if (body.targetMarket !== undefined) update.targetMarket = targetMarketValue(body.targetMarket);
+    if (body.copyLanguage !== undefined) update.copyLanguage = copyLanguageValue(body.copyLanguage);
     if (body.defaultMode !== undefined) update.defaultMode = enumValue<StoryboardMode>(body.defaultMode, ["CREATIVE", "PIXEL_PROTECTED"], "defaultMode");
     if (body.imageResolution !== undefined) update.imageResolution = enumValue<ImageResolution>(body.imageResolution, IMAGE_RESOLUTIONS, "imageResolution");
     if (body.imageAspectRatio !== undefined) update.imageAspectRatio = enumValue<ImageAspectRatio>(body.imageAspectRatio, IMAGE_ASPECT_RATIOS, "imageAspectRatio");
@@ -276,6 +280,21 @@ function stringArray(value: unknown, path: string): string[] { if (!Array.isArra
 function optionalStringArray(value: unknown): string[] | undefined { return value === undefined ? undefined : stringArray(value, "value"); }
 function enumValue<T extends string>(value: unknown, allowed: readonly T[], path: string): T { const item = string(value, path) as T; if (!allowed.includes(item)) throw new ApiError(400, "VALIDATION_ERROR", `${path} must be one of ${allowed.join(", ")}`); return item; }
 function enumArray<T extends string>(value: unknown, allowed: readonly T[], path: string): T[] { const items = stringArray(value, path).map((item) => enumValue<T>(item, allowed, path)); return [...new Set(items)]; }
+function platformTargetsValue(value: unknown): PlatformTarget[] {
+  const targets = value === undefined || value === null ? [] : enumArray<PlatformTarget>(value, ["DOMESTIC", "AMAZON"], "platformTargets");
+  if (targets.length > 1) throw new ApiError(400, "VALIDATION_ERROR", "platformTargets must contain at most one target");
+  return targets;
+}
+function targetMarketValue(value: unknown): TargetMarket | null {
+  if (value === undefined || value === null || value === "") return null;
+  return enumValue<TargetMarket>(value, ["CHINA_MAINLAND", "HONG_KONG", "MACAU", "TAIWAN", "UNITED_STATES", "UNITED_KINGDOM", "GERMANY", "FRANCE", "ITALY", "SPAIN", "JAPAN", "SOUTH_KOREA"], "targetMarket");
+}
+function copyLanguageValue(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  const language = string(value, "copyLanguage");
+  if (language.length > 64) throw new ApiError(400, "VALIDATION_ERROR", "copyLanguage must contain 1 to 64 characters");
+  return language;
+}
 function objectOfStrings(value: unknown, path: string): Record<string, string> { const result = object(value, path); for (const [key, item] of Object.entries(result)) if (typeof item !== "string") throw new ApiError(400, "VALIDATION_ERROR", `${path}.${key} must be a string`); return result as Record<string, string>; }
 function requireModels(value: unknown): ModelDefinition[] { if (!Array.isArray(value) || value.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "models must contain at least one model"); return value.map((model, index) => { const entry = object(model, `models[${index}]`); return { id: string(entry.id, `models[${index}].id`), supportsVision: Boolean(entry.supportsVision), supportsThinking: Boolean(entry.supportsThinking), supportsTools: Boolean(entry.supportsTools), supportsStructuredOutput: Boolean(entry.supportsStructuredOutput), imageApiKind: entry.imageApiKind === "openai_images" || entry.imageApiKind === "custom" ? entry.imageApiKind : null }; }); }
 async function sendStored(reply: FastifyReply, storage: LocalAssetStore, record: { storagePath: string | null; mimeType?: string } | undefined, name: string): Promise<unknown> { if (!record || !record.storagePath) missing(name, "unknown"); return reply.type(record.mimeType ?? mimeForPath(record.storagePath)).send(await storage.read(record.storagePath)); }

@@ -22,6 +22,8 @@ export const PROJECT_FIXTURE = {
   prohibitedClaims: ["医用级"],
   brandGuidelines: {},
   platformTargets: ["DOMESTIC"] as ("DOMESTIC" | "AMAZON")[],
+  targetMarket: null,
+  copyLanguage: null,
   reasoningProviderId: PROVIDER_ID,
   reasoningModelId: "gpt-4o",
   imageProviderId: PROVIDER_ID,

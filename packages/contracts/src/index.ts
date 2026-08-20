@@ -1,6 +1,20 @@
 import { Static, Type } from "@sinclair/typebox";
 
 export const PlatformTarget = Type.Enum({ DOMESTIC: "DOMESTIC", AMAZON: "AMAZON" });
+export const TargetMarket = Type.Enum({
+  CHINA_MAINLAND: "CHINA_MAINLAND",
+  HONG_KONG: "HONG_KONG",
+  MACAU: "MACAU",
+  TAIWAN: "TAIWAN",
+  UNITED_STATES: "UNITED_STATES",
+  UNITED_KINGDOM: "UNITED_KINGDOM",
+  GERMANY: "GERMANY",
+  FRANCE: "FRANCE",
+  ITALY: "ITALY",
+  SPAIN: "SPAIN",
+  JAPAN: "JAPAN",
+  SOUTH_KOREA: "SOUTH_KOREA"
+});
 export const StoryboardMode = Type.Enum({ CREATIVE: "CREATIVE", PIXEL_PROTECTED: "PIXEL_PROTECTED" });
 export const AssetRole = Type.Enum({
   PRODUCT_TRUTH: "PRODUCT_TRUTH",
@@ -120,6 +134,7 @@ export const EventEnvelope = Type.Object({
 });
 
 export type PlatformTarget = Static<typeof PlatformTarget>;
+export type TargetMarket = Static<typeof TargetMarket>;
 export type StoryboardMode = Static<typeof StoryboardMode>;
 export type AssetRole = Static<typeof AssetRole>;
 export type UserAssetKind = Static<typeof UserAssetKind>;

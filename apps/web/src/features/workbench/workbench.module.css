@@ -326,7 +326,15 @@
   margin: 0;
 }
 
-.compactFields :global(.ant-select) {
+.fieldLabelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+}
+
+.compactFields :global(.ant-select),
+.compactFields :global(.ant-select-auto-complete) {
   width: 100%;
 }
 

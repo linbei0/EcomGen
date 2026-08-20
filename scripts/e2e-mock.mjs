@@ -86,7 +86,9 @@ try {
     verifiedFacts: ["304 stainless steel body"],
     prohibitedClaims: ["keeps hot for 24 hours"],
     brandGuidelines: { accent: "#1A3A2E", tone: "premium practical" },
-    platformTargets: ["DOMESTIC", "AMAZON"],
+    platformTargets: ["AMAZON"],
+    targetMarket: "UNITED_STATES",
+    copyLanguage: "en-US",
     reasoningProviderId: provider.id,
     reasoningModelId: "mock-reasoner",
     imageProviderId: provider.id,
@@ -96,6 +98,9 @@ try {
     imageAspectRatio: "AUTO",
     candidatesPerType: 1
   });
+  assert.deepEqual(project.platformTargets, ["AMAZON"]);
+  assert.equal(project.targetMarket, "UNITED_STATES");
+  assert.equal(project.copyLanguage, "en-US");
   const form = new FormData();
   form.append("role", "PRODUCT_TRUTH");
   form.append("file", new Blob([Buffer.from(onePixelPng, "base64")], { type: "image/png" }), "cup.png");

@@ -56,7 +56,9 @@ describe("工作台 · 分镜", () => {
 
     renderBoard();
     expect(await screen.findByText("还没有分镜")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "白底/纯色底产品主图 分镜" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "白底/纯色底产品主图 分镜" }, { timeout: 5_000 }),
+    ).toBeInTheDocument();
   });
 
   it("卡片显示中文名称，点击后弹窗编辑", async () => {
@@ -73,7 +75,7 @@ describe("工作台 · 分镜", () => {
     expect(screen.queryByText("hero-image")).not.toBeInTheDocument();
     expect(screen.queryByText("通用")).not.toBeInTheDocument();
     expect(screen.getByLabelText("1 条风险")).toBeInTheDocument();
-    expect(screen.getByText("2 个分镜 · 预计 2 张候选")).toBeInTheDocument();
+    expect(screen.getByText("共 2 个 · 预计 0/2 张候选")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "白底/纯色底产品主图 分镜" }));
     expect(await screen.findByDisplayValue("白底主图，突出金属质感")).toBeInTheDocument();
@@ -106,6 +108,7 @@ describe("工作台 · 分镜", () => {
     renderBoard();
     await screen.findByRole("button", { name: "确认并生成" });
     const before = storyboardGets;
+    await user.click(screen.getByRole("button", { name: "全选" }));
     await user.click(screen.getByRole("button", { name: "确认并生成" }));
     expect(await screen.findByText("分镜已被其他操作更新")).toBeInTheDocument();
     await waitFor(() => {

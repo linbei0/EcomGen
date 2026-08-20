@@ -669,7 +669,7 @@ components:
         outputCount: { type: integer, minimum: 0 }
     Project:
       type: object
-      required: [id, name, platformTargets, reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, defaultMode, imageResolution, imageAspectRatio, candidatesPerType, webResearchEnabled, createdAt, updatedAt]
+      required: [id, name, platformTargets, targetMarket, copyLanguage, reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, defaultMode, imageResolution, imageAspectRatio, candidatesPerType, webResearchEnabled, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -678,7 +678,9 @@ components:
         verifiedFacts: { type: array, items: { type: string } }
         prohibitedClaims: { type: array, items: { type: string } }
         brandGuidelines: { type: object, additionalProperties: { type: string } }
-        platformTargets: { type: array, minItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        platformTargets: { type: array, maxItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        targetMarket: { type: [string, 'null'], enum: [CHINA_MAINLAND, HONG_KONG, MACAU, TAIWAN, UNITED_STATES, UNITED_KINGDOM, GERMANY, FRANCE, ITALY, SPAIN, JAPAN, SOUTH_KOREA, null] }
+        copyLanguage: { type: [string, 'null'], minLength: 1, maxLength: 64 }
         reasoningProviderId: { type: string, format: uuid }
         reasoningModelId: { type: string }
         imageProviderId: { type: string, format: uuid }
@@ -710,7 +712,7 @@ components:
         modelId: { type: string }
     CreateProjectInput:
       type: object
-      required: [name, platformTargets, reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, defaultMode]
+      required: [name, reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, defaultMode]
       properties:
         name: { type: string, minLength: 1 }
         category: { type: [string, 'null'] }
@@ -718,7 +720,9 @@ components:
         verifiedFacts: { type: array, items: { type: string } }
         prohibitedClaims: { type: array, items: { type: string } }
         brandGuidelines: { type: object, additionalProperties: { type: string } }
-        platformTargets: { type: array, minItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        platformTargets: { type: array, maxItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        targetMarket: { type: [string, 'null'], enum: [CHINA_MAINLAND, HONG_KONG, MACAU, TAIWAN, UNITED_STATES, UNITED_KINGDOM, GERMANY, FRANCE, ITALY, SPAIN, JAPAN, SOUTH_KOREA, null] }
+        copyLanguage: { type: [string, 'null'], minLength: 1, maxLength: 64 }
         reasoningProviderId: { type: string, format: uuid }
         reasoningModelId: { type: string }
         imageProviderId: { type: string, format: uuid }
@@ -737,7 +741,9 @@ components:
         verifiedFacts: { type: array, items: { type: string } }
         prohibitedClaims: { type: array, items: { type: string } }
         brandGuidelines: { type: object, additionalProperties: { type: string } }
-        platformTargets: { type: array, minItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        platformTargets: { type: array, maxItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        targetMarket: { type: [string, 'null'], enum: [CHINA_MAINLAND, HONG_KONG, MACAU, TAIWAN, UNITED_STATES, UNITED_KINGDOM, GERMANY, FRANCE, ITALY, SPAIN, JAPAN, SOUTH_KOREA, null] }
+        copyLanguage: { type: [string, 'null'], minLength: 1, maxLength: 64 }
         reasoningModel: { $ref: '#/components/schemas/ModelRef' }
         imageModel: { $ref: '#/components/schemas/ModelRef' }
         defaultMode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }

@@ -40,6 +40,8 @@ function rebuildWithoutSku(database: SqliteDatabase): void {
       prohibited_claims_json TEXT NOT NULL DEFAULT '[]',
       brand_guidelines_json TEXT NOT NULL DEFAULT '{}',
       platform_targets_json TEXT NOT NULL,
+      target_market TEXT,
+      copy_language TEXT,
       reasoning_provider_id TEXT NOT NULL,
       reasoning_model_id TEXT NOT NULL,
       image_provider_id TEXT NOT NULL,
@@ -146,12 +148,15 @@ function rebuildWithoutSku(database: SqliteDatabase): void {
 
 function migrate(database: SqliteDatabase): void {
   const tables = tableNames(database);
+  const projectColumns = tables.has("projects") ? columnNames(database, "projects") : new Set<string>();
   const needsRebuild =
     tables.has("projects") &&
     (tables.has("variants") ||
       (tables.has("assets") && columnNames(database, "assets").has("variant_id")) ||
       (tables.has("storyboard_items") && columnNames(database, "storyboard_items").has("variant_scope")) ||
-      !columnNames(database, "projects").has("image_resolution"));
+      !projectColumns.has("image_resolution") ||
+      !projectColumns.has("target_market") ||
+      !projectColumns.has("copy_language"));
   if (needsRebuild) {
     rebuildWithoutSku(database);
   }
@@ -192,6 +197,8 @@ function migrate(database: SqliteDatabase): void {
       prohibited_claims_json TEXT NOT NULL DEFAULT '[]',
       brand_guidelines_json TEXT NOT NULL DEFAULT '{}',
       platform_targets_json TEXT NOT NULL,
+      target_market TEXT,
+      copy_language TEXT,
       reasoning_provider_id TEXT NOT NULL,
       reasoning_model_id TEXT NOT NULL,
       image_provider_id TEXT NOT NULL,
@@ -325,8 +332,8 @@ function migrate(database: SqliteDatabase): void {
   if (!providerColumns.has("reasoning_protocol")) {
     database.exec("ALTER TABLE providers ADD COLUMN reasoning_protocol TEXT NOT NULL DEFAULT 'openai'");
   }
-  const projectColumns = columnNames(database, "projects");
-  if (!projectColumns.has("web_research_enabled")) {
+  const currentProjectColumns = columnNames(database, "projects");
+  if (!currentProjectColumns.has("web_research_enabled")) {
     database.exec("ALTER TABLE projects ADD COLUMN web_research_enabled INTEGER NOT NULL DEFAULT 0");
   }
 }
