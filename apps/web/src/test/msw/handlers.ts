@@ -46,7 +46,7 @@ export const PROVIDER_FIXTURE = {
 
 /** 严格按根目录 openapi.yaml 手写；契约变更时先改契约，再同步 handlers 和组件。 */
 export const handlers = [
-  http.get("http://127.0.0.1:8787/health", () => HttpResponse.json({ status: "ok" })),
+  http.get("http://127.0.0.1:8787/health", () => HttpResponse.json({ status: "ok", webResearchAvailable: true })),
 
   http.get(`${BASE}/providers`, () =>
     HttpResponse.json({ items: [PROVIDER_FIXTURE], nextCursor: null }),

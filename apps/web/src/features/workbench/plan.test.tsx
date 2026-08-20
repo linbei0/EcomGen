@@ -73,6 +73,25 @@ describe("工作台 · 规划", () => {
     expect(captured).not.toHaveProperty("imageTypes");
   });
 
+  it("搜索服务可用时保存联网视觉研究开关", async () => {
+    const user = userEvent.setup();
+    let patch: Record<string, unknown> | undefined;
+    server.use(
+      http.get("http://127.0.0.1:8787/health", () => HttpResponse.json({ status: "ok", webResearchAvailable: true })),
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
+      http.patch(`${BASE}/projects/:projectId`, async ({ request }) => {
+        patch = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ ...projectDetailPayload(), ...patch });
+      }),
+    );
+
+    renderSetup();
+    const toggle = await screen.findByRole("switch", { name: "联网视觉研究" });
+    await waitFor(() => expect(toggle).toBeEnabled());
+    await user.click(toggle);
+    await waitFor(() => expect(patch).toEqual({ webResearchEnabled: true }));
+  });
+
   it("失败任务展示错误并可重试", async () => {
     const user = userEvent.setup();
     let retried = false;

@@ -133,6 +133,54 @@ paths:
                   latencyMs: { type: integer, minimum: 0 }
                   modelAvailable: { type: [boolean, 'null'] }
         '502': { $ref: '#/components/responses/ProviderError' }
+  /search-sources:
+    get:
+      operationId: listSearchSources
+      responses:
+        '200':
+          description: Search source configurations in execution priority order.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchSourceList' }
+    post:
+      operationId: createSearchSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSearchSourceInput' }
+      responses:
+        '201':
+          description: Search source created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchSourceConfig' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+  /search-sources/{sourceId}:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateSearchSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSearchSourceInput' }
+      responses:
+        '200':
+          description: Search source updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchSourceConfig' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: deleteSearchSource
+      responses:
+        '204': { description: Search source deleted. }
+        '404': { $ref: '#/components/responses/NotFound' }
   /projects:
     get:
       operationId: listProjects
@@ -515,7 +563,7 @@ components:
       description: Provider connectivity or protocol failure.
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
   schemas:
-    Health: { type: object, required: [status], properties: { status: { type: string, const: ok } } }
+    Health: { type: object, required: [status, webResearchAvailable], properties: { status: { type: string, const: ok }, webResearchAvailable: { type: boolean, description: Whether the server has a configured restricted visual-research search key. } } }
     ErrorResponse:
       type: object
       required: [error]
@@ -568,13 +616,60 @@ components:
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/ProviderConfig' } }
         nextCursor: { type: [string, 'null'] }
+    SearchSourceKind: { type: string, enum: [brave, tavily, searxng] }
+    SearchSourceConfig:
+      type: object
+      required: [id, name, kind, baseUrl, priority, enabled, hasApiKey, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { $ref: '#/components/schemas/SearchSourceKind' }
+        baseUrl: { type: string, format: uri }
+        priority: { type: integer, minimum: 0, maximum: 100000, description: Lower values are searched first. }
+        enabled: { type: boolean }
+        hasApiKey: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreateSearchSourceInput:
+      type: object
+      required: [name, kind, priority]
+      properties:
+        name: { type: string, minLength: 1 }
+        kind: { $ref: '#/components/schemas/SearchSourceKind' }
+        baseUrl: { type: string, format: uri }
+        apiKey: { type: string, minLength: 1, writeOnly: true }
+        priority: { type: integer, minimum: 0, maximum: 100000 }
+        enabled: { type: boolean, default: true }
+    UpdateSearchSourceInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        kind: { $ref: '#/components/schemas/SearchSourceKind' }
+        baseUrl: { type: string, format: uri }
+        apiKey: { type: string, minLength: 1, writeOnly: true }
+        priority: { type: integer, minimum: 0, maximum: 100000 }
+        enabled: { type: boolean }
+    SearchSourceList:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/SearchSourceConfig' } }
+        nextCursor: { type: [string, 'null'] }
     ImageResolution: { type: string, enum: [1K, 2K, 4K] }
     ImageAspectRatio: { type: string, enum: [AUTO, '1:1', '3:4', '4:3', '16:9'] }
     PlanningMode: { type: string, enum: [AI, MANUAL] }
     UserAssetKind: { type: string, enum: [PRODUCT, REFERENCE] }
+    ProjectCover:
+      type: object
+      required: [productAssetId, coverOutputId, previewOutputIds, outputCount]
+      properties:
+        productAssetId: { type: [string, 'null'], format: uuid }
+        coverOutputId: { type: [string, 'null'], format: uuid }
+        previewOutputIds: { type: array, items: { type: string, format: uuid } }
+        outputCount: { type: integer, minimum: 0 }
     Project:
       type: object
-      required: [id, name, platformTargets, reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, defaultMode, imageResolution, imageAspectRatio, candidatesPerType, createdAt, updatedAt]
+      required: [id, name, platformTargets, reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, defaultMode, imageResolution, imageAspectRatio, candidatesPerType, webResearchEnabled, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -592,8 +687,10 @@ components:
         imageResolution: { $ref: '#/components/schemas/ImageResolution' }
         imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
+        webResearchEnabled: { type: boolean, description: Enable restricted visual-direction web research during Agent planning. }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        cover: { $ref: '#/components/schemas/ProjectCover' }
     ProjectDetail:
       allOf:
         - $ref: '#/components/schemas/Project'
@@ -630,6 +727,7 @@ components:
         imageResolution: { $ref: '#/components/schemas/ImageResolution' }
         imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
+        webResearchEnabled: { type: boolean, description: Enable restricted visual-direction web research during Agent planning. }
     UpdateProjectInput:
       type: object
       properties:
@@ -646,11 +744,18 @@ components:
         imageResolution: { $ref: '#/components/schemas/ImageResolution' }
         imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
+        webResearchEnabled: { type: boolean, description: Enable restricted visual-direction web research during Agent planning. }
     ProjectList:
       type: object
       required: [items, nextCursor]
       properties:
-        items: { type: array, items: { $ref: '#/components/schemas/Project' } }
+        items:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Project'
+              - type: object
+                required: [cover]
         nextCursor: { type: [string, 'null'] }
     AssetRole: { type: string, enum: [PRODUCT_TRUTH, PACKAGING, STYLE_REFERENCE, LAYOUT_REFERENCE] }
     Asset:

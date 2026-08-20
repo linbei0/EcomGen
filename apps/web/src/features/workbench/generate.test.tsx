@@ -38,7 +38,7 @@ function renderBoard() {
 }
 
 describe("工作台 · 确认并生成", () => {
-  it("已确认分镜一次提交全部 itemId", async () => {
+  it("全选后可一次提交全部 itemId", async () => {
     const user = userEvent.setup();
     let captured: unknown;
     server.use(
@@ -68,12 +68,42 @@ describe("工作台 · 确认并生成", () => {
     );
 
     renderBoard();
-    expect(await screen.findByRole("button", { name: "开始生成" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "开始生成" }));
+    expect(await screen.findByRole("button", { name: "全选" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "全选" }));
+    await user.click(screen.getByRole("button", { name: "确认并生成" }));
     await waitFor(() => {
       expect(captured).toMatchObject({
         storyboardItemIds: [ITEM_ID, ITEM_ID_B],
       });
+    });
+  });
+
+  it("已确认分镜只提交勾选的 itemId", async () => {
+    const user = userEvent.setup();
+    let captured: unknown;
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () =>
+        HttpResponse.json(
+          projectDetailPayload({
+            storyboard: confirmedBoard.storyboard,
+            items: confirmedBoard.items,
+          }),
+        ),
+      ),
+      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
+        HttpResponse.json(storyboardPayload(confirmedBoard.storyboard, confirmedBoard.items)),
+      ),
+      http.post(`${BASE}/projects/:projectId/generation-jobs`, async ({ request }) => {
+        captured = await request.json();
+        return HttpResponse.json({ jobs: [{ ...GENERATE_JOB_FIXTURE, storyboardItemId: ITEM_ID }] }, { status: 202 });
+      }),
+    );
+
+    renderBoard();
+    await user.click(await screen.findByRole("checkbox", { name: "选择白底/纯色底产品主图" }));
+    await user.click(screen.getByRole("button", { name: "确认并生成" }));
+    await waitFor(() => {
+      expect(captured).toMatchObject({ storyboardItemIds: [ITEM_ID] });
     });
   });
 

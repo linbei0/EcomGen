@@ -1,6 +1,6 @@
 import { App, Button, Input, Modal } from "antd";
 import { motion } from "motion/react";
-import { Trash2, TriangleAlert } from "lucide-react";
+import { Check, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { ProjectDetail, StoryboardItem } from "../../api/adapters/projectDetail";
@@ -34,8 +34,16 @@ export function StoryboardStage({
   const storyboard = board.data?.storyboard ?? detail.storyboard;
   const locked = storyboard?.status === "CONFIRMED";
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const editing = items.find((item) => item.id === editingId);
   const expected = items.reduce((sum, item) => sum + item.candidateCount, 0);
+  const selectedItems = items.filter((item) => selectedIds.includes(item.id));
+  const selectedExpected = selectedItems.reduce((sum, item) => sum + item.candidateCount, 0);
+  const allSelected = selectedItems.length === items.length;
+
+  useEffect(() => {
+    setSelectedIds((current) => current.filter((id) => items.some((item) => item.id === id)));
+  }, [items]);
 
   const requestDelete = (item: StoryboardItem) => {
     Modal.confirm({
@@ -56,13 +64,13 @@ export function StoryboardStage({
     });
   };
 
-  const onConfirmAndGenerate = async () => {
-    if (!storyboard) return;
+  const onConfirmAndGenerate = async (itemIds: string[]) => {
+    if (!storyboard || itemIds.length === 0) return;
     try {
       if (!locked) {
         await confirm.mutateAsync(storyboard.version);
       }
-      await generate.mutateAsync({ storyboardItemIds: items.map((item) => item.id) });
+      await generate.mutateAsync({ storyboardItemIds: itemIds });
       onGenerated?.();
     } catch (error) {
       if (isApiError(error) && error.code === "CONFLICT") {
@@ -72,6 +80,12 @@ export function StoryboardStage({
       }
       notification.error({ title: locked ? "生成失败" : "确认失败", description: errorText(error) });
     }
+  };
+
+  const toggleSelection = (itemId: string) => {
+    setSelectedIds((current) =>
+      current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId],
+    );
   };
 
   if (items.length === 0) {
@@ -99,9 +113,11 @@ export function StoryboardStage({
               item={item}
               label={label}
               selected={item.id === editingId}
+              checked={selectedIds.includes(item.id)}
               deletable={!locked && item.status === "DRAFT"}
               deleting={remove.isPending}
               onSelect={() => setEditingId(item.id)}
+              onToggle={() => toggleSelection(item.id)}
               onDelete={() => requestDelete(item)}
             />
           );
@@ -109,17 +125,24 @@ export function StoryboardStage({
       </motion.div>
 
       <div className={styles.confirmBar}>
-        <p>
-          {items.length} 个分镜 · 预计 {expected} 张候选
-        </p>
-        <Button
-          type="primary"
-          loading={confirm.isPending || generate.isPending}
-          disabled={!storyboard || items.length === 0}
-          onClick={() => void onConfirmAndGenerate()}
-        >
-          {locked ? "开始生成" : "确认并生成"}
-        </Button>
+        <div className={styles.selectionSummary} aria-live="polite">
+          <strong>{selectedItems.length} 个已选分镜</strong>
+          <span>共 {items.length} 个 · 预计 {selectedExpected}/{expected} 张候选</span>
+        </div>
+        <div className={styles.confirmActions}>
+          <Button className={styles.selectAllAction} onClick={() => setSelectedIds(allSelected ? [] : items.map((item) => item.id))}>
+            {allSelected ? "取消全选" : "全选"}
+          </Button>
+          <Button
+            type="primary"
+            className={styles.selectedGenerateAction}
+            loading={confirm.isPending || generate.isPending}
+            disabled={!storyboard || selectedItems.length === 0}
+            onClick={() => void onConfirmAndGenerate(selectedItems.map((item) => item.id))}
+          >
+            确认并生成
+          </Button>
+        </div>
       </div>
 
       <Modal
@@ -200,23 +223,45 @@ function StoryboardCard({
   item,
   label,
   selected,
+  checked,
   deletable,
   deleting,
   onSelect,
+  onToggle,
   onDelete,
 }: {
   item: StoryboardItem;
   label: string;
   selected: boolean;
+  checked: boolean;
   deletable: boolean;
   deleting: boolean;
   onSelect: () => void;
+  onToggle: () => void;
   onDelete: () => void;
 }) {
   const risks = item.riskFlags.length;
   return (
     <div className={styles.shotCardWrap}>
-      <button type="button" className={styles.shotCard} data-selected={selected} aria-label={`${label} 分镜`} onClick={onSelect}>
+      <button
+        type="button"
+        className={styles.shotPick}
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={`选择${label}`}
+        title={checked ? "取消选择" : "选择分镜"}
+        onClick={onToggle}
+      >
+        {checked ? <Check size={15} strokeWidth={2.5} aria-hidden /> : null}
+      </button>
+      <button
+        type="button"
+        className={styles.shotCard}
+        data-selected={selected}
+        data-picked={checked}
+        aria-label={`${label} 分镜`}
+        onClick={onSelect}
+      >
         <div className={styles.shotHero} data-mode={item.mode}>
           <span className={styles.shotType}>{label}</span>
           {risks > 0 ? (

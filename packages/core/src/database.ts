@@ -48,6 +48,7 @@ function rebuildWithoutSku(database: SqliteDatabase): void {
       image_resolution TEXT NOT NULL DEFAULT '1K',
       image_aspect_ratio TEXT NOT NULL DEFAULT 'AUTO',
       candidates_per_type INTEGER NOT NULL DEFAULT 1,
+      web_research_enabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (reasoning_provider_id) REFERENCES providers(id),
@@ -171,6 +172,17 @@ function migrate(database: SqliteDatabase): void {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS search_sources (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      base_url TEXT NOT NULL,
+      encrypted_api_key TEXT,
+      priority INTEGER NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -188,6 +200,7 @@ function migrate(database: SqliteDatabase): void {
       image_resolution TEXT NOT NULL DEFAULT '1K',
       image_aspect_ratio TEXT NOT NULL DEFAULT 'AUTO',
       candidates_per_type INTEGER NOT NULL DEFAULT 1,
+      web_research_enabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (reasoning_provider_id) REFERENCES providers(id),
@@ -257,6 +270,29 @@ function migrate(database: SqliteDatabase): void {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       FOREIGN KEY (storyboard_item_id) REFERENCES storyboard_items(id) ON DELETE SET NULL
     );
+    CREATE TABLE IF NOT EXISTS web_research_audits (
+      job_id TEXT PRIMARY KEY,
+      availability TEXT NOT NULL,
+      invocation_count INTEGER NOT NULL DEFAULT 0,
+      successful_attempt_count INTEGER NOT NULL DEFAULT 0,
+      failed_attempt_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS web_research_attempts (
+      id TEXT PRIMARY KEY,
+      job_id TEXT NOT NULL,
+      query TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      source_name TEXT NOT NULL,
+      source_kind TEXT NOT NULL,
+      status TEXT NOT NULL,
+      result_count INTEGER NOT NULL,
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+    );
     CREATE TABLE IF NOT EXISTS outputs (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
@@ -288,5 +324,9 @@ function migrate(database: SqliteDatabase): void {
   const providerColumns = columnNames(database, "providers");
   if (!providerColumns.has("reasoning_protocol")) {
     database.exec("ALTER TABLE providers ADD COLUMN reasoning_protocol TEXT NOT NULL DEFAULT 'openai'");
+  }
+  const projectColumns = columnNames(database, "projects");
+  if (!projectColumns.has("web_research_enabled")) {
+    database.exec("ALTER TABLE projects ADD COLUMN web_research_enabled INTEGER NOT NULL DEFAULT 0");
   }
 }

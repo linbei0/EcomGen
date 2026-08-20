@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { adaptAsset, adaptExport, adaptExportJobBundle, adaptProjectDetail, adaptStoryboardBundle, exportDownloadUrl } from "./projectDetail";
+import { adaptAsset, adaptExport, adaptExportJobBundle, adaptProject, adaptProjectDetail, adaptStoryboardBundle, exportDownloadUrl } from "./projectDetail";
 import { adaptTemplate } from "./templates";
 
 describe("adapters", () => {
@@ -65,6 +65,34 @@ describe("adapters", () => {
     expect(detail.assets[0]?.url).toContain("/files/assets/a1");
     expect(detail.assets[0]?.kind).toBe("PRODUCT");
     expect(detail.storyboard).toBeNull();
+    expect(detail.cover).toEqual({ productAssetId: null, coverOutputId: null, previewOutputIds: [], outputCount: 0 });
+  });
+
+  it("项目列表封面解析原图与输出 id，并去掉封面重复项", () => {
+    const project = adaptProject({
+      id: "p1",
+      name: "耳机",
+      platformTargets: ["DOMESTIC"],
+      reasoningProviderId: "r",
+      reasoningModelId: "m",
+      imageProviderId: "i",
+      imageModelId: "img",
+      defaultMode: "CREATIVE",
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+      cover: {
+        productAssetId: "a1",
+        coverOutputId: "o1",
+        previewOutputIds: ["o2", "o1", "o3"],
+        outputCount: 4,
+      },
+    });
+    expect(project?.cover).toEqual({
+      productAssetId: "a1",
+      coverOutputId: "o1",
+      previewOutputIds: ["o2", "o3"],
+      outputCount: 4,
+    });
   });
 
   it("分镜接口把并列 items 填回 storyboard，忽略 variantScope", () => {

@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../../config/env";
 import type { components } from "../schema.d.ts";
 
 export type Project = components["schemas"]["Project"];
+export type ProjectCover = components["schemas"]["ProjectCover"];
 export type Asset = components["schemas"]["Asset"];
 export type AssetRole = components["schemas"]["AssetRole"];
 export type UserAssetKind = components["schemas"]["UserAssetKind"];
@@ -49,6 +50,23 @@ function asNumber(value: unknown): number | undefined {
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
+}
+
+function emptyCover(): ProjectCover {
+  return { productAssetId: null, coverOutputId: null, previewOutputIds: [], outputCount: 0 };
+}
+
+function adaptCover(raw: unknown): ProjectCover {
+  if (!isRecord(raw)) return emptyCover();
+  const productAssetId = asString(raw.productAssetId) ?? null;
+  const coverOutputId = asString(raw.coverOutputId) ?? null;
+  const outputCount = asNumber(raw.outputCount) ?? 0;
+  return {
+    productAssetId,
+    coverOutputId,
+    previewOutputIds: asStringArray(raw.previewOutputIds).filter((id) => id !== coverOutputId).slice(0, 2),
+    outputCount: Math.max(0, Math.trunc(outputCount)),
+  };
 }
 
 function kindFromRole(role: AssetRole): UserAssetKind {
@@ -272,6 +290,7 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
   const resolution = asString(raw.imageResolution);
   const aspect = asString(raw.imageAspectRatio);
   const candidates = asNumber(raw.candidatesPerType) ?? 1;
+  const webResearchEnabled = raw.webResearchEnabled === true;
   return {
     id,
     name,
@@ -284,6 +303,7 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
     imageResolution: RESOLUTIONS.has(resolution as ImageResolution) ? (resolution as ImageResolution) : "1K",
     imageAspectRatio: ASPECTS.has(aspect as ImageAspectRatio) ? (aspect as ImageAspectRatio) : "AUTO",
     candidatesPerType: Math.min(4, Math.max(1, candidates)),
+    webResearchEnabled,
     createdAt,
     updatedAt,
     category: asString(raw.category) ?? null,
@@ -291,6 +311,7 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
     verifiedFacts: asStringArray(raw.verifiedFacts),
     prohibitedClaims: asStringArray(raw.prohibitedClaims),
     brandGuidelines: brand,
+    cover: adaptCover(raw.cover),
   };
 }
 

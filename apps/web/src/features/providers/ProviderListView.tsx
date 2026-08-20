@@ -1,5 +1,5 @@
 import { App, Button, Popconfirm, Skeleton, Tag } from "antd";
-import { Images, KeyRound, Pencil, Plus, ScanEye, Trash2 } from "lucide-react";
+import { Globe2, Images, KeyRound, Pencil, Plus, ScanEye, Trash2 } from "lucide-react";
 
 import { useDeleteProvider, useProviders, type ProviderConfig } from "../../api/hooks/useProviders";
 import { errorText } from "../../lib/errorText";
@@ -8,9 +8,10 @@ import styles from "./providers.module.css";
 interface Props {
   onCreate: () => void;
   onEdit: (provider: ProviderConfig) => void;
+  onSearchSources: () => void;
 }
 
-export function ProviderListView({ onCreate, onEdit }: Props) {
+export function ProviderListView({ onCreate, onEdit, onSearchSources }: Props) {
   const providers = useProviders();
   const deleteProvider = useDeleteProvider();
   const { notification } = App.useApp();
@@ -44,13 +45,7 @@ export function ProviderListView({ onCreate, onEdit }: Props) {
     <div className={styles.list}>
       <div className={styles.headerRow}>
         <span className={styles.headerMeta}>{items.length} 个 Provider</span>
-        <Button
-          type="primary"
-          icon={<Plus size={14} strokeWidth={1.75} />}
-          onClick={onCreate}
-        >
-          添加 Provider
-        </Button>
+        <div className={styles.headerActions}><Button icon={<Globe2 size={14} strokeWidth={1.75} />} onClick={onSearchSources}>联网搜索源</Button><Button type="primary" icon={<Plus size={14} strokeWidth={1.75} />} onClick={onCreate}>添加 Provider</Button></div>
       </div>
 
       {items.length === 0 ? (

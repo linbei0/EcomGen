@@ -1,18 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean } } } | undefined, prompt: "", errorMessage: undefined as string | undefined }));
+const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", errorMessage: undefined as string | undefined, simulateResearchFailure: false }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
     public state = { messages: [] as Array<{ role: string; content: Array<{ type: string; text?: string }> }>, errorMessage: captured.errorMessage };
 
-    public constructor(options: { initialState?: { thinkingLevel?: string } }) {
+    public constructor(options: { initialState?: { thinkingLevel?: string; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } }) {
       captured.options = options;
     }
 
     public async prompt(message: string): Promise<void> {
       if (captured.errorMessage) return;
       captured.prompt = message;
+      if (captured.simulateResearchFailure) {
+        const researchTool = captured.options?.initialState?.tools?.find((tool) => tool.name === "research_visual_direction");
+        try { await researchTool?.execute("research-call", { query: "product photography lighting" }); } catch { /* Pi 将工具错误返回给模型并继续规划。 */ }
+      }
       this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify({ campaignStyleLock: "clean", items: [{ assetType: "hero-image", displayName: "整机斜侧展示首图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: 0 }] }) }] }];
     }
   },
@@ -71,5 +75,18 @@ describe("planStoryboard", () => {
     await expect(planStoryboard(input)).rejects.toThrow("provider timed out");
 
     captured.errorMessage = undefined;
+  });
+
+  it("continues planning when visual research fails", async () => {
+    captured.errorMessage = undefined;
+    captured.simulateResearchFailure = true;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("search unavailable"));
+    try {
+      const result = await planStoryboard({ ...input, webResearch: { sources: [{ id: "brave", name: "Brave", kind: "brave", baseUrl: "https://search.example.test", apiKey: "secret" }], maxResults: 1 } });
+      expect(result.items[0]?.promptInstruction).toBe("hero");
+    } finally {
+      fetchMock.mockRestore();
+      captured.simulateResearchFailure = false;
+    }
   });
 });

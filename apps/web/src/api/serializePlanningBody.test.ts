@@ -24,5 +24,6 @@ describe("serializePlanningBody", () => {
     expect(parsed.imageAspectRatio).toBe("1:1");
     expect(parsed.regenerationKey).toBe("run-1");
     expect(parsed.allowAgentRecommendations).toBeUndefined();
+    expect(parsed.webResearchEnabled).toBeUndefined();
   });
 });

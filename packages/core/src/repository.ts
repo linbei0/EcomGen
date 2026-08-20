@@ -9,6 +9,7 @@ import type {
   OutputReviewDecision,
   PlatformTarget,
   ReasoningProtocolProfile,
+  SearchSourceKind,
   StoryboardMode
 } from "@ecomgen/contracts";
 import type { SqliteDatabase } from "./database.js";
@@ -20,6 +21,18 @@ export interface ProviderRecord {
   reasoningProtocol: ReasoningProtocolProfile;
   encryptedApiKey: string;
   models: ModelDefinition[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SearchSourceRecord {
+  id: string;
+  name: string;
+  kind: SearchSourceKind;
+  baseUrl: string;
+  encryptedApiKey: string | null;
+  priority: number;
+  enabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -41,6 +54,7 @@ export interface ProjectRecord {
   imageResolution: ImageResolution;
   imageAspectRatio: ImageAspectRatio;
   candidatesPerType: number;
+  webResearchEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -108,6 +122,32 @@ export interface JobRecord {
   updatedAt: string;
 }
 
+export type WebResearchAvailability = "DISABLED" | "UNAVAILABLE" | "AVAILABLE";
+export type WebResearchAttemptStatus = "SUCCEEDED" | "FAILED";
+
+export interface WebResearchAuditRecord {
+  jobId: string;
+  availability: WebResearchAvailability;
+  invocationCount: number;
+  successfulAttemptCount: number;
+  failedAttemptCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebResearchAttemptRecord {
+  id: string;
+  jobId: string;
+  query: string;
+  sourceId: string;
+  sourceName: string;
+  sourceKind: string;
+  status: WebResearchAttemptStatus;
+  resultCount: number;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 export interface GenerationSnapshot {
   resolution: ImageResolution;
   aspectRatio: ImageAspectRatio;
@@ -139,6 +179,18 @@ export interface ExportRecord {
   updatedAt: string;
 }
 
+/** 首页列表封面：原图取最早 PRODUCT_TRUTH 图片；封面输出优先最新 SELECTED，否则最新输出。 */
+export interface ProjectCoverSummary {
+  productAssetId: string | null;
+  coverOutputId: string | null;
+  previewOutputIds: string[];
+  outputCount: number;
+}
+
+function emptyCover(): ProjectCoverSummary {
+  return { productAssetId: null, coverOutputId: null, previewOutputIds: [], outputCount: 0 };
+}
+
 type Row = Record<string, unknown>;
 const now = (): string => new Date().toISOString();
 const json = (value: unknown): string => JSON.stringify(value);
@@ -165,20 +217,75 @@ export class EcomRepository {
     this.db.prepare("DELETE FROM providers WHERE id=?").run(id); return "deleted";
   }
 
+  public listSearchSources(): SearchSourceRecord[] {
+    return (this.db.prepare("SELECT * FROM search_sources ORDER BY priority ASC, created_at ASC").all() as Row[]).map(mapSearchSource);
+  }
+  public getSearchSource(id: string): SearchSourceRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM search_sources WHERE id = ?").get(id);
+    return row ? mapSearchSource(row as Row) : undefined;
+  }
+  public saveSearchSource(input: Omit<SearchSourceRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }): SearchSourceRecord {
+    const existing = input.id ? this.getSearchSource(input.id) : undefined;
+    const record: SearchSourceRecord = { ...input, id: input.id ?? randomUUID(), createdAt: existing?.createdAt ?? now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO search_sources (id,name,kind,base_url,encrypted_api_key,priority,enabled,created_at,updated_at)
+      VALUES (@id,@name,@kind,@baseUrl,@encryptedApiKey,@priority,@enabled,@createdAt,@updatedAt)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,base_url=excluded.base_url,encrypted_api_key=excluded.encrypted_api_key,priority=excluded.priority,enabled=excluded.enabled,updated_at=excluded.updated_at`)
+      .run({ ...record, enabled: record.enabled ? 1 : 0 });
+    return record;
+  }
+  public deleteSearchSource(id: string): boolean {
+    return this.db.prepare("DELETE FROM search_sources WHERE id=?").run(id).changes > 0;
+  }
+
   public listProjects(): ProjectRecord[] { return (this.db.prepare("SELECT * FROM projects ORDER BY updated_at DESC").all() as Row[]).map(mapProject); }
+  public listProjectCovers(projectIds: string[]): Map<string, ProjectCoverSummary> {
+    const covers = new Map<string, ProjectCoverSummary>();
+    for (const id of projectIds) covers.set(id, emptyCover());
+    if (projectIds.length === 0) return covers;
+    const placeholders = projectIds.map(() => "?").join(",");
+    const assetRows = this.db.prepare(
+      `SELECT id, project_id FROM assets
+       WHERE project_id IN (${placeholders}) AND role='PRODUCT_TRUTH' AND mime_type LIKE 'image/%'
+       ORDER BY created_at ASC, id ASC`
+    ).all(...projectIds) as Array<{ id: string; project_id: string }>;
+    for (const row of assetRows) {
+      const cover = covers.get(row.project_id);
+      if (cover && cover.productAssetId === null) cover.productAssetId = row.id;
+    }
+    const outputRows = this.db.prepare(
+      `SELECT id, project_id, review_decision FROM outputs
+       WHERE project_id IN (${placeholders})
+       ORDER BY created_at DESC, id DESC`
+    ).all(...projectIds) as Array<{ id: string; project_id: string; review_decision: string }>;
+    const grouped = new Map<string, Array<{ id: string; review_decision: string }>>();
+    for (const row of outputRows) {
+      const list = grouped.get(row.project_id) ?? [];
+      list.push(row);
+      grouped.set(row.project_id, list);
+    }
+    for (const [projectId, outputs] of grouped) {
+      const cover = covers.get(projectId);
+      if (!cover) continue;
+      cover.outputCount = outputs.length;
+      const selected = outputs.find((output) => output.review_decision === "SELECTED");
+      cover.coverOutputId = selected?.id ?? outputs[0]?.id ?? null;
+      cover.previewOutputIds = outputs.filter((output) => output.id !== cover.coverOutputId).slice(0, 2).map((output) => output.id);
+    }
+    return covers;
+  }
   public getProject(id: string): ProjectRecord | undefined { const row = this.db.prepare("SELECT * FROM projects WHERE id = ?").get(id); return row ? mapProject(row as Row) : undefined; }
-  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt">): ProjectRecord {
-    const record: ProjectRecord = { ...input, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,created_at,updated_at)
-      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@createdAt,@updatedAt)`)
-      .run({ ...record, platformTargets: json(record.platformTargets), verifiedFacts: json(record.verifiedFacts), prohibitedClaims: json(record.prohibitedClaims), brandGuidelines: json(record.brandGuidelines) });
+  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled"> & Partial<Pick<ProjectRecord, "webResearchEnabled">>): ProjectRecord {
+    const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, id: randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,created_at,updated_at)
+      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@createdAt,@updatedAt)`)
+      .run({ ...record, webResearchEnabled: record.webResearchEnabled ? 1 : 0, platformTargets: json(record.platformTargets), verifiedFacts: json(record.verifiedFacts), prohibitedClaims: json(record.prohibitedClaims), brandGuidelines: json(record.brandGuidelines) });
     return record;
   }
   public updateProject(id: string, patch: Partial<Omit<ProjectRecord, "id" | "createdAt">>): ProjectRecord | undefined {
     const current = this.getProject(id); if (!current) return undefined;
     const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,updated_at=@updatedAt WHERE id=@id`)
-      .run({ ...next, platformTargets: json(next.platformTargets), verifiedFacts: json(next.verifiedFacts), prohibitedClaims: json(next.prohibitedClaims), brandGuidelines: json(next.brandGuidelines) });
+    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,updated_at=@updatedAt WHERE id=@id`)
+      .run({ ...next, webResearchEnabled: next.webResearchEnabled ? 1 : 0, platformTargets: json(next.platformTargets), verifiedFacts: json(next.verifiedFacts), prohibitedClaims: json(next.prohibitedClaims), brandGuidelines: json(next.brandGuidelines) });
     return next;
   }
 
@@ -260,6 +367,25 @@ export class EcomRepository {
   public findJobByFingerprint(projectId: string, fingerprint: string): JobRecord | undefined { const row = this.db.prepare("SELECT * FROM jobs WHERE project_id=? AND request_fingerprint=? AND status IN ('QUEUED','RUNNING','SUCCEEDED') ORDER BY created_at DESC LIMIT 1").get(projectId, fingerprint); return row ? mapJob(row as Row) : undefined; }
   public recoverInterruptedJobs(): JobRecord[] { const rows = this.db.prepare("SELECT * FROM jobs WHERE status='RUNNING'").all() as Row[]; this.db.prepare("UPDATE jobs SET status='QUEUED',progress=0,cancel_requested=0,updated_at=? WHERE status='RUNNING'").run(now()); return rows.map((row) => mapJob({ ...row, status: "QUEUED", progress: 0, cancel_requested: 0 })); }
   public listJobs(projectId: string): JobRecord[] { return (this.db.prepare("SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapJob); }
+  public createWebResearchAudit(jobId: string, availability: WebResearchAvailability): WebResearchAuditRecord {
+    const record: WebResearchAuditRecord = { jobId, availability, invocationCount: 0, successfulAttemptCount: 0, failedAttemptCount: 0, createdAt: now(), updatedAt: now() };
+    this.db.prepare("INSERT OR REPLACE INTO web_research_audits (job_id,availability,invocation_count,successful_attempt_count,failed_attempt_count,created_at,updated_at) VALUES (@jobId,@availability,@invocationCount,@successfulAttemptCount,@failedAttemptCount,@createdAt,@updatedAt)").run(record);
+    return record;
+  }
+  public recordWebResearchSearch(jobId: string): void {
+    this.db.prepare("UPDATE web_research_audits SET invocation_count=invocation_count+1,updated_at=? WHERE job_id=?").run(now(), jobId);
+  }
+  public recordWebResearchAttempt(input: Omit<WebResearchAttemptRecord, "id" | "createdAt">): WebResearchAttemptRecord {
+    const record: WebResearchAttemptRecord = { ...input, id: randomUUID(), createdAt: now() };
+    const column = record.status === "SUCCEEDED" ? "successful_attempt_count" : "failed_attempt_count";
+    const write = this.db.transaction(() => {
+      this.db.prepare("INSERT INTO web_research_attempts (id,job_id,query,source_id,source_name,source_kind,status,result_count,error_message,created_at) VALUES (@id,@jobId,@query,@sourceId,@sourceName,@sourceKind,@status,@resultCount,@errorMessage,@createdAt)").run(record);
+      this.db.prepare(`UPDATE web_research_audits SET ${column}=${column}+1,updated_at=? WHERE job_id=?`).run(now(), record.jobId);
+    });
+    write(); return record;
+  }
+  public getWebResearchAudit(jobId: string): WebResearchAuditRecord | undefined { const row = this.db.prepare("SELECT * FROM web_research_audits WHERE job_id=?").get(jobId); return row ? mapWebResearchAudit(row as Row) : undefined; }
+  public listWebResearchAttempts(jobId: string): WebResearchAttemptRecord[] { return (this.db.prepare("SELECT * FROM web_research_attempts WHERE job_id=? ORDER BY created_at,id").all(jobId) as Row[]).map(mapWebResearchAttempt); }
 
   public createOutput(input: Omit<OutputRecord, "id" | "createdAt">): OutputRecord {
     const record = { ...input, id: randomUUID(), createdAt: now() };
@@ -278,6 +404,7 @@ export class EcomRepository {
 }
 
 function mapProvider(row: Row): ProviderRecord { return { id: String(row.id), name: String(row.name), baseUrl: String(row.base_url), reasoningProtocol: row.reasoning_protocol as ReasoningProtocolProfile, encryptedApiKey: String(row.encrypted_api_key), models: parse(row.models_json), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapSearchSource(row: Row): SearchSourceRecord { return { id: String(row.id), name: String(row.name), kind: row.kind as SearchSourceKind, baseUrl: String(row.base_url), encryptedApiKey: row.encrypted_api_key ? String(row.encrypted_api_key) : null, priority: Number(row.priority), enabled: Boolean(row.enabled), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapProject(row: Row): ProjectRecord {
   return {
     id: String(row.id),
@@ -296,6 +423,7 @@ function mapProject(row: Row): ProjectRecord {
     imageResolution: (row.image_resolution as ImageResolution | undefined) ?? "1K",
     imageAspectRatio: (row.image_aspect_ratio as ImageAspectRatio | undefined) ?? "AUTO",
     candidatesPerType: Number(row.candidates_per_type ?? 1),
+    webResearchEnabled: Boolean(row.web_research_enabled),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at)
   };
@@ -337,6 +465,8 @@ function mapStoryboardItem(row: Row): StoryboardItemRecord {
   };
 }
 function mapJob(row: Row): JobRecord { return { id: String(row.id), projectId: String(row.project_id), storyboardItemId: row.storyboard_item_id ? String(row.storyboard_item_id) : null, type: row.type as JobType, status: row.status as JobStatus, progress: Number(row.progress), retryable: Boolean(row.retryable), input: parse(row.input_json), requestFingerprint: row.request_fingerprint ? String(row.request_fingerprint) : null, providerId: row.provider_id ? String(row.provider_id) : null, modelId: row.model_id ? String(row.model_id) : null, estimatedCost: row.estimated_cost_json ? parse(row.estimated_cost_json) : null, actualCost: row.actual_cost_json ? parse(row.actual_cost_json) : null, cancelRequested: Boolean(row.cancel_requested), providerTaskId: row.provider_task_id ? String(row.provider_task_id) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapWebResearchAudit(row: Row): WebResearchAuditRecord { return { jobId: String(row.job_id), availability: row.availability as WebResearchAvailability, invocationCount: Number(row.invocation_count), successfulAttemptCount: Number(row.successful_attempt_count), failedAttemptCount: Number(row.failed_attempt_count), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapWebResearchAttempt(row: Row): WebResearchAttemptRecord { return { id: String(row.id), jobId: String(row.job_id), query: String(row.query), sourceId: String(row.source_id), sourceName: String(row.source_name), sourceKind: String(row.source_kind), status: row.status as WebResearchAttemptStatus, resultCount: Number(row.result_count), errorMessage: row.error_message ? String(row.error_message) : null, createdAt: String(row.created_at) }; }
 function mapOutput(row: Row): OutputRecord {
   return {
     id: String(row.id),

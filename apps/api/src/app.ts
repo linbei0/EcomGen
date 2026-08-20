@@ -4,10 +4,10 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type ProviderRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus } from "@ecomgen/jobs";
-import type { AssetRole, ImageAspectRatio, ImageResolution, ModelDefinition, OutputReviewDecision, PlanningMode, PlatformTarget, ReasoningProtocolProfile, StoryboardMode, UserAssetKind } from "@ecomgen/contracts";
+import type { AssetRole, ImageAspectRatio, ImageResolution, ModelDefinition, OutputReviewDecision, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, UserAssetKind } from "@ecomgen/contracts";
 import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, roleForUserAssetKind } from "@ecomgen/contracts";
 import { OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
@@ -36,7 +36,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     return reply.status(status).send({ error: { code: known ? error.code : "INTERNAL_ERROR", message: known ? error.message : "Unexpected server error", details: known ? error.details : [], requestId: request.id } });
   });
 
-  app.get("/health", async () => ({ status: "ok" }));
+  app.get("/health", async () => ({ status: "ok", webResearchAvailable: repository.listSearchSources().some((source) => source.enabled && (source.kind === "searxng" || source.encryptedApiKey)) }));
   app.get("/api/v1/ecom-templates", async () => ({ source: ECOM_DETAILS_IMAGE_SOURCE, items: ECOM_TEMPLATES }));
   app.get("/api/v1/providers", async () => ({ items: repository.listProviders().map(publicProvider), nextCursor: null }));
   app.post("/api/v1/providers", async (request, reply) => {
@@ -71,7 +71,34 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.delete("/api/v1/providers/:providerId", async (request, reply) => { const id = parameter(request, "providerId"); const result = repository.deleteProvider(id); if (result === "missing") missing("provider", id); if (result === "in_use") throw new ApiError(409, "CONFLICT", "Provider is used by a project and cannot be deleted"); return reply.code(204).send(); });
 
-  app.get("/api/v1/projects", async () => ({ items: repository.listProjects(), nextCursor: null }));
+  app.get("/api/v1/search-sources", async () => ({ items: repository.listSearchSources().map(publicSearchSource), nextCursor: null }));
+  app.post("/api/v1/search-sources", async (request, reply) => {
+    const body = object(request.body, "body");
+    const kind = enumValue<SearchSourceKind>(body.kind, ["brave", "tavily", "searxng"], "kind");
+    const apiKey = optionalString(body.apiKey);
+    if (kind !== "searxng" && !apiKey) throw new ApiError(400, "VALIDATION_ERROR", "apiKey is required for this search source");
+    const record = repository.saveSearchSource({ name: string(body.name, "name"), kind, baseUrl: searchSourceBaseUrl(kind, optionalString(body.baseUrl)), encryptedApiKey: apiKey ? secrets.encrypt(apiKey) : null, priority: priorityValue(body.priority), enabled: body.enabled === undefined ? true : booleanValue(body.enabled, "enabled") });
+    return reply.code(201).send(publicSearchSource(record));
+  });
+  app.patch("/api/v1/search-sources/:sourceId", async (request) => {
+    const id = parameter(request, "sourceId"); const current = repository.getSearchSource(id); if (!current) missing("search source", id);
+    const body = object(request.body, "body");
+    const kind = body.kind === undefined ? current.kind : enumValue<SearchSourceKind>(body.kind, ["brave", "tavily", "searxng"], "kind");
+    const apiKey = optionalString(body.apiKey);
+    const encryptedApiKey = apiKey ? secrets.encrypt(apiKey) : current.encryptedApiKey;
+    if (kind !== "searxng" && !encryptedApiKey) throw new ApiError(400, "VALIDATION_ERROR", "apiKey is required for this search source");
+    return publicSearchSource(repository.saveSearchSource({ id, name: optionalString(body.name) ?? current.name, kind, baseUrl: searchSourceBaseUrl(kind, optionalString(body.baseUrl) ?? current.baseUrl), encryptedApiKey, priority: body.priority === undefined ? current.priority : priorityValue(body.priority), enabled: body.enabled === undefined ? current.enabled : booleanValue(body.enabled, "enabled") }));
+  });
+  app.delete("/api/v1/search-sources/:sourceId", async (request, reply) => { const id = parameter(request, "sourceId"); if (!repository.deleteSearchSource(id)) missing("search source", id); return reply.code(204).send(); });
+
+  app.get("/api/v1/projects", async () => {
+    const projects = repository.listProjects();
+    const covers = repository.listProjectCovers(projects.map((project) => project.id));
+    return {
+      items: projects.map((project) => ({ ...project, cover: covers.get(project.id) ?? { productAssetId: null, coverOutputId: null, previewOutputIds: [], outputCount: 0 } })),
+      nextCursor: null
+    };
+  });
   app.post("/api/v1/projects", async (request, reply) => {
     const body = object(request.body, "body"); const platformTargets = enumArray<PlatformTarget>(body.platformTargets, ["DOMESTIC", "AMAZON"], "platformTargets");
     const reasoningProviderId = string(body.reasoningProviderId, "reasoningProviderId"); const imageProviderId = string(body.imageProviderId, "imageProviderId");
@@ -91,7 +118,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       defaultMode: enumValue<StoryboardMode>(body.defaultMode, ["CREATIVE", "PIXEL_PROTECTED"], "defaultMode"),
       imageResolution: body.imageResolution === undefined ? DEFAULT_IMAGE_RESOLUTION : enumValue<ImageResolution>(body.imageResolution, IMAGE_RESOLUTIONS, "imageResolution"),
       imageAspectRatio: body.imageAspectRatio === undefined ? DEFAULT_IMAGE_ASPECT_RATIO : enumValue<ImageAspectRatio>(body.imageAspectRatio, IMAGE_ASPECT_RATIOS, "imageAspectRatio"),
-      candidatesPerType: body.candidatesPerType === undefined ? DEFAULT_CANDIDATES_PER_TYPE : candidatesPerType(body.candidatesPerType)
+      candidatesPerType: body.candidatesPerType === undefined ? DEFAULT_CANDIDATES_PER_TYPE : candidatesPerType(body.candidatesPerType),
+      webResearchEnabled: body.webResearchEnabled === undefined ? false : booleanValue(body.webResearchEnabled, "webResearchEnabled")
     }));
   });
   app.get("/api/v1/projects/:projectId", async (request) => projectDetail(repository, parameter(request, "projectId")));
@@ -109,6 +137,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (body.imageResolution !== undefined) update.imageResolution = enumValue<ImageResolution>(body.imageResolution, IMAGE_RESOLUTIONS, "imageResolution");
     if (body.imageAspectRatio !== undefined) update.imageAspectRatio = enumValue<ImageAspectRatio>(body.imageAspectRatio, IMAGE_ASPECT_RATIOS, "imageAspectRatio");
     if (body.candidatesPerType !== undefined) update.candidatesPerType = candidatesPerType(body.candidatesPerType);
+    if (body.webResearchEnabled !== undefined) update.webResearchEnabled = booleanValue(body.webResearchEnabled, "webResearchEnabled");
     applyModelFields(body, update, (providerId, modelId, kind) => verifyModel(repository, providerId, modelId, kind));
     return repository.updateProject(id, update) as object;
   });
@@ -213,6 +242,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
 }
 
 function publicProvider(value: ProviderRecord): object { const { encryptedApiKey, ...provider } = value; return { ...provider, hasApiKey: Boolean(encryptedApiKey) }; }
+function publicSearchSource(value: SearchSourceRecord): object { const { encryptedApiKey, ...source } = value; return { ...source, hasApiKey: Boolean(encryptedApiKey) }; }
 function projectDetail(repository: EcomRepository, id: string): object { const project = repository.getProject(id); if (!project) missing("project", id); return { ...project, assets: repository.listAssets(id), storyboard: repository.getStoryboard(id), items: repository.listStoryboardItems(id), outputs: repository.listOutputs(id), jobs: repository.listJobs(id) }; }
 function parseAssetRole(value: unknown): AssetRole {
   if (value === "PRODUCT" || value === "REFERENCE") return roleForUserAssetKind(value as UserAssetKind);
@@ -234,6 +264,13 @@ function parameter(request: FastifyRequest, name: string): string { const value 
 function object(value: unknown, path: string): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) throw new ApiError(400, "VALIDATION_ERROR", `${path} must be an object`); return value as Record<string, unknown>; }
 function string(value: unknown, path: string): string { if (typeof value !== "string" || !value.trim()) throw new ApiError(400, "VALIDATION_ERROR", `${path} must be a non-empty string`); return value.trim(); }
 function optionalString(value: unknown): string | undefined { return value === undefined || value === null || value === "" ? undefined : string(value, "value"); }
+function booleanValue(value: unknown, path: string): boolean { if (typeof value !== "boolean") throw new ApiError(400, "VALIDATION_ERROR", `${path} must be a boolean`); return value; }
+function priorityValue(value: unknown): number { const priority = typeof value === "number" ? value : Number(value); if (!Number.isInteger(priority) || priority < 0 || priority > 100_000) throw new ApiError(400, "VALIDATION_ERROR", "priority must be an integer between 0 and 100000"); return priority; }
+function searchSourceBaseUrl(kind: SearchSourceKind, value: string | undefined): string {
+  const baseUrl = value ?? (kind === "brave" ? "https://api.search.brave.com/res/v1/web/search" : kind === "tavily" ? "https://api.tavily.com/search" : "http://127.0.0.1:8080/search");
+  try { new URL(baseUrl); } catch { throw new ApiError(400, "VALIDATION_ERROR", "baseUrl must be a valid URL"); }
+  return baseUrl;
+}
 
 function stringArray(value: unknown, path: string): string[] { if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) throw new ApiError(400, "VALIDATION_ERROR", `${path} must be an array of strings`); return value as string[]; }
 function optionalStringArray(value: unknown): string[] | undefined { return value === undefined ? undefined : stringArray(value, "value"); }

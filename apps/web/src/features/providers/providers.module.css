@@ -11,6 +11,11 @@
   margin-bottom: 4px;
 }
 
+.headerActions {
+  display: flex;
+  gap: 8px;
+}
+
 .headerMeta {
   color: var(--text-3);
   font-size: 12px;
@@ -31,6 +36,9 @@
 }
 
 .cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin: 0;
   font-family: var(--font-display);
   font-size: 15px;
@@ -62,6 +70,13 @@
 .metaText {
   color: var(--text-3);
   font-size: 12px;
+}
+
+.enabledTag:global(.ant-tag) {
+  border-color: #3a8a64;
+  background: #153d2b;
+  color: #c5f4d8;
+  font-weight: 600;
 }
 
 .emptyBlock {

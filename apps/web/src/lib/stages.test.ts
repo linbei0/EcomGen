@@ -16,6 +16,7 @@ function detail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     imageResolution: "1K",
     imageAspectRatio: "AUTO",
     candidatesPerType: 1,
+    webResearchEnabled: false,
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-08-01T00:00:00.000Z",
     assets: [],

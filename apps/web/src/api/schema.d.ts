@@ -88,6 +88,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/search-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSearchSources"];
+        put?: never;
+        post: operations["createSearchSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search-sources/{sourceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteSearchSource"];
+        options?: never;
+        head?: never;
+        patch: operations["updateSearchSource"];
+        trace?: never;
+    };
     "/projects": {
         parameters: {
             query?: never;
@@ -433,6 +467,8 @@ export interface components {
         Health: {
             /** @constant */
             status: "ok";
+            /** @description Whether the server has a configured restricted visual-research search key. */
+            webResearchAvailable: boolean;
         };
         ErrorResponse: {
             error: {
@@ -482,6 +518,47 @@ export interface components {
             nextCursor: string | null;
         };
         /** @enum {string} */
+        SearchSourceKind: "brave" | "tavily" | "searxng";
+        SearchSourceConfig: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["SearchSourceKind"];
+            /** Format: uri */
+            baseUrl: string;
+            /** @description Lower values are searched first. */
+            priority: number;
+            enabled: boolean;
+            hasApiKey: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateSearchSourceInput: {
+            name: string;
+            kind: components["schemas"]["SearchSourceKind"];
+            /** Format: uri */
+            baseUrl?: string;
+            apiKey?: string;
+            priority: number;
+            /** @default true */
+            enabled: boolean;
+        };
+        UpdateSearchSourceInput: {
+            name?: string;
+            kind?: components["schemas"]["SearchSourceKind"];
+            /** Format: uri */
+            baseUrl?: string;
+            apiKey?: string;
+            priority?: number;
+            enabled?: boolean;
+        };
+        SearchSourceList: {
+            items: components["schemas"]["SearchSourceConfig"][];
+            nextCursor: string | null;
+        };
+        /** @enum {string} */
         ImageResolution: "1K" | "2K" | "4K";
         /** @enum {string} */
         ImageAspectRatio: "AUTO" | "1:1" | "3:4" | "4:3" | "16:9";
@@ -489,6 +566,14 @@ export interface components {
         PlanningMode: "AI" | "MANUAL";
         /** @enum {string} */
         UserAssetKind: "PRODUCT" | "REFERENCE";
+        ProjectCover: {
+            /** Format: uuid */
+            productAssetId: string | null;
+            /** Format: uuid */
+            coverOutputId: string | null;
+            previewOutputIds: string[];
+            outputCount: number;
+        };
         Project: {
             /** Format: uuid */
             id: string;
@@ -512,10 +597,13 @@ export interface components {
             imageResolution: components["schemas"]["ImageResolution"];
             imageAspectRatio: components["schemas"]["ImageAspectRatio"];
             candidatesPerType: number;
+            /** @description Enable restricted visual-direction web research during Agent planning. */
+            webResearchEnabled: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            cover?: components["schemas"]["ProjectCover"];
         };
         ProjectDetail: components["schemas"]["Project"] & {
             assets: components["schemas"]["Asset"][];
@@ -550,6 +638,8 @@ export interface components {
             imageResolution?: components["schemas"]["ImageResolution"];
             imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
             candidatesPerType?: number;
+            /** @description Enable restricted visual-direction web research during Agent planning. */
+            webResearchEnabled?: boolean;
         };
         UpdateProjectInput: {
             name?: string;
@@ -568,9 +658,11 @@ export interface components {
             imageResolution?: components["schemas"]["ImageResolution"];
             imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
             candidatesPerType?: number;
+            /** @description Enable restricted visual-direction web research during Agent planning. */
+            webResearchEnabled?: boolean;
         };
         ProjectList: {
-            items: components["schemas"]["Project"][];
+            items: (components["schemas"]["Project"] & Record<string, never>)[];
             nextCursor: string | null;
         };
         /** @enum {string} */
@@ -982,6 +1074,99 @@ export interface operations {
                 };
             };
             502: components["responses"]["ProviderError"];
+        };
+    };
+    listSearchSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Search source configurations in execution priority order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSourceList"];
+                };
+            };
+        };
+    };
+    createSearchSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSearchSourceInput"];
+            };
+        };
+        responses: {
+            /** @description Search source created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSourceConfig"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+        };
+    };
+    deleteSearchSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Search source deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateSearchSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSearchSourceInput"];
+            };
+        };
+        responses: {
+            /** @description Search source updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSourceConfig"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     listProjects: {

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { adaptJob, type Job } from "../adapters/projectDetail";
 import { api, unwrap } from "../client";
@@ -13,8 +14,9 @@ async function readJob(raw: unknown): Promise<Job> {
   return job;
 }
 
-export function useJob(jobId: string | undefined) {
-  return useQuery({
+export function useJob(projectId: string, jobId: string | undefined) {
+  const queryClient = useQueryClient();
+  const query = useQuery({
     queryKey: qk.job(jobId ?? ""),
     enabled: Boolean(jobId),
     queryFn: async () => readJob(await unwrap(api.GET("/jobs/{jobId}", { params: { path: { jobId: jobId! } } }))),
@@ -23,6 +25,15 @@ export function useJob(jobId: string | undefined) {
       return status === "QUEUED" || status === "RUNNING" ? 2000 : false;
     },
   });
+  const job = query.data;
+
+  useEffect(() => {
+    if (job?.type !== "PLAN" || job.status !== "SUCCEEDED") return;
+    void queryClient.refetchQueries({ queryKey: qk.storyboard(projectId), type: "active" });
+    void queryClient.refetchQueries({ queryKey: qk.project(projectId), type: "active" });
+  }, [job, projectId, queryClient]);
+
+  return query;
 }
 
 export function useCancelJob(projectId: string) {

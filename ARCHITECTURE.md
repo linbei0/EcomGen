@@ -24,7 +24,7 @@ flowchart LR
 | 模块 | 负责 | 不负责 |
 | --- | --- | --- |
 | `apps/api` | HTTP 校验、SQLite 持久化、请求指纹、入队 | 调用推理模型或生图模型 |
-| `packages/agent` | Pi Agent、只读业务工具、规划输出校验、Prompt 改写 | 访问文件、Shell、浏览器、任意 Web；直接保存数据库 |
+| `packages/agent` | Pi Agent、只读业务工具、受控视觉研究、规划输出校验、Prompt 改写 | 访问文件、Shell、浏览器、任意 URL 抓取；直接保存数据库 |
 | `packages/ecom-skill` | 固定来源的模板目录和结构化视觉规范 | 运行模型调用；向生图 Provider 发送请求 |
 | `apps/worker` | BullMQ 消费、取消检查、资源/状态检查、尺寸计算、Provider 调用、导出 | 把模板字符串、Campaign Style Lock 或隐含规则追加到 Prompt |
 | `packages/providers` | Provider 配置、能力声明和 OpenAI-compatible 适配 | 修改业务 Prompt 语义 |
@@ -38,8 +38,11 @@ flowchart LR
 
 - `read_ecom_template`：按稳定模板 ID 返回结构化的构图、镜头、占比、留白、平台预留区和反幻觉规则。
 - `read_platform_guidance`：返回目标市场/平台的版式和合规要求。
+- `research_visual_direction`：仅在配置搜索 API Key 时启用，检索近期视觉趋势与版式灵感；不打开网页、不下载图片，结果不能升级为商品事实。
 
-工具返回的是给 Agent 使用的知识，不是要原样发送给生图模型的 Prompt。最终 Prompt 必须由 Agent 改写成完整、自然、可执行的图像指令。
+工具返回的是给 Agent 使用的知识，不是要原样发送给生图模型的 Prompt。外部搜索结果始终按不可信内容处理；最终 Prompt 必须由 Agent 改写成完整、自然、可执行的图像指令。
+
+联网开关是项目级设置。搜索源由全局设置管理，按数值从小到大的优先级串行调用，当前源失败才切换备用源，任一成功即停止；项目不能选择特定供应商。所有源失败时，搜索调用作为工具错误交给 Pi Agent，Agent 可以继续使用项目上下文完成规划；只有模型请求、输出解析或契约校验失败才进入 BullMQ 的任务重试，不伪造搜索成功结果。
 
 ### 分镜阶段
 

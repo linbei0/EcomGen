@@ -6,6 +6,13 @@ export const GENERATE_JOB_ID = "ffffffff-aaaa-4bbb-8ccc-dddddddddddd";
 export const ITEM_ID = "cccccccc-dddd-4eee-8fff-000000000000";
 export const ITEM_ID_B = "dddddddd-eeee-4fff-8000-111111111111";
 
+export const EMPTY_COVER = {
+  productAssetId: null,
+  coverOutputId: null,
+  previewOutputIds: [] as string[],
+  outputCount: 0,
+};
+
 export const PROJECT_FIXTURE = {
   id: PROJECT_ID,
   name: "无线耳机 SPU",
@@ -23,8 +30,10 @@ export const PROJECT_FIXTURE = {
   imageResolution: "1K" as const,
   imageAspectRatio: "AUTO" as const,
   candidatesPerType: 1,
+  webResearchEnabled: false,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
+  cover: EMPTY_COVER,
 };
 
 export const ASSET_FIXTURE = {

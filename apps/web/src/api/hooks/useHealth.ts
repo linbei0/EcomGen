@@ -11,7 +11,7 @@ export function useHealth() {
     queryFn: async () => {
       const response = await fetch(healthUrl(API_BASE_URL));
       if (!response.ok) throw new Error(`health check failed: ${response.status}`);
-      return (await response.json()) as { status: string };
+      return (await response.json()) as { status: string; webResearchAvailable?: boolean };
     },
     refetchInterval: 30_000,
     retry: 1,

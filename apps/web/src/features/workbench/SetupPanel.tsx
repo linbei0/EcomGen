@@ -1,10 +1,11 @@
-import { App, Button, Input, Select } from "antd";
-import { ChevronDown, Layers3, Package, SlidersHorizontal, Sparkles } from "lucide-react";
+import { App, Button, Input, Select, Switch, Tooltip } from "antd";
+import { ChevronDown, Globe2, Layers3, Package, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { PlanningMode, ProjectDetail, UpdateProjectInput } from "../../api/adapters/projectDetail";
 import { useCreatePlanningJob } from "../../api/hooks/usePlanning";
 import { useJob, useRetryJob } from "../../api/hooks/useJobs";
+import { useHealth } from "../../api/hooks/useHealth";
 import { useProviders } from "../../api/hooks/useProviders";
 import { useUpdateProject } from "../../api/hooks/useProjects";
 import { useTemplates } from "../../api/hooks/useTemplates";
@@ -31,6 +32,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const { notification } = App.useApp();
   const updateProject = useUpdateProject(detail.id);
   const providers = useProviders();
+  const health = useHealth();
   const templates = useTemplates();
   const createPlan = useCreatePlanningJob(detail.id);
   const retryJob = useRetryJob(detail.id);
@@ -74,7 +76,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   };
 
   const seedJob = latestPlanJob(detail.jobs);
-  const liveJob = useJob(activeJobId ?? seedJob?.id);
+  const liveJob = useJob(detail.id, activeJobId ?? seedJob?.id);
   const job = liveJob.data ?? seedJob;
   const planning = isActiveJob(job);
   const productCount = detail.assets.filter((asset) => asset.role === "PRODUCT_TRUTH").length;
@@ -82,6 +84,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const imageOptions = modelOptions(providers.data?.items ?? [], "image");
   const reasoningKey = `${detail.reasoningProviderId}::${detail.reasoningModelId}`;
   const imageKey = `${detail.imageProviderId}::${detail.imageModelId}`;
+  const webResearchAvailable = health.data?.webResearchAvailable === true;
   const splitKey = (value: string) => {
     const [providerId, modelId] = value.split("::");
     return { providerId: providerId!, modelId: modelId! };
@@ -313,6 +316,21 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
           placeholder="补充画面限制、构图偏好或不要出现的内容（可选）"
           onChange={(event) => setInstruction(event.target.value)}
         />
+        <div className={styles.researchControl}>
+          <div>
+            <span className={styles.researchLabel}><Globe2 size={14} strokeWidth={1.75} aria-hidden /> 联网视觉研究</span>
+            <p className={styles.researchHint}>仅检索近期构图、光线、材质表现和平台版式；不会搜索或补充商品事实。</p>
+          </div>
+          <Tooltip title={webResearchAvailable ? "搜索服务已配置，启用后本项目的分镜规划可使用视觉研究" : "服务端尚未配置搜索 API Key，暂不能开启"}>
+            <Switch
+              aria-label="联网视觉研究"
+              checked={detail.webResearchEnabled}
+              disabled={!webResearchAvailable || updateProject.isPending}
+              onChange={(webResearchEnabled) => void save({ webResearchEnabled }, "保存联网视觉研究设置失败")}
+            />
+          </Tooltip>
+        </div>
+        {detail.webResearchEnabled && !webResearchAvailable ? <p className={styles.researchUnavailable}>服务端未配置搜索服务，本次规划不会联网。</p> : null}
       </Section>
 
       {detail.defaultMode === "PIXEL_PROTECTED" && productCount === 0 ? (

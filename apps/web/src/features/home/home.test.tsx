@@ -4,7 +4,7 @@ import { http, HttpResponse } from "msw";
 import { Route, Routes, useParams } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { PROJECT_FIXTURE } from "../../test/msw/fixtures";
+import { ASSET_ID, OUTPUT_ID, OUTPUT_ID_B, PROJECT_FIXTURE } from "../../test/msw/fixtures";
 import { BASE } from "../../test/msw/handlers";
 import { server } from "../../test/msw/server";
 import { renderWithProviders } from "../../test/render";
@@ -32,6 +32,35 @@ describe("首页 · 项目画廊", () => {
     renderWithProviders(<HomePage />);
     expect(await screen.findByRole("link", { name: /无线耳机 SPU/ })).toBeInTheDocument();
     expect(screen.queryByText("项目画廊 · 暂无项目")).not.toBeInTheDocument();
+    expect(screen.queryByText("国内平台")).not.toBeInTheDocument();
+    expect(screen.queryByText("创意")).not.toBeInTheDocument();
+  });
+
+  it("有生成图时显示原图角标与套图数量", async () => {
+    server.use(
+      http.get(`${BASE}/projects`, () =>
+        HttpResponse.json({
+          items: [
+            {
+              ...PROJECT_FIXTURE,
+              cover: {
+                productAssetId: ASSET_ID,
+                coverOutputId: OUTPUT_ID,
+                previewOutputIds: [OUTPUT_ID_B],
+                outputCount: 3,
+              },
+            },
+          ],
+          nextCursor: null,
+        }),
+      ),
+    );
+    renderWithProviders(<HomePage />);
+    expect(await screen.findByRole("link", { name: /无线耳机 SPU/ })).toBeInTheDocument();
+    expect(screen.getByText("原图")).toBeInTheDocument();
+    expect(screen.getByText("生成 3 张套图")).toBeInTheDocument();
+    expect(screen.queryByText("国内平台")).not.toBeInTheDocument();
+    expect(screen.queryByText("创意")).not.toBeInTheDocument();
   });
 });
 

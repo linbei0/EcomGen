@@ -62,6 +62,7 @@ export const JobStatus = Type.Enum({
   CANCELLED: "CANCELLED"
 });
 export const ReasoningProtocolProfile = Type.Enum({ OPENAI: "openai", DASHSCOPE_QWEN: "dashscope_qwen" });
+export const SearchSourceKind = Type.Enum({ BRAVE: "brave", TAVILY: "tavily", SEARXNG: "searxng" });
 export const OutputReviewDecision = Type.Enum({
   SELECTED: "SELECTED",
   REJECTED: "REJECTED",
@@ -128,6 +129,7 @@ export type PlanningMode = Static<typeof PlanningMode>;
 export type JobType = Static<typeof JobType>;
 export type JobStatus = Static<typeof JobStatus>;
 export type ReasoningProtocolProfile = Static<typeof ReasoningProtocolProfile>;
+export type SearchSourceKind = Static<typeof SearchSourceKind>;
 export type OutputReviewDecision = Static<typeof OutputReviewDecision>;
 export type ModelCapabilities = Static<typeof ModelCapabilities>;
 export type ModelDefinition = Static<typeof ModelDefinition>;

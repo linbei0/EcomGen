@@ -64,6 +64,8 @@ async function executePlan(job: JobRecord): Promise<void> {
     });
   }
   const plannerAssets = assets.map((asset) => ({ id: asset.id, role: asset.role, kind: userAssetKindForRole(asset.role), name: asset.originalName, mimeType: asset.mimeType }));
+  const webResearch = project.webResearchEnabled ? configuredWebResearch() : undefined;
+  repository.createWebResearchAudit(job.id, webResearch ? "AVAILABLE" : project.webResearchEnabled ? "UNAVAILABLE" : "DISABLED");
   const plan = await planStoryboard({
       model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
       apiKey: secrets.decrypt(provider.encryptedApiKey),
@@ -80,11 +82,26 @@ async function executePlan(job: JobRecord): Promise<void> {
       planningMode: input.planningMode ?? "AI",
       requestedTypes: input.requestedTypes,
       userInstruction: input.userInstruction,
-      candidatesPerType: input.candidatesPerType ?? project.candidatesPerType
+      candidatesPerType: input.candidatesPerType ?? project.candidatesPerType,
+      webResearch: webResearch ? {
+        ...webResearch,
+        audit: {
+          onSearchStarted: () => repository.recordWebResearchSearch(job.id),
+          onSourceAttempt: (attempt) => repository.recordWebResearchAttempt({ jobId: job.id, ...attempt })
+        }
+      } : undefined
     });
   throwIfCancelled(job);
   const storyboard = repository.saveStoryboard(project.id, plan.campaignStyleLock, "DRAFT", plan.items.map((item) => ({ ...item, status: "DRAFT", compiledPrompt: null })));
   await updateJob(job, { progress: 90 }); await events.publish(project.id, "storyboard.updated", { storyboard, items: repository.listStoryboardItems(project.id) });
+}
+
+/** 搜索源严格按后台 priority 执行；所有源失败仍由 Pi 使用已有项目上下文完成规划。 */
+function configuredWebResearch() {
+  const sources = repository.listSearchSources()
+    .filter((source) => source.enabled && (source.kind === "searxng" || source.encryptedApiKey))
+    .map((source) => ({ id: source.id, name: source.name, kind: source.kind, baseUrl: source.baseUrl, apiKey: source.encryptedApiKey ? secrets.decrypt(source.encryptedApiKey) : undefined }));
+  return sources.length ? { sources, maxResults: 3, timeoutMs: 8_000 } : undefined;
 }
 
 async function executeGeneration(job: JobRecord): Promise<void> {

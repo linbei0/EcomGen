@@ -5,6 +5,7 @@ import { Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import {
+  PLAN_JOB_FIXTURE,
   PROJECT_ID,
   STORYBOARD_FIXTURE,
   STORYBOARD_ITEM_B_FIXTURE,
@@ -32,6 +33,32 @@ const detailWithBoard = projectDetailPayload({
 });
 
 describe("工作台 · 分镜", () => {
+  it("规划完成后停留在分镜页会自动刷新卡片", async () => {
+    let completed = false;
+    const emptyDetail = projectDetailPayload({
+      jobs: [{ ...PLAN_JOB_FIXTURE, status: "RUNNING", progress: 90 }],
+    });
+    const completedDetail = projectDetailPayload({
+      storyboard: STORYBOARD_FIXTURE,
+      items: [STORYBOARD_ITEM_FIXTURE, STORYBOARD_ITEM_B_FIXTURE],
+      jobs: [{ ...PLAN_JOB_FIXTURE, status: "SUCCEEDED", progress: 100 }],
+    });
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(completed ? completedDetail : emptyDetail)),
+      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
+        HttpResponse.json(completed ? storyboardPayload() : storyboardPayload(null, [])),
+      ),
+      http.get(`${BASE}/jobs/:jobId`, () => {
+        completed = true;
+        return HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "SUCCEEDED", progress: 100 });
+      }),
+    );
+
+    renderBoard();
+    expect(await screen.findByText("还没有分镜")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "白底/纯色底产品主图 分镜" })).toBeInTheDocument();
+  });
+
   it("卡片显示中文名称，点击后弹窗编辑", async () => {
     const user = userEvent.setup();
     server.use(
