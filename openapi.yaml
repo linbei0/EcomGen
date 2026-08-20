@@ -317,6 +317,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/Job'
         '422': { $ref: '#/components/responses/CapabilityUnsupported' }
+  /projects/{projectId}/copywriting-jobs:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: createCopywritingJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCopywritingJobInput'
+      responses:
+        '200':
+          description: Existing copywriting job reused.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '202':
+          description: Copywriting job queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '422': { $ref: '#/components/responses/CapabilityUnsupported' }
+  /copywriting-jobs/{jobId}/result:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      operationId: getCopywritingResult
+      responses:
+        '200':
+          description: Generated copywriting result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopywritingResult'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /projects/{projectId}/storyboard:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -796,6 +836,22 @@ components:
         imageResolution: { $ref: '#/components/schemas/ImageResolution' }
         imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         regenerationKey: { type: string, minLength: 1, description: Unique key for an intentional re-planning run. }
+    CopywritingTarget: { type: string, enum: [PRODUCT_DESCRIPTION, PLANNING_INSTRUCTION] }
+    CreateCopywritingJobInput:
+      type: object
+      required: [target, regenerationKey]
+      properties:
+        target: { $ref: '#/components/schemas/CopywritingTarget' }
+        regenerationKey: { type: string, minLength: 1, description: Unique key for an intentional copywriting run. }
+    CopywritingResult:
+      type: object
+      required: [jobId, projectId, target, content, createdAt]
+      properties:
+        jobId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        target: { $ref: '#/components/schemas/CopywritingTarget' }
+        content: { type: string }
+        createdAt: { type: string, format: date-time }
     Storyboard:
       type: object
       required: [projectId, version, status, campaignStyleLock]
@@ -848,7 +904,7 @@ components:
       required: [id, type, status, progress, retryable, createdAt]
       properties:
         id: { type: string, format: uuid }
-        type: { type: string, enum: [PLAN, GENERATE, EXPORT] }
+        type: { type: string, enum: [PLAN, COPYWRITE, GENERATE, EXPORT] }
         status: { type: string, enum: [QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED] }
         progress: { type: integer, minimum: 0, maximum: 100 }
         retryable: { type: boolean }

@@ -1,9 +1,10 @@
 import { App, AutoComplete, Button, Input, Select, Switch, Tooltip } from "antd";
-import { ChevronDown, Globe2, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChevronDown, Globe2, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store, WandSparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { PlanningMode, ProjectDetail, TargetMarket, UpdateProjectInput } from "../../api/adapters/projectDetail";
 import { useCreatePlanningJob } from "../../api/hooks/usePlanning";
+import { useCopywritingResult, useCreateCopywritingJob, type CopywritingTarget } from "../../api/hooks/useCopywriting";
 import { useJob, useRetryJob } from "../../api/hooks/useJobs";
 import { useHealth } from "../../api/hooks/useHealth";
 import { useProviders } from "../../api/hooks/useProviders";
@@ -53,6 +54,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const health = useHealth();
   const templates = useTemplates();
   const createPlan = useCreatePlanningJob(detail.id);
+  const createCopywriting = useCreateCopywritingJob(detail.id);
   const retryJob = useRetryJob(detail.id);
   const catalog = templates.data ?? [];
   const stored = useMemo(() => loadImageTypes(detail.id), [detail.id]);
@@ -65,8 +67,10 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const [selected, setSelected] = useState<string[]>(stored);
   const [instruction, setInstruction] = useState("");
   const [activeJobId, setActiveJobId] = useState<string | undefined>(undefined);
+  const [activeCopywritingJob, setActiveCopywritingJob] = useState<{ id: string; target: CopywritingTarget } | undefined>(undefined);
   const [copyLanguage, setCopyLanguage] = useState(detail.copyLanguage ?? "");
   const [savedCopyLanguage, setSavedCopyLanguage] = useState(detail.copyLanguage ?? "");
+  const handledCopywritingJobs = useRef(new Set<string>());
 
   useEffect(() => setName(detail.name), [detail.name]);
   useEffect(() => {
@@ -114,11 +118,28 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const job = liveJob.data ?? seedJob;
   const planning = isActiveJob(job);
   const productCount = detail.assets.filter((asset) => asset.role === "PRODUCT_TRUTH").length;
+  const copywritingJobQuery = useJob(detail.id, activeCopywritingJob?.id);
+  const copywritingJob = copywritingJobQuery.data;
+  const copywritingResult = useCopywritingResult(
+    activeCopywritingJob?.id,
+    copywritingJob?.status === "SUCCEEDED",
+  );
   const reasoningOptions = modelOptions(providers.data?.items ?? [], "reasoning");
   const imageOptions = modelOptions(providers.data?.items ?? [], "image");
   const reasoningKey = `${detail.reasoningProviderId}::${detail.reasoningModelId}`;
   const imageKey = `${detail.imageProviderId}::${detail.imageModelId}`;
   const webResearchAvailable = health.data?.webResearchAvailable === true;
+  const configuredReasoningModel = providers.data?.items
+    .find((provider) => provider.id === detail.reasoningProviderId)
+    ?.models.find((model) => model.id === detail.reasoningModelId);
+  const copywritingUnavailableReason = productCount === 0
+    ? "请先上传至少一张产品图"
+    : providers.data && !configuredReasoningModel
+      ? "当前推理模型不可用"
+    : configuredReasoningModel && !configuredReasoningModel.supportsVision
+      ? "当前推理模型不支持图片识别"
+      : undefined;
+  const copywritingActive = createCopywriting.isPending || (Boolean(activeCopywritingJob) && !copywritingJob) || copywritingJob?.status === "QUEUED" || copywritingJob?.status === "RUNNING";
   const splitKey = (value: string) => {
     const [providerId, modelId] = value.split("::");
     return { providerId: providerId!, modelId: modelId! };
@@ -132,6 +153,36 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       return [...current, id];
     });
   };
+
+  const startCopywriting = async (target: CopywritingTarget) => {
+    if (copywritingUnavailableReason) {
+      notification.warning({ title: copywritingUnavailableReason });
+      return;
+    }
+    try {
+      const created = await createCopywriting.mutateAsync({ target, regenerationKey: crypto.randomUUID() });
+      setActiveCopywritingJob({ id: created.id, target });
+    } catch (error) {
+      notification.error({ title: "AI 帮写提交失败", description: errorText(error) });
+    }
+  };
+
+  useEffect(() => {
+    if (!copywritingResult.data || !activeCopywritingJob || handledCopywritingJobs.current.has(activeCopywritingJob.id)) return;
+    handledCopywritingJobs.current.add(activeCopywritingJob.id);
+    if (copywritingResult.data.target === "PRODUCT_DESCRIPTION") {
+      setDescription(copywritingResult.data.content);
+      void save({ productDescription: copywritingResult.data.content }, "保存 AI 商品描述失败");
+      return;
+    }
+    setInstruction(copywritingResult.data.content);
+  }, [activeCopywritingJob, copywritingResult.data]);
+
+  useEffect(() => {
+    if (!copywritingJob || copywritingJob.status !== "FAILED" || handledCopywritingJobs.current.has(copywritingJob.id)) return;
+    handledCopywritingJobs.current.add(copywritingJob.id);
+    notification.error({ title: "AI 帮写失败", description: jobErrorText(copywritingJob) ?? "生成服务未返回文案" });
+  }, [copywritingJob, notification]);
 
   const submitPlan = async () => {
     if (planningMode === "MANUAL" && selected.length === 0) {
@@ -234,19 +285,28 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       <Section title="核心卖点" icon={<Sparkles size={14} strokeWidth={1.75} aria-hidden />}>
         <label className={styles.fieldLabel}>
           商品描述
-          <Input.TextArea
-            aria-label="商品描述"
-            rows={3}
-            maxLength={400}
-            value={description}
-            placeholder="描述产品特点、目标人群和使用场景；具体可宣称参数请填写在下方。"
-            onChange={(event) => setDescription(event.target.value)}
-            onBlur={() => {
-              const next = description.trim();
-              if (next === (detail.productDescription ?? "")) return;
-              void save({ productDescription: next || null }, "保存描述失败");
-            }}
-          />
+          <div className={styles.aiTextArea}>
+            <Input.TextArea
+              aria-label="商品描述"
+              rows={3}
+              maxLength={400}
+              value={description}
+              placeholder="描述产品特点、目标人群和使用场景；具体可宣称参数请填写在下方。"
+              onChange={(event) => setDescription(event.target.value)}
+              onBlur={() => {
+                const next = description.trim();
+                if (next === (detail.productDescription ?? "")) return;
+                void save({ productDescription: next || null }, "保存描述失败");
+              }}
+            />
+            <AiWriteButton
+              label="AI 帮写商品描述"
+              disabled={Boolean(copywritingUnavailableReason) || copywritingActive}
+              loading={copywritingActive && activeCopywritingJob?.target === "PRODUCT_DESCRIPTION"}
+              reason={copywritingUnavailableReason}
+              onClick={() => void startCopywriting("PRODUCT_DESCRIPTION")}
+            />
+          </div>
         </label>
         <label className={styles.fieldLabel}>
           已核验事实（每行一条）
@@ -393,14 +453,23 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
             </div>
           </>
         )}
-        <Input.TextArea
-          aria-label="补充说明"
-          value={instruction}
-          maxLength={4000}
-          rows={3}
-          placeholder="补充画面限制、构图偏好或不要出现的内容（可选）"
-          onChange={(event) => setInstruction(event.target.value)}
-        />
+        <div className={styles.aiTextArea}>
+          <Input.TextArea
+            aria-label="补充说明"
+            value={instruction}
+            maxLength={4000}
+            rows={3}
+            placeholder="补充画面限制、构图偏好或不要出现的内容（可选）"
+            onChange={(event) => setInstruction(event.target.value)}
+          />
+          <AiWriteButton
+            label="AI 帮写补充说明"
+            disabled={Boolean(copywritingUnavailableReason) || copywritingActive}
+            loading={copywritingActive && activeCopywritingJob?.target === "PLANNING_INSTRUCTION"}
+            reason={copywritingUnavailableReason}
+            onClick={() => void startCopywriting("PLANNING_INSTRUCTION")}
+          />
+        </div>
         <div className={styles.researchControl}>
           <div>
             <span className={styles.researchLabel}><Globe2 size={14} strokeWidth={1.75} aria-hidden /> 联网视觉研究</span>
@@ -436,6 +505,23 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       )}
     </div>
   );
+}
+
+function AiWriteButton({ label, disabled, loading, reason, onClick }: {
+  label: string;
+  disabled: boolean;
+  loading: boolean;
+  reason: string | undefined;
+  onClick: () => void;
+}) {
+  const button = (
+    <button type="button" className={styles.aiWriteButton} aria-label={label} disabled={disabled} onClick={onClick}>
+      <WandSparkles size={14} strokeWidth={1.8} aria-hidden />
+      <span>{loading ? "生成中" : "AI 帮写"}</span>
+    </button>
+  );
+  const wrapped = <span className={styles.aiWriteTooltip}>{button}</span>;
+  return reason ? <Tooltip title={reason}>{wrapped}</Tooltip> : wrapped;
 }
 
 function Section({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {

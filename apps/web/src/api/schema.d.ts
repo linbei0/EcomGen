@@ -210,6 +210,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/copywriting-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createCopywritingJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copywriting-jobs/{jobId}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getCopywritingResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{projectId}/storyboard": {
         parameters: {
             query?: never;
@@ -707,6 +743,23 @@ export interface components {
             /** @description Unique key for an intentional re-planning run. */
             regenerationKey?: string;
         };
+        /** @enum {string} */
+        CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION";
+        CreateCopywritingJobInput: {
+            target: components["schemas"]["CopywritingTarget"];
+            /** @description Unique key for an intentional copywriting run. */
+            regenerationKey: string;
+        };
+        CopywritingResult: {
+            /** Format: uuid */
+            jobId: string;
+            /** Format: uuid */
+            projectId: string;
+            target: components["schemas"]["CopywritingTarget"];
+            content: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
         Storyboard: {
             /** Format: uuid */
             projectId: string;
@@ -762,7 +815,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "PLAN" | "GENERATE" | "EXPORT";
+            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT";
             /** @enum {string} */
             status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
             progress: number;
@@ -1433,6 +1486,67 @@ export interface operations {
                 };
             };
             422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    createCopywritingJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCopywritingJobInput"];
+            };
+        };
+        responses: {
+            /** @description Existing copywriting job reused. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Copywriting job queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    getCopywritingResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Generated copywriting result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CopywritingResult"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getStoryboard: {

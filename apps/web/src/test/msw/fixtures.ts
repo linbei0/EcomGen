@@ -118,6 +118,14 @@ export const PLAN_JOB_FIXTURE = {
   updatedAt: "2026-08-01T00:10:00.000Z",
 };
 
+export const COPYWRITING_JOB_FIXTURE = {
+  ...PLAN_JOB_FIXTURE,
+  id: "abababab-bcbc-4dcd-8eee-ffffffffffff",
+  type: "COPYWRITE" as const,
+  input: { target: "PRODUCT_DESCRIPTION", regenerationKey: "mock-copywriting" },
+  requestFingerprint: "fp-copywriting",
+};
+
 export const GENERATE_JOB_FIXTURE = {
   id: GENERATE_JOB_ID,
   projectId: PROJECT_ID,

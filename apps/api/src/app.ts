@@ -6,8 +6,8 @@ import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
-import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus } from "@ecomgen/jobs";
-import type { AssetRole, ImageAspectRatio, ImageResolution, ModelDefinition, OutputReviewDecision, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind } from "@ecomgen/contracts";
+import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
+import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, ModelDefinition, OutputReviewDecision, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind } from "@ecomgen/contracts";
 import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, roleForUserAssetKind } from "@ecomgen/contracts";
 import { OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
@@ -178,6 +178,28 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const project = repository.getProject(projectId); const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "PLAN", input, requestFingerprint: fingerprint, providerId: project?.reasoningProviderId ?? null, modelId: project?.reasoningModelId ?? null, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueue(queue, { jobId: job.id, kind: "plan" }); return reply.code(202).send(job);
   });
+  app.post("/api/v1/projects/:projectId/copywriting-jobs", async (request, reply) => {
+    const projectId = parameter(request, "projectId");
+    const project = repository.getProject(projectId);
+    if (!project) missing("project", projectId);
+    const productImages = repository.listAssets(projectId).filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/"));
+    if (productImages.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "AI copywriting requires at least one product image");
+    verifyCopywritingModel(repository, project.reasoningProviderId, project.reasoningModelId);
+    const body = object(request.body ?? {}, "body");
+    const input = {
+      target: enumValue<CopywritingTarget>(body.target, ["PRODUCT_DESCRIPTION", "PLANNING_INSTRUCTION"], "target"),
+      regenerationKey: string(body.regenerationKey, "regenerationKey"),
+    };
+    const fingerprint = requestFingerprint({ type: "COPYWRITE", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null });
+    const existing = repository.findJobByFingerprint(projectId, fingerprint);
+    if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    const job = repository.createJob({
+      id: randomUUID(), projectId, storyboardItemId: null, type: "COPYWRITE", input, requestFingerprint: fingerprint,
+      providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" },
+    });
+    await enqueue(queue, { jobId: job.id, kind: "copywrite" });
+    return reply.code(202).send(job);
+  });
   app.get("/api/v1/projects/:projectId/storyboard", async (request) => {
     const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); return { storyboard: repository.getStoryboard(projectId) ?? null, items: repository.listStoryboardItems(projectId) };
   });
@@ -252,6 +274,15 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     await Promise.all(jobs.map((job) => enqueue(queue, { jobId: job.id, kind: "generate" }))); return reply.code(202).send({ jobs });
   });
   app.get("/api/v1/jobs/:jobId", async (request) => { const job = repository.getJob(parameter(request, "jobId")); if (!job) missing("job", parameter(request, "jobId")); return job; });
+  app.get("/api/v1/copywriting-jobs/:jobId/result", async (request) => {
+    const jobId = parameter(request, "jobId");
+    const job = repository.getJob(jobId);
+    if (!job || job.type !== "COPYWRITE") missing("copywriting job", jobId);
+    if (job.status !== "SUCCEEDED") throw new ApiError(409, "CONFLICT", "Copywriting job has not succeeded");
+    const result = repository.getCopywritingResult(jobId);
+    if (!result) missing("copywriting result", jobId);
+    return result;
+  });
   app.post("/api/v1/jobs/:jobId/cancel", async (request) => {
     const id = parameter(request, "jobId");
     const current = repository.getJob(id);
@@ -266,7 +297,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     }
     return repository.updateJob(id, { cancelRequested: true });
   });
-  app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => { const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id); if (!job.retryable) throw new ApiError(409, "CONFLICT", "This job cannot be retried"); const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input: job.input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); await enqueue(queue, { jobId: retry.id, kind: retry.type.toLowerCase() as "plan" | "generate" | "export" }); return reply.code(202).send(retry); });
+  app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => { const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id); if (!job.retryable) throw new ApiError(409, "CONFLICT", "This job cannot be retried"); const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input: job.input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); await enqueue(queue, { jobId: retry.id, kind: queueKindForJobType(retry.type) }); return reply.code(202).send(retry); });
   app.get("/api/v1/projects/:projectId/outputs", async (request) => repository.listOutputs(parameter(request, "projectId")));
   app.patch("/api/v1/outputs/:outputId/review", async (request) => { const body = object(request.body, "body"); const result = repository.reviewOutput(parameter(request, "outputId"), enumValue<OutputReviewDecision>(body.reviewDecision ?? body.decision, ["SELECTED", "REJECTED", "NEEDS_REVIEW"], "reviewDecision"), optionalString(body.reviewNote ?? body.note) ?? null); if (!result) missing("output", parameter(request, "outputId")); return result; });
   app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = object(request.body ?? {}, "body"); const input = { outputIds: optionalStringArray(body.outputIds), filenamePrefix: optionalString(body.filenamePrefix) }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueue(queue, { jobId: job.id, kind: "export" }); return reply.code(202).send({ job, export: exportRecord }); });
@@ -301,6 +332,19 @@ function planningImageCount(value: unknown): number {
 function clampCandidates(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.min(MAX_CANDIDATES_PER_TYPE, Math.max(1, Math.round(value)));
+}
+function verifyCopywritingModel(repository: EcomRepository, providerId: string, modelId: string): void {
+  const provider = repository.getProvider(providerId);
+  if (!provider) missing("provider", providerId);
+  const model = provider.models.find((candidate) => candidate.id === modelId);
+  if (!model) throw new ApiError(400, "VALIDATION_ERROR", "Configured reasoning model is not declared by its provider");
+  if (!model.supportsVision) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected reasoning model must support Vision for AI copywriting");
+}
+function queueKindForJobType(type: JobType): EcomJobKind {
+  if (type === "PLAN") return "plan";
+  if (type === "COPYWRITE") return "copywrite";
+  if (type === "GENERATE") return "generate";
+  return "export";
 }
 function verifyModel(repository: EcomRepository, providerId: string, modelId: string, kind: "reasoning" | "image"): void { const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new ApiError(400, "VALIDATION_ERROR", `${kind} model is not declared by the selected provider`); if (kind === "image" && !model.imageApiKind) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected image model has no image API configured"); }
 function ensureProject(repository: EcomRepository, id: string): void { if (!repository.getProject(id)) missing("project", id); }

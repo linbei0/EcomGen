@@ -36,6 +36,10 @@ export const ImageAspectRatio = Type.Enum({
   WIDE: "16:9"
 });
 export const PlanningMode = Type.Enum({ AI: "AI", MANUAL: "MANUAL" });
+export const CopywritingTarget = Type.Enum({
+  PRODUCT_DESCRIPTION: "PRODUCT_DESCRIPTION",
+  PLANNING_INSTRUCTION: "PLANNING_INSTRUCTION"
+});
 export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
 export const IMAGE_ASPECT_RATIOS = ["AUTO", "1:1", "3:4", "4:3", "16:9"] as const;
 export const MAX_CANDIDATES_PER_TYPE = 4;
@@ -70,7 +74,7 @@ export function roleForUserAssetKind(kind: Static<typeof UserAssetKind>): Static
   return kind === "PRODUCT" ? "PRODUCT_TRUTH" : "STYLE_REFERENCE";
 }
 
-export const JobType = Type.Enum({ PLAN: "PLAN", GENERATE: "GENERATE", EXPORT: "EXPORT" });
+export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERATE: "GENERATE", EXPORT: "EXPORT" });
 export const JobStatus = Type.Enum({
   QUEUED: "QUEUED",
   RUNNING: "RUNNING",
@@ -144,6 +148,7 @@ export type UserAssetKind = Static<typeof UserAssetKind>;
 export type ImageResolution = Static<typeof ImageResolution>;
 export type ImageAspectRatio = Static<typeof ImageAspectRatio>;
 export type PlanningMode = Static<typeof PlanningMode>;
+export type CopywritingTarget = Static<typeof CopywritingTarget>;
 export type JobType = Static<typeof JobType>;
 export type JobStatus = Static<typeof JobStatus>;
 export type ReasoningProtocolProfile = Static<typeof ReasoningProtocolProfile>;

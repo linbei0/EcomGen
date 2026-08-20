@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { EventEnvelope } from "@ecomgen/contracts";
 
 export const QUEUE_NAME = process.env.ECOMGEN_QUEUE_NAME ?? "ecomgen";
-export type EcomJobKind = "plan" | "generate" | "export";
+export type EcomJobKind = "plan" | "copywrite" | "generate" | "export";
 export interface EcomJobPayload { jobId: string; kind: EcomJobKind; }
 export const EVENT_CHANNEL_PREFIX = "ecomgen:project-events:";
 

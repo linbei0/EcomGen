@@ -2,6 +2,7 @@ import { http, HttpResponse } from "msw";
 
 import {
   ASSET_FIXTURE,
+  COPYWRITING_JOB_FIXTURE,
   EXPORT_FIXTURE,
   EXPORT_JOB_FIXTURE,
   GENERATE_JOB_FIXTURE,
@@ -129,6 +130,20 @@ export const handlers = [
 
   http.post(`${BASE}/projects/:projectId/planning-jobs`, () =>
     HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 0 }),
+  ),
+
+  http.post(`${BASE}/projects/:projectId/copywriting-jobs`, ({ params }) =>
+    HttpResponse.json({ ...COPYWRITING_JOB_FIXTURE, projectId: params.projectId as string }),
+  ),
+
+  http.get(`${BASE}/copywriting-jobs/:jobId/result`, ({ params }) =>
+    HttpResponse.json({
+      jobId: params.jobId as string,
+      projectId: PROJECT_FIXTURE.id,
+      target: "PRODUCT_DESCRIPTION",
+      content: "产品名称：无线耳机\n核心卖点：\n- 入耳佩戴\n适用人群：日常用户\n期望场景：通勤",
+      createdAt: "2026-08-01T00:00:01.000Z",
+    }),
   ),
 
   http.get(`${BASE}/jobs/:jobId`, ({ params }) =>

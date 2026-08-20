@@ -2,11 +2,11 @@ import { PassThrough } from "node:stream";
 import { resolve } from "node:path";
 import { Worker } from "bullmq";
 import archiver from "archiver";
-import { planStoryboard, reviseImagePrompt } from "@ecomgen/agent";
+import { planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
 import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
 import { getTemplate } from "@ecomgen/ecom-skill";
-import { resolveImageSize, userAssetKindForRole, type ImageAspectRatio, type ImageResolution, type PlanningMode } from "@ecomgen/contracts";
-import { createJobQueue, createRedisConnection, enqueue, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
+import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
+import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel } from "@ecomgen/providers";
 
 const masterKey = process.env.ECOMGEN_MASTER_KEY;
@@ -21,7 +21,7 @@ const events = new RedisProjectEventBus(redis.duplicate(), redis.duplicate());
 const recoveryRedis = redis.duplicate();
 const recoveryQueue = createJobQueue(recoveryRedis);
 // 进程异常退出后，数据库中的 RUNNING 任务会被重新置为 QUEUED 并再次交给 BullMQ。
-for (const recovered of repository.recoverInterruptedJobs()) await enqueue(recoveryQueue, { jobId: recovered.id, kind: recovered.type.toLowerCase() as "plan" | "generate" | "export" });
+for (const recovered of repository.recoverInterruptedJobs()) await enqueue(recoveryQueue, { jobId: recovered.id, kind: queueKindForJobType(recovered.type) });
 await recoveryQueue.close();
 await recoveryRedis.quit();
 
@@ -31,6 +31,7 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
   await updateJob(job, { status: "RUNNING", progress: 5, error: null });
   try {
     if (queueJob.data.kind === "plan") await executePlan(job);
+    else if (queueJob.data.kind === "copywrite") await executeCopywriting(job);
     else if (queueJob.data.kind === "generate") await executeGeneration(job);
     else await executeExport(job);
     const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") { await updateJob(job, { status: "CANCELLED", progress: current.progress }); } else await updateJob(job, { status: "SUCCEEDED", progress: 100 });
@@ -97,6 +98,43 @@ async function executePlan(job: JobRecord): Promise<void> {
   throwIfCancelled(job);
   const storyboard = repository.saveStoryboard(project.id, plan.campaignStyleLock, "DRAFT", plan.items.map((item) => ({ ...item, status: "DRAFT", compiledPrompt: null })));
   await updateJob(job, { progress: 90 }); await events.publish(project.id, "storyboard.updated", { storyboard, items: repository.listStoryboardItems(project.id) });
+}
+
+async function executeCopywriting(job: JobRecord): Promise<void> {
+  throwIfCancelled(job);
+  const project = projectFor(job);
+  const provider = providerFor(project.reasoningProviderId);
+  const model = provider.models.find((candidate) => candidate.id === project.reasoningModelId);
+  if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
+  if (!model.supportsVision) throw new Error("Selected reasoning model must support Vision for AI copywriting");
+  const assets = repository.listAssets(project.id).filter((asset) => asset.mimeType.startsWith("image/"));
+  if (!assets.some((asset) => asset.role === "PRODUCT_TRUTH")) throw new Error("AI copywriting requires at least one product image");
+  const target = job.input.target;
+  if (target !== "PRODUCT_DESCRIPTION" && target !== "PLANNING_INSTRUCTION") throw new Error("Copywriting job has an invalid target");
+  await updateJob(job, { progress: 25 });
+  const visualAttachments = await Promise.all(assets.map(async (asset) => ({
+    type: "image" as const,
+    mimeType: asset.mimeType,
+    data: (await storage.read(asset.storagePath)).toString("base64"),
+  })));
+  const result = await writeCopywriting({
+    target: target as CopywritingTarget,
+    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
+    apiKey: secrets.decrypt(provider.encryptedApiKey),
+    projectName: project.name,
+    productCategory: project.category,
+    productDescription: project.productDescription,
+    verifiedFacts: project.verifiedFacts,
+    prohibitedClaims: project.prohibitedClaims,
+    platformTargets: project.platformTargets,
+    targetMarket: project.targetMarket,
+    copyLanguage: project.copyLanguage,
+    assets: assets.map((asset) => ({ id: asset.id, role: asset.role, name: asset.originalName, mimeType: asset.mimeType })),
+    referenceImages: visualAttachments,
+  });
+  throwIfCancelled(job);
+  repository.saveCopywritingResult({ jobId: job.id, projectId: project.id, target: result.target, content: result.content });
+  await updateJob(job, { progress: 90 });
 }
 
 /** 搜索源严格按后台 priority 执行；所有源失败仍由 Pi 使用已有项目上下文完成规划。 */
@@ -179,6 +217,12 @@ async function reviseGenerationPrompt(project: ProjectRecord, prompt: string, re
   });
 }
 async function updateJob(job: JobRecord, patch: Parameters<EcomRepository["updateJob"]>[1]): Promise<void> { const updated = repository.updateJob(job.id, patch); if (updated) await events.publish(job.projectId, "job.updated", updated); }
+function queueKindForJobType(type: JobType): EcomJobKind {
+  if (type === "PLAN") return "plan";
+  if (type === "COPYWRITE") return "copywrite";
+  if (type === "GENERATE") return "generate";
+  return "export";
+}
 class JobCancelled extends Error {}
 function throwIfCancelled(job: JobRecord): void { const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") throw new JobCancelled(`Job ${job.id} was cancelled`); }
 function extensionForMime(mimeType: string): string { return mimeType.includes("webp") ? ".webp" : mimeType.includes("jpeg") ? ".jpg" : ".png"; }

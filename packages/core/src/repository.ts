@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type {
   AssetRole,
+  CopywritingTarget,
   ImageAspectRatio,
   ImageResolution,
   JobStatus,
@@ -127,6 +128,15 @@ export interface JobRecord {
   error: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** AI 帮写结果单独保存，避免把临时文案混入项目配置或通用任务成本字段。 */
+export interface CopywritingResultRecord {
+  jobId: string;
+  projectId: string;
+  target: CopywritingTarget;
+  content: string;
+  createdAt: string;
 }
 
 export type WebResearchAvailability = "DISABLED" | "UNAVAILABLE" | "AVAILABLE";
@@ -382,6 +392,15 @@ export class EcomRepository {
   public findJobByFingerprint(projectId: string, fingerprint: string): JobRecord | undefined { const row = this.db.prepare("SELECT * FROM jobs WHERE project_id=? AND request_fingerprint=? AND status IN ('QUEUED','RUNNING','SUCCEEDED') ORDER BY created_at DESC LIMIT 1").get(projectId, fingerprint); return row ? mapJob(row as Row) : undefined; }
   public recoverInterruptedJobs(): JobRecord[] { const rows = this.db.prepare("SELECT * FROM jobs WHERE status='RUNNING'").all() as Row[]; this.db.prepare("UPDATE jobs SET status='QUEUED',progress=0,cancel_requested=0,updated_at=? WHERE status='RUNNING'").run(now()); return rows.map((row) => mapJob({ ...row, status: "QUEUED", progress: 0, cancel_requested: 0 })); }
   public listJobs(projectId: string): JobRecord[] { return (this.db.prepare("SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapJob); }
+  public saveCopywritingResult(input: Omit<CopywritingResultRecord, "createdAt">): CopywritingResultRecord {
+    const record: CopywritingResultRecord = { ...input, createdAt: now() };
+    this.db.prepare("INSERT OR REPLACE INTO copywriting_results (job_id,project_id,target,content,created_at) VALUES (@jobId,@projectId,@target,@content,@createdAt)").run(record);
+    return record;
+  }
+  public getCopywritingResult(jobId: string): CopywritingResultRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM copywriting_results WHERE job_id=?").get(jobId);
+    return row ? mapCopywritingResult(row as Row) : undefined;
+  }
   public createWebResearchAudit(jobId: string, availability: WebResearchAvailability): WebResearchAuditRecord {
     const record: WebResearchAuditRecord = { jobId, availability, invocationCount: 0, successfulAttemptCount: 0, failedAttemptCount: 0, createdAt: now(), updatedAt: now() };
     this.db.prepare("INSERT OR REPLACE INTO web_research_audits (job_id,availability,invocation_count,successful_attempt_count,failed_attempt_count,created_at,updated_at) VALUES (@jobId,@availability,@invocationCount,@successfulAttemptCount,@failedAttemptCount,@createdAt,@updatedAt)").run(record);
@@ -487,6 +506,7 @@ function mapStoryboardItem(row: Row): StoryboardItemRecord {
   };
 }
 function mapJob(row: Row): JobRecord { return { id: String(row.id), projectId: String(row.project_id), storyboardItemId: row.storyboard_item_id ? String(row.storyboard_item_id) : null, type: row.type as JobType, status: row.status as JobStatus, progress: Number(row.progress), retryable: Boolean(row.retryable), input: parse(row.input_json), requestFingerprint: row.request_fingerprint ? String(row.request_fingerprint) : null, providerId: row.provider_id ? String(row.provider_id) : null, modelId: row.model_id ? String(row.model_id) : null, estimatedCost: row.estimated_cost_json ? parse(row.estimated_cost_json) : null, actualCost: row.actual_cost_json ? parse(row.actual_cost_json) : null, cancelRequested: Boolean(row.cancel_requested), providerTaskId: row.provider_task_id ? String(row.provider_task_id) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapCopywritingResult(row: Row): CopywritingResultRecord { return { jobId: String(row.job_id), projectId: String(row.project_id), target: row.target as CopywritingTarget, content: String(row.content), createdAt: String(row.created_at) }; }
 function mapWebResearchAudit(row: Row): WebResearchAuditRecord { return { jobId: String(row.job_id), availability: row.availability as WebResearchAvailability, invocationCount: Number(row.invocation_count), successfulAttemptCount: Number(row.successful_attempt_count), failedAttemptCount: Number(row.failed_attempt_count), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapWebResearchAttempt(row: Row): WebResearchAttemptRecord { return { id: String(row.id), jobId: String(row.job_id), query: String(row.query), sourceId: String(row.source_id), sourceName: String(row.source_name), sourceKind: String(row.source_kind), status: row.status as WebResearchAttemptStatus, resultCount: Number(row.result_count), errorMessage: row.error_message ? String(row.error_message) : null, createdAt: String(row.created_at) }; }
 function mapOutput(row: Row): OutputRecord {

@@ -118,6 +118,47 @@
   width: 100%;
 }
 
+.aiTextArea {
+  position: relative;
+}
+
+.aiTextArea :global(textarea.ant-input) {
+  padding-bottom: 40px;
+}
+
+.aiWriteTooltip {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 1;
+}
+
+.aiWriteButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-s);
+  background: var(--bg-1);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.aiWriteButton:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.aiWriteButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .kindToggle {
   display: grid;
   grid-template-columns: 1fr 1fr;

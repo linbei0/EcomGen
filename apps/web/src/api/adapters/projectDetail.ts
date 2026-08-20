@@ -193,7 +193,7 @@ export function adaptJob(raw: unknown): Job | null {
   const createdAt = asString(raw.createdAt);
   const progress = asNumber(raw.progress);
   if (!id || !createdAt || progress === undefined) return null;
-  if (type !== "PLAN" && type !== "GENERATE" && type !== "EXPORT") return null;
+  if (type !== "PLAN" && type !== "COPYWRITE" && type !== "GENERATE" && type !== "EXPORT") return null;
   if (
     status !== "QUEUED" &&
     status !== "RUNNING" &&

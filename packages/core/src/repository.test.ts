@@ -76,6 +76,36 @@ describe("EcomRepository", () => {
     database.close();
   });
 
+  it("stores a copywriting result separately from project fields and associates it with its job", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject({
+      name: "cup",
+      category: null,
+      productDescription: null,
+      verifiedFacts: [],
+      prohibitedClaims: [],
+      brandGuidelines: {},
+      platformTargets: ["DOMESTIC"],
+      targetMarket: null,
+      copyLanguage: null,
+      reasoningProviderId: provider.id,
+      reasoningModelId: "reasoner",
+      imageProviderId: provider.id,
+      imageModelId: "image",
+      defaultMode: "CREATIVE",
+      imageResolution: "1K",
+      imageAspectRatio: "AUTO",
+      candidatesPerType: 1,
+    });
+    const job = repository.createJob({ id: "copywrite-job", projectId: project.id, storyboardItemId: null, type: "COPYWRITE", input: { target: "PRODUCT_DESCRIPTION" } });
+    repository.saveCopywritingResult({ jobId: job.id, projectId: project.id, target: "PRODUCT_DESCRIPTION", content: "产品名称：随行杯" });
+    expect(repository.getCopywritingResult(job.id)).toMatchObject({ jobId: job.id, projectId: project.id, target: "PRODUCT_DESCRIPTION", content: "产品名称：随行杯" });
+    expect(repository.getProject(project.id)?.productDescription).toBeNull();
+    database.close();
+  });
+
   it("keeps storyboard items bound to a project version and persists output review", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);

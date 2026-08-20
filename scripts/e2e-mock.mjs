@@ -9,7 +9,7 @@ const root = resolve(import.meta.dirname, "..");
 const dataDir = join(root, "data-e2e-mock");
 const onePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL7WQAAAABJRU5ErkJggg==";
 const plan = { campaignStyleLock: "fixed deep green #1A3A2E and clean off-white #FFFFFF ecommerce system", items: [{ assetType: "hero-image", displayName: "通勤杯质感首图", templateVariant: "luxury", candidateCount: 1, referencedAssets: [], mode: "PIXEL_PROTECTED", promptInstruction: "Create a premium e-commerce hero image of the verified green insulated travel cup. Keep the exact supplied product geometry and visible details. Use a clean off-white background, centered three-quarter product composition, Rembrandt lighting, and restrained deep green accents. Preserve generous whitespace and reserve a blank price-overlay zone without generating readable price, logo, or promotional text. Use the verified fact 304 stainless steel body only as visual material guidance; do not claim keeps hot for 24 hours. No extra props, hands, watermarks, fake logos, or invented product details.", factClaims: ["304 stainless steel body"], riskFlags: [], sortOrder: 0 }] };
-const observed = { planningPrompt: "", imagePrompt: "" };
+const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "" };
 const children = [];
 let mock;
 
@@ -19,11 +19,21 @@ try {
     const body = await readBody(request);
     if (request.url === "/v1/chat/completions") {
       const requestBody = JSON.parse(body.toString("utf8"));
-      const userText = requestBody.messages?.at(-1)?.content ?? "";
-      if (typeof userText === "string" && userText.includes("Existing final prompt:")) {
+      const requestText = body.toString("utf8");
+      if (requestText.includes("Existing final prompt:")) {
         response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
         response.write(`data: ${JSON.stringify({ id: "mock-revision", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: plan.items[0].promptInstruction + " Revision applied: initial." }, finish_reason: null }] })}\n\n`);
         response.write(`data: ${JSON.stringify({ id: "mock-revision", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+        response.write("data: [DONE]\n\n");
+        response.end();
+        return;
+      }
+      if (requestText.includes("Write copy for this project.")) {
+        observed.copywritingPrompt = requestText;
+        const copy = { productName: "Green travel cup", coreSellingPoints: ["Everyday portable design"], suitableAudience: "Daily commuters", expectedScenarios: "Commuting and desk use" };
+        response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        response.write(`data: ${JSON.stringify({ id: "mock-copywriting", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(copy) }, finish_reason: null }] })}\n\n`);
+        response.write(`data: ${JSON.stringify({ id: "mock-copywriting", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
         response.write("data: [DONE]\n\n");
         response.end();
         return;
@@ -71,7 +81,8 @@ try {
     reasoningProtocol: "openai",
     apiKey: "mock-key",
     models: [
-      { id: "mock-reasoner", supportsVision: false, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
+      { id: "mock-reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
+      { id: "mock-text", supportsVision: false, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
       { id: "mock-image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" }
     ]
   });
@@ -101,11 +112,32 @@ try {
   assert.deepEqual(project.platformTargets, ["AMAZON"]);
   assert.equal(project.targetMarket, "UNITED_STATES");
   assert.equal(project.copyLanguage, "en-US");
+  const missingProductCopywriting = await fetch(`${base}/projects/${project.id}/copywriting-jobs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ target: "PRODUCT_DESCRIPTION", regenerationKey: "missing-product" }) });
+  assert.equal(missingProductCopywriting.status, 400);
   const form = new FormData();
   form.append("role", "PRODUCT_TRUTH");
   form.append("file", new Blob([Buffer.from(onePixelPng, "base64")], { type: "image/png" }), "cup.png");
   const assetResponse = await fetch(`${base}/projects/${project.id}/assets`, { method: "POST", body: form });
   assert.equal(assetResponse.status, 200, await assetResponse.text());
+  const referenceForm = new FormData();
+  referenceForm.append("role", "STYLE_REFERENCE");
+  referenceForm.append("file", new Blob([Buffer.from(onePixelPng, "base64")], { type: "image/png" }), "reference.png");
+  const referenceResponse = await fetch(`${base}/projects/${project.id}/assets`, { method: "POST", body: referenceForm });
+  assert.equal(referenceResponse.status, 200, await referenceResponse.text());
+  await requestJson(`${base}/projects/${project.id}`, "PATCH", { reasoningModel: { providerId: provider.id, modelId: "mock-text" } });
+  const unsupportedCopywriting = await fetch(`${base}/projects/${project.id}/copywriting-jobs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ target: "PRODUCT_DESCRIPTION", regenerationKey: "unsupported-model" }) });
+  assert.equal(unsupportedCopywriting.status, 422);
+  await requestJson(`${base}/projects/${project.id}`, "PATCH", { reasoningModel: { providerId: provider.id, modelId: "mock-reasoner" } });
+  const copywriting = await requestJson(`${base}/projects/${project.id}/copywriting-jobs`, "POST", { target: "PRODUCT_DESCRIPTION", regenerationKey: "copywriting-1" });
+  const duplicateCopywriting = await requestJson(`${base}/projects/${project.id}/copywriting-jobs`, "POST", { target: "PRODUCT_DESCRIPTION", regenerationKey: "copywriting-1" });
+  assert.equal(duplicateCopywriting.id, copywriting.id);
+  const copywritingJob = await waitJob(base, copywriting.id);
+  assert.equal(copywritingJob.status, "SUCCEEDED");
+  const copywritingResult = await requestJson(`${base}/copywriting-jobs/${copywriting.id}/result`, "GET");
+  assert.equal(copywritingResult.target, "PRODUCT_DESCRIPTION");
+  assert.match(copywritingResult.content, /产品名称：Green travel cup/);
+  assert.match(observed.copywritingPrompt, /PRODUCT_TRUTH/);
+  assert.match(observed.copywritingPrompt, /STYLE_REFERENCE/);
   await requestJson(`${base}/projects/${project.id}/planning-jobs`, "POST", { planningMode: "AI", requestedTypes: ["hero-image"], candidatesPerType: 1, targetImageCount: 1 });
   const planningJob = await waitForJob(base, project.id, "PLAN");
   assert.equal(planningJob.status, "SUCCEEDED");

@@ -90,6 +90,49 @@ describe("工作台 · 配置", () => {
 });
 
 describe("工作台 · 左栏编辑", () => {
+  it("AI 帮写必须先有产品图，完成后覆盖商品描述并持久化", async () => {
+    const user = userEvent.setup();
+    const patches: Record<string, unknown>[] = [];
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
+      http.post(`${BASE}/projects/:projectId/copywriting-jobs`, async ({ request }) => {
+        expect(await request.json()).toMatchObject({ target: "PRODUCT_DESCRIPTION" });
+        return HttpResponse.json({
+          id: "copywrite-1", projectId: PROJECT_ID, storyboardItemId: null, type: "COPYWRITE", status: "QUEUED", progress: 0,
+          retryable: true, requestFingerprint: "copywrite", providerId: PROVIDER_ID, modelId: "gpt-4o", estimatedCost: null,
+          actualCost: null, cancelRequested: false, error: null, createdAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:00.000Z",
+        }, { status: 202 });
+      }),
+      http.get(`${BASE}/jobs/:jobId`, ({ params }) => HttpResponse.json({
+        id: params.jobId as string, projectId: PROJECT_ID, storyboardItemId: null, type: "COPYWRITE", status: "SUCCEEDED", progress: 100,
+        retryable: true, requestFingerprint: "copywrite", providerId: PROVIDER_ID, modelId: "gpt-4o", estimatedCost: null,
+        actualCost: null, cancelRequested: false, error: null, createdAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:01.000Z",
+      })),
+      http.get(`${BASE}/copywriting-jobs/:jobId/result`, ({ params }) => HttpResponse.json({
+        jobId: params.jobId as string, projectId: PROJECT_ID, target: "PRODUCT_DESCRIPTION",
+        content: "产品名称：无线耳机\n核心卖点：\n- 入耳佩戴\n适用人群：日常用户\n期望场景：通勤",
+        createdAt: "2026-08-01T00:00:01.000Z",
+      })),
+      http.patch(`${BASE}/projects/:projectId`, async ({ request }) => {
+        patches.push(await request.json() as Record<string, unknown>);
+        return HttpResponse.json(PROJECT_FIXTURE);
+      }),
+    );
+    renderWorkbench();
+    const button = await screen.findByRole("button", { name: "AI 帮写商品描述" });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    await waitFor(() => expect((screen.getByLabelText("商品描述") as HTMLTextAreaElement).value).toContain("产品名称：无线耳机"));
+    expect(patches).toContainEqual(expect.objectContaining({ productDescription: expect.stringContaining("核心卖点") }));
+  });
+
+  it("没有产品图时禁用两个 AI 帮写按钮", async () => {
+    server.use(http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload({ assets: [] }))));
+    renderWorkbench();
+    expect(await screen.findByRole("button", { name: "AI 帮写商品描述" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "AI 帮写补充说明" })).toBeDisabled();
+  });
+
   it("市场与创作默认展开，支持选择、清除与折叠", async () => {
     const user = userEvent.setup();
     const patches: Record<string, unknown>[] = [];

@@ -285,6 +285,15 @@ function migrate(database: SqliteDatabase): void {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       FOREIGN KEY (storyboard_item_id) REFERENCES storyboard_items(id) ON DELETE SET NULL
     );
+    CREATE TABLE IF NOT EXISTS copywriting_results (
+      job_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      target TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
     CREATE TABLE IF NOT EXISTS web_research_audits (
       job_id TEXT PRIMARY KEY,
       availability TEXT NOT NULL,
