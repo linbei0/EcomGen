@@ -820,6 +820,10 @@ components:
         displayName: { type: string }
         templateVariant: { type: [string, 'null'] }
         candidateCount: { type: integer, minimum: 1, maximum: 4 }
+        imageProviderId: { type: string, format: uuid }
+        imageModelId: { type: string }
+        imageResolution: { $ref: '#/components/schemas/ImageResolution' }
+        imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         referencedAssets: { type: array, items: { type: string, format: uuid } }
         mode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
         status: { type: string, enum: [DRAFT, CONFIRMED, GENERATING, GENERATED] }
@@ -833,6 +837,9 @@ components:
         displayName: { type: string }
         templateVariant: { type: [string, 'null'] }
         candidateCount: { type: integer, minimum: 1, maximum: 4 }
+        imageModel: { $ref: '#/components/schemas/ModelRef' }
+        imageResolution: { $ref: '#/components/schemas/ImageResolution' }
+        imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         referencedAssets: { type: array, items: { type: string, format: uuid } }
         mode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
         promptInstruction: { type: string, maxLength: 4000, description: Editable final image-generation prompt; the saved value is sent as-is to the image model. }
@@ -864,6 +871,8 @@ components:
         generationSnapshot:
           type: [object, 'null']
           properties:
+            providerId: { type: string, format: uuid }
+            modelId: { type: string }
             resolution: { $ref: '#/components/schemas/ImageResolution' }
             aspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
             size: { type: string }

@@ -251,6 +251,14 @@ export function adaptStoryboardItem(raw: unknown): StoryboardItem | null {
     displayName: asString(raw.displayName) ?? assetType,
     templateVariant: asString(raw.templateVariant) ?? null,
     candidateCount: Math.min(4, Math.max(1, candidateCount)),
+    imageProviderId: asString(raw.imageProviderId),
+    imageModelId: asString(raw.imageModelId),
+    imageResolution: RESOLUTIONS.has(raw.imageResolution as ImageResolution)
+      ? raw.imageResolution as ImageResolution
+      : undefined,
+    imageAspectRatio: ASPECTS.has(raw.imageAspectRatio as ImageAspectRatio)
+      ? raw.imageAspectRatio as ImageAspectRatio
+      : undefined,
     referencedAssets: asStringArray(raw.referencedAssets),
     mode,
     status,

@@ -91,6 +91,10 @@ function rebuildWithoutSku(database: SqliteDatabase): void {
       display_name TEXT NOT NULL,
       template_variant TEXT,
       candidate_count INTEGER NOT NULL DEFAULT 1,
+      image_provider_id TEXT,
+      image_model_id TEXT,
+      image_resolution TEXT,
+      image_aspect_ratio TEXT,
       referenced_assets_json TEXT NOT NULL DEFAULT '[]',
       mode TEXT NOT NULL,
       status TEXT NOT NULL,
@@ -243,6 +247,10 @@ function migrate(database: SqliteDatabase): void {
       display_name TEXT NOT NULL,
       template_variant TEXT,
       candidate_count INTEGER NOT NULL DEFAULT 1,
+      image_provider_id TEXT,
+      image_model_id TEXT,
+      image_resolution TEXT,
+      image_aspect_ratio TEXT,
       referenced_assets_json TEXT NOT NULL DEFAULT '[]',
       mode TEXT NOT NULL,
       status TEXT NOT NULL,
@@ -336,4 +344,25 @@ function migrate(database: SqliteDatabase): void {
   if (!currentProjectColumns.has("web_research_enabled")) {
     database.exec("ALTER TABLE projects ADD COLUMN web_research_enabled INTEGER NOT NULL DEFAULT 0");
   }
+  const storyboardItemColumns = columnNames(database, "storyboard_items");
+  if (!storyboardItemColumns.has("image_provider_id")) {
+    database.exec("ALTER TABLE storyboard_items ADD COLUMN image_provider_id TEXT");
+  }
+  if (!storyboardItemColumns.has("image_model_id")) {
+    database.exec("ALTER TABLE storyboard_items ADD COLUMN image_model_id TEXT");
+  }
+  if (!storyboardItemColumns.has("image_resolution")) {
+    database.exec("ALTER TABLE storyboard_items ADD COLUMN image_resolution TEXT");
+  }
+  if (!storyboardItemColumns.has("image_aspect_ratio")) {
+    database.exec("ALTER TABLE storyboard_items ADD COLUMN image_aspect_ratio TEXT");
+  }
+  database.exec(`
+    UPDATE storyboard_items
+    SET image_provider_id = (SELECT image_provider_id FROM projects WHERE projects.id = storyboard_items.project_id),
+        image_model_id = (SELECT image_model_id FROM projects WHERE projects.id = storyboard_items.project_id),
+        image_resolution = (SELECT image_resolution FROM projects WHERE projects.id = storyboard_items.project_id),
+        image_aspect_ratio = (SELECT image_aspect_ratio FROM projects WHERE projects.id = storyboard_items.project_id)
+    WHERE image_provider_id IS NULL OR image_model_id IS NULL OR image_resolution IS NULL OR image_aspect_ratio IS NULL
+  `);
 }

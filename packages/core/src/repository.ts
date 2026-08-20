@@ -92,6 +92,10 @@ export interface StoryboardItemRecord {
   displayName: string;
   templateVariant: string | null;
   candidateCount: number;
+  imageProviderId: string;
+  imageModelId: string;
+  imageResolution: ImageResolution;
+  imageAspectRatio: ImageAspectRatio;
   referencedAssets: string[];
   mode: StoryboardMode;
   status: "DRAFT" | "CONFIRMED" | "GENERATING" | "GENERATED";
@@ -152,6 +156,8 @@ export interface WebResearchAttemptRecord {
 }
 
 export interface GenerationSnapshot {
+  providerId: string;
+  modelId: string;
   resolution: ImageResolution;
   aspectRatio: ImageAspectRatio;
   size: string;
@@ -310,17 +316,23 @@ export class EcomRepository {
   }
 
   public getStoryboard(projectId: string): StoryboardRecord | undefined { const row = this.db.prepare("SELECT * FROM storyboards WHERE project_id=?").get(projectId); return row ? mapStoryboard(row as Row) : undefined; }
-  public saveStoryboard(projectId: string, campaignStyleLock: string, status: StoryboardRecord["status"], items: Array<Omit<StoryboardItemRecord, "id" | "projectId" | "storyboardVersion" | "createdAt" | "updatedAt">>): StoryboardRecord {
+  public saveStoryboard(projectId: string, campaignStyleLock: string, status: StoryboardRecord["status"], items: Array<Omit<StoryboardItemRecord, "id" | "projectId" | "storyboardVersion" | "createdAt" | "updatedAt" | "imageProviderId" | "imageModelId" | "imageResolution" | "imageAspectRatio"> & Partial<Pick<StoryboardItemRecord, "imageProviderId" | "imageModelId" | "imageResolution" | "imageAspectRatio">>>): StoryboardRecord {
+    const project = this.getProject(projectId);
+    if (!project) throw new Error(`Project not found for storyboard ${projectId}`);
     const previous = this.getStoryboard(projectId);
     const storyboard: StoryboardRecord = { projectId, version: (previous?.version ?? 0) + 1, status, campaignStyleLock, createdAt: previous?.createdAt ?? now(), updatedAt: now() };
     const write = this.db.transaction(() => {
       this.db.prepare(`INSERT INTO storyboards (project_id,version,status,campaign_style_lock,created_at,updated_at) VALUES (@projectId,@version,@status,@campaignStyleLock,@createdAt,@updatedAt)
         ON CONFLICT(project_id) DO UPDATE SET version=excluded.version,status=excluded.status,campaign_style_lock=excluded.campaign_style_lock,updated_at=excluded.updated_at`).run(storyboard);
       const sortOffset = Number((this.db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS value FROM storyboard_items WHERE project_id=?").get(projectId) as { value: number }).value) + 1;
-      const insert = this.db.prepare(`INSERT INTO storyboard_items (id,project_id,storyboard_version,asset_type,display_name,template_variant,candidate_count,referenced_assets_json,mode,status,prompt_instruction,compiled_prompt,fact_claims_json,risk_flags_json,sort_order,created_at,updated_at)
-        VALUES (@id,@projectId,@storyboardVersion,@assetType,@displayName,@templateVariant,@candidateCount,@referencedAssets,@mode,@status,@promptInstruction,@compiledPrompt,@factClaims,@riskFlags,@sortOrder,@createdAt,@updatedAt)`);
+      const insert = this.db.prepare(`INSERT INTO storyboard_items (id,project_id,storyboard_version,asset_type,display_name,template_variant,candidate_count,image_provider_id,image_model_id,image_resolution,image_aspect_ratio,referenced_assets_json,mode,status,prompt_instruction,compiled_prompt,fact_claims_json,risk_flags_json,sort_order,created_at,updated_at)
+        VALUES (@id,@projectId,@storyboardVersion,@assetType,@displayName,@templateVariant,@candidateCount,@imageProviderId,@imageModelId,@imageResolution,@imageAspectRatio,@referencedAssets,@mode,@status,@promptInstruction,@compiledPrompt,@factClaims,@riskFlags,@sortOrder,@createdAt,@updatedAt)`);
       items.forEach((item, index) => insert.run({
         ...item,
+        imageProviderId: item.imageProviderId ?? project.imageProviderId,
+        imageModelId: item.imageModelId ?? project.imageModelId,
+        imageResolution: item.imageResolution ?? project.imageResolution,
+        imageAspectRatio: item.imageAspectRatio ?? project.imageAspectRatio,
         id: randomUUID(),
         projectId,
         storyboardVersion: storyboard.version,
@@ -341,9 +353,9 @@ export class EcomRepository {
     this.db.prepare("DELETE FROM storyboard_items WHERE id=?").run(id);
     return mapStoryboardItem(row as Row);
   }
-  public updateStoryboardItem(id: string, patch: Partial<Pick<StoryboardItemRecord, "assetType" | "displayName" | "templateVariant" | "candidateCount" | "referencedAssets" | "mode" | "promptInstruction" | "compiledPrompt" | "status" | "sortOrder" | "factClaims" | "riskFlags">>): StoryboardItemRecord | undefined {
+  public updateStoryboardItem(id: string, patch: Partial<Pick<StoryboardItemRecord, "assetType" | "displayName" | "templateVariant" | "candidateCount" | "imageProviderId" | "imageModelId" | "imageResolution" | "imageAspectRatio" | "referencedAssets" | "mode" | "promptInstruction" | "compiledPrompt" | "status" | "sortOrder" | "factClaims" | "riskFlags">>): StoryboardItemRecord | undefined {
     const current = this.getStoryboardItem(id); if (!current) return undefined; const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare(`UPDATE storyboard_items SET asset_type=@assetType,display_name=@displayName,template_variant=@templateVariant,candidate_count=@candidateCount,referenced_assets_json=@referencedAssets,mode=@mode,status=@status,prompt_instruction=@promptInstruction,compiled_prompt=@compiledPrompt,fact_claims_json=@factClaims,risk_flags_json=@riskFlags,sort_order=@sortOrder,updated_at=@updatedAt WHERE id=@id`)
+    this.db.prepare(`UPDATE storyboard_items SET asset_type=@assetType,display_name=@displayName,template_variant=@templateVariant,candidate_count=@candidateCount,image_provider_id=@imageProviderId,image_model_id=@imageModelId,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,referenced_assets_json=@referencedAssets,mode=@mode,status=@status,prompt_instruction=@promptInstruction,compiled_prompt=@compiledPrompt,fact_claims_json=@factClaims,risk_flags_json=@riskFlags,sort_order=@sortOrder,updated_at=@updatedAt WHERE id=@id`)
       .run({ ...next, referencedAssets: json(next.referencedAssets), factClaims: json(next.factClaims), riskFlags: json(next.riskFlags) }); return next;
   }
   public confirmStoryboard(projectId: string): StoryboardRecord | undefined {
@@ -388,7 +400,8 @@ export class EcomRepository {
     write(); return record;
   }
   public getWebResearchAudit(jobId: string): WebResearchAuditRecord | undefined { const row = this.db.prepare("SELECT * FROM web_research_audits WHERE job_id=?").get(jobId); return row ? mapWebResearchAudit(row as Row) : undefined; }
-  public listWebResearchAttempts(jobId: string): WebResearchAttemptRecord[] { return (this.db.prepare("SELECT * FROM web_research_attempts WHERE job_id=? ORDER BY created_at,id").all(jobId) as Row[]).map(mapWebResearchAttempt); }
+  /** 审计记录按插入顺序返回，避免同一毫秒内的随机 UUID 改变来源尝试顺序。 */
+  public listWebResearchAttempts(jobId: string): WebResearchAttemptRecord[] { return (this.db.prepare("SELECT * FROM web_research_attempts WHERE job_id=? ORDER BY rowid").all(jobId) as Row[]).map(mapWebResearchAttempt); }
 
   public createOutput(input: Omit<OutputRecord, "id" | "createdAt">): OutputRecord {
     const record = { ...input, id: randomUUID(), createdAt: now() };
@@ -457,6 +470,10 @@ function mapStoryboardItem(row: Row): StoryboardItemRecord {
     displayName: String(row.display_name ?? row.asset_type),
     templateVariant: row.template_variant ? String(row.template_variant) : null,
     candidateCount: Number(row.candidate_count ?? 1),
+    imageProviderId: String(row.image_provider_id),
+    imageModelId: String(row.image_model_id),
+    imageResolution: row.image_resolution as ImageResolution,
+    imageAspectRatio: row.image_aspect_ratio as ImageAspectRatio,
     referencedAssets: parse(row.referenced_assets_json ?? "[]"),
     mode: row.mode as StoryboardMode,
     status: row.status as StoryboardItemRecord["status"],

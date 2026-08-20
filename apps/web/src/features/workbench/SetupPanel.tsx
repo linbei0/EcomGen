@@ -239,7 +239,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
             rows={3}
             maxLength={400}
             value={description}
-            placeholder="只写可核验事实，不要写疗效或未证实规格"
+            placeholder="描述产品特点、目标人群和使用场景；具体可宣称参数请填写在下方。"
             onChange={(event) => setDescription(event.target.value)}
             onBlur={() => {
               const next = description.trim();

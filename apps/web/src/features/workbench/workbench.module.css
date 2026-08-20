@@ -997,6 +997,83 @@
   width: 100%;
 }
 
+.inspectorSettings {
+  margin: 18px 0;
+  padding: 14px 0 2px;
+  border-top: 1px solid var(--line-1);
+}
+
+.inspectorSectionTitle {
+  margin: 0 0 10px !important;
+  color: var(--text-1) !important;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inspectorSettingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.inspectorCandidate {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.inspectorStepper {
+  display: grid;
+  grid-template-columns: 36px minmax(44px, 1fr) 36px;
+  min-height: 32px;
+  overflow: hidden;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-s);
+  background: var(--bg-2);
+}
+
+.inspectorStepper button {
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font: inherit;
+}
+
+.inspectorStepper button:first-child {
+  border-right: 1px solid var(--line-1);
+}
+
+.inspectorStepper button:last-child {
+  border-left: 1px solid var(--line-1);
+}
+
+.inspectorStepper button:hover:not(:disabled) {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.inspectorStepper button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.inspectorStepper strong {
+  display: grid;
+  place-items: center;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+@media (max-width: 560px) {
+  .inspectorSettingGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .generateWrap {
   display: flex;
   flex-direction: column;

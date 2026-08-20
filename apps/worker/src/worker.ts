@@ -111,14 +111,16 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   throwIfCancelled(job);
   if (!job.storyboardItemId) throw new Error("Generation job has no storyboard item");
   const project = projectFor(job); const item = repository.getStoryboardItem(job.storyboardItemId); if (!item || item.projectId !== project.id) throw new Error("Storyboard item is missing or belongs to another project");
-  const provider = providerFor(project.imageProviderId); const model = provider.models.find((candidate) => candidate.id === project.imageModelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images") throw new Error("Only OpenAI-compatible Images API models are currently executable");
+  const providerId = job.providerId ?? item.imageProviderId;
+  const modelId = job.modelId ?? item.imageModelId;
+  const provider = providerFor(providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images") throw new Error("Only OpenAI-compatible Images API models are currently executable");
   const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`);
   const inputs = generationAssets(project, item.mode);
   if (item.mode === "PIXEL_PROTECTED" && inputs.length === 0) throw new Error("PIXEL_PROTECTED generation requires a PRODUCT_TRUTH image on the project");
   const revision = typeof job.input.revision === "string" ? job.input.revision.trim() : "";
   const candidateIndex = typeof job.input.candidateIndex === "number" ? job.input.candidateIndex : 1;
-  const resolution = (typeof job.input.imageResolution === "string" ? job.input.imageResolution : project.imageResolution) as ImageResolution;
-  const aspectRatio = (typeof job.input.imageAspectRatio === "string" ? job.input.imageAspectRatio : project.imageAspectRatio) as ImageAspectRatio;
+  const resolution = (typeof job.input.imageResolution === "string" ? job.input.imageResolution : item.imageResolution) as ImageResolution;
+  const aspectRatio = (typeof job.input.imageAspectRatio === "string" ? job.input.imageAspectRatio : item.imageAspectRatio) as ImageAspectRatio;
   const size = resolveImageSize(resolution, aspectRatio, template.defaultSize);
   const basePrompt = item.promptInstruction.trim();
   if (!basePrompt) throw new Error("Storyboard item has no final image prompt; re-plan the storyboard before generating");
@@ -139,7 +141,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
     storyboardItemId: item.id,
     jobId: job.id,
     candidateIndex,
-    generationSnapshot: { resolution, aspectRatio, size, candidateIndex },
+    generationSnapshot: { providerId, modelId, resolution, aspectRatio, size, candidateIndex },
     storagePath: stored.path,
     hash: stored.hash,
     reviewDecision: "NEEDS_REVIEW",

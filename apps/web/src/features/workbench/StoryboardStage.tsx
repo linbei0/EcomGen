@@ -159,7 +159,6 @@ export function StoryboardStage({
             projectId={detail.id}
             item={editing}
             templates={templates.data ?? []}
-            locked={editing ? isGenerationLocked(editing) : true}
           />
         ) : null}
       </Modal>

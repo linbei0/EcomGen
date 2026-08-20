@@ -728,6 +728,11 @@ export interface components {
             displayName: string;
             templateVariant?: string | null;
             candidateCount: number;
+            /** Format: uuid */
+            imageProviderId?: string;
+            imageModelId?: string;
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
             referencedAssets?: string[];
             /** @enum {string} */
             mode: "CREATIVE" | "PIXEL_PROTECTED";
@@ -744,6 +749,9 @@ export interface components {
             displayName?: string;
             templateVariant?: string | null;
             candidateCount?: number;
+            imageModel?: components["schemas"]["ModelRef"];
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
             referencedAssets?: string[];
             /** @enum {string} */
             mode?: "CREATIVE" | "PIXEL_PROTECTED";
@@ -779,6 +787,9 @@ export interface components {
             storyboardItemId: string;
             candidateIndex?: number;
             generationSnapshot?: {
+                /** Format: uuid */
+                providerId?: string;
+                modelId?: string;
                 resolution?: components["schemas"]["ImageResolution"];
                 aspectRatio?: components["schemas"]["ImageAspectRatio"];
                 size?: string;

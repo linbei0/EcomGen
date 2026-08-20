@@ -183,8 +183,11 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.patch("/api/v1/storyboard-items/:itemId", async (request) => {
     const itemId = parameter(request, "itemId"); const current = repository.getStoryboardItem(itemId); if (!current) missing("storyboard item", itemId); const body = object(request.body, "body");
-    if (current.status === "GENERATING" || current.status === "GENERATED") {
-      throw new ApiError(409, "CONFLICT", "Generated or generating storyboard items cannot be updated");
+    if (current.status === "GENERATING") {
+      throw new ApiError(409, "CONFLICT", "Generating storyboard items cannot be updated");
+    }
+    if (current.status === "GENERATED" && (body.assetType !== undefined || body.displayName !== undefined || body.templateVariant !== undefined || body.referencedAssets !== undefined || body.mode !== undefined || body.promptInstruction !== undefined)) {
+      throw new ApiError(409, "CONFLICT", "Generated storyboard items only allow generation-setting updates");
     }
     const patch: Record<string, unknown> = {};
     if (body.assetType !== undefined) {
@@ -195,6 +198,16 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (body.displayName !== undefined) patch.displayName = string(body.displayName, "displayName");
     if (body.templateVariant !== undefined) { const template = getTemplate(String(patch.assetType ?? current.assetType)); const variant = optionalString(body.templateVariant) ?? null; if (variant && !template?.variants[variant]) throw new ApiError(400, "VALIDATION_ERROR", "templateVariant is not declared by the selected ecom-details-image template"); patch.templateVariant = variant; }
     if (body.candidateCount !== undefined) patch.candidateCount = candidatesPerType(body.candidateCount);
+    if (body.imageModel !== undefined) {
+      const model = object(body.imageModel, "imageModel");
+      const providerId = string(model.providerId, "imageModel.providerId");
+      const modelId = string(model.modelId, "imageModel.modelId");
+      verifyModel(repository, providerId, modelId, "image");
+      patch.imageProviderId = providerId;
+      patch.imageModelId = modelId;
+    }
+    if (body.imageResolution !== undefined) patch.imageResolution = enumValue<ImageResolution>(body.imageResolution, IMAGE_RESOLUTIONS, "imageResolution");
+    if (body.imageAspectRatio !== undefined) patch.imageAspectRatio = enumValue<ImageAspectRatio>(body.imageAspectRatio, IMAGE_ASPECT_RATIOS, "imageAspectRatio");
     if (body.referencedAssets !== undefined) {
       const ids = stringArray(body.referencedAssets, "referencedAssets");
       const known = new Set(repository.listAssets(current.projectId).map((asset) => asset.id));
@@ -227,13 +240,13 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
         const input = {
           revision: optionalString(body.revision),
           candidateIndex: index + 1,
-          imageResolution: project.imageResolution,
-          imageAspectRatio: project.imageAspectRatio
+          imageResolution: item.imageResolution,
+          imageAspectRatio: item.imageAspectRatio
         };
         const fingerprint = requestFingerprint({ type: "GENERATE", projectId, itemId, storyboardVersion: storyboard.version, itemUpdatedAt: item.updatedAt, input, idempotencyKey: request.headers["idempotency-key"] ?? null });
         const existing = repository.findJobByFingerprint(projectId, fingerprint);
         if (existing) return existing;
-        return repository.createJob({ id: randomUUID(), projectId, storyboardItemId: itemId, type: "GENERATE", input, requestFingerprint: fingerprint, providerId: project.imageProviderId, modelId: project.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+        return repository.createJob({ id: randomUUID(), projectId, storyboardItemId: itemId, type: "GENERATE", input, requestFingerprint: fingerprint, providerId: item.imageProviderId, modelId: item.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
       });
     });
     await Promise.all(jobs.map((job) => enqueue(queue, { jobId: job.id, kind: "generate" }))); return reply.code(202).send({ jobs });
@@ -253,7 +266,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     }
     return repository.updateJob(id, { cancelRequested: true });
   });
-  app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => { const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id); if (!job.retryable) throw new ApiError(409, "CONFLICT", "This job cannot be retried"); const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input: job.input }); await enqueue(queue, { jobId: retry.id, kind: retry.type.toLowerCase() as "plan" | "generate" | "export" }); return reply.code(202).send(retry); });
+  app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => { const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id); if (!job.retryable) throw new ApiError(409, "CONFLICT", "This job cannot be retried"); const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input: job.input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); await enqueue(queue, { jobId: retry.id, kind: retry.type.toLowerCase() as "plan" | "generate" | "export" }); return reply.code(202).send(retry); });
   app.get("/api/v1/projects/:projectId/outputs", async (request) => repository.listOutputs(parameter(request, "projectId")));
   app.patch("/api/v1/outputs/:outputId/review", async (request) => { const body = object(request.body, "body"); const result = repository.reviewOutput(parameter(request, "outputId"), enumValue<OutputReviewDecision>(body.reviewDecision ?? body.decision, ["SELECTED", "REJECTED", "NEEDS_REVIEW"], "reviewDecision"), optionalString(body.reviewNote ?? body.note) ?? null); if (!result) missing("output", parameter(request, "outputId")); return result; });
   app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = object(request.body ?? {}, "body"); const input = { outputIds: optionalStringArray(body.outputIds), filenamePrefix: optionalString(body.filenamePrefix) }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueue(queue, { jobId: job.id, kind: "export" }); return reply.code(202).send({ job, export: exportRecord }); });

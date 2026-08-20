@@ -117,6 +117,10 @@ describe("EcomRepository", () => {
     expect(storyboard.version).toBe(1);
     expect(item.displayName).toBe("白底/纯色底产品主图");
     expect(item.candidateCount).toBe(2);
+    expect(item.imageProviderId).toBe(provider.id);
+    expect(item.imageModelId).toBe("image");
+    expect(item.imageResolution).toBe("1K");
+    expect(item.imageAspectRatio).toBe("AUTO");
     expect(item.templateVariant).toBe("luxury");
     expect(repository.getProject(project.id)?.verifiedFacts).toEqual(["304 stainless steel body"]);
     expect(repository.getProject(project.id)?.candidatesPerType).toBe(2);
@@ -142,6 +146,11 @@ describe("EcomRepository", () => {
     expect(provider.models[0]?.supportsThinking).toBe(true);
     expect(repository.confirmStoryboard(project.id)?.status).toBe("CONFIRMED");
     expect(repository.listStoryboardItems(project.id)[0]?.status).toBe("CONFIRMED");
+    expect(repository.updateStoryboardItem(item.id, { imageResolution: "2K", imageAspectRatio: "1:1", candidateCount: 3 })).toMatchObject({
+      imageResolution: "2K",
+      imageAspectRatio: "1:1",
+      candidateCount: 3,
+    });
     const job = repository.createJob({ id: "job-1", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: { candidateIndex: 1 }, requestFingerprint: "fp-1", providerId: provider.id, modelId: "image", estimatedCost: { status: "UNKNOWN" } });
     expect(repository.findJobByFingerprint(project.id, "fp-1")?.id).toBe("job-1");
     expect(repository.updateJob(job.id, { cancelRequested: true })?.cancelRequested).toBe(true);
@@ -156,7 +165,7 @@ describe("EcomRepository", () => {
       storyboardItemId: item.id,
       jobId: job.id,
       candidateIndex: 1,
-      generationSnapshot: { resolution: "1K", aspectRatio: "AUTO", size: "1024x1024", candidateIndex: 1 },
+      generationSnapshot: { providerId: provider.id, modelId: "image", resolution: "1K", aspectRatio: "AUTO", size: "1024x1024", candidateIndex: 1 },
       storagePath: "outputs/cup.png",
       hash: "hash",
       reviewDecision: "NEEDS_REVIEW",

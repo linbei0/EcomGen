@@ -82,8 +82,9 @@ describe("工作台 · 分镜", () => {
     expect(screen.getAllByText("续航 8 小时").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("已确认但未生成的分镜仍可编辑和删除，已生成分镜保持冻结", async () => {
+  it("已生成分镜保留内容锁定，但可调整下一次生图配置", async () => {
     const user = userEvent.setup();
+    let patchBody: unknown;
     const confirmed = { ...STORYBOARD_ITEM_FIXTURE, status: "CONFIRMED" as const };
     const generated = { ...STORYBOARD_ITEM_B_FIXTURE, status: "GENERATED" as const };
     const confirmedBoard = { ...STORYBOARD_FIXTURE, status: "CONFIRMED" as const };
@@ -94,6 +95,15 @@ describe("工作台 · 分镜", () => {
       http.get(`${BASE}/projects/:projectId/storyboard`, () =>
         HttpResponse.json({ storyboard: confirmedBoard, items: [confirmed, generated] }),
       ),
+      http.patch(`${BASE}/storyboard-items/:itemId`, async ({ request, params }) => {
+        const body = await request.json();
+        patchBody = body;
+        return HttpResponse.json({
+          ...generated,
+          ...(body && typeof body === "object" ? body : {}),
+          id: params.itemId as string,
+        });
+      }),
     );
 
     renderBoard();
@@ -104,6 +114,13 @@ describe("工作台 · 分镜", () => {
     await user.click(screen.getByRole("button", { name: "场景化生活图 分镜" }));
     expect(screen.getByDisplayValue(generated.promptInstruction)).toBeDisabled();
     expect(screen.queryByRole("button", { name: "删除场景化生活图" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("分镜图片比例")).not.toBeDisabled();
+    expect(screen.getByLabelText("分镜分辨率")).not.toBeDisabled();
+    expect(screen.getByLabelText("分镜生图模型")).not.toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "增加分镜候选数" }));
+    await waitFor(() => {
+      expect(patchBody).toMatchObject({ candidateCount: 2 });
+    });
   });
 
   it("确认 409 时提示冲突并重新拉取分镜", async () => {
