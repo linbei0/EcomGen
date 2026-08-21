@@ -74,7 +74,7 @@ export function roleForUserAssetKind(kind: Static<typeof UserAssetKind>): Static
   return kind === "PRODUCT" ? "PRODUCT_TRUTH" : "STYLE_REFERENCE";
 }
 
-export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERATE: "GENERATE", EXPORT: "EXPORT" });
+export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERATE: "GENERATE", EXPORT: "EXPORT", EDIT_PLAN: "EDIT_PLAN", EDIT_GENERATE: "EDIT_GENERATE" });
 export const JobStatus = Type.Enum({
   QUEUED: "QUEUED",
   RUNNING: "RUNNING",
@@ -89,6 +89,9 @@ export const OutputReviewDecision = Type.Enum({
   REJECTED: "REJECTED",
   NEEDS_REVIEW: "NEEDS_REVIEW"
 });
+export const EditOperation = Type.Enum({ PRECISE_INPAINT: "PRECISE_INPAINT", PRODUCT_REPLACE: "PRODUCT_REPLACE", SCENE_ADJUST: "SCENE_ADJUST", OUTPAINT: "OUTPAINT", NATURAL_FUSION: "NATURAL_FUSION" });
+export const EditTurnStatus = Type.Enum({ DRAFT: "DRAFT", PLANNING: "PLANNING", PLAN_READY: "PLAN_READY", NEED_INPUT: "NEED_INPUT", AWAITING_CONFIRMATION: "AWAITING_CONFIRMATION", GENERATING: "GENERATING", SUCCEEDED: "SUCCEEDED", FAILED: "FAILED", CANCELLED: "CANCELLED" });
+export const EditSessionStatus = Type.Enum({ ACTIVE: "ACTIVE", ARCHIVED: "ARCHIVED" });
 export const ErrorCode = Type.Enum({
   VALIDATION_ERROR: "VALIDATION_ERROR",
   NOT_FOUND: "NOT_FOUND",
@@ -132,6 +135,8 @@ export const EventEnvelope = Type.Object({
     Type.Literal("job.updated"),
     Type.Literal("storyboard.updated"),
     Type.Literal("output.created"),
+    Type.Literal("edit-session.updated"),
+    Type.Literal("edit-turn.updated"),
     Type.Literal("export.updated"),
     Type.Literal("provider.updated")
   ]),
@@ -154,6 +159,9 @@ export type JobStatus = Static<typeof JobStatus>;
 export type ReasoningProtocolProfile = Static<typeof ReasoningProtocolProfile>;
 export type SearchSourceKind = Static<typeof SearchSourceKind>;
 export type OutputReviewDecision = Static<typeof OutputReviewDecision>;
+export type EditOperation = Static<typeof EditOperation>;
+export type EditTurnStatus = Static<typeof EditTurnStatus>;
+export type EditSessionStatus = Static<typeof EditSessionStatus>;
 export type ModelCapabilities = Static<typeof ModelCapabilities>;
 export type ModelDefinition = Static<typeof ModelDefinition>;
 export type ModelRef = Static<typeof ModelRef>;

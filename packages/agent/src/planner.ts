@@ -1,7 +1,7 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { ImageContent, Model } from "@earendil-works/pi-ai";
-import type { PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
+import type { EditOperation, PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createPlanningTools, readPlatformGuidance, type WebResearchConfig } from "./tools.js";
@@ -122,6 +122,66 @@ export async function reviseImagePrompt(input: PromptRevisionInput): Promise<str
   const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n").trim() : "";
   if (!text) throw new Error("Prompt revision model returned no text");
   return assertFinalPrompt(stripJsonFence(text));
+}
+
+export interface EditPlannerInput {
+  model: Model<"openai-completions">;
+  apiKey: string;
+  message: string;
+  annotations: Record<string, unknown>;
+  hasEditMask: boolean;
+  hasCanvasExpansion: boolean;
+  referenceAssets: Array<{ id: string; name: string; role: string }>;
+  memorySummary: { summary?: string; constraints?: string[] };
+  projectFacts: string[];
+  sourceImage?: ImageContent;
+}
+
+export interface PlannedEdit {
+  operation: EditOperation;
+  userSummary: string;
+  prompt: string;
+  targetAnnotationIds: string[];
+  requiresConfirmation: boolean;
+  compositePolicy: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT";
+  memoryPatch: { summary?: string; constraints?: string[] };
+}
+
+export async function planImageEdit(input: EditPlannerInput): Promise<PlannedEdit> {
+  const agent = new Agent({
+    streamFn: openAICompletionsApi().stream,
+    getApiKey: () => input.apiKey,
+    initialState: {
+      model: input.model,
+      systemPrompt: "You are an image-editing planner for an e-commerce workspace. Return only valid JSON. Use the user's words, mask availability, annotations, references, and previous constraints to choose one operation: PRECISE_INPAINT, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION. Never invent asset IDs or annotation IDs. PRODUCT_REPLACE requires a supplied reference asset. PRECISE_INPAINT requires an editable mask or target annotation. Set requiresConfirmation true for PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION. The prompt is a complete final image-edit prompt, preserving product facts and user-protected areas. For PRECISE_INPAINT use MASK_LOCKED; for OUTPAINT use OUTPAINT; otherwise use NATURAL_BLEND.",
+      thinkingLevel: input.model.reasoning ? "medium" : "off",
+      tools: []
+    }
+  });
+  const annotationIds = annotationIdList(input.annotations);
+  await agent.prompt(`Plan this edit. Return {"operation":string,"userSummary":string,"prompt":string,"targetAnnotationIds":string[],"requiresConfirmation":boolean,"compositePolicy":string,"memoryPatch":{"summary":string,"constraints":string[]}}.\n${JSON.stringify({ ...input, model: undefined, apiKey: undefined, sourceImage: undefined, annotationIds })}`, input.model.input.includes("image") ? [input.sourceImage].filter((image): image is ImageContent => Boolean(image)) : undefined);
+  if (agent.state.errorMessage) throw new Error(`Edit planning model request failed: ${agent.state.errorMessage}`);
+  const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
+  const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n") : "";
+  if (!text) throw new Error("Edit planning model returned no text");
+  return validateEditPlan(JSON.parse(stripJsonFence(text)) as PlannedEdit, input, annotationIds);
+}
+
+function annotationIdList(annotations: Record<string, unknown>): string[] {
+  const entries = Array.isArray(annotations.annotations) ? annotations.annotations : [];
+  return entries.flatMap((annotation) => annotation && typeof annotation === "object" && typeof (annotation as Record<string, unknown>).id === "string" ? [(annotation as Record<string, unknown>).id as string] : []);
+}
+
+function validateEditPlan(plan: PlannedEdit, input: EditPlannerInput, annotationIds: string[]): PlannedEdit {
+  const operations: EditOperation[] = ["PRECISE_INPAINT", "PRODUCT_REPLACE", "SCENE_ADJUST", "OUTPAINT", "NATURAL_FUSION"];
+  if (!plan || !operations.includes(plan.operation) || !plan.userSummary?.trim() || !plan.prompt?.trim()) throw new Error("Edit planning model returned an invalid plan");
+  const targets = Array.isArray(plan.targetAnnotationIds) ? plan.targetAnnotationIds.filter((id): id is string => typeof id === "string" && annotationIds.includes(id)) : [];
+  if (plan.operation === "PRODUCT_REPLACE" && input.referenceAssets.length === 0) throw new Error("REFERENCE_ASSET_REQUIRED");
+  if (plan.operation === "PRECISE_INPAINT" && !input.hasEditMask && targets.length === 0) throw new Error("EDIT_TARGET_REQUIRED");
+  if (plan.operation === "OUTPAINT" && !input.hasCanvasExpansion) throw new Error("OUTPAINT_CANVAS_REQUIRED");
+  const requiresConfirmation = ["PRODUCT_REPLACE", "SCENE_ADJUST", "OUTPAINT", "NATURAL_FUSION"].includes(plan.operation);
+  const compositePolicy = plan.operation === "PRECISE_INPAINT" ? "MASK_LOCKED" : plan.operation === "OUTPAINT" ? "OUTPAINT" : "NATURAL_BLEND";
+  return { operation: plan.operation, userSummary: plan.userSummary.trim(), prompt: plan.prompt.trim(), targetAnnotationIds: targets, requiresConfirmation, compositePolicy, memoryPatch: plan.memoryPatch ?? {} };
 }
 
 function stripJsonFence(value: string): string { return value.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, ""); }

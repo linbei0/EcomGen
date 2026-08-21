@@ -106,6 +106,23 @@ describe("EcomRepository", () => {
     database.close();
   });
 
+  it("keeps an edit session across derived outputs and records immutable output lineage", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database); const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["DOMESTIC"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const storyboard = repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero-image", displayName: "杯子首图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    const item = repository.listStoryboardItems(project.id)[0]!;
+    const job = repository.createJob({ id: "edit-lineage-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
+    const root = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/root.png", hash: "root", reviewDecision: "NEEDS_REVIEW", reviewNote: null });
+    const session = repository.createEditSession({ id: "edit-session", projectId: project.id, currentOutputId: root.id, status: "ACTIVE", memorySummary: { constraints: ["保留背景"] } });
+    const turn = repository.createEditTurn({ id: "edit-turn", sessionId: session.id, projectId: project.id, baseOutputId: root.id, status: "SUCCEEDED", message: "变亮", annotations: {}, editMaskPath: null, editMaskHash: null, protectMaskPath: null, protectMaskHash: null, referenceAssetIds: [], plan: {}, error: null });
+    const derived = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/derived.png", hash: "derived", reviewDecision: "NEEDS_REVIEW", reviewNote: null, parentOutputId: root.id, rootOutputId: root.id, editSessionId: session.id, editTurnId: turn.id });
+    repository.updateEditSession(session.id, { currentOutputId: derived.id });
+    expect(repository.getActiveEditSession(project.id, derived.id)?.id).toBe(session.id);
+    expect(repository.getOutput(derived.id)).toMatchObject({ parentOutputId: root.id, rootOutputId: root.id, editTurnId: turn.id });
+    database.close();
+  });
+
   it("keeps storyboard items bound to a project version and persists output review", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);

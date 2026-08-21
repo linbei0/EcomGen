@@ -11,6 +11,8 @@ export interface ImageGenerationInput {
   size?: string;
   quality?: "low" | "medium" | "high";
   images?: Array<{ data: Buffer; filename: string; mimeType: string }>;
+  mask?: { data: Buffer; filename: string; mimeType: string };
+  inputFidelity?: "low" | "high";
 }
 
 export interface ImageGenerationResult {
@@ -57,9 +59,11 @@ export class OpenAiCompatibleImageProvider {
     form.set("response_format", "b64_json");
     if (input.size) form.set("size", input.size);
     if (input.quality) form.set("quality", input.quality);
+    if (input.inputFidelity) form.set("input_fidelity", input.inputFidelity);
     for (const image of input.images ?? []) {
       form.append("image", new Blob([new Uint8Array(image.data)], { type: image.mimeType }), image.filename);
     }
+    if (input.mask) form.append("mask", new Blob([new Uint8Array(input.mask.data)], { type: input.mask.mimeType }), input.mask.filename);
     const response = await fetch(new URL("images/edits", this.baseUrl()), {
       method: "POST",
       headers: this.headers(),

@@ -329,6 +329,10 @@ function migrate(database: SqliteDatabase): void {
       review_decision TEXT NOT NULL,
       review_note TEXT,
       created_at TEXT NOT NULL,
+      parent_output_id TEXT,
+      root_output_id TEXT,
+      edit_session_id TEXT,
+      edit_turn_id TEXT,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       FOREIGN KEY (storyboard_item_id) REFERENCES storyboard_items(id) ON DELETE CASCADE,
       FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
@@ -343,6 +347,38 @@ function migrate(database: SqliteDatabase): void {
       updated_at TEXT NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS edit_sessions (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      current_output_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      memory_summary_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (current_output_id) REFERENCES outputs(id)
+    );
+    CREATE TABLE IF NOT EXISTS edit_turns (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      base_output_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      message TEXT NOT NULL,
+      annotations_json TEXT NOT NULL DEFAULT '{}',
+      edit_mask_path TEXT,
+      edit_mask_hash TEXT,
+      protect_mask_path TEXT,
+      protect_mask_hash TEXT,
+      reference_asset_ids_json TEXT NOT NULL DEFAULT '[]',
+      plan_json TEXT,
+      error_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES edit_sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (base_output_id) REFERENCES outputs(id)
     );
   `);
   const providerColumns = columnNames(database, "providers");
@@ -366,6 +402,11 @@ function migrate(database: SqliteDatabase): void {
   if (!storyboardItemColumns.has("image_aspect_ratio")) {
     database.exec("ALTER TABLE storyboard_items ADD COLUMN image_aspect_ratio TEXT");
   }
+  const outputColumns = columnNames(database, "outputs");
+  if (!outputColumns.has("parent_output_id")) database.exec("ALTER TABLE outputs ADD COLUMN parent_output_id TEXT");
+  if (!outputColumns.has("root_output_id")) database.exec("ALTER TABLE outputs ADD COLUMN root_output_id TEXT");
+  if (!outputColumns.has("edit_session_id")) database.exec("ALTER TABLE outputs ADD COLUMN edit_session_id TEXT");
+  if (!outputColumns.has("edit_turn_id")) database.exec("ALTER TABLE outputs ADD COLUMN edit_turn_id TEXT");
   database.exec(`
     UPDATE storyboard_items
     SET image_provider_id = (SELECT image_provider_id FROM projects WHERE projects.id = storyboard_items.project_id),

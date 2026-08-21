@@ -318,6 +318,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/outputs/{outputId}/edit-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createEditSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/edit-sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getEditSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/edit-sessions/{sessionId}/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createEditTurn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/edit-sessions/{sessionId}/select-output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["selectEditSessionOutput"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/edit-turns/{turnId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turnId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getEditTurn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/edit-turns/{turnId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turnId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approveEditTurn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/{jobId}": {
         parameters: {
             query?: never;
@@ -815,7 +924,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT";
+            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE";
             /** @enum {string} */
             status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
             progress: number;
@@ -853,8 +962,55 @@ export interface components {
             /** @enum {string} */
             reviewDecision: "SELECTED" | "REJECTED" | "NEEDS_REVIEW";
             reviewNote?: string | null;
+            /** Format: uuid */
+            parentOutputId?: string | null;
+            /** Format: uuid */
+            rootOutputId?: string | null;
+            /** Format: uuid */
+            editSessionId?: string | null;
+            /** Format: uuid */
+            editTurnId?: string | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        /** @enum {string} */
+        EditTurnStatus: "DRAFT" | "PLANNING" | "PLAN_READY" | "NEED_INPUT" | "AWAITING_CONFIRMATION" | "GENERATING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+        EditSession: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            currentOutputId: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "ARCHIVED";
+            memorySummary: Record<string, never>;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        EditTurn: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            baseOutputId: string;
+            status: components["schemas"]["EditTurnStatus"];
+            message: string;
+            annotations: Record<string, never>;
+            editMaskPath?: string | null;
+            protectMaskPath?: string | null;
+            referenceAssetIds: string[];
+            plan?: Record<string, never> | null;
+            error?: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
         CreateExportJobInput: {
             outputIds?: string[];
@@ -1688,6 +1844,173 @@ export interface operations {
                 };
             };
             409: components["responses"]["Conflict"];
+        };
+    };
+    createEditSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Edit session created or reused. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditSession"];
+                };
+            };
+        };
+    };
+    getEditSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Edit session and turns. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditSession"] & {
+                        turns: components["schemas"]["EditTurn"][];
+                    };
+                };
+            };
+        };
+    };
+    createEditTurn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: uuid */
+                    baseOutputId?: string;
+                    message: string;
+                    /** @description JSON encoded annotation document. */
+                    annotations?: string;
+                    /** Format: binary */
+                    editMask?: string;
+                    /** Format: binary */
+                    protectMask?: string;
+                    /** @description JSON encoded asset ID array. */
+                    referenceAssetIds?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Edit plan queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        turnId: string;
+                        /** Format: uuid */
+                        planJobId: string;
+                        status: components["schemas"]["EditTurnStatus"];
+                    };
+                };
+            };
+        };
+    };
+    selectEditSessionOutput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    outputId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Current edit output changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditSession"];
+                };
+            };
+        };
+    };
+    getEditTurn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Edit turn state and plan. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditTurn"];
+                };
+            };
+        };
+    };
+    approveEditTurn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Edit generation queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        job: components["schemas"]["Job"];
+                        turn: components["schemas"]["EditTurn"];
+                    };
+                };
+            };
         };
     };
     getJob: {

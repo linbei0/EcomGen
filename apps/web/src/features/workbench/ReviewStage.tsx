@@ -15,6 +15,7 @@ import styles from "./workbench.module.css";
 import type { GenerationJobInput } from "../../api/serializeGenerationBody";
 import { ASPECT_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
 import { modelOptions } from "../../lib/modelOptions";
+import { EditImageWorkspace } from "./EditImageWorkspace";
 
 export function ReviewStage({
   detail,
@@ -31,6 +32,7 @@ export function ReviewStage({
   const groups = useMemo(() => groupOutputsByItem(items, detail.outputs), [detail.outputs, items]);
   const [picked, setPicked] = useState<string[]>([]);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const decide = (outputId: string, decision: ReviewDecision) => {
     void review.mutateAsync({ outputId, decision }).catch((error: unknown) => {
@@ -114,7 +116,9 @@ export function ReviewStage({
         onRetry={(generationConfig) => {
           if (lightboxItem) onRetryItem(lightboxItem.id, generationConfig);
         }}
+        onEdit={() => { if (lightbox) setEditingId(lightbox.id); }}
       />
+      <EditImageWorkspace projectId={detail.id} output={detail.outputs.find((output) => output.id === editingId)} assets={detail.assets} onClose={() => setEditingId(null)} />
     </div>
   );
 }
@@ -167,6 +171,7 @@ function LightboxModal({
   onClose,
   onDecide,
   onRetry,
+  onEdit,
 }: {
   output: Output | undefined;
   item: StoryboardItem | undefined;
@@ -174,6 +179,7 @@ function LightboxModal({
   onClose: () => void;
   onDecide: (decision: ReviewDecision) => void;
   onRetry: (generationConfig: NonNullable<GenerationJobInput["generationConfig"]>) => void;
+  onEdit: () => void;
 }) {
   const providers = useProviders();
   const [retryOpen, setRetryOpen] = useState(false);
@@ -216,6 +222,7 @@ function LightboxModal({
               onChange={(value) => onDecide(value as ReviewDecision)}
             />
             <Button onClick={openRetry}>用此分镜重新生成</Button>
+            <Button type="primary" onClick={onEdit}>编辑图片</Button>
           </div>
         </div>
       ) : null}

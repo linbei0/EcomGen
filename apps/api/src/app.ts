@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import sharp from "sharp";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
@@ -281,6 +282,62 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     });
     await Promise.all(jobs.map((job) => enqueue(queue, { jobId: job.id, kind: "generate" }))); return reply.code(202).send({ jobs });
   });
+  app.post("/api/v1/projects/:projectId/outputs/:outputId/edit-sessions", async (request, reply) => {
+    const projectId = parameter(request, "projectId"); const outputId = parameter(request, "outputId"); ensureProject(repository, projectId);
+    const output = repository.getOutput(outputId); if (!output || output.projectId !== projectId) missing("output", outputId);
+    const existing = repository.getActiveEditSession(projectId, outputId); if (existing) return reply.code(201).send(existing);
+    return reply.code(201).send(repository.createEditSession({ id: randomUUID(), projectId, currentOutputId: outputId, status: "ACTIVE", memorySummary: {} }));
+  });
+  app.get("/api/v1/edit-sessions/:sessionId", async (request) => {
+    const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
+    return { ...session, turns: repository.listEditTurns(session.id) };
+  });
+  app.post("/api/v1/edit-sessions/:sessionId/turns", async (request, reply) => {
+    const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
+    if (session.status !== "ACTIVE") throw new ApiError(409, "CONFLICT", "Edit session is not active");
+    const parts = request.parts(); const fields = new Map<string, string>(); let editMask: { content: Buffer; mimeType: string } | undefined; let protectMask: { content: Buffer; mimeType: string } | undefined;
+    for await (const part of parts) {
+      if (part.type === "file") {
+        if (part.fieldname !== "editMask" && part.fieldname !== "protectMask") throw new ApiError(400, "VALIDATION_ERROR", `Unsupported edit file field: ${part.fieldname}`);
+        if (part.mimetype !== "image/png") throw new ApiError(400, "VALIDATION_ERROR", `${part.fieldname} must be a PNG image`);
+        const value = { content: await part.toBuffer(), mimeType: part.mimetype };
+        if (part.fieldname === "editMask") editMask = value; else protectMask = value;
+      } else fields.set(part.fieldname, String(part.value));
+    }
+    const baseOutputId = fields.get("baseOutputId") ?? session.currentOutputId;
+    const baseOutput = repository.getOutput(baseOutputId); if (!baseOutput || baseOutput.projectId !== session.projectId) throw new ApiError(400, "VALIDATION_ERROR", "baseOutputId must belong to this project");
+    const message = fields.get("message")?.trim(); if (!message) throw new ApiError(400, "VALIDATION_ERROR", "message is required");
+    const annotations = jsonObject(fields.get("annotations"), "annotations");
+    const referenceAssetIds = jsonStringArray(fields.get("referenceAssetIds"), "referenceAssetIds");
+    const knownAssets = new Set(repository.listAssets(session.projectId).map((asset) => asset.id)); if (referenceAssetIds.some((id) => !knownAssets.has(id))) throw new ApiError(400, "VALIDATION_ERROR", "referenceAssetIds must belong to this project");
+    if (editMask) await validateMaskDimensions(baseOutput.storagePath, editMask.content, storage);
+    if (protectMask) await validateMaskDimensions(baseOutput.storagePath, protectMask.content, storage);
+    const turnId = randomUUID();
+    const editStored = editMask ? await storage.putEditArtifact(session.projectId, session.id, turnId, "edit-mask.png", editMask.content) : undefined;
+    const protectStored = protectMask ? await storage.putEditArtifact(session.projectId, session.id, turnId, "protect-mask.png", protectMask.content) : undefined;
+    const fingerprint = requestFingerprint({ type: "EDIT_PLAN", projectId: session.projectId, sessionId: session.id, baseOutputId, message, annotations, editMaskHash: editStored?.hash ?? null, protectMaskHash: protectStored?.hash ?? null, referenceAssetIds, idempotencyKey: request.headers["idempotency-key"] ?? null });
+    const existing = repository.findJobByFingerprint(session.projectId, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ turnId: existing.input.editTurnId, planJobId: existing.id, status: existing.status });
+    const turn = repository.createEditTurn({ id: turnId, sessionId: session.id, projectId: session.projectId, baseOutputId, status: "PLANNING", message, annotations, editMaskPath: editStored?.path ?? null, editMaskHash: editStored?.hash ?? null, protectMaskPath: protectStored?.path ?? null, protectMaskHash: protectStored?.hash ?? null, referenceAssetIds, plan: null, error: null });
+    const project = repository.getProject(session.projectId); if (!project) missing("project", session.projectId);
+    const job = repository.createJob({ id: randomUUID(), projectId: session.projectId, storyboardItemId: null, type: "EDIT_PLAN", input: { editTurnId: turn.id }, requestFingerprint: fingerprint, providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    await enqueue(queue, { jobId: job.id, kind: "edit_plan" }); return reply.code(202).send({ turnId: turn.id, planJobId: job.id, status: turn.status });
+  });
+  app.get("/api/v1/edit-turns/:turnId", async (request) => { const turn = repository.getEditTurn(parameter(request, "turnId")); if (!turn) missing("edit turn", parameter(request, "turnId")); return turn; });
+  app.post("/api/v1/edit-turns/:turnId/approve", async (request, reply) => {
+    const turn = repository.getEditTurn(parameter(request, "turnId")); if (!turn) missing("edit turn", parameter(request, "turnId"));
+    if (turn.status !== "AWAITING_CONFIRMATION" && turn.status !== "PLAN_READY") throw new ApiError(409, "CONFLICT", "Edit turn is not ready for generation");
+    const project = repository.getProject(turn.projectId); if (!project) missing("project", turn.projectId);
+    const fingerprint = requestFingerprint({ type: "EDIT_GENERATE", projectId: turn.projectId, editTurnId: turn.id, plan: turn.plan });
+    const existing = repository.findJobByFingerprint(turn.projectId, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, turn: repository.getEditTurn(turn.id) });
+    repository.updateEditTurn(turn.id, { status: "GENERATING", error: null });
+    const job = repository.createJob({ id: randomUUID(), projectId: turn.projectId, storyboardItemId: null, type: "EDIT_GENERATE", input: { editTurnId: turn.id }, requestFingerprint: fingerprint, providerId: project.imageProviderId, modelId: project.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    await enqueue(queue, { jobId: job.id, kind: "edit_generate" }); return reply.code(202).send({ job, turn: repository.getEditTurn(turn.id) });
+  });
+  app.post("/api/v1/edit-sessions/:sessionId/select-output", async (request) => {
+    const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
+    const body = object(request.body, "body"); const outputId = string(body.outputId, "outputId"); const output = repository.getOutput(outputId); if (!output || output.projectId !== session.projectId) throw new ApiError(400, "VALIDATION_ERROR", "outputId must belong to this project");
+    return repository.updateEditSession(session.id, { currentOutputId: outputId });
+  });
   app.get("/api/v1/jobs/:jobId", async (request) => { const job = repository.getJob(parameter(request, "jobId")); if (!job) missing("job", parameter(request, "jobId")); return job; });
   app.get("/api/v1/copywriting-jobs/:jobId/result", async (request) => {
     const jobId = parameter(request, "jobId");
@@ -371,6 +428,18 @@ function searchSourceBaseUrl(kind: SearchSourceKind, value: string | undefined):
 
 function stringArray(value: unknown, path: string): string[] { if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) throw new ApiError(400, "VALIDATION_ERROR", `${path} must be an array of strings`); return value as string[]; }
 function optionalStringArray(value: unknown): string[] | undefined { return value === undefined ? undefined : stringArray(value, "value"); }
+function jsonObject(value: string | undefined, path: string): Record<string, unknown> {
+  if (!value) return {};
+  try { return object(JSON.parse(value), path); } catch { throw new ApiError(400, "VALIDATION_ERROR", `${path} must be valid JSON object`); }
+}
+function jsonStringArray(value: string | undefined, path: string): string[] {
+  if (!value) return [];
+  try { return stringArray(JSON.parse(value), path); } catch { throw new ApiError(400, "VALIDATION_ERROR", `${path} must be a JSON array of strings`); }
+}
+async function validateMaskDimensions(sourcePath: string, mask: Buffer, storage: LocalAssetStore): Promise<void> {
+  const [source, candidate] = await Promise.all([sharp(await storage.read(sourcePath)).metadata(), sharp(mask).metadata()]);
+  if (!source.width || !source.height || source.width !== candidate.width || source.height !== candidate.height) throw new ApiError(400, "VALIDATION_ERROR", "MASK_DIMENSION_MISMATCH");
+}
 function enumValue<T extends string>(value: unknown, allowed: readonly T[], path: string): T { const item = string(value, path) as T; if (!allowed.includes(item)) throw new ApiError(400, "VALIDATION_ERROR", `${path} must be one of ${allowed.join(", ")}`); return item; }
 function enumArray<T extends string>(value: unknown, allowed: readonly T[], path: string): T[] { const items = stringArray(value, path).map((item) => enumValue<T>(item, allowed, path)); return [...new Set(items)]; }
 function platformTargetsValue(value: unknown): PlatformTarget[] {

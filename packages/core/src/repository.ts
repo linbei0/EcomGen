@@ -14,6 +14,7 @@ import type {
   StoryboardMode,
   TargetMarket
 } from "@ecomgen/contracts";
+import type { EditOperation, EditSessionStatus, EditTurnStatus } from "@ecomgen/contracts";
 import type { SqliteDatabase } from "./database.js";
 
 export interface ProviderRecord {
@@ -172,6 +173,11 @@ export interface GenerationSnapshot {
   aspectRatio: ImageAspectRatio;
   size: string;
   candidateIndex: number;
+  operation?: EditOperation;
+  sourceOutputId?: string;
+  maskHash?: string | null;
+  protectMaskHash?: string | null;
+  compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT";
 }
 
 export interface OutputRecord {
@@ -185,7 +191,40 @@ export interface OutputRecord {
   hash: string;
   reviewDecision: OutputReviewDecision;
   reviewNote: string | null;
+  parentOutputId?: string | null;
+  rootOutputId?: string | null;
+  editSessionId?: string | null;
+  editTurnId?: string | null;
   createdAt: string;
+}
+
+export interface EditSessionRecord {
+  id: string;
+  projectId: string;
+  currentOutputId: string;
+  status: EditSessionStatus;
+  memorySummary: { summary?: string; constraints?: string[] };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EditTurnRecord {
+  id: string;
+  sessionId: string;
+  projectId: string;
+  baseOutputId: string;
+  status: EditTurnStatus;
+  message: string;
+  annotations: Record<string, unknown>;
+  editMaskPath: string | null;
+  editMaskHash: string | null;
+  protectMaskPath: string | null;
+  protectMaskHash: string | null;
+  referenceAssetIds: string[];
+  plan: Record<string, unknown> | null;
+  error: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ExportRecord {
@@ -423,14 +462,50 @@ export class EcomRepository {
   public listWebResearchAttempts(jobId: string): WebResearchAttemptRecord[] { return (this.db.prepare("SELECT * FROM web_research_attempts WHERE job_id=? ORDER BY rowid").all(jobId) as Row[]).map(mapWebResearchAttempt); }
 
   public createOutput(input: Omit<OutputRecord, "id" | "createdAt">): OutputRecord {
-    const record = { ...input, id: randomUUID(), createdAt: now() };
-    this.db.prepare("INSERT INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,review_decision,review_note,created_at) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationSnapshot,@storagePath,@hash,@reviewDecision,@reviewNote,@createdAt)")
+    const record: OutputRecord = { ...input, parentOutputId: input.parentOutputId ?? null, rootOutputId: input.rootOutputId ?? null, editSessionId: input.editSessionId ?? null, editTurnId: input.editTurnId ?? null, id: randomUUID(), createdAt: now() };
+    this.db.prepare("INSERT INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,review_decision,review_note,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationSnapshot,@storagePath,@hash,@reviewDecision,@reviewNote,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
       .run({ ...record, generationSnapshot: record.generationSnapshot ? json(record.generationSnapshot) : null });
     return record;
   }
   public getOutput(id: string): OutputRecord | undefined { const row = this.db.prepare("SELECT * FROM outputs WHERE id=?").get(id); return row ? mapOutput(row as Row) : undefined; }
   public listOutputs(projectId: string): OutputRecord[] { return (this.db.prepare("SELECT * FROM outputs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapOutput); }
   public reviewOutput(id: string, reviewDecision: OutputReviewDecision, reviewNote: string | null): OutputRecord | undefined { const output = this.getOutput(id); if (!output) return undefined; this.db.prepare("UPDATE outputs SET review_decision=?,review_note=? WHERE id=?").run(reviewDecision, reviewNote, id); return this.getOutput(id); }
+
+  public getEditSession(id: string): EditSessionRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM edit_sessions WHERE id=?").get(id);
+    return row ? mapEditSession(row as Row) : undefined;
+  }
+  public getActiveEditSession(projectId: string, outputId: string): EditSessionRecord | undefined {
+    const row = this.db.prepare("SELECT DISTINCT edit_sessions.* FROM edit_sessions LEFT JOIN outputs ON outputs.edit_session_id=edit_sessions.id WHERE edit_sessions.project_id=? AND edit_sessions.status='ACTIVE' AND (edit_sessions.current_output_id=? OR outputs.id=?) ORDER BY edit_sessions.updated_at DESC LIMIT 1").get(projectId, outputId, outputId);
+    return row ? mapEditSession(row as Row) : undefined;
+  }
+  public createEditSession(input: Omit<EditSessionRecord, "createdAt" | "updatedAt">): EditSessionRecord {
+    const record = { ...input, createdAt: now(), updatedAt: now() };
+    this.db.prepare("INSERT INTO edit_sessions (id,project_id,current_output_id,status,memory_summary_json,created_at,updated_at) VALUES (@id,@projectId,@currentOutputId,@status,@memorySummary,@createdAt,@updatedAt)").run({ ...record, memorySummary: json(record.memorySummary) });
+    return record;
+  }
+  public updateEditSession(id: string, patch: Partial<Pick<EditSessionRecord, "currentOutputId" | "status" | "memorySummary">>): EditSessionRecord | undefined {
+    const current = this.getEditSession(id); if (!current) return undefined;
+    const next = { ...current, ...patch, updatedAt: now() };
+    this.db.prepare("UPDATE edit_sessions SET current_output_id=@currentOutputId,status=@status,memory_summary_json=@memorySummary,updated_at=@updatedAt WHERE id=@id").run({ ...next, memorySummary: json(next.memorySummary) });
+    return next;
+  }
+  public getEditTurn(id: string): EditTurnRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM edit_turns WHERE id=?").get(id);
+    return row ? mapEditTurn(row as Row) : undefined;
+  }
+  public listEditTurns(sessionId: string): EditTurnRecord[] { return (this.db.prepare("SELECT * FROM edit_turns WHERE session_id=? ORDER BY created_at ASC").all(sessionId) as Row[]).map(mapEditTurn); }
+  public createEditTurn(input: Omit<EditTurnRecord, "createdAt" | "updatedAt">): EditTurnRecord {
+    const record = { ...input, createdAt: now(), updatedAt: now() };
+    this.db.prepare("INSERT INTO edit_turns (id,session_id,project_id,base_output_id,status,message,annotations_json,edit_mask_path,edit_mask_hash,protect_mask_path,protect_mask_hash,reference_asset_ids_json,plan_json,error_json,created_at,updated_at) VALUES (@id,@sessionId,@projectId,@baseOutputId,@status,@message,@annotations,@editMaskPath,@editMaskHash,@protectMaskPath,@protectMaskHash,@referenceAssetIds,@plan,@error,@createdAt,@updatedAt)").run({ ...record, annotations: json(record.annotations), referenceAssetIds: json(record.referenceAssetIds), plan: record.plan ? json(record.plan) : null, error: record.error ? json(record.error) : null });
+    return record;
+  }
+  public updateEditTurn(id: string, patch: Partial<Pick<EditTurnRecord, "status" | "plan" | "error">>): EditTurnRecord | undefined {
+    const current = this.getEditTurn(id); if (!current) return undefined;
+    const next = { ...current, ...patch, updatedAt: now() };
+    this.db.prepare("UPDATE edit_turns SET status=@status,plan_json=@plan,error_json=@error,updated_at=@updatedAt WHERE id=@id").run({ ...next, plan: next.plan ? json(next.plan) : null, error: next.error ? json(next.error) : null });
+    return next;
+  }
 
   public createExport(input: Omit<ExportRecord, "id" | "createdAt" | "updatedAt">): ExportRecord { const record = { ...input, id: randomUUID(), createdAt: now(), updatedAt: now() }; this.db.prepare("INSERT INTO exports (id,project_id,job_id,status,storage_path,created_at,updated_at) VALUES (@id,@projectId,@jobId,@status,@storagePath,@createdAt,@updatedAt)").run(record); return record; }
   public getExport(id: string): ExportRecord | undefined { const row = this.db.prepare("SELECT * FROM exports WHERE id=?").get(id); return row ? mapExport(row as Row) : undefined; }
@@ -521,7 +596,13 @@ function mapOutput(row: Row): OutputRecord {
     hash: String(row.hash),
     reviewDecision: row.review_decision as OutputReviewDecision,
     reviewNote: row.review_note ? String(row.review_note) : null,
+    parentOutputId: row.parent_output_id ? String(row.parent_output_id) : null,
+    rootOutputId: row.root_output_id ? String(row.root_output_id) : null,
+    editSessionId: row.edit_session_id ? String(row.edit_session_id) : null,
+    editTurnId: row.edit_turn_id ? String(row.edit_turn_id) : null,
     createdAt: String(row.created_at)
   };
 }
+function mapEditSession(row: Row): EditSessionRecord { return { id: String(row.id), projectId: String(row.project_id), currentOutputId: String(row.current_output_id), status: row.status as EditSessionStatus, memorySummary: parse(row.memory_summary_json ?? "{}"), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapEditTurn(row: Row): EditTurnRecord { return { id: String(row.id), sessionId: String(row.session_id), projectId: String(row.project_id), baseOutputId: String(row.base_output_id), status: row.status as EditTurnStatus, message: String(row.message), annotations: parse(row.annotations_json ?? "{}"), editMaskPath: row.edit_mask_path ? String(row.edit_mask_path) : null, editMaskHash: row.edit_mask_hash ? String(row.edit_mask_hash) : null, protectMaskPath: row.protect_mask_path ? String(row.protect_mask_path) : null, protectMaskHash: row.protect_mask_hash ? String(row.protect_mask_hash) : null, referenceAssetIds: parse(row.reference_asset_ids_json ?? "[]"), plan: row.plan_json ? parse(row.plan_json) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapExport(row: Row): ExportRecord { return { id: String(row.id), projectId: String(row.project_id), jobId: String(row.job_id), status: String(row.status), storagePath: row.storage_path ? String(row.storage_path) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }

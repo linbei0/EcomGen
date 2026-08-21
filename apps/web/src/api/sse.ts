@@ -5,6 +5,8 @@ export const SSE_EVENT_NAMES = [
   "job.updated",
   "storyboard.updated",
   "output.created",
+  "edit-session.updated",
+  "edit-turn.updated",
   "export.updated",
   "provider.updated",
 ] as const;
@@ -36,6 +38,8 @@ export function invalidateKeysForEvent(
     case "storyboard.updated":
       return [qk.storyboard(projectId), qk.project(projectId)];
     case "output.created":
+    case "edit-session.updated":
+    case "edit-turn.updated":
       return [qk.project(projectId), qk.storyboard(projectId)];
     case "export.updated":
       return [qk.exports(projectId), qk.project(projectId)];

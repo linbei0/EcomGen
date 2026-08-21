@@ -460,6 +460,128 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Job' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/outputs/{outputId}/edit-sessions:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/OutputId'
+    post:
+      operationId: createEditSession
+      responses:
+        '201':
+          description: Edit session created or reused.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EditSession' }
+  /edit-sessions/{sessionId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getEditSession
+      responses:
+        '200':
+          description: Edit session and turns.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EditSession'
+                  - type: object
+                    required: [turns]
+                    properties:
+                      turns: { type: array, items: { $ref: '#/components/schemas/EditTurn' } }
+  /edit-sessions/{sessionId}/turns:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createEditTurn
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                baseOutputId: { type: string, format: uuid }
+                message: { type: string, maxLength: 4000 }
+                annotations: { type: string, description: JSON encoded annotation document. }
+                editMask: { type: string, format: binary }
+                protectMask: { type: string, format: binary }
+                referenceAssetIds: { type: string, description: JSON encoded asset ID array. }
+      responses:
+        '202':
+          description: Edit plan queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [turnId, planJobId, status]
+                properties:
+                  turnId: { type: string, format: uuid }
+                  planJobId: { type: string, format: uuid }
+                  status: { $ref: '#/components/schemas/EditTurnStatus' }
+  /edit-sessions/{sessionId}/select-output:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: selectEditSessionOutput
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outputId]
+              properties:
+                outputId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current edit output changed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EditSession' }
+  /edit-turns/{turnId}:
+    parameters:
+      - name: turnId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getEditTurn
+      responses:
+        '200':
+          description: Edit turn state and plan.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EditTurn' }
+  /edit-turns/{turnId}/approve:
+    parameters:
+      - name: turnId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: approveEditTurn
+      responses:
+        '202':
+          description: Edit generation queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job, turn]
+                properties:
+                  job: { $ref: '#/components/schemas/Job' }
+                  turn: { $ref: '#/components/schemas/EditTurn' }
   /jobs/{jobId}:
     parameters:
       - $ref: '#/components/parameters/JobId'
@@ -916,7 +1038,7 @@ components:
       required: [id, type, status, progress, retryable, createdAt]
       properties:
         id: { type: string, format: uuid }
-        type: { type: string, enum: [PLAN, COPYWRITE, GENERATE, EXPORT] }
+        type: { type: string, enum: [PLAN, COPYWRITE, GENERATE, EXPORT, EDIT_PLAN, EDIT_GENERATE] }
         status: { type: string, enum: [QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED] }
         progress: { type: integer, minimum: 0, maximum: 100 }
         retryable: { type: boolean }
@@ -949,7 +1071,43 @@ components:
         storagePath: { type: string }
         reviewDecision: { type: string, enum: [SELECTED, REJECTED, NEEDS_REVIEW] }
         reviewNote: { type: [string, 'null'] }
+        parentOutputId: { type: [string, 'null'], format: uuid }
+        rootOutputId: { type: [string, 'null'], format: uuid }
+        editSessionId: { type: [string, 'null'], format: uuid }
+        editTurnId: { type: [string, 'null'], format: uuid }
         createdAt: { type: string, format: date-time }
+    EditTurnStatus:
+      type: string
+      enum: [DRAFT, PLANNING, PLAN_READY, NEED_INPUT, AWAITING_CONFIRMATION, GENERATING, SUCCEEDED, FAILED, CANCELLED]
+    EditSession:
+      type: object
+      required: [id, projectId, currentOutputId, status, memorySummary, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        currentOutputId: { type: string, format: uuid }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        memorySummary: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    EditTurn:
+      type: object
+      required: [id, sessionId, projectId, baseOutputId, status, message, annotations, referenceAssetIds, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        sessionId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        baseOutputId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/EditTurnStatus' }
+        message: { type: string }
+        annotations: { type: object }
+        editMaskPath: { type: [string, 'null'] }
+        protectMaskPath: { type: [string, 'null'] }
+        referenceAssetIds: { type: array, items: { type: string, format: uuid } }
+        plan: { type: [object, 'null'] }
+        error: { type: [object, 'null'] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     CreateExportJobInput:
       type: object
       properties:

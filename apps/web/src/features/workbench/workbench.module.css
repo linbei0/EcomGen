@@ -1115,6 +1115,11 @@
   }
 }
 
+@media (max-width: 960px) {
+  .editWorkspace { grid-template-columns: 48px minmax(0, 1fr); }
+  .editAgentPanel { grid-column: 1 / -1; border-top: 1px solid var(--line-1); border-left: 0; }
+}
+
 .generateWrap {
   display: flex;
   flex-direction: column;
@@ -1319,6 +1324,60 @@
   gap: 8px;
   color: var(--accent);
 }
+
+.editModal :global(.ant-modal-content) { overflow: hidden; padding: 0; background: var(--bg-0); }
+.editModal :global(.ant-modal-header) { margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--line-1); background: var(--bg-1); }
+.editModal :global(.ant-modal-body) { padding: 0; }
+.editWorkspace { display: grid; grid-template-columns: 52px minmax(0, 1fr) 320px; min-height: min(760px, calc(100vh - 130px)); background: #101214; }
+.editToolbar { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 8px; border-right: 1px solid var(--line-1); background: var(--bg-1); }
+.editTool { display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-2); cursor: pointer; }
+.editTool:hover:not(:disabled), .editTool[data-active="true"] { border-color: var(--accent-line); background: var(--accent-subtle); color: var(--accent); }
+.editTool:disabled { cursor: not-allowed; opacity: 0.35; }
+.editDivider { width: 24px; height: 1px; margin: 4px 0; background: var(--line-1); }
+.editCanvasArea { display: grid; min-width: 0; min-height: 0; place-items: center; overflow: auto; padding: 24px; background: #141619; }
+.editCanvasFrame { position: relative; display: inline-grid; max-width: 100%; max-height: calc(100vh - 190px); transform-origin: center center; box-shadow: 0 18px 48px rgb(0 0 0 / 0.32); }
+.editCanvasFrame > img { display: block; max-width: 100%; max-height: calc(100vh - 190px); object-fit: contain; }
+.editCanvas { position: absolute; z-index: 2; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.editCanvas[data-tool="rect"] { cursor: crosshair; }
+.editCanvas[data-tool="pan"] { cursor: grab; }
+.editCanvas[data-tool="pan"]:active { cursor: grabbing; }
+.editCanvas[data-tool="brush"] { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%231888f2' stroke-width='2'/%3E%3C/svg%3E") 16 16, crosshair; }
+.editCanvas[data-tool="erase"] { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23f0f3f5' stroke-width='2'/%3E%3C/svg%3E") 16 16, crosshair; }
+.editCanvas[data-tool="protect"] { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23f29a18' stroke-width='2'/%3E%3C/svg%3E") 16 16, crosshair; }
+.editCanvas[data-tool="arrow"] { cursor: crosshair; }
+.editCanvas[data-tool="text"] { cursor: text; }
+.editInlineText { position: absolute; z-index: 5; display: block; min-width: 128px; max-width: min(320px, 45%); padding: 4px 6px; border: 1px solid currentColor; border-radius: 3px; outline: none; pointer-events: auto; background: rgb(12 14 16 / 0.9); box-shadow: 0 4px 16px rgb(0 0 0 / 0.32); font-family: inherit; }
+.editColorPicker, .editTextSize { display: grid; gap: 7px; color: var(--text-3); font-size: 12px; }
+.editColorPicker > div { display: flex; gap: 7px; }
+.editColorPicker button { width: 22px; height: 22px; padding: 0; border: 2px solid transparent; border-radius: 4px; cursor: pointer; }
+.editColorPicker button[data-active="true"] { border-color: var(--text-1); box-shadow: 0 0 0 1px var(--bg-1); }
+.editTextHint { margin: -8px 0 0; color: var(--text-3); font-size: 12px; }
+.editAgentPanel { display: flex; flex-direction: column; gap: 16px; padding: 20px; border-left: 1px solid var(--line-1); background: var(--bg-1); }
+.editAgentPanel h2 { margin: 3px 0 0; color: var(--text-1); font-family: var(--font-display); font-size: 20px; font-weight: 400; }
+.editEyebrow { margin: 0; color: var(--accent); font-size: 11px; letter-spacing: 0.1em; }
+.editHint { margin: 8px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.5; }
+.editBrushSize { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 12px; }
+.editBrushSize input { flex: 1; accent-color: var(--accent); }
+.editPlan { padding: 12px; border-left: 2px solid var(--accent); background: var(--accent-subtle); }
+.editPlan p, .editPlan span, .editError, .editSuccess { margin: 0; font-size: 13px; line-height: 1.55; }
+.editPlan p { color: var(--text-1); }
+.editPlan span { display: block; margin-top: 5px; color: var(--text-3); font-size: 11px; }
+.editError { color: var(--danger); }
+.editSuccess { color: var(--accent); }
+.editCommands { margin-top: auto; }
+.editCommands :global(.ant-btn) { width: 100%; }
+.editReferences > p { margin: 0 0 8px; color: var(--text-3); font-size: 12px; }
+.editReferences > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.editReferences button { overflow: hidden; padding: 0; border: 1px solid var(--line-1); border-radius: 5px; background: var(--bg-2); color: var(--text-3); cursor: pointer; }
+.editReferences button[data-selected="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.editReferences img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.editReferences span { display: block; padding: 3px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.editOutpaint { display: grid; gap: 6px; }
+.editOutpaint p { margin: 0; color: var(--text-3); font-size: 12px; }
+.editOutpaint p span { margin-left: 6px; color: var(--text-4); }
+.editOutpaint > div { display: flex; gap: 6px; }
+.editOutpaint button { display: grid; width: 30px; height: 30px; place-items: center; color: var(--text-3); border: 1px solid var(--line-1); border-radius: 4px; background: var(--bg-2); cursor: pointer; }
+.editOutpaint button[data-active="true"] { color: #e6f3ff; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--bg-2)); }
 
 @media (max-width: 960px) {
   .shell {

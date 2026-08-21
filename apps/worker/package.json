@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "tsx watch --env-file=../../.env src/worker.ts", "build": "tsc -p tsconfig.json", "test": "vitest run --passWithNoTests", "start": "node dist/worker.js" },
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/worker.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "start": "node dist/worker.js"
+  },
   "dependencies": {
     "@ecomgen/agent": "workspace:*",
     "@ecomgen/contracts": "workspace:*",
@@ -12,7 +17,8 @@
     "@ecomgen/jobs": "workspace:*",
     "@ecomgen/providers": "workspace:*",
     "archiver": "^7.0.1",
-    "bullmq": "^6.1.2"
+    "bullmq": "^6.1.2",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@types/archiver": "^6.0.4"

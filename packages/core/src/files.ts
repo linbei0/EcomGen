@@ -10,7 +10,7 @@ export class LocalAssetStore {
   }
 
   public async initialize(): Promise<void> {
-    await Promise.all(["assets", "outputs", "exports", "tmp"].map((part) => mkdir(join(this.root, part), { recursive: true })));
+    await Promise.all(["assets", "outputs", "exports", "edits", "tmp"].map((part) => mkdir(join(this.root, part), { recursive: true })));
   }
 
   public async putAsset(projectId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
@@ -31,6 +31,13 @@ export class LocalAssetStore {
   public async putExport(projectId: string, content: Buffer, extension = ".zip"): Promise<{ path: string; hash: string }> {
     const hash = createHash("sha256").update(content).digest("hex");
     const relativePath = join("exports", projectId, `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(extension)}`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
+  public async putEditArtifact(projectId: string, sessionId: string, turnId: string, name: string, content: Buffer): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const relativePath = join("edits", projectId, sessionId, turnId, `${name}-${hash.slice(0, 12)}${this.safeExtension(name)}`);
     await this.write(relativePath, content);
     return { path: relativePath, hash };
   }

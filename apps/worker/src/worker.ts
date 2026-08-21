@@ -1,9 +1,11 @@
 import { PassThrough } from "node:stream";
 import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 import { Worker } from "bullmq";
 import archiver from "archiver";
-import { planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
+import sharp from "sharp";
+import { planImageEdit, planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
 import { getTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
@@ -20,6 +22,8 @@ const redis = createRedisConnection(process.env.REDIS_URL ?? "redis://127.0.0.1:
 const events = new RedisProjectEventBus(redis.duplicate(), redis.duplicate());
 const recoveryRedis = redis.duplicate();
 const recoveryQueue = createJobQueue(recoveryRedis);
+const executionRedis = redis.duplicate();
+const executionQueue = createJobQueue(executionRedis);
 // 进程异常退出后，数据库中的 RUNNING 任务会被重新置为 QUEUED 并再次交给 BullMQ。
 for (const recovered of repository.recoverInterruptedJobs()) await enqueue(recoveryQueue, { jobId: recovered.id, kind: queueKindForJobType(recovered.type) });
 await recoveryQueue.close();
@@ -33,18 +37,27 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
     if (queueJob.data.kind === "plan") await executePlan(job);
     else if (queueJob.data.kind === "copywrite") await executeCopywriting(job);
     else if (queueJob.data.kind === "generate") await executeGeneration(job);
+    else if (queueJob.data.kind === "edit_plan") await executeEditPlan(job);
+    else if (queueJob.data.kind === "edit_generate") await executeEditGeneration(job);
     else await executeExport(job);
     const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") { await updateJob(job, { status: "CANCELLED", progress: current.progress }); } else await updateJob(job, { status: "SUCCEEDED", progress: 100 });
   } catch (error) {
     if (error instanceof JobCancelled) { await updateJob(job, { status: "CANCELLED", cancelRequested: true }); return; }
     const message = error instanceof Error ? error.message : String(error);
+    if (job.type === "EDIT_PLAN" || job.type === "EDIT_GENERATE") {
+      const turnId = typeof job.input.editTurnId === "string" ? job.input.editTurnId : "";
+      if (turnId) {
+        const turn = repository.updateEditTurn(turnId, { status: "FAILED", error: { message } });
+        if (turn) await events.publish(job.projectId, "edit-turn.updated", { turn });
+      }
+    }
     await updateJob(job, { status: "FAILED", progress: 100, error: { message, providerStatus: error instanceof ProviderError ? error.status : undefined } });
     throw error;
   }
 }, { connection: redis, concurrency: Number(process.env.WORKER_CONCURRENCY ?? 2) });
 
 worker.on("failed", (job, error) => { console.error(`Queue job ${job?.id ?? "unknown"} failed: ${error instanceof Error ? error.message : String(error)}`); });
-async function stop(): Promise<void> { await worker.close(); await events.close(); await redis.quit(); }
+async function stop(): Promise<void> { await worker.close(); await executionQueue.close(); await executionRedis.quit(); await events.close(); await redis.quit(); }
 process.once("SIGINT", () => { void stop().then(() => process.exit(0)); });
 process.once("SIGTERM", () => { void stop().then(() => process.exit(0)); });
 
@@ -188,6 +201,88 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   repository.updateStoryboardItem(item.id, { status: "GENERATED" }); await events.publish(project.id, "output.created", { output });
 }
 
+async function executeEditPlan(job: JobRecord): Promise<void> {
+  const turn = editTurnFor(job);
+  const project = projectFor(job);
+  const provider = providerFor(project.reasoningProviderId);
+  const model = provider.models.find((candidate) => candidate.id === project.reasoningModelId);
+  if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
+  await updateJob(job, { progress: 25 });
+  const session = repository.getEditSession(turn.sessionId); if (!session) throw new Error("Edit session is missing");
+  const assets = repository.listAssets(project.id);
+  const references = assets.filter((asset) => turn.referenceAssetIds.includes(asset.id)).map((asset) => ({ id: asset.id, name: asset.originalName, role: asset.role }));
+  const source = repository.getOutput(turn.baseOutputId); if (!source) throw new Error("Edit source output is missing");
+  let plan;
+  try {
+    plan = await planImageEdit({
+      model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
+      apiKey: secrets.decrypt(provider.encryptedApiKey),
+      message: turn.message,
+      annotations: turn.annotations,
+      hasEditMask: Boolean(turn.editMaskPath),
+      hasCanvasExpansion: Boolean((turn.annotations as Record<string, unknown>).canvasExpansion),
+      referenceAssets: references,
+      memorySummary: session.memorySummary,
+      projectFacts: project.verifiedFacts,
+      sourceImage: model.supportsVision ? { type: "image", mimeType: mimeForStoredPath(source.storagePath), data: (await storage.read(source.storagePath)).toString("base64") } : undefined
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (["REFERENCE_ASSET_REQUIRED", "EDIT_TARGET_REQUIRED", "OUTPAINT_CANVAS_REQUIRED"].includes(message)) {
+      const updated = repository.updateEditTurn(turn.id, { status: "NEED_INPUT", error: { message } });
+      if (updated) await events.publish(project.id, "edit-turn.updated", { turn: updated });
+      await updateJob(job, { progress: 90 });
+      return;
+    }
+    throw error;
+  }
+  throwIfCancelled(job);
+  const status = plan.requiresConfirmation ? "AWAITING_CONFIRMATION" : "GENERATING";
+  repository.updateEditTurn(turn.id, { status, plan: plan as unknown as Record<string, unknown>, error: null });
+  await events.publish(project.id, "edit-turn.updated", { turn: repository.getEditTurn(turn.id) });
+  if (!plan.requiresConfirmation) {
+    const generation = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "EDIT_GENERATE", input: { editTurnId: turn.id }, requestFingerprint: null, providerId: project.imageProviderId, modelId: project.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    await enqueue(executionQueue, { jobId: generation.id, kind: "edit_generate" });
+  }
+  await updateJob(job, { progress: 90 });
+}
+
+async function executeEditGeneration(job: JobRecord): Promise<void> {
+  const turn = editTurnFor(job);
+  const project = projectFor(job);
+  const session = repository.getEditSession(turn.sessionId); if (!session) throw new Error("Edit session is missing");
+  const source = repository.getOutput(turn.baseOutputId); if (!source || source.projectId !== project.id) throw new Error("Edit source output is missing or belongs to another project");
+  const plan = turn.plan as { operation?: string; prompt?: string; compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT"; memoryPatch?: { summary?: string; constraints?: string[] } } | null;
+  if (!plan?.operation || !plan.prompt || !plan.compositePolicy) throw new Error("Edit turn has no executable plan");
+  const outpaintExpansion = plan.compositePolicy === "OUTPAINT" ? canvasExpansionFor(turn) : null;
+  if (plan.compositePolicy === "OUTPAINT" && !outpaintExpansion) throw new Error("OUTPAINT_CANVAS_REQUIRED");
+  if (plan.compositePolicy === "MASK_LOCKED" && !turn.editMaskPath) throw new Error("EDIT_TARGET_REQUIRED");
+  const provider = providerFor(project.imageProviderId);
+  const model = provider.models.find((candidate) => candidate.id === project.imageModelId);
+  if (!model || model.imageApiKind !== "openai_images") throw new Error("CAPABILITY_UNSUPPORTED: selected image model cannot execute masked edits");
+  await updateJob(job, { progress: 30 });
+  const sourceImage = await storage.read(source.storagePath);
+  const mask = turn.editMaskPath ? await storage.read(turn.editMaskPath) : undefined;
+  if (mask) await assertMaskDimensions(sourceImage, mask);
+  const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+  const assets = repository.listAssets(project.id);
+  const references = await Promise.all(assets.filter((asset) => turn.referenceAssetIds.includes(asset.id)).map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType })));
+  const outpaintCanvas = outpaintExpansion ? await createOutpaintCanvas(sourceImage, outpaintExpansion) : null;
+  const inputImage = outpaintCanvas?.image ?? sourceImage;
+  const providerMask = outpaintCanvas?.mask ?? (mask ? await providerMaskFor(sourceImage, mask, turn.protectMaskPath ? await storage.read(turn.protectMaskPath) : undefined) : undefined);
+  const result = await generator.generate({ model: model.id, prompt: plan.prompt, quality: "high", images: [{ data: inputImage, filename: "source.png", mimeType: "image/png" }, ...references], mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined, inputFidelity: "high" });
+  throwIfCancelled(job);
+  await updateJob(job, { progress: 75, providerTaskId: result.providerTaskId ?? null });
+  const protectedMask = turn.protectMaskPath ? await storage.read(turn.protectMaskPath) : undefined;
+  const composed = plan.compositePolicy === "MASK_LOCKED" && mask ? await compositeMaskedEdit(sourceImage, result.image, mask, protectedMask) : outpaintCanvas ? await sharp(result.image).resize(outpaintCanvas.width, outpaintCanvas.height, { fit: "fill" }).png().toBuffer() : await sharp(result.image).png().toBuffer();
+  const stored = await storage.putOutput(project.id, composed, ".png");
+  const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex: 1, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: project.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex: 1, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy }, storagePath: stored.path, hash: stored.hash, reviewDecision: "NEEDS_REVIEW", reviewNote: null, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
+  repository.updateEditSession(session.id, { currentOutputId: output.id, memorySummary: { summary: plan.memoryPatch?.summary ?? session.memorySummary.summary, constraints: plan.memoryPatch?.constraints ?? session.memorySummary.constraints } });
+  repository.updateEditTurn(turn.id, { status: "SUCCEEDED", error: null });
+  await events.publish(project.id, "output.created", { output });
+  await events.publish(project.id, "edit-turn.updated", { turn: repository.getEditTurn(turn.id) });
+}
+
 async function executeExport(job: JobRecord): Promise<void> {
   throwIfCancelled(job);
   const project = projectFor(job); const outputIds = Array.isArray(job.input.outputIds) ? job.input.outputIds.filter((value): value is string => typeof value === "string") : undefined;
@@ -221,7 +316,53 @@ function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "PLAN") return "plan";
   if (type === "COPYWRITE") return "copywrite";
   if (type === "GENERATE") return "generate";
+  if (type === "EDIT_PLAN") return "edit_plan";
+  if (type === "EDIT_GENERATE") return "edit_generate";
   return "export";
+}
+function editTurnFor(job: JobRecord): EditTurnRecord { const turnId = typeof job.input.editTurnId === "string" ? job.input.editTurnId : ""; const turn = repository.getEditTurn(turnId); if (!turn || turn.projectId !== job.projectId) throw new Error("Edit turn is missing or belongs to another project"); return turn; }
+function canvasExpansionFor(turn: EditTurnRecord): { top: number; right: number; bottom: number; left: number } | null {
+  const value = (turn.annotations as Record<string, unknown>).canvasExpansion;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const expansion = value as Record<string, unknown>;
+  const read = (edge: "top" | "right" | "bottom" | "left") => typeof expansion[edge] === "number" && Number.isFinite(expansion[edge]) ? Math.max(0, Math.round(expansion[edge])) : 0;
+  const result = { top: read("top"), right: read("right"), bottom: read("bottom"), left: read("left") };
+  return result.top || result.right || result.bottom || result.left ? result : null;
+}
+async function createOutpaintCanvas(source: Buffer, expansion: { top: number; right: number; bottom: number; left: number }): Promise<{ image: Buffer; mask: Buffer; width: number; height: number }> {
+  const meta = await sharp(source).metadata(); if (!meta.width || !meta.height) throw new Error("Source image dimensions are unavailable");
+  const width = meta.width + expansion.left + expansion.right; const height = meta.height + expansion.top + expansion.bottom;
+  const original = await sharp(source).ensureAlpha().png().toBuffer();
+  const image = await sharp({ create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: original, left: expansion.left, top: expansion.top }]).png().toBuffer();
+  const protectedOriginal = await sharp({ create: { width: meta.width, height: meta.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } }).png().toBuffer();
+  const mask = await sharp({ create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: protectedOriginal, left: expansion.left, top: expansion.top }]).png().toBuffer();
+  return { image, mask, width, height };
+}
+async function assertMaskDimensions(source: Buffer, mask: Buffer): Promise<void> { const [sourceMeta, maskMeta] = await Promise.all([sharp(source).metadata(), sharp(mask).metadata()]); if (!sourceMeta.width || !sourceMeta.height || sourceMeta.width !== maskMeta.width || sourceMeta.height !== maskMeta.height) throw new Error("MASK_DIMENSION_MISMATCH"); }
+async function compositeMaskedEdit(source: Buffer, generated: Buffer, editMask: Buffer, protectMask?: Buffer): Promise<Buffer> {
+  const sourceMeta = await sharp(source).metadata(); if (!sourceMeta.width || !sourceMeta.height) throw new Error("Source image dimensions are unavailable");
+  let mask = sharp(editMask).greyscale().removeAlpha().resize(sourceMeta.width, sourceMeta.height, { fit: "fill" });
+  if (protectMask) {
+    const [editPixels, protectPixels] = await Promise.all([mask.raw().toBuffer(), sharp(protectMask).greyscale().removeAlpha().resize(sourceMeta.width, sourceMeta.height, { fit: "fill" }).raw().toBuffer()]);
+    for (let index = 0; index < editPixels.length; index += 1) editPixels[index] = Math.max(0, editPixels[index]! - protectPixels[index]!);
+    mask = sharp(editPixels, { raw: { width: sourceMeta.width, height: sourceMeta.height, channels: 1 } });
+  }
+  const alphaMask = await mask.png().toBuffer();
+  const resized = await sharp(generated).resize(sourceMeta.width, sourceMeta.height, { fit: "fill" }).png().toBuffer();
+  const foreground = await sharp(resized).removeAlpha().joinChannel(alphaMask).png().toBuffer();
+  return sharp(source).resize(sourceMeta.width, sourceMeta.height, { fit: "fill" }).composite([{ input: foreground }]).png().toBuffer();
+}
+function mimeForStoredPath(path: string): string { return path.endsWith(".jpg") || path.endsWith(".jpeg") ? "image/jpeg" : path.endsWith(".webp") ? "image/webp" : "image/png"; }
+async function providerMaskFor(source: Buffer, editMask: Buffer, protectMask?: Buffer): Promise<Buffer> {
+  const meta = await sharp(source).metadata(); if (!meta.width || !meta.height) throw new Error("Source image dimensions are unavailable");
+  const edit = await sharp(editMask).greyscale().removeAlpha().resize(meta.width, meta.height, { fit: "fill" }).raw().toBuffer();
+  const protect = protectMask ? await sharp(protectMask).greyscale().removeAlpha().resize(meta.width, meta.height, { fit: "fill" }).raw().toBuffer() : undefined;
+  const rgba = Buffer.alloc(edit.length * 4);
+  for (let index = 0; index < edit.length; index += 1) {
+    const editable = Math.max(0, edit[index]! - (protect?.[index] ?? 0));
+    const target = index * 4; rgba[target] = 0; rgba[target + 1] = 0; rgba[target + 2] = 0; rgba[target + 3] = 255 - editable;
+  }
+  return sharp(rgba, { raw: { width: meta.width, height: meta.height, channels: 4 } }).png().toBuffer();
 }
 class JobCancelled extends Error {}
 function throwIfCancelled(job: JobRecord): void { const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") throw new JobCancelled(`Job ${job.id} was cancelled`); }
