@@ -509,6 +509,7 @@ paths:
               type: object
               required: [summary, constraints]
               properties:
+                outputId: { type: string, format: uuid, description: Output node whose branch memory should be updated. Defaults to currentOutputId. }
                 summary: { type: string, maxLength: 4000 }
                 constraints: { type: array, items: { type: string, maxLength: 500 }, maxItems: 30 }
       responses:
@@ -1093,6 +1094,7 @@ components:
           properties:
             summary: { type: string }
             constraints: { type: array, items: { type: string } }
+            sourceOutputId: { type: string, format: uuid, description: Output node that owns the effective branch memory. }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     EditTurn:

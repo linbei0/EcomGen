@@ -1492,6 +1492,8 @@
 .editReferences span { display: block; padding: 3px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .editVersions, .editMemory { display: grid; gap: 7px; }
 .editVersions > p, .editMemory > p { margin: 0; color: var(--text-3); font-size: 12px; }
+.editMemoryHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.editMemoryHeading small { color: var(--text-4); font-size: 10px; }
 .editVersionRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; }
 .editVersionRow button { min-height: 28px; padding: 4px 7px; border: 1px solid var(--line-1); border-radius: 4px; background: var(--bg-2); color: var(--text-3); font-size: 11px; cursor: pointer; }
 .editVersionRow button:first-child { display: flex; justify-content: space-between; gap: 8px; text-align: left; }

@@ -13,7 +13,7 @@ export function kindForRole(role: AssetRole): UserAssetKind {
 
 export const PLATFORM_LABEL = {
   DOMESTIC: "国内平台",
-  AMAZON: "Amazon",
+  AMAZON: "亚马逊",
 } as const;
 
 export const RESOLUTION_LABEL = {

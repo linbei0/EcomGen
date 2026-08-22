@@ -41,10 +41,10 @@ const MARKET_OPTIONS: Array<{ value: Exclude<TargetMarket, null>; label: string 
 
 const COPY_LANGUAGE_OPTIONS = [
   { value: "zh-Hans", label: "简体中文 (zh-Hans)" }, { value: "zh-Hant", label: "繁体中文 (zh-Hant)" },
-  { value: "en-US", label: "English (US)" }, { value: "en-GB", label: "English (UK)" },
-  { value: "de-DE", label: "Deutsch" }, { value: "fr-FR", label: "Francais" },
-  { value: "it-IT", label: "Italiano" }, { value: "es-ES", label: "Espanol" },
-  { value: "ja-JP", label: "日本語" }, { value: "ko-KR", label: "한국어" },
+  { value: "en-US", label: "英语（美国）" }, { value: "en-GB", label: "英语（英国）" },
+  { value: "de-DE", label: "德语" }, { value: "fr-FR", label: "法语" },
+  { value: "it-IT", label: "意大利语" }, { value: "es-ES", label: "西班牙语" },
+  { value: "ja-JP", label: "日语" }, { value: "ko-KR", label: "韩语" },
 ];
 
 export function SetupPanel({ detail }: { detail: ProjectDetail }) {
@@ -236,7 +236,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
               allowClear
               placeholder="请选择目标平台"
               value={detail.platformTargets[0]}
-              options={[{ value: "DOMESTIC", label: "大陆电商" }, { value: "AMAZON", label: "Amazon" }]}
+              options={[{ value: "DOMESTIC", label: "大陆电商" }, { value: "AMAZON", label: "亚马逊" }]}
               onChange={(value: "DOMESTIC" | "AMAZON" | undefined) => void save({ platformTargets: value ? [value] : [] }, "保存平台失败")}
             />
           </label>

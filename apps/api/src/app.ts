@@ -285,7 +285,12 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.post("/api/v1/projects/:projectId/outputs/:outputId/edit-sessions", async (request, reply) => {
     const projectId = parameter(request, "projectId"); const outputId = parameter(request, "outputId"); ensureProject(repository, projectId);
     const output = repository.getOutput(outputId); if (!output || output.projectId !== projectId) missing("output", outputId);
-    const existing = repository.getActiveEditSession(projectId, outputId); if (existing) return reply.code(201).send(editSessionDetails(repository, existing));
+    const existing = repository.getActiveEditSession(projectId, outputId);
+    if (existing) {
+      const selected = existing.currentOutputId === outputId ? existing : repository.updateEditSession(existing.id, { currentOutputId: outputId });
+      if (!selected) missing("edit session", existing.id);
+      return reply.code(201).send(editSessionDetails(repository, selected));
+    }
     return reply.code(201).send(editSessionDetails(repository, repository.createEditSession({ id: randomUUID(), projectId, currentOutputId: outputId, status: "ACTIVE", memorySummary: {} })));
   });
   app.get("/api/v1/edit-sessions/:sessionId", async (request) => {
@@ -295,12 +300,16 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.patch("/api/v1/edit-sessions/:sessionId/memory", async (request) => {
     const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
     const body = object(request.body, "body");
+    const outputId = body.outputId === undefined ? session.currentOutputId : string(body.outputId, "outputId");
+    const output = repository.getOutput(outputId);
+    if (!output || output.projectId !== session.projectId || !repository.isOutputInEditSession(session.id, outputId)) throw new ApiError(400, "VALIDATION_ERROR", "outputId must belong to the edit session");
     const summary = optionalString(body.summary) ?? "";
-    const constraints = body.constraints === undefined ? (session.memorySummary.constraints ?? []) : stringArray(body.constraints, "constraints");
-    const updated = repository.updateEditSession(session.id, { memorySummary: { summary, constraints } });
+    const constraints = body.constraints === undefined ? (session.memorySummary.scopes?.[outputId]?.constraints ?? session.memorySummary.constraints ?? []) : stringArray(body.constraints, "constraints");
+    const scopes = { ...(session.memorySummary.scopes ?? {}), [outputId]: { summary, constraints } };
+    const updated = repository.updateEditSession(session.id, { memorySummary: { ...session.memorySummary, scopes } });
     if (!updated) missing("edit session", session.id);
     await events.publish(session.projectId, "edit-session.updated", { session: updated });
-    return updated;
+    return editSessionDetails(repository, updated);
   });
   app.post("/api/v1/edit-sessions/:sessionId/turns", async (request, reply) => {
     const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
@@ -350,7 +359,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const updated = repository.updateEditSession(session.id, { currentOutputId: outputId });
     if (!updated) missing("edit session", session.id);
     await events.publish(session.projectId, "edit-session.updated", { session: updated });
-    return updated;
+    return editSessionDetails(repository, updated);
   });
   app.get("/api/v1/jobs/:jobId", async (request) => { const job = repository.getJob(parameter(request, "jobId")); if (!job) missing("job", parameter(request, "jobId")); return job; });
   app.get("/api/v1/copywriting-jobs/:jobId/result", async (request) => {
@@ -396,8 +405,40 @@ function projectDetail(repository: EcomRepository, id: string): object { const p
 function editSessionDetails(repository: EcomRepository, session: EditSessionRecord): object {
   const editOutputs = repository.listEditOutputs(session.id);
   const rootIds = new Set(editOutputs.map((output) => output.rootOutputId).filter((id): id is string => Boolean(id)));
-  const versions = [...editOutputs, ...[...rootIds].map((id) => repository.getOutput(id)).filter((output): output is NonNullable<typeof output> => Boolean(output)), repository.getOutput(session.currentOutputId)].filter((output): output is NonNullable<typeof output> => Boolean(output)).filter((output, index, all) => all.findIndex((candidate) => candidate.id === output.id) === index).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  return { ...session, turns: repository.listEditTurns(session.id), versions };
+  const candidates = [...editOutputs, ...[...rootIds].map((id) => repository.getOutput(id)).filter((output): output is NonNullable<typeof output> => Boolean(output)), repository.getOutput(session.currentOutputId)].filter((output): output is NonNullable<typeof output> => Boolean(output)).filter((output, index, all) => all.findIndex((candidate) => candidate.id === output.id) === index);
+  const current = repository.getOutput(session.currentOutputId);
+  const byId = new Map(candidates.map((output) => [output.id, output]));
+  const relatedIds = new Set<string>();
+  let ancestor = current;
+  while (ancestor) {
+    relatedIds.add(ancestor.id);
+    ancestor = ancestor.parentOutputId ? byId.get(ancestor.parentOutputId) : undefined;
+  }
+  const descendants = [current].filter((output): output is NonNullable<typeof output> => Boolean(output));
+  while (descendants.length > 0) {
+    const parent = descendants.shift();
+    if (!parent) continue;
+    for (const child of candidates) {
+      if (child.parentOutputId !== parent.id || relatedIds.has(child.id)) continue;
+      relatedIds.add(child.id);
+      descendants.push(child);
+    }
+  }
+  const versions = candidates.filter((output) => relatedIds.has(output.id)).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  return { ...session, memorySummary: effectiveEditMemory(repository, session, session.currentOutputId), turns: repository.listEditTurns(session.id), versions };
+}
+function effectiveEditMemory(repository: EcomRepository, session: EditSessionRecord, outputId: string): { summary?: string; constraints?: string[]; sourceOutputId?: string } {
+  const scopes = session.memorySummary.scopes ?? {};
+  let current = repository.getOutput(outputId);
+  while (current) {
+    const scoped = scopes[current.id];
+    if (scoped) return { ...scoped, sourceOutputId: current.id };
+    current = current.parentOutputId ? repository.getOutput(current.parentOutputId) : undefined;
+  }
+  const output = repository.getOutput(outputId);
+  return output && !output.parentOutputId
+    ? { summary: session.memorySummary.summary, constraints: session.memorySummary.constraints, sourceOutputId: output.id }
+    : {};
 }
 function parseAssetRole(value: unknown): AssetRole {
   if (value === "PRODUCT" || value === "REFERENCE") return roleForUserAssetKind(value as UserAssetKind);

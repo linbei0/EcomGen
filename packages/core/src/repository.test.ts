@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import Database from "better-sqlite3";
 import { openDatabase } from "./database.js";
 import { EcomRepository } from "./repository.js";
 
@@ -58,6 +59,41 @@ describe("EcomRepository", () => {
       const migrated = openDatabase(filename);
       const project = new EcomRepository(migrated).getProject("legacy-project");
       expect(project).toMatchObject({ platformTargets: ["DOMESTIC"], targetMarket: null, copyLanguage: null });
+      migrated.close();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("removes legacy output review columns without losing output lineage", () => {
+    const directory = mkdtempSync(join(tmpdir(), "ecomgen-output-migration-"));
+    const filename = join(directory, "ecomgen.db");
+    try {
+      const legacy = new Database(filename);
+      legacy.exec(`
+        CREATE TABLE outputs (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          storyboard_item_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          candidate_index INTEGER NOT NULL,
+          generation_snapshot_json TEXT,
+          storage_path TEXT NOT NULL,
+          hash TEXT NOT NULL,
+          review_decision TEXT NOT NULL,
+          review_note TEXT,
+          created_at TEXT NOT NULL,
+          parent_output_id TEXT,
+          root_output_id TEXT,
+          edit_session_id TEXT,
+          edit_turn_id TEXT
+        );
+        INSERT INTO outputs VALUES ('root','p','item','job',1,NULL,'root.png','hash','NEEDS_REVIEW',NULL,'2026-01-01T00:00:00.000Z',NULL,NULL,NULL,NULL);
+      `);
+      legacy.close();
+      const migrated = openDatabase(filename);
+      expect(migrated.prepare("PRAGMA table_info(outputs)").all()).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: "review_decision" })]));
+      expect(migrated.prepare("SELECT id, parent_output_id FROM outputs").get()).toEqual({ id: "root", parent_output_id: null });
       migrated.close();
     } finally {
       rmSync(directory, { recursive: true, force: true });

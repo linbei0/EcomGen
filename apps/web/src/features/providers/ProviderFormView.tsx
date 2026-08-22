@@ -271,7 +271,7 @@ export function ProviderFormView({ view, onDone }: Props) {
                     <p className={styles.testOk}>
                       <CircleCheck size={14} aria-hidden />
                       <span className="num">连通 · {testRow.latencyMs}ms</span>
-                      {testRow.modelAvailable === false && <span>（模型未出现在 /models 列表）</span>}
+                      {testRow.modelAvailable === false && <span>（模型未出现在模型列表中）</span>}
                     </p>
                   )}
                   {testRow?.state === "fail" && (

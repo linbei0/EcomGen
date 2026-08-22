@@ -220,7 +220,7 @@ async function executeEditPlan(job: JobRecord): Promise<void> {
       hasEditMask: Boolean(turn.editMaskPath),
       hasCanvasExpansion: Boolean((turn.annotations as Record<string, unknown>).canvasExpansion),
       referenceAssets: references,
-      memorySummary: session.memorySummary,
+      memorySummary: effectiveEditMemory(session, turn.baseOutputId),
       projectFacts: project.verifiedFacts,
       sourceImage: model.supportsVision ? { type: "image", mimeType: mimeForStoredPath(source.storagePath), data: (await storage.read(source.storagePath)).toString("base64") } : undefined
     });
@@ -275,7 +275,9 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   const composed = plan.compositePolicy === "MASK_LOCKED" && mask ? await compositeMaskedEdit(sourceImage, result.image, mask, protectedMask) : outpaintCanvas ? await sharp(result.image).resize(outpaintCanvas.width, outpaintCanvas.height, { fit: "fill" }).png().toBuffer() : await sharp(result.image).png().toBuffer();
   const stored = await storage.putOutput(project.id, composed, ".png");
   const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex: 1, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: project.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex: 1, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy }, storagePath: stored.path, hash: stored.hash, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
-  const updatedSession = repository.updateEditSession(session.id, { currentOutputId: output.id, memorySummary: { summary: plan.memoryPatch?.summary ?? session.memorySummary.summary, constraints: plan.memoryPatch?.constraints ?? session.memorySummary.constraints } });
+  const inheritedMemory = effectiveEditMemory(session, source.id);
+  const nextMemory = { summary: plan.memoryPatch?.summary ?? inheritedMemory.summary, constraints: plan.memoryPatch?.constraints ?? inheritedMemory.constraints };
+  const updatedSession = repository.updateEditSession(session.id, { currentOutputId: output.id, memorySummary: { ...session.memorySummary, scopes: { ...(session.memorySummary.scopes ?? {}), [output.id]: nextMemory } } });
   repository.updateEditTurn(turn.id, { status: "SUCCEEDED", error: null });
   if (updatedSession) await events.publish(project.id, "edit-session.updated", { session: updatedSession });
   await events.publish(project.id, "output.created", { output });
@@ -295,6 +297,16 @@ async function executeExport(job: JobRecord): Promise<void> {
 
 function projectFor(job: JobRecord): ProjectRecord { const project = repository.getProject(job.projectId); if (!project) throw new Error(`Project not found for job ${job.id}`); return project; }
 function providerFor(id: string) { const provider = repository.getProvider(id); if (!provider) throw new Error(`Configured provider not found: ${id}`); return provider; }
+function effectiveEditMemory(session: { memorySummary: { summary?: string; constraints?: string[]; scopes?: Record<string, { summary?: string; constraints?: string[] }> } }, outputId: string): { summary?: string; constraints?: string[] } {
+  let current = repository.getOutput(outputId);
+  while (current) {
+    const scoped = session.memorySummary.scopes?.[current.id];
+    if (scoped) return scoped;
+    current = current.parentOutputId ? repository.getOutput(current.parentOutputId) : undefined;
+  }
+  const output = repository.getOutput(outputId);
+  return output && !output.parentOutputId ? { summary: session.memorySummary.summary, constraints: session.memorySummary.constraints } : {};
+}
 function generationAssets(project: ProjectRecord, mode: string): AssetRecord[] {
   const all = repository.listAssets(project.id).filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/"));
   return mode === "PIXEL_PROTECTED" ? all : all.slice(0, 4);

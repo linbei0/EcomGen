@@ -200,7 +200,12 @@ export interface EditSessionRecord {
   projectId: string;
   currentOutputId: string;
   status: EditSessionStatus;
-  memorySummary: { summary?: string; constraints?: string[] };
+  memorySummary: {
+    summary?: string;
+    constraints?: string[];
+    /** 以输出节点为键保存分支记忆，避免同一会话中的兄弟分支互相污染。 */
+    scopes?: Record<string, { summary?: string; constraints?: string[] }>;
+  };
   createdAt: string;
   updatedAt: string;
 }

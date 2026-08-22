@@ -14,11 +14,61 @@ export function openDatabase(filename: string): SqliteDatabase {
   return database;
 }
 
+function tableNames(database: SqliteDatabase): Set<string> {
+  const rows = database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>;
+  return new Set(rows.map((row) => row.name));
+}
+
+function columnNames(database: SqliteDatabase, table: string): Set<string> {
+  const rows = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return new Set(rows.map((row) => row.name));
+}
+
+/** 一次性清理审核字段，保留已有输出及编辑版本血缘。 */
+function removeLegacyOutputReviewColumns(database: SqliteDatabase): void {
+  const tables = tableNames(database);
+  if (!tables.has("outputs") || !columnNames(database, "outputs").has("review_decision")) return;
+  database.pragma("foreign_keys = OFF");
+  try {
+    database.exec(`
+      CREATE TABLE outputs_without_review (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        storyboard_item_id TEXT NOT NULL,
+        job_id TEXT NOT NULL,
+        candidate_index INTEGER NOT NULL DEFAULT 1,
+        generation_snapshot_json TEXT,
+        storage_path TEXT NOT NULL,
+        hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        parent_output_id TEXT,
+        root_output_id TEXT,
+        edit_session_id TEXT,
+        edit_turn_id TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (storyboard_item_id) REFERENCES storyboard_items(id) ON DELETE CASCADE,
+        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+      );
+      INSERT INTO outputs_without_review (
+        id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id
+      )
+      SELECT
+        id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id
+      FROM outputs;
+      DROP TABLE outputs;
+      ALTER TABLE outputs_without_review RENAME TO outputs;
+    `);
+  } finally {
+    database.pragma("foreign_keys = ON");
+  }
+}
+
 /**
  * 开发初期以本 schema 为唯一规范，不保留历史迁移或兼容分支；
  * 结构变更时直接删除旧开发库文件重建。
  */
 function migrate(database: SqliteDatabase): void {
+  removeLegacyOutputReviewColumns(database);
   database.exec(`
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,

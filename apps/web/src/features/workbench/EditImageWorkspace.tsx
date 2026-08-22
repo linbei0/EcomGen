@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import type { Asset, Output } from "../../api/adapters/projectDetail";
 import { API_BASE_URL } from "../../config/env";
 import { errorText } from "../../lib/errorText";
+import { editErrorLabel, editOperationLabel } from "../../lib/userText";
 import styles from "./workbench.module.css";
 
 type Tool = "pan" | "rect" | "brush" | "erase" | "protect" | "arrow" | "text";
@@ -14,7 +15,7 @@ interface Point { x: number; y: number; }
 interface Bounds { x: number; y: number; width: number; height: number; }
 interface TextDraft { point: Point; value: string; }
 interface Snapshot { edit: string; protect: string; annotations: Array<Record<string, unknown>>; }
-interface EditSessionState { id: string; currentOutputId: string; memorySummary: { summary?: string; constraints?: string[] }; versions: Array<{ id: string; createdAt: string }>; }
+interface EditSessionState { id: string; currentOutputId: string; memorySummary: { summary?: string; constraints?: string[]; sourceOutputId?: string }; versions: Array<{ id: string; createdAt: string }>; }
 
 const MARK_COLORS = ["#1888f2", "#ff5c5c", "#ffbf2f", "#25bd7b", "#9968f2"];
 
@@ -52,6 +53,7 @@ export function EditImageWorkspace({ projectId, output, outputs, assets, onSelec
   const [session, setSession] = useState<EditSessionState | null>(null);
   const [memorySummary, setMemorySummary] = useState("");
   const [memoryConstraints, setMemoryConstraints] = useState("");
+  const [memorySourceOutputId, setMemorySourceOutputId] = useState<string | undefined>();
   const [compareOutputId, setCompareOutputId] = useState<string | null>(null);
   const panRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
   const pendingAutoSelectRef = useRef<string | null>(null);
@@ -92,10 +94,10 @@ export function EditImageWorkspace({ projectId, output, outputs, assets, onSelec
   useEffect(() => () => { if (renderFrameRef.current !== null) cancelAnimationFrame(renderFrameRef.current); }, []);
   useEffect(() => { redrawOverlay(annotations); }, [annotations, tool, brushSize, markColor, textDraft]);
   useEffect(() => {
-    setSessionId(null); setSession(null); setTurn(null); setMessage(""); setAnnotations([]); setReferenceAssetIds([]); setOutpaintEdges({ top: false, right: false, bottom: false, left: false }); setHistory([]); setHistoryIndex(-1); setTextDraft(null); setZoom(1); setPanOffset({ x: 0, y: 0 }); setCompareOutputId(null);
+    setSessionId(null); setSession(null); setTurn(null); setMessage(""); setAnnotations([]); setReferenceAssetIds([]); setOutpaintEdges({ top: false, right: false, bottom: false, left: false }); setHistory([]); setHistoryIndex(-1); setTextDraft(null); setZoom(1); setPanOffset({ x: 0, y: 0 }); setCompareOutputId(null); setMemorySourceOutputId(undefined);
     if (!output) return;
     let cancelled = false;
-    void fetch(`${API_BASE_URL}/projects/${projectId}/outputs/${output.id}/edit-sessions`, { method: "POST" }).then(async (response) => { if (!response.ok) throw new Error(await response.text()); return response.json() as Promise<EditSessionState>; }).then((value) => { if (cancelled) return; setSessionId(value.id); setSession(value); setMemorySummary(value.memorySummary?.summary ?? ""); setMemoryConstraints((value.memorySummary?.constraints ?? []).join("\n")); }).catch(() => undefined);
+    void fetch(`${API_BASE_URL}/projects/${projectId}/outputs/${output.id}/edit-sessions`, { method: "POST" }).then(async (response) => { if (!response.ok) throw new Error(await response.text()); return response.json() as Promise<EditSessionState>; }).then((value) => { if (cancelled) return; setSessionId(value.id); setSession(value); setMemorySummary(value.memorySummary?.summary ?? ""); setMemoryConstraints((value.memorySummary?.constraints ?? []).join("\n")); setMemorySourceOutputId(value.memorySummary?.sourceOutputId); }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [output?.id, projectId]);
   useEffect(() => { if (!turn || ["SUCCEEDED", "FAILED", "NEED_INPUT"].includes(turn.status)) return; const timer = window.setInterval(() => { void refreshTurn(turn.id); }, 1500); return () => window.clearInterval(timer); }, [turn?.id, turn?.status]);
@@ -171,14 +173,14 @@ export function EditImageWorkspace({ projectId, output, outputs, assets, onSelec
     setSession(await response.json() as EditSessionState);
     onSelectOutput(versionId);
   };
-  const saveMemory = async () => { if (!session) return; const constraints = memoryConstraints.split(/\r?\n/).map((value) => value.trim()).filter(Boolean); const response = await fetch(`${API_BASE_URL}/edit-sessions/${session.id}/memory`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ summary: memorySummary.trim(), constraints }) }); if (!response.ok) throw new Error(await response.text()); const updated = await response.json() as EditSessionState; setSession((current) => current ? { ...current, ...updated } : updated); };
+  const saveMemory = async () => { if (!session || !output) return; const constraints = memoryConstraints.split(/\r?\n/).map((value) => value.trim()).filter(Boolean); const response = await fetch(`${API_BASE_URL}/edit-sessions/${session.id}/memory`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ outputId: output.id, summary: memorySummary.trim(), constraints }) }); if (!response.ok) throw new Error(await response.text()); const updated = await response.json() as EditSessionState; setSession((current) => current ? { ...current, ...updated } : updated); setMemorySourceOutputId(updated.memorySummary?.sourceOutputId); };
   const canvasBlob = (canvas: HTMLCanvasElement | null) => new Promise<Blob | null>((resolve) => canvas?.toBlob(resolve, "image/png"));
   const hasInk = (canvas: HTMLCanvasElement | null) => { if (!canvas) return false; const pixels = canvas.getContext("2d")?.getImageData(0, 0, canvas.width, canvas.height).data; return Boolean(pixels?.some((_, index) => index % 4 === 3 && pixels[index] !== 0)); };
   const submit = async () => {
     if (!output || !message.trim()) return; commitText();
     try { const [editMask, protectMask, id] = await Promise.all([hasInk(editMaskRef.current) ? canvasBlob(editMaskRef.current) : null, hasInk(protectMaskRef.current) ? canvasBlob(protectMaskRef.current) : null, ensureSession()]); const sourceWidth = editMaskRef.current?.width ?? 0; const sourceHeight = editMaskRef.current?.height ?? 0; const canvasExpansion = Object.values(outpaintEdges).some(Boolean) ? { top: outpaintEdges.top ? Math.round(sourceHeight * 0.2) : 0, right: outpaintEdges.right ? Math.round(sourceWidth * 0.2) : 0, bottom: outpaintEdges.bottom ? Math.round(sourceHeight * 0.2) : 0, left: outpaintEdges.left ? Math.round(sourceWidth * 0.2) : 0 } : undefined; const form = new FormData(); form.set("baseOutputId", output.id); form.set("message", message.trim()); form.set("annotations", JSON.stringify({ sourceWidth, sourceHeight, annotations, canvasExpansion })); form.set("referenceAssetIds", JSON.stringify(referenceAssetIds)); if (editMask) form.set("editMask", editMask, "edit-mask.png"); if (protectMask) form.set("protectMask", protectMask, "protect-mask.png"); const response = await fetch(`${API_BASE_URL}/edit-sessions/${id}/turns`, { method: "POST", body: form }); if (!response.ok) throw new Error(await response.text()); const result = await response.json() as { turnId: string }; setTurn({ id: result.turnId, status: "PLANNING", plan: null, error: null }); } catch (error) { setTurn({ id: "", status: "FAILED", plan: null, error: { message: errorText(error) } }); }
   };
-  const refreshSession = async (id: string, autoSelect = false) => { const response = await fetch(`${API_BASE_URL}/edit-sessions/${id}`); if (!response.ok) return; const value = await response.json() as EditSessionState; if (autoSelect) pendingAutoSelectRef.current = value.currentOutputId; setSession(value); setMemorySummary(value.memorySummary?.summary ?? ""); setMemoryConstraints((value.memorySummary?.constraints ?? []).join("\n")); };
+  const refreshSession = async (id: string, autoSelect = false) => { const response = await fetch(`${API_BASE_URL}/edit-sessions/${id}`); if (!response.ok) return; const value = await response.json() as EditSessionState; if (autoSelect) pendingAutoSelectRef.current = value.currentOutputId; setSession(value); setMemorySummary(value.memorySummary?.summary ?? ""); setMemoryConstraints((value.memorySummary?.constraints ?? []).join("\n")); setMemorySourceOutputId(value.memorySummary?.sourceOutputId); };
   const refreshTurn = async (id: string) => { const response = await fetch(`${API_BASE_URL}/edit-turns/${id}`); if (!response.ok) return; const value = await response.json() as EditTurn; setTurn(value); if (value.status === "SUCCEEDED" && sessionId) void refreshSession(sessionId, true); };
   const approve = async () => { if (!turn?.id) return; const response = await fetch(`${API_BASE_URL}/edit-turns/${turn.id}/approve`, { method: "POST" }); if (response.ok) setTurn((current) => current ? { ...current, status: "GENERATING" } : current); };
   const clearMarks = () => { const edit = editMaskRef.current; const protect = protectMaskRef.current; if (!edit || !protect) return; edit.getContext("2d")?.clearRect(0, 0, edit.width, edit.height); protect.getContext("2d")?.clearRect(0, 0, protect.width, protect.height); setAnnotations([]); redrawOverlay([]); pushHistory([]); };
@@ -189,11 +191,14 @@ export function EditImageWorkspace({ projectId, output, outputs, assets, onSelec
   const tools: Array<{ id: Tool; label: string; icon: ReactNode }> = [{ id: "pan", label: "移动画布", icon: <Hand size={18} /> }, { id: "rect", label: "框选可编辑区域", icon: <SquareDashedMousePointer size={18} /> }, { id: "brush", label: "涂抹可编辑区域", icon: <Brush size={18} /> }, { id: "erase", label: "擦除标记", icon: <Eraser size={18} /> }, { id: "protect", label: "保护区域", icon: <Shield size={18} /> }, { id: "arrow", label: "箭头标注", icon: <ArrowUpRight size={18} /> }, { id: "text", label: "文字标注", icon: <Type size={18} /> }];
   const sessionOutputs = (session?.versions ?? []).map((version) => outputs.find((item) => item.id === version.id)).filter((item): item is Output => Boolean(item));
   const versionLabel = (version: Output) => {
-    const byId = new Map(sessionOutputs.map((item) => [item.id, item]));
+    const byId = new Map(outputs.map((item) => [item.id, item]));
     let depth = 0;
     let parentId = version.parentOutputId;
     while (parentId && byId.has(parentId)) { depth += 1; parentId = byId.get(parentId)?.parentOutputId ?? null; }
-    return depth === 0 ? "原图" : `V${depth + 1}`;
+    if (depth === 0) return "原图";
+    const siblings = outputs.filter((candidate) => candidate.parentOutputId === version.parentOutputId).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    const ordinal = siblings.findIndex((candidate) => candidate.id === version.id) + 1;
+    return `V${depth + 1}${siblings.length > 1 ? ` · ${ordinal}` : ""}`;
   };
   const compareOutput = compareOutputId ? outputs.find((item) => item.id === compareOutputId) : undefined;
   const productIntent = /替换|换成|换为|商品|产品|货品/.test(message);
@@ -223,11 +228,11 @@ export function EditImageWorkspace({ projectId, output, outputs, assets, onSelec
         {sessionOutputs.length > 0 ? <div className={styles.editVersions}><p>连续版本</p><div>{sessionOutputs.map((version, index) => { const baseLabel = versionLabel(version); const duplicateCount = sessionOutputs.filter((candidate) => versionLabel(candidate) === baseLabel).length; const ordinal = sessionOutputs.slice(0, index).filter((candidate) => versionLabel(candidate) === baseLabel).length + 1; return <div key={version.id} className={styles.editVersionRow}><button type="button" data-current={output.id === version.id} onClick={() => void selectVersion(version.id)}><span>{baseLabel}{duplicateCount > 1 ? ` · ${ordinal}` : ""}</span><small>{output.id === version.id ? "当前" : "历史"}</small></button>{index < sessionOutputs.length - 1 && output.id !== version.id ? <button type="button" onClick={() => setCompareOutputId(compareOutputId === version.id ? null : version.id)}>{compareOutputId === version.id ? "取消对比" : "对比当前"}</button> : null}</div>; })}</div></div> : null}
         {compareOutput && compareOutput.id !== output.id ? <div className={styles.editCompare}><div><img src={output.url} alt="当前版本" /><span>当前</span></div><div><img src={compareOutput.url} alt="对比版本" /><span>对比</span></div></div> : null}
         {showReferencePicker && assets.filter((asset) => asset.kind === "REFERENCE").length > 0 ? <div className={styles.editReferences}><p>参考素材</p><div>{assets.filter((asset) => asset.kind === "REFERENCE").map((asset) => <button key={asset.id} type="button" data-selected={referenceAssetIds.includes(asset.id)} onClick={() => setReferenceAssetIds((current) => current.includes(asset.id) ? current.filter((id) => id !== asset.id) : [...current, asset.id])}><img src={asset.url} alt="" /><span>{asset.id.slice(0, 6)}</span></button>)}</div></div> : null}
-        {session ? <div className={styles.editMemory}><p>连续记忆</p><Input.TextArea value={memorySummary} onChange={(event) => setMemorySummary(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} placeholder="例如：保持晨光方向和木质台面" /><Input.TextArea value={memoryConstraints} onChange={(event) => setMemoryConstraints(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} placeholder="每行一条约束，例如：不要改变叶片形状" /><Button size="small" onClick={() => void saveMemory()}>保存记忆</Button></div> : null}
+        {session ? <div className={styles.editMemory}><div className={styles.editMemoryHeading}><p>当前分支记忆</p><small>{memorySourceOutputId && memorySourceOutputId !== output?.id ? `继承自 ${versionLabel(outputs.find((item) => item.id === memorySourceOutputId) ?? output)}` : memorySourceOutputId ? "本节点记忆" : "未设置"}</small></div><Input.TextArea value={memorySummary} onChange={(event) => setMemorySummary(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} placeholder="例如：保持晨光方向和木质台面" /><Input.TextArea value={memoryConstraints} onChange={(event) => setMemoryConstraints(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} placeholder="每行一条约束，例如：不要改变叶片形状" /><Button size="small" onClick={() => void saveMemory()}>保存记忆</Button></div> : null}
         <div className={styles.editOutpaint}><p>扩展画布 <span>每侧 20%</span></p><div><Tooltip title="向上扩展"><button type="button" data-active={outpaintEdges.top} onClick={() => toggleOutpaintEdge("top")} aria-label="向上扩展"><ArrowUp size={16} /></button></Tooltip><Tooltip title="向右扩展"><button type="button" data-active={outpaintEdges.right} onClick={() => toggleOutpaintEdge("right")} aria-label="向右扩展"><ArrowRight size={16} /></button></Tooltip><Tooltip title="向下扩展"><button type="button" data-active={outpaintEdges.bottom} onClick={() => toggleOutpaintEdge("bottom")} aria-label="向下扩展"><ArrowDown size={16} /></button></Tooltip><Tooltip title="向左扩展"><button type="button" data-active={outpaintEdges.left} onClick={() => toggleOutpaintEdge("left")} aria-label="向左扩展"><ArrowLeft size={16} /></button></Tooltip></div></div>
         <Input.TextArea value={message} onChange={(event) => setMessage(event.target.value)} autoSize={{ minRows: 4, maxRows: 8 }} placeholder="例如：把选中的菠萝颜色调得更金黄，保留叶片和背景光线" disabled={pending} />
-        {turn?.plan?.userSummary ? <div className={styles.editPlan}><p>{turn.plan.userSummary}</p><span>{turn.plan.operation === "PRECISE_INPAINT" ? "局部精确修改" : turn.plan.operation}</span></div> : null}
-        {turn?.status === "NEED_INPUT" || turn?.status === "FAILED" ? <p className={styles.editError}>{turn.error?.message ?? "需要补充编辑区域或参考素材。"}</p> : null}{turn?.status === "SUCCEEDED" ? <p className={styles.editSuccess}>新版本已生成，可关闭后继续在结果区编辑。</p> : null}
+        {turn?.plan?.userSummary ? <div className={styles.editPlan}><p>{turn.plan.userSummary}</p><span>{editOperationLabel(turn.plan.operation)}</span></div> : null}
+        {turn?.status === "NEED_INPUT" || turn?.status === "FAILED" ? <p className={styles.editError}>{editErrorLabel(turn.error?.message)}</p> : null}{turn?.status === "SUCCEEDED" ? <p className={styles.editSuccess}>新版本已生成，可关闭后继续在结果区编辑。</p> : null}
         <div className={styles.editCommands}>{turn?.status === "AWAITING_CONFIRMATION" || turn?.status === "PLAN_READY" ? <Button type="primary" onClick={() => void approve()}>确认修改</Button> : <Button type="primary" icon={<Send size={15} />} disabled={!message.trim() || pending} loading={pending} onClick={() => void submit()}>生成计划</Button>}</div>
       </aside>
     </div> : null}

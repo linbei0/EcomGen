@@ -984,6 +984,7 @@ export interface components {
             memorySummary: {
                 summary?: string;
                 constraints?: string[];
+                sourceOutputId?: string;
             };
             /** Format: date-time */
             createdAt: string;
@@ -1906,6 +1907,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    outputId?: string;
                     summary: string;
                     constraints: string[];
                 };

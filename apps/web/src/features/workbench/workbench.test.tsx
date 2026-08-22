@@ -182,7 +182,7 @@ describe("工作台 · 左栏编辑", () => {
     await waitFor(() => expect(patches.at(-1)).toMatchObject({ name: "新名字" }));
 
     await user.click(screen.getByLabelText("目标平台"));
-    await user.click(await screen.findByText("Amazon"));
+    await user.click(await screen.findByText("亚马逊"));
     await waitFor(() => expect(patches.at(-1)).toMatchObject({ platformTargets: ["AMAZON"] }));
 
     await user.click(screen.getByLabelText("默认模式"));

@@ -76,7 +76,7 @@ export function HomePage() {
             显影一套详情页。
           </h1>
           <p className={styles.lede}>
-            分镜可编辑、SKU 变体隔离、像素保护与事实约束——由 Pi 规划，由你确认。
+            分镜可编辑、SKU 变体隔离、像素保护与事实约束——由 Agent 规划，由你确认。
           </p>
           <div className={styles.ctaRow}>
             <Button
