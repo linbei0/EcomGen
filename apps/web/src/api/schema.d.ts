@@ -355,6 +355,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/edit-sessions/{sessionId}/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateEditSessionMemory"];
+        trace?: never;
+    };
     "/edit-sessions/{sessionId}/turns": {
         parameters: {
             query?: never;
@@ -984,7 +1002,10 @@ export interface components {
             currentOutputId: string;
             /** @enum {string} */
             status: "ACTIVE" | "ARCHIVED";
-            memorySummary: Record<string, never>;
+            memorySummary: {
+                summary?: string;
+                constraints?: string[];
+            };
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -1888,9 +1909,40 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EditSession"] & {
                         turns: components["schemas"]["EditTurn"][];
+                        versions?: components["schemas"]["Output"][];
                     };
                 };
             };
+        };
+    };
+    updateEditSessionMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    summary: string;
+                    constraints: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Updated edit session memory. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditSession"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     createEditTurn: {

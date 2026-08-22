@@ -5,7 +5,7 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type EditSessionRecord, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, ModelDefinition, OutputReviewDecision, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind } from "@ecomgen/contracts";
@@ -285,12 +285,22 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.post("/api/v1/projects/:projectId/outputs/:outputId/edit-sessions", async (request, reply) => {
     const projectId = parameter(request, "projectId"); const outputId = parameter(request, "outputId"); ensureProject(repository, projectId);
     const output = repository.getOutput(outputId); if (!output || output.projectId !== projectId) missing("output", outputId);
-    const existing = repository.getActiveEditSession(projectId, outputId); if (existing) return reply.code(201).send(existing);
-    return reply.code(201).send(repository.createEditSession({ id: randomUUID(), projectId, currentOutputId: outputId, status: "ACTIVE", memorySummary: {} }));
+    const existing = repository.getActiveEditSession(projectId, outputId); if (existing) return reply.code(201).send(editSessionDetails(repository, existing));
+    return reply.code(201).send(editSessionDetails(repository, repository.createEditSession({ id: randomUUID(), projectId, currentOutputId: outputId, status: "ACTIVE", memorySummary: {} })));
   });
   app.get("/api/v1/edit-sessions/:sessionId", async (request) => {
     const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
-    return { ...session, turns: repository.listEditTurns(session.id) };
+    return editSessionDetails(repository, session);
+  });
+  app.patch("/api/v1/edit-sessions/:sessionId/memory", async (request) => {
+    const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
+    const body = object(request.body, "body");
+    const summary = optionalString(body.summary) ?? "";
+    const constraints = body.constraints === undefined ? (session.memorySummary.constraints ?? []) : stringArray(body.constraints, "constraints");
+    const updated = repository.updateEditSession(session.id, { memorySummary: { summary, constraints } });
+    if (!updated) missing("edit session", session.id);
+    await events.publish(session.projectId, "edit-session.updated", { session: updated });
+    return updated;
   });
   app.post("/api/v1/edit-sessions/:sessionId/turns", async (request, reply) => {
     const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
@@ -336,7 +346,11 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.post("/api/v1/edit-sessions/:sessionId/select-output", async (request) => {
     const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
     const body = object(request.body, "body"); const outputId = string(body.outputId, "outputId"); const output = repository.getOutput(outputId); if (!output || output.projectId !== session.projectId) throw new ApiError(400, "VALIDATION_ERROR", "outputId must belong to this project");
-    return repository.updateEditSession(session.id, { currentOutputId: outputId });
+    if (!repository.isOutputInEditSession(session.id, output.id)) throw new ApiError(400, "VALIDATION_ERROR", "outputId is not part of this edit session");
+    const updated = repository.updateEditSession(session.id, { currentOutputId: outputId });
+    if (!updated) missing("edit session", session.id);
+    await events.publish(session.projectId, "edit-session.updated", { session: updated });
+    return updated;
   });
   app.get("/api/v1/jobs/:jobId", async (request) => { const job = repository.getJob(parameter(request, "jobId")); if (!job) missing("job", parameter(request, "jobId")); return job; });
   app.get("/api/v1/copywriting-jobs/:jobId/result", async (request) => {
@@ -380,6 +394,12 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
 function publicProvider(value: ProviderRecord): object { const { encryptedApiKey, ...provider } = value; return { ...provider, hasApiKey: Boolean(encryptedApiKey) }; }
 function publicSearchSource(value: SearchSourceRecord): object { const { encryptedApiKey, ...source } = value; return { ...source, hasApiKey: Boolean(encryptedApiKey) }; }
 function projectDetail(repository: EcomRepository, id: string): object { const project = repository.getProject(id); if (!project) missing("project", id); return { ...project, assets: repository.listAssets(id), storyboard: repository.getStoryboard(id), items: repository.listStoryboardItems(id), outputs: repository.listOutputs(id), jobs: repository.listJobs(id) }; }
+function editSessionDetails(repository: EcomRepository, session: EditSessionRecord): object {
+  const editOutputs = repository.listEditOutputs(session.id);
+  const rootIds = new Set(editOutputs.map((output) => output.rootOutputId).filter((id): id is string => Boolean(id)));
+  const versions = [...editOutputs, ...[...rootIds].map((id) => repository.getOutput(id)).filter((output): output is NonNullable<typeof output> => Boolean(output)), repository.getOutput(session.currentOutputId)].filter((output): output is NonNullable<typeof output> => Boolean(output)).filter((output, index, all) => all.findIndex((candidate) => candidate.id === output.id) === index).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  return { ...session, turns: repository.listEditTurns(session.id), versions };
+}
 function parseAssetRole(value: unknown): AssetRole {
   if (value === "PRODUCT" || value === "REFERENCE") return roleForUserAssetKind(value as UserAssetKind);
   return enumValue<AssetRole>(value, ["PRODUCT_TRUTH", "PACKAGING", "STYLE_REFERENCE", "LAYOUT_REFERENCE"], "role");

@@ -133,6 +133,10 @@ function adaptOutput(raw: unknown): Output | null {
     candidateIndex: asNumber(raw.candidateIndex),
     generationSnapshot: snapshot,
     storagePath: asString(raw.storagePath),
+    parentOutputId: asString(raw.parentOutputId) ?? null,
+    rootOutputId: asString(raw.rootOutputId) ?? null,
+    editSessionId: asString(raw.editSessionId) ?? null,
+    editTurnId: asString(raw.editTurnId) ?? null,
     url: outputPreviewUrl({ id, url: asString(raw.url) }),
   };
 }

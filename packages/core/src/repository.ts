@@ -469,6 +469,11 @@ export class EcomRepository {
   }
   public getOutput(id: string): OutputRecord | undefined { const row = this.db.prepare("SELECT * FROM outputs WHERE id=?").get(id); return row ? mapOutput(row as Row) : undefined; }
   public listOutputs(projectId: string): OutputRecord[] { return (this.db.prepare("SELECT * FROM outputs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapOutput); }
+  public listEditOutputs(sessionId: string): OutputRecord[] { return (this.db.prepare("SELECT * FROM outputs WHERE edit_session_id=? ORDER BY created_at ASC").all(sessionId) as Row[]).map(mapOutput); }
+  public isOutputInEditSession(sessionId: string, outputId: string): boolean {
+    const row = this.db.prepare("SELECT 1 FROM edit_sessions s WHERE s.id=? AND (s.current_output_id=? OR EXISTS (SELECT 1 FROM outputs o WHERE o.id=? AND o.edit_session_id=s.id) OR EXISTS (SELECT 1 FROM outputs o WHERE o.edit_session_id=s.id AND o.root_output_id=?)) LIMIT 1").get(sessionId, outputId, outputId, outputId);
+    return Boolean(row);
+  }
   public reviewOutput(id: string, reviewDecision: OutputReviewDecision, reviewNote: string | null): OutputRecord | undefined { const output = this.getOutput(id); if (!output) return undefined; this.db.prepare("UPDATE outputs SET review_decision=?,review_note=? WHERE id=?").run(reviewDecision, reviewNote, id); return this.getOutput(id); }
 
   public getEditSession(id: string): EditSessionRecord | undefined {

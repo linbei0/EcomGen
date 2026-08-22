@@ -1,6 +1,6 @@
 import { App, Button, Checkbox, Image, InputNumber, Modal, Segmented, Select } from "antd";
-import { CircleSlash, Maximize2, SquareCheckBig } from "lucide-react";
-import { useMemo, useState } from "react";
+import { CircleSlash, Maximize2, Minus, Plus, SquareCheckBig } from "lucide-react";
+import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import type { Output, ProjectDetail, StoryboardItem } from "../../api/adapters/projectDetail";
 import { useReviewOutput } from "../../api/hooks/useReview";
@@ -29,10 +29,24 @@ export function ReviewStage({
   const review = useReviewOutput(detail.id);
   const templates = useTemplates();
   const items = board.data?.items ?? detail.items;
-  const groups = useMemo(() => groupOutputsByItem(items, detail.outputs), [detail.outputs, items]);
+  const originalOutputs = useMemo(() => detail.outputs.filter((output) => !output.editSessionId), [detail.outputs]);
+  const editedOutputs = useMemo(() => detail.outputs.filter((output) => Boolean(output.editSessionId)), [detail.outputs]);
+  const groups = useMemo(() => groupOutputsByItem(items, originalOutputs), [originalOutputs, items]);
+  const editedByRoot = useMemo(() => {
+    const grouped = new Map<string, Output[]>();
+    for (const output of editedOutputs) {
+      const rootId = output.rootOutputId ?? output.parentOutputId;
+      if (!rootId) continue;
+      const bucket = grouped.get(rootId) ?? [];
+      bucket.push(output);
+      grouped.set(rootId, bucket.sort((left, right) => left.createdAt.localeCompare(right.createdAt)));
+    }
+    return grouped;
+  }, [editedOutputs]);
   const [picked, setPicked] = useState<string[]>([]);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [versionRootId, setVersionRootId] = useState<string | null>(null);
 
   const decide = (outputId: string, decision: ReviewDecision) => {
     void review.mutateAsync({ outputId, decision }).catch((error: unknown) => {
@@ -73,11 +87,20 @@ export function ReviewStage({
                 onToggle={() => toggle(output.id)}
                 onDecide={(decision) => decide(output.id, decision)}
                 onOpen={() => setLightboxId(output.id)}
+                editedOutputs={editedByRoot.get(output.id) ?? []}
+                onOpenVersions={() => setVersionRootId(output.id)}
               />
             ))}
           </div>
         </section>
       ))}
+
+      <VersionTreeModal
+        root={versionRootId ? detail.outputs.find((output) => output.id === versionRootId) : undefined}
+        outputs={versionRootId ? [detail.outputs.find((output) => output.id === versionRootId), ...(editedByRoot.get(versionRootId) ?? [])].filter((output): output is Output => Boolean(output)) : []}
+        onClose={() => setVersionRootId(null)}
+        onOpenOutput={(outputId) => { setVersionRootId(null); setEditingId(outputId); }}
+      />
 
       {picked.length > 0 ? (
         <div className={styles.confirmBar}>
@@ -118,7 +141,7 @@ export function ReviewStage({
         }}
         onEdit={() => { if (lightbox) setEditingId(lightbox.id); }}
       />
-      <EditImageWorkspace projectId={detail.id} output={detail.outputs.find((output) => output.id === editingId)} assets={detail.assets} onClose={() => setEditingId(null)} />
+      <EditImageWorkspace projectId={detail.id} output={detail.outputs.find((output) => output.id === editingId)} outputs={detail.outputs} assets={detail.assets} onSelectOutput={setEditingId} onClose={() => setEditingId(null)} />
     </div>
   );
 }
@@ -129,18 +152,23 @@ function ReviewCard({
   onToggle,
   onDecide,
   onOpen,
+  editedOutputs = [],
+  onOpenVersions,
 }: {
   output: Output;
   checked: boolean;
   onToggle: () => void;
   onDecide: (decision: ReviewDecision) => void;
   onOpen: () => void;
+  editedOutputs?: Output[];
+  onOpenVersions?: () => void;
 }) {
   return (
     <article className={styles.reviewCard} data-decision={output.reviewDecision} data-checked={checked}>
       <div className={styles.reviewThumb}>
         <img src={output.url} alt="" className={styles.outputImage} loading="lazy" decoding="async" />
         <span className={styles.reviewMark}>{REVIEW_LABEL[output.reviewDecision]}</span>
+        {editedOutputs.length > 0 ? <button type="button" className={styles.editVersionPeek} onClick={onOpenVersions} aria-label={`查看 ${editedOutputs.length} 个编辑版本`}><span className={styles.editVersionPeekImages}>{editedOutputs.slice(-3).map((version) => <img key={version.id} src={version.url} alt="" />)}</span><span>编辑 {editedOutputs.length} 版</span></button> : null}
         <div className={styles.reviewActions}>
           <button type="button" onClick={() => onDecide("SELECTED")} aria-label="选入">
             <SquareCheckBig size={16} strokeWidth={1.75} />
@@ -237,4 +265,51 @@ function LightboxModal({
     </Modal>
     </>
   );
+}
+
+function VersionTreeModal({ root, outputs, onClose, onOpenOutput }: { root: Output | undefined; outputs: Output[]; onClose: () => void; onOpenOutput: (outputId: string) => void }) {
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const nodes = useMemo(() => {
+    const byId = new Map(outputs.map((output) => [output.id, output]));
+    const children = new Map<string, Output[]>();
+    for (const output of outputs) { if (!output.parentOutputId) continue; const bucket = children.get(output.parentOutputId) ?? []; bucket.push(output); children.set(output.parentOutputId, bucket); }
+    const level = new Map<string, number>(root ? [[root.id, 0]] : []);
+    const visit = (output: Output) => {
+      for (const child of children.get(output.id) ?? []) {
+        level.set(child.id, (level.get(output.id) ?? 0) + 1);
+        visit(child);
+      }
+    };
+    if (root) visit(root);
+    const rows = new Map<number, Output[]>();
+    for (const output of outputs) { const bucket = rows.get(level.get(output.id) ?? 0) ?? []; bucket.push(output); rows.set(level.get(output.id) ?? 0, bucket); }
+    return [...rows.entries()].flatMap(([depth, row]) => row.map((output, index) => {
+      const parent = output.parentOutputId ? byId.get(output.parentOutputId) : undefined;
+      const siblings = parent ? (children.get(parent.id) ?? []) : [];
+      return {
+        output,
+        depth,
+        index,
+        x: 72 + index * 250,
+        y: 72 + depth * 190,
+        parent,
+        siblingCount: siblings.length,
+        siblingOrdinal: siblings.findIndex((candidate) => candidate.id === output.id) + 1,
+      };
+    }));
+  }, [outputs, root]);
+  const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => { event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { x: event.clientX, y: event.clientY, ox: offset.x, oy: offset.y }; };
+  const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => { if (!dragRef.current) return; setOffset({ x: dragRef.current.ox + event.clientX - dragRef.current.x, y: dragRef.current.oy + event.clientY - dragRef.current.y }); };
+  const pointerUp = () => { dragRef.current = null; };
+  return <Modal open={Boolean(root)} onCancel={onClose} footer={null} width="min(1100px, calc(100vw - 32px))" title="编辑版本关系">
+    <div className={styles.versionTreeHeader}><div><strong>{root ? "这张图的编辑版本" : ""}</strong><span>点击图片进入编辑，拖动画布查看关系</span></div><div><button type="button" onClick={() => setZoom((value) => Math.max(0.65, value - 0.1))} aria-label="缩小"><Minus size={16} /></button><span>{Math.round(zoom * 100)}%</span><button type="button" onClick={() => setZoom((value) => Math.min(1.5, value + 0.1))} aria-label="放大"><Plus size={16} /></button></div></div>
+    <div className={styles.versionTreeCanvas} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
+      <div className={styles.versionTreeWorld} style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${zoom})` }}>
+        <svg className={styles.versionTreeLinks} width="1000" height="650" aria-hidden>{nodes.filter((node) => node.parent).map((node) => { const parent = nodes.find((candidate) => candidate.output.id === node.parent?.id); return parent ? <path key={node.output.id} d={`M ${parent.x + 96} ${parent.y + 126} C ${parent.x + 96} ${parent.y + 155}, ${node.x + 96} ${node.y - 25}, ${node.x + 96} ${node.y}`} /> : null; })}</svg>
+        {nodes.map((node) => { const label = node.depth === 0 ? "原图" : `V${node.depth + 1}${node.siblingCount > 1 ? ` · ${node.siblingOrdinal}` : ""}`; return <button type="button" key={node.output.id} className={styles.versionTreeNode} style={{ left: node.x, top: node.y }} onPointerDown={(event) => event.stopPropagation()} onClick={() => onOpenOutput(node.output.id)}><img src={node.output.url} alt="" /><span>{label}</span></button>; })}
+      </div>
+    </div>
+  </Modal>;
 }

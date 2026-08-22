@@ -277,8 +277,9 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   const composed = plan.compositePolicy === "MASK_LOCKED" && mask ? await compositeMaskedEdit(sourceImage, result.image, mask, protectedMask) : outpaintCanvas ? await sharp(result.image).resize(outpaintCanvas.width, outpaintCanvas.height, { fit: "fill" }).png().toBuffer() : await sharp(result.image).png().toBuffer();
   const stored = await storage.putOutput(project.id, composed, ".png");
   const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex: 1, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: project.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex: 1, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy }, storagePath: stored.path, hash: stored.hash, reviewDecision: "NEEDS_REVIEW", reviewNote: null, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
-  repository.updateEditSession(session.id, { currentOutputId: output.id, memorySummary: { summary: plan.memoryPatch?.summary ?? session.memorySummary.summary, constraints: plan.memoryPatch?.constraints ?? session.memorySummary.constraints } });
+  const updatedSession = repository.updateEditSession(session.id, { currentOutputId: output.id, memorySummary: { summary: plan.memoryPatch?.summary ?? session.memorySummary.summary, constraints: plan.memoryPatch?.constraints ?? session.memorySummary.constraints } });
   repository.updateEditTurn(turn.id, { status: "SUCCEEDED", error: null });
+  if (updatedSession) await events.publish(project.id, "edit-session.updated", { session: updatedSession });
   await events.publish(project.id, "output.created", { output });
   await events.publish(project.id, "edit-turn.updated", { turn: repository.getEditTurn(turn.id) });
 }

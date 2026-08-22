@@ -492,6 +492,32 @@ paths:
                     required: [turns]
                     properties:
                       turns: { type: array, items: { $ref: '#/components/schemas/EditTurn' } }
+                      versions: { type: array, items: { $ref: '#/components/schemas/Output' } }
+  /edit-sessions/{sessionId}/memory:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateEditSessionMemory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [summary, constraints]
+              properties:
+                summary: { type: string, maxLength: 4000 }
+                constraints: { type: array, items: { type: string, maxLength: 500 }, maxItems: 30 }
+      responses:
+        '200':
+          description: Updated edit session memory.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EditSession' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /edit-sessions/{sessionId}/turns:
     parameters:
       - name: sessionId
@@ -1087,7 +1113,11 @@ components:
         projectId: { type: string, format: uuid }
         currentOutputId: { type: string, format: uuid }
         status: { type: string, enum: [ACTIVE, ARCHIVED] }
-        memorySummary: { type: object }
+        memorySummary:
+          type: object
+          properties:
+            summary: { type: string }
+            constraints: { type: array, items: { type: string } }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     EditTurn:

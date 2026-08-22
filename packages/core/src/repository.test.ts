@@ -120,6 +120,10 @@ describe("EcomRepository", () => {
     repository.updateEditSession(session.id, { currentOutputId: derived.id });
     expect(repository.getActiveEditSession(project.id, derived.id)?.id).toBe(session.id);
     expect(repository.getOutput(derived.id)).toMatchObject({ parentOutputId: root.id, rootOutputId: root.id, editTurnId: turn.id });
+    expect(repository.listEditOutputs(session.id).map((output) => output.id)).toEqual([derived.id]);
+    expect(repository.isOutputInEditSession(session.id, root.id)).toBe(true);
+    expect(repository.isOutputInEditSession(session.id, derived.id)).toBe(true);
+    expect(repository.isOutputInEditSession(session.id, "other-output")).toBe(false);
     database.close();
   });
 
