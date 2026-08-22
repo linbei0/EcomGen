@@ -42,6 +42,8 @@ export function StoryboardInspector({
   const [draft, setDraft] = useState<Draft>(toDraft(item));
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const snapshot = useRef(item);
+  const saveVersion = useRef(0);
+  const saveQueue = useRef(Promise.resolve());
 
   useEffect(() => {
     snapshot.current = item;
@@ -53,17 +55,25 @@ export function StoryboardInspector({
     if (item.status === "GENERATING") return;
     const next = patchFrom(snapshot.current, draft);
     if (!next) return;
+    const version = ++saveVersion.current;
     const timer = window.setTimeout(() => {
       setSaveState("saving");
-      void persist({ itemId: item.id, body: next })
-        .then((saved) => {
-          snapshot.current = saved;
-          setSaveState("saved");
-        })
-        .catch((error: unknown) => {
-          setDraft(toDraft(snapshot.current));
-          setSaveState("idle");
-          notification.error({ title: "分镜未保存", description: errorText(error) });
+      saveQueue.current = saveQueue.current
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            const saved = await persist({ itemId: item.id, body: next });
+            if (saveVersion.current === version) {
+              snapshot.current = saved;
+              setSaveState("saved");
+            }
+          } catch (error: unknown) {
+            if (saveVersion.current === version) {
+              setDraft(toDraft(snapshot.current));
+              setSaveState("idle");
+              notification.error({ title: "分镜未保存", description: errorText(error) });
+            }
+          }
         });
     }, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);

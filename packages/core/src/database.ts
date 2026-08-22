@@ -282,5 +282,12 @@ function migrate(database: SqliteDatabase): void {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       FOREIGN KEY (base_output_id) REFERENCES outputs(id)
     );
+    CREATE INDEX IF NOT EXISTS idx_assets_project_created ON assets(project_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_storyboard_items_project_sort ON storyboard_items(project_id, storyboard_version, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_jobs_project_status_updated ON jobs(project_id, status, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_outputs_project_created ON outputs(project_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_outputs_root_created ON outputs(root_output_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_exports_project_updated ON exports(project_id, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_edit_turns_project_updated ON edit_turns(project_id, updated_at);
   `);
 }

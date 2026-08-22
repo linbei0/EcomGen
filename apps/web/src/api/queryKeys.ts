@@ -8,5 +8,7 @@ export const qk = {
   project: (id: string) => ["projects", id] as const,
   storyboard: (id: string) => ["projects", id, "storyboard"] as const,
   job: (id: string) => ["jobs", id] as const,
+  editTurn: (id: string) => ["edit-turns", id] as const,
+  export: (id: string) => ["exports", id] as const,
   exports: (id: string) => ["projects", id, "exports"] as const,
 };

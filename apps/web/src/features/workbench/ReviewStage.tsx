@@ -292,6 +292,7 @@ function VersionTreeModal({ root, outputs, onClose, onOpenOutput, selectedOutput
       };
     }));
   }, [outputs, root]);
+  const nodesById = useMemo(() => new Map(nodes.map((node) => [node.output.id, node])), [nodes]);
   const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => { event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { x: event.clientX, y: event.clientY, ox: offset.x, oy: offset.y }; };
   const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => { if (!dragRef.current) return; setOffset({ x: dragRef.current.ox + event.clientX - dragRef.current.x, y: dragRef.current.oy + event.clientY - dragRef.current.y }); };
   const pointerUp = () => { dragRef.current = null; };
@@ -317,7 +318,7 @@ function VersionTreeModal({ root, outputs, onClose, onOpenOutput, selectedOutput
       onWheel={handleWheel}
     >
       <div className={styles.versionTreeWorld} style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${zoom})` }}>
-        <svg className={styles.versionTreeLinks} width="1000" height="650" aria-hidden>{nodes.filter((node) => node.parent).map((node) => { const parent = nodes.find((candidate) => candidate.output.id === node.parent?.id); return parent ? <path key={node.output.id} d={`M ${parent.x + 96} ${parent.y + 126} C ${parent.x + 96} ${parent.y + 155}, ${node.x + 96} ${node.y - 25}, ${node.x + 96} ${node.y}`} /> : null; })}</svg>
+        <svg className={styles.versionTreeLinks} width="1000" height="650" aria-hidden>{nodes.filter((node) => node.parent).map((node) => { const parent = node.parent ? nodesById.get(node.parent.id) : undefined; return parent ? <path key={node.output.id} d={`M ${parent.x + 96} ${parent.y + 126} C ${parent.x + 96} ${parent.y + 155}, ${node.x + 96} ${node.y - 25}, ${node.x + 96} ${node.y}`} /> : null; })}</svg>
         {nodes.map((node) => { const label = node.depth === 0 ? "原图" : `V${node.depth + 1}${node.siblingCount > 1 ? ` · ${node.siblingOrdinal}` : ""}`; return <div key={node.output.id} className={styles.versionTreeNode} style={{ left: node.x, top: node.y }} onPointerDown={(event) => event.stopPropagation()}><button type="button" className={styles.versionTreeOpen} onClick={() => onOpenOutput(node.output.id)}><img src={node.output.url} alt="" /><span>{label}</span></button><label className={styles.versionTreeSelect}><input type="checkbox" checked={selectedOutputIds.includes(node.output.id)} onChange={() => onToggleSelection(node.output.id)} aria-label={`选择下载 ${label}`} /></label><button type="button" className={styles.versionTreeDownload} onClick={() => onDownload(node.output, label)} aria-label={`下载 ${label}`}><Download size={14} /></button></div>; })}
       </div>
     </div>

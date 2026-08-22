@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { createReadStream } from "node:fs";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
@@ -44,6 +45,14 @@ export class LocalAssetStore {
 
   public async read(relativePath: string): Promise<Buffer> {
     return readFile(this.absolute(relativePath));
+  }
+
+  public stream(relativePath: string) {
+    return createReadStream(this.absolute(relativePath));
+  }
+
+  public async size(relativePath: string): Promise<number> {
+    return (await stat(this.absolute(relativePath))).size;
   }
 
   public async exists(relativePath: string): Promise<boolean> {

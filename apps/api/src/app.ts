@@ -391,9 +391,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.get("/api/v1/projects/:projectId/outputs", async (request) => repository.listOutputs(parameter(request, "projectId")));
   app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = object(request.body ?? {}, "body"); const input = { outputIds: optionalStringArray(body.outputIds), filenamePrefix: optionalString(body.filenamePrefix) }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueue(queue, { jobId: job.id, kind: "export" }); return reply.code(202).send({ job, export: exportRecord }); });
   app.get("/api/v1/exports/:exportId", async (request) => { const result = repository.getExport(parameter(request, "exportId")); if (!result) missing("export", parameter(request, "exportId")); return result; });
-  app.get("/api/v1/files/assets/:assetId", async (request, reply) => sendStored(reply, storage, repository.getAsset(parameter(request, "assetId")), "asset"));
-  app.get("/api/v1/files/outputs/:outputId", async (request, reply) => sendStored(reply, storage, repository.getOutput(parameter(request, "outputId")), "output"));
-  app.get("/api/v1/files/exports/:exportId", async (request, reply) => sendStored(reply, storage, repository.getExport(parameter(request, "exportId")), "export"));
+  app.get("/api/v1/files/assets/:assetId", async (request, reply) => sendStored(request, reply, storage, repository.getAsset(parameter(request, "assetId")), "asset"));
+  app.get("/api/v1/files/outputs/:outputId", async (request, reply) => sendStored(request, reply, storage, repository.getOutput(parameter(request, "outputId")), "output"));
+  app.get("/api/v1/files/exports/:exportId", async (request, reply) => sendStored(request, reply, storage, repository.getExport(parameter(request, "exportId")), "export"));
   app.get("/api/v1/events", { sse: "only" }, async (request, reply) => {
     const projectId = typeof request.query === "object" && request.query && "projectId" in request.query ? String((request.query as Record<string, unknown>).projectId) : ""; if (!projectId) throw new ApiError(400, "VALIDATION_ERROR", "projectId query parameter is required"); ensureProject(repository, projectId);
     reply.sse.keepAlive(); const unsubscribe = await events.subscribe(projectId, (event) => { void reply.sse.send({ id: event.id, event: event.type, data: event }); }); reply.sse.onClose(() => { void unsubscribe(); }); await reply.sse.send({ event: "connected", data: { projectId } });
@@ -534,5 +534,18 @@ function copyLanguageValue(value: unknown): string | null {
 }
 function objectOfStrings(value: unknown, path: string): Record<string, string> { const result = object(value, path); for (const [key, item] of Object.entries(result)) if (typeof item !== "string") throw new ApiError(400, "VALIDATION_ERROR", `${path}.${key} must be a string`); return result as Record<string, string>; }
 function requireModels(value: unknown): ModelDefinition[] { if (!Array.isArray(value) || value.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "models must contain at least one model"); return value.map((model, index) => { const entry = object(model, `models[${index}]`); return { id: string(entry.id, `models[${index}].id`), supportsVision: Boolean(entry.supportsVision), supportsThinking: Boolean(entry.supportsThinking), supportsTools: Boolean(entry.supportsTools), supportsStructuredOutput: Boolean(entry.supportsStructuredOutput), imageApiKind: entry.imageApiKind === "openai_images" || entry.imageApiKind === "custom" ? entry.imageApiKind : null }; }); }
-async function sendStored(reply: FastifyReply, storage: LocalAssetStore, record: { storagePath: string | null; mimeType?: string } | undefined, name: string): Promise<unknown> { if (!record || !record.storagePath) missing(name, "unknown"); return reply.type(record.mimeType ?? mimeForPath(record.storagePath)).send(await storage.read(record.storagePath)); }
+async function sendStored(request: FastifyRequest, reply: FastifyReply, storage: LocalAssetStore, record: { storagePath: string | null; mimeType?: string; hash?: string } | undefined, name: string): Promise<unknown> {
+  if (!record || !record.storagePath) missing(name, "unknown");
+  const etag = record.hash ? `"${record.hash}"` : undefined;
+  if (etag && request.headers["if-none-match"] === etag) return reply.code(304).send();
+  const size = await storage.size(record.storagePath);
+  reply
+    .type(record.mimeType ?? mimeForPath(record.storagePath))
+    .header("cache-control", "public, max-age=31536000, immutable")
+    .header("accept-ranges", "bytes")
+    .header("content-length", size)
+    .header("etag", etag ?? `W/"${size}"`)
+    .send(storage.stream(record.storagePath));
+  return reply;
+}
 function mimeForPath(path: string): string { if (path.endsWith(".png")) return "image/png"; if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg"; if (path.endsWith(".webp")) return "image/webp"; if (path.endsWith(".zip")) return "application/zip"; return "application/octet-stream"; }

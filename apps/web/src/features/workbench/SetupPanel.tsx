@@ -70,6 +70,18 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const [activeCopywritingJob, setActiveCopywritingJob] = useState<{ id: string; target: CopywritingTarget } | undefined>(undefined);
   const [copyLanguage, setCopyLanguage] = useState(detail.copyLanguage ?? "");
   const [savedCopyLanguage, setSavedCopyLanguage] = useState(detail.copyLanguage ?? "");
+  const [platformTarget, setPlatformTarget] = useState(detail.platformTargets[0]);
+  const [targetMarket, setTargetMarket] = useState(detail.targetMarket ?? undefined);
+  const [defaultMode, setDefaultMode] = useState(detail.defaultMode);
+  const [reasoningKeyDraft, setReasoningKeyDraft] = useState(`${detail.reasoningProviderId}::${detail.reasoningModelId}`);
+  const [imageKeyDraft, setImageKeyDraft] = useState(`${detail.imageProviderId}::${detail.imageModelId}`);
+  const [imageResolution, setImageResolution] = useState(detail.imageResolution);
+  const [imageAspectRatio, setImageAspectRatio] = useState(detail.imageAspectRatio);
+  const [candidatesPerType, setCandidatesPerType] = useState(detail.candidatesPerType);
+  const candidateRef = useRef(detail.candidatesPerType);
+  const candidatePending = useRef(false);
+  const candidateQueue = useRef(Promise.resolve());
+  const projectSaveQueue = useRef(Promise.resolve());
   const handledCopywritingJobs = useRef(new Set<string>());
 
   useEffect(() => setName(detail.name), [detail.name]);
@@ -83,17 +95,72 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
     setCopyLanguage(next);
     setSavedCopyLanguage(next);
   }, [detail.copyLanguage]);
+  useEffect(() => setPlatformTarget(detail.platformTargets[0]), [detail.platformTargets]);
+  useEffect(() => setTargetMarket(detail.targetMarket ?? undefined), [detail.targetMarket]);
+  useEffect(() => setDefaultMode(detail.defaultMode), [detail.defaultMode]);
+  useEffect(() => setReasoningKeyDraft(`${detail.reasoningProviderId}::${detail.reasoningModelId}`), [detail.reasoningProviderId, detail.reasoningModelId]);
+  useEffect(() => setImageKeyDraft(`${detail.imageProviderId}::${detail.imageModelId}`), [detail.imageProviderId, detail.imageModelId]);
+  useEffect(() => setImageResolution(detail.imageResolution), [detail.imageResolution]);
+  useEffect(() => setImageAspectRatio(detail.imageAspectRatio), [detail.imageAspectRatio]);
+  useEffect(() => {
+    if (candidatePending.current) return;
+    candidateRef.current = detail.candidatesPerType;
+    setCandidatesPerType(detail.candidatesPerType);
+  }, [detail.candidatesPerType]);
   useEffect(() => {
     if (selected.length > 0 || catalog.length === 0 || stored.length > 0) return;
     setSelected([catalog[0]!.id]);
   }, [catalog, selected.length, stored.length]);
 
   const save = async (body: UpdateProjectInput, failureTitle: string) => {
-    try {
-      await updateProject.mutateAsync(body);
-    } catch (error) {
-      notification.error({ title: failureTitle, description: errorText(error) });
-    }
+    projectSaveQueue.current = projectSaveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          await updateProject.mutateAsync(body);
+        } catch (error) {
+          notification.error({ title: failureTitle, description: errorText(error) });
+        }
+      });
+    await projectSaveQueue.current;
+  };
+
+  const saveOptimistic = async <T,>(next: T, setValue: (value: T) => void, previous: T, body: UpdateProjectInput, failureTitle: string) => {
+    setValue(next);
+    projectSaveQueue.current = projectSaveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          await updateProject.mutateAsync(body);
+        } catch (error) {
+          setValue(previous);
+          notification.error({ title: failureTitle, description: errorText(error) });
+        }
+      });
+    await projectSaveQueue.current;
+  };
+
+  const changeCandidates = (delta: number) => {
+    const next = Math.min(4, Math.max(1, candidateRef.current + delta));
+    if (next === candidateRef.current) return;
+    candidateRef.current = next;
+    candidatePending.current = true;
+    setCandidatesPerType(next);
+    candidateQueue.current = candidateQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          await updateProject.mutateAsync({ candidatesPerType: next });
+          if (candidateRef.current === next) candidatePending.current = false;
+        } catch (error) {
+          if (candidateRef.current === next) {
+            candidatePending.current = false;
+            candidateRef.current = detail.candidatesPerType;
+            setCandidatesPerType(detail.candidatesPerType);
+          }
+          notification.error({ title: "保存出图数失败", description: errorText(error) });
+        }
+      });
   };
 
   const commitName = async () => {
@@ -126,8 +193,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   );
   const reasoningOptions = modelOptions(providers.data?.items ?? [], "reasoning");
   const imageOptions = modelOptions(providers.data?.items ?? [], "image");
-  const reasoningKey = `${detail.reasoningProviderId}::${detail.reasoningModelId}`;
-  const imageKey = `${detail.imageProviderId}::${detail.imageModelId}`;
+  const reasoningKey = reasoningKeyDraft;
+  const imageKey = imageKeyDraft;
   const webResearchAvailable = health.data?.webResearchAvailable === true;
   const configuredReasoningModel = providers.data?.items
     .find((provider) => provider.id === detail.reasoningProviderId)
@@ -194,10 +261,10 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
         planningMode,
         requestedTypes: planningMode === "MANUAL" ? selected : undefined,
         userInstruction: instruction.trim() || undefined,
-        candidatesPerType: detail.candidatesPerType,
+        candidatesPerType,
         ...(planningMode === "AI" ? { targetImageCount } : {}),
-        imageResolution: detail.imageResolution,
-        imageAspectRatio: detail.imageAspectRatio,
+        imageResolution,
+        imageAspectRatio,
         regenerationKey: seedJob?.status === "SUCCEEDED" ? crypto.randomUUID() : undefined,
       });
       if (selected.length > 0) saveImageTypes(detail.id, selected);
@@ -235,9 +302,9 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
               aria-label="目标平台"
               allowClear
               placeholder="请选择目标平台"
-              value={detail.platformTargets[0]}
+              value={platformTarget}
               options={[{ value: "DOMESTIC", label: "大陆电商" }, { value: "AMAZON", label: "亚马逊" }]}
-              onChange={(value: "DOMESTIC" | "AMAZON" | undefined) => void save({ platformTargets: value ? [value] : [] }, "保存平台失败")}
+              onChange={(value: "DOMESTIC" | "AMAZON" | undefined) => void saveOptimistic(value, setPlatformTarget, platformTarget, { platformTargets: value ? [value] : [] }, "保存平台失败")}
             />
           </label>
           <label className={styles.fieldLabel}>
@@ -248,9 +315,9 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
               showSearch
               optionFilterProp="label"
               placeholder="请选择目标市场"
-              value={detail.targetMarket ?? undefined}
+              value={targetMarket}
               options={MARKET_OPTIONS}
-              onChange={(value: Exclude<TargetMarket, null> | undefined) => void save({ targetMarket: value ?? null }, "保存目标市场失败")}
+              onChange={(value: Exclude<TargetMarket, null> | undefined) => void saveOptimistic(value, setTargetMarket, targetMarket, { targetMarket: value ?? null }, "保存目标市场失败")}
             />
           </label>
           <label className={styles.fieldLabel}>
@@ -271,12 +338,12 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
             <span className={styles.fieldLabelTitle}><Sparkles size={13} strokeWidth={1.75} aria-hidden />默认模式</span>
             <Select
               aria-label="默认模式"
-              value={detail.defaultMode}
+              value={defaultMode}
               options={[
                 { value: "CREATIVE", label: "创意模式 · 允许场景创作" },
                 { value: "PIXEL_PROTECTED", label: "像素保护 · 保留主体像素" },
               ]}
-              onChange={(value) => void save({ defaultMode: value }, "保存模式失败")}
+              onChange={(value) => void saveOptimistic(value, setDefaultMode, defaultMode, { defaultMode: value }, "保存模式失败")}
             />
           </label>
         </div>
@@ -347,7 +414,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
               value={reasoningOptions.some((item) => item.value === reasoningKey) ? reasoningKey : undefined}
               options={reasoningOptions}
               placeholder="选择推理模型"
-              onChange={(value) => void save({ reasoningModel: splitKey(value) }, "保存推理模型失败")}
+              onChange={(value) => void saveOptimistic(value, setReasoningKeyDraft, reasoningKeyDraft, { reasoningModel: splitKey(value) }, "保存推理模型失败")}
             />
           </label>
           <label className={styles.fieldLabel}>
@@ -357,25 +424,25 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
               value={imageOptions.some((item) => item.value === imageKey) ? imageKey : undefined}
               options={imageOptions}
               placeholder="仅列出含 imageApiKind 的模型"
-              onChange={(value) => void save({ imageModel: splitKey(value) }, "保存生图模型失败")}
+              onChange={(value) => void saveOptimistic(value, setImageKeyDraft, imageKeyDraft, { imageModel: splitKey(value) }, "保存生图模型失败")}
             />
           </label>
           <label className={styles.fieldLabel}>
             分辨率
             <Select
               aria-label="分辨率"
-              value={detail.imageResolution}
+              value={imageResolution}
               options={Object.entries(RESOLUTION_LABEL).map(([value, label]) => ({ value, label }))}
-              onChange={(imageResolution) => void save({ imageResolution }, "保存分辨率失败")}
+              onChange={(value) => void saveOptimistic(value, setImageResolution, imageResolution, { imageResolution: value }, "保存分辨率失败")}
             />
           </label>
           <label className={styles.fieldLabel}>
             图片比例
             <Select
               aria-label="图片比例"
-              value={detail.imageAspectRatio}
+              value={imageAspectRatio}
               options={Object.entries(ASPECT_LABEL).map(([value, label]) => ({ value, label }))}
-              onChange={(imageAspectRatio) => void save({ imageAspectRatio }, "保存比例失败")}
+              onChange={(value) => void saveOptimistic(value, setImageAspectRatio, imageAspectRatio, { imageAspectRatio: value }, "保存比例失败")}
             />
           </label>
         </div>
@@ -384,17 +451,17 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
           <button
             type="button"
             aria-label="减少出图数"
-            disabled={detail.candidatesPerType <= 1}
-            onClick={() => void save({ candidatesPerType: detail.candidatesPerType - 1 }, "保存出图数失败")}
+            disabled={candidatesPerType <= 1}
+            onClick={() => changeCandidates(-1)}
           >
             −
           </button>
-          <strong>{detail.candidatesPerType}</strong>
+          <strong>{candidatesPerType}</strong>
           <button
             type="button"
             aria-label="增加出图数"
-            disabled={detail.candidatesPerType >= 4}
-            onClick={() => void save({ candidatesPerType: detail.candidatesPerType + 1 }, "保存出图数失败")}
+            disabled={candidatesPerType >= 4}
+            onClick={() => changeCandidates(1)}
           >
             +
           </button>
@@ -487,7 +554,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
         {detail.webResearchEnabled && !webResearchAvailable ? <p className={styles.researchUnavailable}>服务端未配置搜索服务，本次规划不会联网。</p> : null}
       </Section>
 
-      {detail.defaultMode === "PIXEL_PROTECTED" && productCount === 0 ? (
+      {defaultMode === "PIXEL_PROTECTED" && productCount === 0 ? (
         <p className={styles.banner}>像素保护需要至少一张产品图，否则生成会失败。</p>
       ) : null}
       {job?.status === "FAILED" && jobErrorText(job) ? <p className={styles.jobError}>{jobErrorText(job)}</p> : null}

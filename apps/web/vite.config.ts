@@ -12,7 +12,18 @@ export default defineConfig({
       "/health": { target: "http://127.0.0.1:8787", changeOrigin: true },
     },
   },
-  build: { sourcemap: true },
+  build: {
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          antd: ["antd"],
+          query: ["@tanstack/react-query"],
+          icons: ["lucide-react"],
+        },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],

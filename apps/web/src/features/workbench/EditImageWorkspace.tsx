@@ -27,6 +27,8 @@ const EDIT_OVERLAY_COLOR = "#006dff";
 const PROTECT_OVERLAY_COLOR = "#f07800";
 const EDIT_OVERLAY_ALPHA = 0.72;
 const PROTECT_OVERLAY_ALPHA = 0.64;
+const MAX_HISTORY_ENTRIES = 20;
+const MAX_HISTORY_BYTES = 32 * 1024 * 1024;
 
 function boundsFor(point: Point, size: number): Bounds { return { x: point.x - size / 2, y: point.y - size / 2, width: size, height: size }; }
 function mergeBounds(current: Bounds | null, next: Bounds): Bounds { if (!current) return next; const x = Math.min(current.x, next.x); const y = Math.min(current.y, next.y); return { x, y, width: Math.max(current.x + current.width, next.x + next.width) - x, height: Math.max(current.y + current.height, next.y + next.height) - y }; }
@@ -196,7 +198,19 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
   useEffect(() => { if (textDraft) window.requestAnimationFrame(() => textInputRef.current?.focus()); }, [textDraft]);
 
   const snapshot = (records = annotations): Snapshot => ({ edit: editMaskRef.current?.toDataURL() ?? "", protect: protectMaskRef.current?.toDataURL() ?? "", annotations: records.map((annotation) => structuredClone(annotation)) });
-  const pushHistory = (records = annotations) => { const next = [...historyRef.current.slice(0, historyIndexRef.current + 1), snapshot(records)].slice(-20); historyRef.current = next; historyIndexRef.current = next.length - 1; setHistory(next); setHistoryIndex(next.length - 1); };
+  const pushHistory = (records = annotations) => {
+    const next = [...historyRef.current.slice(0, historyIndexRef.current + 1), snapshot(records)].slice(-MAX_HISTORY_ENTRIES);
+    let bytes = 0;
+    while (next.length > 1) {
+      bytes = next.reduce((total, value) => total + value.edit.length + value.protect.length + JSON.stringify(value.annotations).length, 0);
+      if (bytes <= MAX_HISTORY_BYTES) break;
+      next.shift();
+    }
+    historyRef.current = next;
+    historyIndexRef.current = next.length - 1;
+    setHistory(next);
+    setHistoryIndex(next.length - 1);
+  };
   const restoreHistory = (index: number) => {
     const value = historyRef.current[index]; if (!value || !editMaskRef.current || !protectMaskRef.current) return;
     const load = (canvas: HTMLCanvasElement, url: string) => new Promise<void>((resolve) => { const image = new Image(); image.onload = () => { canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height); canvas.getContext("2d")?.drawImage(image, 0, 0); resolve(); }; image.src = url; });

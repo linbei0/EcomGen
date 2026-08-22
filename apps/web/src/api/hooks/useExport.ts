@@ -39,7 +39,7 @@ export function useCreateExportJob(projectId: string) {
 
 export function useExport(exportId: string | undefined) {
   return useQuery({
-    queryKey: ["exports", exportId ?? ""] as const,
+    queryKey: qk.export(exportId ?? ""),
     enabled: Boolean(exportId),
     queryFn: async (): Promise<Export> => {
       const raw = await unwrap(

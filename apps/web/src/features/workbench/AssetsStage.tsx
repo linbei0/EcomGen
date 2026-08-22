@@ -22,12 +22,20 @@ export function AssetsStage({
   const removeAsset = useDeleteAsset();
   const grouped = useMemo(() => groupAssets(detail.assets), [detail.assets]);
 
-  const uploadFiles = (images: File[]) => {
-    for (const file of images) {
-      void upload.mutateAsync({ projectId: detail.id, file, kind }).catch((error: unknown) => {
-        notification.error({ title: "上传失败", description: errorText(error) });
-      });
-    }
+  const uploadFiles = async (images: File[]) => {
+    const queue = [...images];
+    const worker = async () => {
+      while (queue.length > 0) {
+        const file = queue.shift();
+        if (!file) return;
+        try {
+          await upload.mutateAsync({ projectId: detail.id, file, kind });
+        } catch (error: unknown) {
+          notification.error({ title: "上传失败", description: errorText(error) });
+        }
+      }
+    };
+    await Promise.all([worker(), worker()]);
   };
 
   const sendFiles = (files: FileList | File[]) => {
@@ -36,7 +44,7 @@ export function AssetsStage({
       notification.error({ title: "只支持图片文件" });
       return;
     }
-    uploadFiles(images);
+    void uploadFiles(images);
   };
 
   useEffect(() => {
@@ -46,11 +54,11 @@ export function AssetsStage({
       );
       if (images.length === 0) return;
       event.preventDefault();
-      uploadFiles(images);
+      void uploadFiles(images);
     };
     document.addEventListener("paste", onPaste);
     return () => document.removeEventListener("paste", onPaste);
-  });
+  }, [detail.id, kind]);
 
   const onDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();

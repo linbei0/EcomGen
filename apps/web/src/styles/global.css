@@ -1,21 +1,18 @@
 /* 全局样式：字体、基元、滚动条、噪点层。布局样式走 CSS Modules，不在此堆积。 */
 
-/* 自托管字体（文件由 P9 子集化后落入 public/fonts/，缺失时回退系统字体，见 fonts/README.md） */
+/* 字体优先使用本机安装版本；仓库未携带字体二进制时直接回退系统字体。 */
 @font-face {
   font-family: "Smiley Sans";
   src:
     local("Smiley Sans"),
-    local("SmileySans-Oblique"),
-    url("/fonts/SmileySansSubset.woff2") format("woff2");
-  font-display: swap;
+    local("SmileySans-Oblique");
+  font-display: optional;
 }
 
 @font-face {
   font-family: "JetBrains Mono";
-  src:
-    local("JetBrains Mono"),
-    url("/fonts/JetBrainsMonoSubset.woff2") format("woff2");
-  font-display: swap;
+  src: local("JetBrains Mono");
+  font-display: optional;
 }
 
 *,
