@@ -644,29 +644,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Job'
-  /outputs/{outputId}/review:
-    parameters:
-      - $ref: '#/components/parameters/OutputId'
-    patch:
-      operationId: reviewOutput
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                reviewDecision: { type: string, enum: [SELECTED, REJECTED, NEEDS_REVIEW] }
-                reviewNote: { type: string, maxLength: 1000 }
-                decision: { type: string, enum: [SELECTED, REJECTED, NEEDS_REVIEW] }
-                note: { type: string, maxLength: 1000 }
-      responses:
-        '200':
-          description: Output review updated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Output'
   /projects/{projectId}/export-jobs:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -1079,7 +1056,7 @@ components:
         updatedAt: { type: string, format: date-time }
     Output:
       type: object
-      required: [id, storyboardItemId, reviewDecision, createdAt]
+      required: [id, storyboardItemId, createdAt]
       properties:
         id: { type: string, format: uuid }
         storyboardItemId: { type: string, format: uuid }
@@ -1095,8 +1072,6 @@ components:
             candidateIndex: { type: integer, minimum: 1 }
         url: { type: string }
         storagePath: { type: string }
-        reviewDecision: { type: string, enum: [SELECTED, REJECTED, NEEDS_REVIEW] }
-        reviewNote: { type: [string, 'null'] }
         parentOutputId: { type: [string, 'null'], format: uuid }
         rootOutputId: { type: [string, 'null'], format: uuid }
         editSessionId: { type: [string, 'null'], format: uuid }

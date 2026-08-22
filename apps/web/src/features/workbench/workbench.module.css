@@ -1226,10 +1226,61 @@
 .versionTreeWorld { position: absolute; width: 1000px; height: 650px; transform-origin: 0 0; }
 .versionTreeLinks { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .versionTreeLinks path { fill: none; stroke: var(--accent-line); stroke-width: 2; stroke-dasharray: 5 5; }
-.versionTreeNode { position: absolute; z-index: 1; display: grid; width: 192px; padding: 0; overflow: hidden; border: 1px solid var(--line-2); border-radius: 7px; background: var(--bg-1); color: var(--text-1); box-shadow: 0 10px 24px rgb(0 0 0 / 0.2); cursor: pointer; font: inherit; text-align: left; }
+.versionTreeNode { position: absolute; z-index: 1; display: grid; width: 192px; overflow: hidden; border: 1px solid var(--line-2); border-radius: 7px; background: var(--bg-1); color: var(--text-1); box-shadow: 0 10px 24px rgb(0 0 0 / 0.2); }
 .versionTreeNode:hover { border-color: var(--accent-line); transform: translateY(-2px); }
-.versionTreeNode img { display: block; width: 192px; height: 126px; object-fit: cover; }
-.versionTreeNode span { padding: 8px 10px; color: var(--text-2); font-size: 12px; }
+.versionTreeOpen { display: grid; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; text-align: left; }
+.versionTreeOpen img { display: block; width: 192px; height: 126px; object-fit: cover; }
+.versionTreeOpen span { padding: 8px 10px; color: var(--text-2); font-size: 12px; }
+/* 版本树悬浮按钮：与结果卡片的选择按钮共用圆形玻璃视觉语言 */
+.versionTreeSelect,
+.versionTreeDownload { position: absolute; top: 8px; z-index: 2; display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid rgb(255 255 255 / 0.22); border-radius: 50%; background: rgb(12 14 16 / 0.62); box-shadow: 0 4px 14px rgb(0 0 0 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.08); backdrop-filter: blur(6px); opacity: 0; cursor: pointer; color: rgb(255 255 255 / 0.82); transition: opacity 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 160ms ease, color 120ms ease; }
+.versionTreeSelect { left: 8px; }
+.versionTreeDownload { right: 8px; }
+.versionTreeNode:hover .versionTreeSelect,
+.versionTreeNode:hover .versionTreeDownload,
+.versionTreeNode:focus-within .versionTreeSelect,
+.versionTreeNode:focus-within .versionTreeDownload { opacity: 1; }
+.versionTreeDownload:hover { border-color: rgb(255 255 255 / 0.5); background: rgb(12 14 16 / 0.8); color: #fff; }
+
+/* 版本树选择按钮：悬停出现；选中后填充主题色并显示对勾 */
+.versionTreeSelect::before {
+  content: "+";
+  color: rgb(255 255 255 / 0.7);
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1;
+  transition: color 120ms ease;
+}
+.versionTreeSelect:hover { border-color: rgb(255 255 255 / 0.5); background: rgb(12 14 16 / 0.8); }
+.versionTreeSelect:hover::before { color: #fff; }
+.versionTreeSelect:active { transform: scale(0.9); }
+.versionTreeSelect input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+.versionTreeSelect:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 70%, white);
+  background: color-mix(in srgb, var(--accent) 84%, #0e1013);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent), inset 0 1px 0 rgb(255 255 255 / 0.18);
+}
+.versionTreeSelect:has(input:checked)::before { content: none; }
+.versionTreeSelect:has(input:checked)::after {
+  content: "";
+  width: 10px;
+  height: 5px;
+  margin-top: -2px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  background: none;
+  transform: rotate(-45deg);
+}
+.versionTreeSelect:has(input:focus-visible) { outline: 2px solid var(--accent-line); outline-offset: 1px; }
 
 .reviewCard {
   overflow: hidden;
@@ -1238,81 +1289,129 @@
   background: var(--bg-2);
 }
 
-.reviewCard[data-decision="SELECTED"] {
-  border-color: var(--accent-line);
-}
-
-.reviewCard[data-decision="REJECTED"] {
-  opacity: 0.4;
-}
-
-.reviewCard[data-decision="REJECTED"] .reviewMark {
-  text-decoration: line-through;
-}
-
 .reviewThumb {
   position: relative;
 }
 
-.editVersionPeek { position: absolute; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 16px); padding: 4px 6px 4px 4px; border: 1px solid rgb(255 255 255 / 0.26); border-radius: 6px; background: rgb(12 14 16 / 0.82); color: var(--text-1); cursor: pointer; font: inherit; font-size: 11px; text-align: left; }
-.editVersionPeekImages { display: inline-flex; align-items: center; }
-.editVersionPeekImages img { width: 32px; height: 32px; margin-right: -8px; border: 1px solid rgb(12 14 16 / 0.82); border-radius: 4px; object-fit: cover; }
-.editVersionPeekImages img:last-child { margin-right: 0; }
-
-.reviewMark {
+/* 悬浮选择按钮：圆形玻璃按钮，悬停出现；选中后填充主题色并显示对勾 */
+.outputSelect {
   position: absolute;
   top: 8px;
   left: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-0) 70%, transparent);
-  color: var(--text-1);
-  font-size: 12px;
+  z-index: 2;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: 50%;
+  background: rgb(12 14 16 / 0.62);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.08);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
-.reviewCard[data-decision="SELECTED"] .reviewMark {
-  color: var(--accent);
+.reviewThumb:hover .outputSelect,
+.reviewThumb:focus-within .outputSelect { opacity: 1; }
+
+.outputSelect::before {
+  content: "+";
+  color: rgb(255 255 255 / 0.7);
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1;
+  transition: color 120ms ease;
 }
 
+.outputSelect:hover { border-color: rgb(255 255 255 / 0.5); background: rgb(12 14 16 / 0.8); }
+.outputSelect:hover::before { color: #fff; }
+.outputSelect:active { transform: scale(0.9); }
+
+.outputSelect input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* 选中态用 CSS 画对勾，避免字符渲染差异 */
+.outputSelect:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 70%, white);
+  background: color-mix(in srgb, var(--accent) 84%, #0e1013);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent), inset 0 1px 0 rgb(255 255 255 / 0.18);
+}
+.outputSelect:has(input:checked)::before { content: none; }
+.outputSelect:has(input:checked)::after {
+  content: "";
+  width: 10px;
+  height: 5px;
+  margin-top: -2px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  background: none;
+  transform: rotate(-45deg);
+}
+.outputSelect:has(input:focus-visible) { outline: 2px solid var(--accent-line); outline-offset: 1px; }
+
+.editVersionPeek { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 16px); padding: 4px 8px 4px 4px; border: 1px solid rgb(255 255 255 / 0.22); border-radius: 999px; background: rgb(12 14 16 / 0.72); color: var(--text-1); cursor: pointer; font: inherit; font-size: 11px; text-align: left; backdrop-filter: blur(6px); transition: border-color 120ms ease, background-color 120ms ease; }
+.editVersionPeek:hover { border-color: var(--accent-line); background: rgb(12 14 16 / 0.88); }
+.editVersionPeekImages { display: inline-flex; align-items: center; }
+.editVersionPeekImages img { width: 22px; height: 22px; margin-right: -7px; border: 1px solid rgb(12 14 16 / 0.82); border-radius: 50%; object-fit: cover; }
+.editVersionPeekImages img:last-child { margin-right: 0; }
+
+/* 底部悬浮胶囊操作条：与右上角编辑版本徽标分离，互不遮挡 */
 .reviewActions {
   position: absolute;
-  inset: auto 8px 8px 8px;
+  bottom: 10px;
+  left: 50%;
   display: flex;
-  gap: 6px;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 999px;
+  background: rgb(10 12 14 / 0.72);
+  backdrop-filter: blur(8px);
   opacity: 0;
+  transform: translate(-50%, 6px);
+  transition: opacity 140ms ease, transform 140ms ease;
+  pointer-events: none;
 }
 
 .reviewThumb:hover .reviewActions,
 .reviewThumb:focus-within .reviewActions {
   opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
 }
 
 .reviewActions button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--radius-s);
-  background: color-mix(in srgb, var(--bg-0) 82%, transparent);
+  gap: 5px;
+  padding: 5px 11px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
   color: var(--text-1);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 
-.reviewPick {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  color: var(--text-3);
-  font-size: 12px;
+.reviewActions button:hover:not(:disabled),
+.reviewActions button:focus-visible {
+  background: rgb(255 255 255 / 0.14);
 }
 
-.batchActions {
-  display: flex;
-  gap: 8px;
+.reviewActions button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .lightboxBody {

@@ -6,7 +6,6 @@ import {
   EXPORT_FIXTURE,
   EXPORT_JOB_FIXTURE,
   GENERATE_JOB_FIXTURE,
-  OUTPUT_FIXTURE,
   PLAN_JOB_FIXTURE,
   PROJECT_FIXTURE,
   STORYBOARD_FIXTURE,
@@ -206,17 +205,6 @@ export const handlers = [
       headers: { "Content-Type": "image/png" },
     }),
   ),
-
-  http.patch(`${BASE}/outputs/:outputId/review`, async ({ request, params }) => {
-    const body = (await request.json()) as { reviewDecision?: string; decision?: string; reviewNote?: string | null };
-    const decision = body.reviewDecision ?? body.decision ?? "NEEDS_REVIEW";
-    return HttpResponse.json({
-      ...OUTPUT_FIXTURE,
-      id: params.outputId as string,
-      reviewDecision: decision,
-      reviewNote: body.reviewNote ?? null,
-    });
-  }),
 
   http.post(`${BASE}/projects/:projectId/export-jobs`, async ({ request }) => {
     const body = (await request.json()) as { outputIds?: string[] };

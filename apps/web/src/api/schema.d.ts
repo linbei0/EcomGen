@@ -499,24 +499,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/outputs/{outputId}/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                outputId: components["parameters"]["OutputId"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["reviewOutput"];
-        trace?: never;
-    };
     "/projects/{projectId}/export-jobs": {
         parameters: {
             query?: never;
@@ -977,9 +959,6 @@ export interface components {
             } | null;
             url?: string;
             storagePath?: string;
-            /** @enum {string} */
-            reviewDecision: "SELECTED" | "REJECTED" | "NEEDS_REVIEW";
-            reviewNote?: string | null;
             /** Format: uuid */
             parentOutputId?: string | null;
             /** Format: uuid */
@@ -2127,39 +2106,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"];
-                };
-            };
-        };
-    };
-    reviewOutput: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                outputId: components["parameters"]["OutputId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @enum {string} */
-                    reviewDecision?: "SELECTED" | "REJECTED" | "NEEDS_REVIEW";
-                    reviewNote?: string;
-                    /** @enum {string} */
-                    decision?: "SELECTED" | "REJECTED" | "NEEDS_REVIEW";
-                    note?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Output review updated. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Output"];
                 };
             };
         };

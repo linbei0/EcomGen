@@ -10,6 +10,7 @@ import {
   OUTPUT_B_FIXTURE,
   OUTPUT_FIXTURE,
   OUTPUT_ID,
+  OUTPUT_ID_B,
   PROJECT_ID,
   STORYBOARD_FIXTURE,
   STORYBOARD_ITEM_FIXTURE,
@@ -20,11 +21,7 @@ import { server } from "../../test/msw/server";
 import { renderWithProviders } from "../../test/render";
 import { WorkbenchPage } from "./WorkbenchPage";
 
-type OutputFixture = Omit<typeof OUTPUT_FIXTURE, "reviewDecision"> & {
-  reviewDecision: "SELECTED" | "REJECTED" | "NEEDS_REVIEW";
-};
-
-function renderExport(outputs: OutputFixture[] = [{ ...OUTPUT_FIXTURE, reviewDecision: "SELECTED" }]) {
+function renderExport(outputs = [OUTPUT_FIXTURE, OUTPUT_B_FIXTURE]) {
   server.use(
     http.get(`${BASE}/projects/:projectId`, () =>
       HttpResponse.json(
@@ -45,7 +42,7 @@ function renderExport(outputs: OutputFixture[] = [{ ...OUTPUT_FIXTURE, reviewDec
 }
 
 describe("工作台 · 导出", () => {
-  it("只统计 SELECTED，并显式提交 outputIds", async () => {
+  it("打包下载显式提交已选择的 outputIds", async () => {
     const user = userEvent.setup();
     let captured: unknown;
     server.use(
@@ -54,14 +51,12 @@ describe("工作台 · 导出", () => {
         return HttpResponse.json({ job: EXPORT_JOB_FIXTURE, export: EXPORT_FIXTURE }, { status: 202 });
       }),
     );
-    renderExport([
-      { ...OUTPUT_FIXTURE, reviewDecision: "SELECTED" },
-      { ...OUTPUT_B_FIXTURE, reviewDecision: "REJECTED" },
-    ]);
-    await user.click(await screen.findByRole("button", { name: /下载已选入/ }));
+    renderExport();
+    await user.click(await screen.findByRole("button", { name: "全选图片" }));
+    await user.click(await screen.findByRole("button", { name: /打包下载/ }));
     await waitFor(() => {
       expect(captured).toMatchObject({
-        outputIds: [OUTPUT_ID],
+        outputIds: [OUTPUT_ID, OUTPUT_ID_B],
         platformTargets: ["DOMESTIC"],
         includeDetailPageSlices: false,
       });
@@ -83,7 +78,8 @@ describe("工作台 · 导出", () => {
       ),
     );
     renderExport();
-    await user.click(await screen.findByRole("button", { name: /下载已选入/ }));
+    await user.click(await screen.findByRole("button", { name: "全选图片" }));
+    await user.click(await screen.findByRole("button", { name: /打包下载/ }));
     const link = await screen.findByRole("link", { name: "打开 ZIP" });
     expect(link).toHaveAttribute("href", "https://files.local/pack.zip");
   });

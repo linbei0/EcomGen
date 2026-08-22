@@ -7,7 +7,6 @@ import type {
   JobStatus,
   JobType,
   ModelDefinition,
-  OutputReviewDecision,
   PlatformTarget,
   ReasoningProtocolProfile,
   SearchSourceKind,
@@ -189,8 +188,6 @@ export interface OutputRecord {
   generationSnapshot: GenerationSnapshot | null;
   storagePath: string;
   hash: string;
-  reviewDecision: OutputReviewDecision;
-  reviewNote: string | null;
   parentOutputId?: string | null;
   rootOutputId?: string | null;
   editSessionId?: string | null;
@@ -237,7 +234,7 @@ export interface ExportRecord {
   updatedAt: string;
 }
 
-/** 首页列表封面：原图取最早 PRODUCT_TRUTH 图片；封面输出优先最新 SELECTED，否则最新输出。 */
+/** 首页列表封面：原图取最早 PRODUCT_TRUTH 图片；封面输出取最新输出。 */
 export interface ProjectCoverSummary {
   productAssetId: string | null;
   coverOutputId: string | null;
@@ -311,11 +308,11 @@ export class EcomRepository {
       if (cover && cover.productAssetId === null) cover.productAssetId = row.id;
     }
     const outputRows = this.db.prepare(
-      `SELECT id, project_id, review_decision FROM outputs
+      `SELECT id, project_id FROM outputs
        WHERE project_id IN (${placeholders})
        ORDER BY created_at DESC, id DESC`
-    ).all(...projectIds) as Array<{ id: string; project_id: string; review_decision: string }>;
-    const grouped = new Map<string, Array<{ id: string; review_decision: string }>>();
+    ).all(...projectIds) as Array<{ id: string; project_id: string }>;
+    const grouped = new Map<string, Array<{ id: string }>>();
     for (const row of outputRows) {
       const list = grouped.get(row.project_id) ?? [];
       list.push(row);
@@ -325,8 +322,7 @@ export class EcomRepository {
       const cover = covers.get(projectId);
       if (!cover) continue;
       cover.outputCount = outputs.length;
-      const selected = outputs.find((output) => output.review_decision === "SELECTED");
-      cover.coverOutputId = selected?.id ?? outputs[0]?.id ?? null;
+      cover.coverOutputId = outputs[0]?.id ?? null;
       cover.previewOutputIds = outputs.filter((output) => output.id !== cover.coverOutputId).slice(0, 2).map((output) => output.id);
     }
     return covers;
@@ -463,7 +459,7 @@ export class EcomRepository {
 
   public createOutput(input: Omit<OutputRecord, "id" | "createdAt">): OutputRecord {
     const record: OutputRecord = { ...input, parentOutputId: input.parentOutputId ?? null, rootOutputId: input.rootOutputId ?? null, editSessionId: input.editSessionId ?? null, editTurnId: input.editTurnId ?? null, id: randomUUID(), createdAt: now() };
-    this.db.prepare("INSERT INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,review_decision,review_note,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationSnapshot,@storagePath,@hash,@reviewDecision,@reviewNote,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
+    this.db.prepare("INSERT INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationSnapshot,@storagePath,@hash,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
       .run({ ...record, generationSnapshot: record.generationSnapshot ? json(record.generationSnapshot) : null });
     return record;
   }
@@ -474,8 +470,6 @@ export class EcomRepository {
     const row = this.db.prepare("SELECT 1 FROM edit_sessions s WHERE s.id=? AND (s.current_output_id=? OR EXISTS (SELECT 1 FROM outputs o WHERE o.id=? AND o.edit_session_id=s.id) OR EXISTS (SELECT 1 FROM outputs o WHERE o.edit_session_id=s.id AND o.root_output_id=?)) LIMIT 1").get(sessionId, outputId, outputId, outputId);
     return Boolean(row);
   }
-  public reviewOutput(id: string, reviewDecision: OutputReviewDecision, reviewNote: string | null): OutputRecord | undefined { const output = this.getOutput(id); if (!output) return undefined; this.db.prepare("UPDATE outputs SET review_decision=?,review_note=? WHERE id=?").run(reviewDecision, reviewNote, id); return this.getOutput(id); }
-
   public getEditSession(id: string): EditSessionRecord | undefined {
     const row = this.db.prepare("SELECT * FROM edit_sessions WHERE id=?").get(id);
     return row ? mapEditSession(row as Row) : undefined;
@@ -599,8 +593,6 @@ function mapOutput(row: Row): OutputRecord {
     generationSnapshot: row.generation_snapshot_json ? parse(row.generation_snapshot_json) : null,
     storagePath: String(row.storage_path),
     hash: String(row.hash),
-    reviewDecision: row.review_decision as OutputReviewDecision,
-    reviewNote: row.review_note ? String(row.review_note) : null,
     parentOutputId: row.parent_output_id ? String(row.parent_output_id) : null,
     rootOutputId: row.root_output_id ? String(row.root_output_id) : null,
     editSessionId: row.edit_session_id ? String(row.edit_session_id) : null,

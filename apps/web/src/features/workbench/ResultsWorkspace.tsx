@@ -1,13 +1,12 @@
 import { App, Button, Tooltip } from "antd";
 import { Download, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { exportDownloadUrl, type ProjectDetail } from "../../api/adapters/projectDetail";
 import { useCreateExportJob, useExport } from "../../api/hooks/useExport";
 import { useCreateGenerationJobs } from "../../api/hooks/useGeneration";
 import { useCancelJob, useRetryJob } from "../../api/hooks/useJobs";
 import { errorText } from "../../lib/errorText";
-import { exportableOutputs } from "../../lib/exportJob";
 import { JOB_STATUS_LABEL } from "../../lib/factClaims";
 import { activeGenerateJobs } from "../../lib/generateSelection";
 import { jobErrorText } from "../../lib/jobError";
@@ -25,13 +24,18 @@ export function ResultsWorkspace({
   const cancelJob = useCancelJob(detail.id);
   const createExport = useCreateExportJob(detail.id);
   const [activeExportId, setActiveExportId] = useState<string | undefined>(undefined);
+  const [selectedOutputIds, setSelectedOutputIds] = useState<string[]>([]);
   const liveExport = useExport(activeExportId);
-  const selectedIds = useMemo(() => exportableOutputs(detail.outputs), [detail.outputs]);
   const active = activeGenerateJobs(detail.jobs);
   const failed = detail.jobs.filter((job) => job.type === "GENERATE" && job.status === "FAILED");
   const record = liveExport.data;
   const packing = createExport.isPending || record?.status === "QUEUED" || record?.status === "RUNNING";
   const readyUrl = record?.status === "SUCCEEDED" ? exportDownloadUrl(record) : null;
+
+  useEffect(() => {
+    const available = new Set(detail.outputs.map((output) => output.id));
+    setSelectedOutputIds((current) => current.filter((id) => available.has(id)));
+  }, [detail.outputs]);
 
   useEffect(() => {
     if (record?.status === "FAILED") notification.error({ title: "打包失败，请重新下载" });
@@ -95,28 +99,29 @@ export function ResultsWorkspace({
       ))}
 
       <div className={styles.resultsToolbar}>
+        <Button size="small" onClick={() => setSelectedOutputIds(detail.outputs.map((output) => output.id))} disabled={detail.outputs.length === 0}>全选图片</Button>
+        <Button size="small" onClick={() => setSelectedOutputIds([])} disabled={selectedOutputIds.length === 0}>清空选择</Button>
         {packing ? <span className={styles.hint}>打包中…</span> : null}
         {readyUrl ? (
           <a className={styles.downloadLink} href={readyUrl}>
             打开 ZIP
           </a>
         ) : null}
-        <Button loading={packing} onClick={() => void download(detail.outputs.map((output) => output.id))}>
-          全部下载
-        </Button>
         <Button
           type="primary"
           icon={<Download size={14} strokeWidth={1.75} />}
           loading={packing}
-          disabled={selectedIds.length === 0}
-          onClick={() => void download(selectedIds)}
+          disabled={selectedOutputIds.length === 0}
+          onClick={() => void download(selectedOutputIds)}
         >
-          下载已选入 {selectedIds.length > 0 ? selectedIds.length : ""}
+          打包下载 {selectedOutputIds.length > 0 ? selectedOutputIds.length : ""}
         </Button>
       </div>
 
       <ReviewStage
         detail={detail}
+        selectedOutputIds={selectedOutputIds}
+        onSelectionChange={setSelectedOutputIds}
         onRetryItem={(itemId, generationConfig) => {
           void generate.mutateAsync({ storyboardItemIds: [itemId], revision: "retry", generationConfig }).catch((error: unknown) => {
             notification.error({ title: "重新生成失败", description: errorText(error) });

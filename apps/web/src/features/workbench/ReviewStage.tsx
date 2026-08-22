@@ -1,16 +1,17 @@
-import { App, Button, Checkbox, Image, InputNumber, Modal, Segmented, Select } from "antd";
-import { CircleSlash, Maximize2, Minus, Plus, SquareCheckBig } from "lucide-react";
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { App, Button, Image, InputNumber, Modal, Select } from "antd";
+import { Download, Maximize2, Minus, Plus } from "lucide-react";
+import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 
 import type { Output, ProjectDetail, StoryboardItem } from "../../api/adapters/projectDetail";
-import { useReviewOutput } from "../../api/hooks/useReview";
 import { useProviders } from "../../api/hooks/useProviders";
 import { useStoryboard } from "../../api/hooks/useStoryboard";
 import { useTemplates } from "../../api/hooks/useTemplates";
 import { ModeBadge } from "../../components/ModeBadge";
+import { downloadOriginal, outputFileName } from "../../lib/downloadImage";
 import { errorText } from "../../lib/errorText";
+import { outputPreviewUrl } from "../../lib/assetUrl";
 import { itemDisplayName } from "../../lib/itemName";
-import { groupOutputsByItem, REVIEW_LABEL, type ReviewDecision } from "../../lib/review";
+import { groupOutputsByItem } from "../../lib/review";
 import styles from "./workbench.module.css";
 import type { GenerationJobInput } from "../../api/serializeGenerationBody";
 import { ASPECT_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
@@ -19,14 +20,17 @@ import { EditImageWorkspace } from "./EditImageWorkspace";
 
 export function ReviewStage({
   detail,
+  selectedOutputIds,
+  onSelectionChange,
   onRetryItem,
 }: {
   detail: ProjectDetail;
+  selectedOutputIds: string[];
+  onSelectionChange: (ids: string[]) => void;
   onRetryItem: (itemId: string, generationConfig: NonNullable<GenerationJobInput["generationConfig"]>) => void;
 }) {
   const { notification } = App.useApp();
   const board = useStoryboard(detail.id);
-  const review = useReviewOutput(detail.id);
   const templates = useTemplates();
   const items = board.data?.items ?? detail.items;
   const originalOutputs = useMemo(() => detail.outputs.filter((output) => !output.editSessionId), [detail.outputs]);
@@ -43,19 +47,26 @@ export function ReviewStage({
     }
     return grouped;
   }, [editedOutputs]);
-  const [picked, setPicked] = useState<string[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [versionRootId, setVersionRootId] = useState<string | null>(null);
 
-  const decide = (outputId: string, decision: ReviewDecision) => {
-    void review.mutateAsync({ outputId, decision }).catch((error: unknown) => {
-      notification.error({ title: "审核未保存", description: errorText(error) });
-    });
+  const toggleSelection = (outputId: string) => {
+    onSelectionChange(selectedOutputIds.includes(outputId)
+      ? selectedOutputIds.filter((id) => id !== outputId)
+      : [...selectedOutputIds, outputId]);
   };
 
-  const toggle = (id: string) => {
-    setPicked((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  const download = async (output: Output, label: string) => {
+    setDownloadingId(output.id);
+    try {
+      await downloadOriginal(outputPreviewUrl(output), outputFileName(output, label));
+    } catch (error: unknown) {
+      notification.error({ title: "下载原图失败", description: errorText(error) });
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const lightbox = detail.outputs.find((output) => output.id === lightboxId);
@@ -79,18 +90,23 @@ export function ReviewStage({
             <span>{group.outputs.length} 张</span>
           </h2>
           <div className={styles.reviewGrid}>
-            {group.outputs.map((output) => (
-              <ReviewCard
-                key={output.id}
-                output={output}
-                checked={picked.includes(output.id)}
-                onToggle={() => toggle(output.id)}
-                onDecide={(decision) => decide(output.id, decision)}
-                onOpen={() => setLightboxId(output.id)}
-                editedOutputs={editedByRoot.get(output.id) ?? []}
-                onOpenVersions={() => setVersionRootId(output.id)}
-              />
-            ))}
+            {group.outputs.map((output) => {
+              const label = itemDisplayName(group.item, templates.data ?? []);
+              return (
+                <ReviewCard
+                  key={output.id}
+                  output={output}
+                  label={label}
+                  downloading={downloadingId === output.id}
+                  onDownload={() => void download(output, label)}
+                  onOpen={() => setLightboxId(output.id)}
+                  editedOutputs={editedByRoot.get(output.id) ?? []}
+                  onOpenVersions={() => setVersionRootId(output.id)}
+                  selected={selectedOutputIds.includes(output.id)}
+                  onToggleSelection={() => toggleSelection(output.id)}
+                />
+              );
+            })}
           </div>
         </section>
       ))}
@@ -100,41 +116,19 @@ export function ReviewStage({
         outputs={versionRootId ? [detail.outputs.find((output) => output.id === versionRootId), ...(editedByRoot.get(versionRootId) ?? [])].filter((output): output is Output => Boolean(output)) : []}
         onClose={() => setVersionRootId(null)}
         onOpenOutput={(outputId) => { setVersionRootId(null); setEditingId(outputId); }}
+        selectedOutputIds={selectedOutputIds}
+        onToggleSelection={toggleSelection}
+        onDownload={(output, label) => void download(output, label)}
       />
-
-      {picked.length > 0 ? (
-        <div className={styles.confirmBar}>
-          <p>已选 {picked.length} 张</p>
-          <div className={styles.batchActions}>
-            <Button
-              icon={<SquareCheckBig size={14} strokeWidth={1.75} />}
-              onClick={() => {
-                for (const id of picked) decide(id, "SELECTED");
-                setPicked([]);
-              }}
-            >
-              批量选入
-            </Button>
-            <Button
-              icon={<CircleSlash size={14} strokeWidth={1.75} />}
-              onClick={() => {
-                for (const id of picked) decide(id, "REJECTED");
-                setPicked([]);
-              }}
-            >
-              批量淘汰
-            </Button>
-          </div>
-        </div>
-      ) : null}
 
       <LightboxModal
         output={lightbox}
         item={lightboxItem}
         label={lightboxItem ? itemDisplayName(lightboxItem, templates.data ?? []) : ""}
         onClose={() => setLightboxId(null)}
-        onDecide={(decision) => {
-          if (lightbox) decide(lightbox.id, decision);
+        downloading={lightbox ? downloadingId === lightbox.id : false}
+        onDownload={() => {
+          if (lightbox) void download(lightbox, lightboxItem ? itemDisplayName(lightboxItem, templates.data ?? []) : "");
         }}
         onRetry={(generationConfig) => {
           if (lightboxItem) onRetryItem(lightboxItem.id, generationConfig);
@@ -148,35 +142,37 @@ export function ReviewStage({
 
 function ReviewCard({
   output,
-  checked,
-  onToggle,
-  onDecide,
+  label,
+  downloading,
+  onDownload,
   onOpen,
   editedOutputs = [],
   onOpenVersions,
+  selected,
+  onToggleSelection,
 }: {
   output: Output;
-  checked: boolean;
-  onToggle: () => void;
-  onDecide: (decision: ReviewDecision) => void;
+  label: string;
+  downloading: boolean;
+  onDownload: () => void;
   onOpen: () => void;
   editedOutputs?: Output[];
   onOpenVersions?: () => void;
+  selected: boolean;
+  onToggleSelection: () => void;
 }) {
   return (
-    <article className={styles.reviewCard} data-decision={output.reviewDecision} data-checked={checked}>
+    <article className={styles.reviewCard} title={label}>
       <div className={styles.reviewThumb}>
-        <img src={output.url} alt="" className={styles.outputImage} loading="lazy" decoding="async" />
-        <span className={styles.reviewMark}>{REVIEW_LABEL[output.reviewDecision]}</span>
+        <img src={output.url} alt={label} className={styles.outputImage} loading="lazy" decoding="async" />
+        <label className={styles.outputSelect}>
+          <input type="checkbox" checked={selected} onChange={onToggleSelection} aria-label={`选择下载 ${label}`} />
+        </label>
         {editedOutputs.length > 0 ? <button type="button" className={styles.editVersionPeek} onClick={onOpenVersions} aria-label={`查看 ${editedOutputs.length} 个编辑版本`}><span className={styles.editVersionPeekImages}>{editedOutputs.slice(-3).map((version) => <img key={version.id} src={version.url} alt="" />)}</span><span>编辑 {editedOutputs.length} 版</span></button> : null}
         <div className={styles.reviewActions}>
-          <button type="button" onClick={() => onDecide("SELECTED")} aria-label="选入">
-            <SquareCheckBig size={16} strokeWidth={1.75} />
-            选入
-          </button>
-          <button type="button" onClick={() => onDecide("REJECTED")} aria-label="淘汰">
-            <CircleSlash size={16} strokeWidth={1.75} />
-            淘汰
+          <button type="button" onClick={onDownload} disabled={downloading} aria-label="下载原图">
+            <Download size={16} strokeWidth={1.75} />
+            下载
           </button>
           <button type="button" onClick={onOpen} aria-label="灯箱">
             <Maximize2 size={16} strokeWidth={1.75} />
@@ -184,10 +180,6 @@ function ReviewCard({
           </button>
         </div>
       </div>
-      <label className={styles.reviewPick}>
-        <Checkbox checked={checked} onChange={onToggle} aria-label="选择成图" />
-        对比选中
-      </label>
     </article>
   );
 }
@@ -197,7 +189,8 @@ function LightboxModal({
   item,
   label,
   onClose,
-  onDecide,
+  downloading,
+  onDownload,
   onRetry,
   onEdit,
 }: {
@@ -205,7 +198,8 @@ function LightboxModal({
   item: StoryboardItem | undefined;
   label: string;
   onClose: () => void;
-  onDecide: (decision: ReviewDecision) => void;
+  downloading: boolean;
+  onDownload: () => void;
   onRetry: (generationConfig: NonNullable<GenerationJobInput["generationConfig"]>) => void;
   onEdit: () => void;
 }) {
@@ -240,15 +234,13 @@ function LightboxModal({
             <p className={styles.shotType}>{label}</p>
             <ModeBadge mode={item.mode} />
             <p className={styles.promptPreview}>{item.promptInstruction}</p>
-            <Segmented
-              value={output.reviewDecision}
-              options={[
-                { label: "选入", value: "SELECTED" },
-                { label: "待审", value: "NEEDS_REVIEW" },
-                { label: "淘汰", value: "REJECTED" },
-              ]}
-              onChange={(value) => onDecide(value as ReviewDecision)}
-            />
+            <Button
+              icon={<Download size={14} strokeWidth={1.75} />}
+              loading={downloading}
+              onClick={onDownload}
+            >
+              下载原图
+            </Button>
             <Button onClick={openRetry}>用此分镜重新生成</Button>
             <Button type="primary" onClick={onEdit}>编辑图片</Button>
           </div>
@@ -267,7 +259,7 @@ function LightboxModal({
   );
 }
 
-function VersionTreeModal({ root, outputs, onClose, onOpenOutput }: { root: Output | undefined; outputs: Output[]; onClose: () => void; onOpenOutput: (outputId: string) => void }) {
+function VersionTreeModal({ root, outputs, onClose, onOpenOutput, selectedOutputIds, onToggleSelection, onDownload }: { root: Output | undefined; outputs: Output[]; onClose: () => void; onOpenOutput: (outputId: string) => void; selectedOutputIds: string[]; onToggleSelection: (outputId: string) => void; onDownload: (output: Output, label: string) => void }) {
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -303,12 +295,30 @@ function VersionTreeModal({ root, outputs, onClose, onOpenOutput }: { root: Outp
   const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => { event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { x: event.clientX, y: event.clientY, ox: offset.x, oy: offset.y }; };
   const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => { if (!dragRef.current) return; setOffset({ x: dragRef.current.ox + event.clientX - dragRef.current.x, y: dragRef.current.oy + event.clientY - dragRef.current.y }); };
   const pointerUp = () => { dragRef.current = null; };
+  const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    const next = Math.min(1.5, Math.max(0.65, zoom * (event.deltaY > 0 ? 0.92 : 1.08)));
+    if (next === zoom) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const pointerX = event.clientX - rect.left;
+    const pointerY = event.clientY - rect.top;
+    setZoom(next);
+    setOffset({
+      x: pointerX - ((pointerX - offset.x) * next) / zoom,
+      y: pointerY - ((pointerY - offset.y) * next) / zoom,
+    });
+  };
   return <Modal open={Boolean(root)} onCancel={onClose} footer={null} width="min(1100px, calc(100vw - 32px))" title="编辑版本关系">
-    <div className={styles.versionTreeHeader}><div><strong>{root ? "这张图的编辑版本" : ""}</strong><span>点击图片进入编辑，拖动画布查看关系</span></div><div><button type="button" onClick={() => setZoom((value) => Math.max(0.65, value - 0.1))} aria-label="缩小"><Minus size={16} /></button><span>{Math.round(zoom * 100)}%</span><button type="button" onClick={() => setZoom((value) => Math.min(1.5, value + 0.1))} aria-label="放大"><Plus size={16} /></button></div></div>
-    <div className={styles.versionTreeCanvas} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
+    <div className={styles.versionTreeHeader}><div><strong>{root ? "这张图的编辑版本" : ""}</strong><span>点击图片进入编辑，拖动画布查看关系，滚轮缩放</span></div><div><button type="button" onClick={() => setZoom((value) => Math.max(0.65, value - 0.1))} aria-label="缩小"><Minus size={16} /></button><span>{Math.round(zoom * 100)}%</span><button type="button" onClick={() => setZoom((value) => Math.min(1.5, value + 0.1))} aria-label="放大"><Plus size={16} /></button></div></div>
+    <div className={styles.versionTreeCanvas}
+      onPointerDown={pointerDown}
+      onPointerMove={pointerMove}
+      onPointerUp={pointerUp}
+      onPointerCancel={pointerUp}
+      onWheel={handleWheel}
+    >
       <div className={styles.versionTreeWorld} style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${zoom})` }}>
         <svg className={styles.versionTreeLinks} width="1000" height="650" aria-hidden>{nodes.filter((node) => node.parent).map((node) => { const parent = nodes.find((candidate) => candidate.output.id === node.parent?.id); return parent ? <path key={node.output.id} d={`M ${parent.x + 96} ${parent.y + 126} C ${parent.x + 96} ${parent.y + 155}, ${node.x + 96} ${node.y - 25}, ${node.x + 96} ${node.y}`} /> : null; })}</svg>
-        {nodes.map((node) => { const label = node.depth === 0 ? "原图" : `V${node.depth + 1}${node.siblingCount > 1 ? ` · ${node.siblingOrdinal}` : ""}`; return <button type="button" key={node.output.id} className={styles.versionTreeNode} style={{ left: node.x, top: node.y }} onPointerDown={(event) => event.stopPropagation()} onClick={() => onOpenOutput(node.output.id)}><img src={node.output.url} alt="" /><span>{label}</span></button>; })}
+        {nodes.map((node) => { const label = node.depth === 0 ? "原图" : `V${node.depth + 1}${node.siblingCount > 1 ? ` · ${node.siblingOrdinal}` : ""}`; return <div key={node.output.id} className={styles.versionTreeNode} style={{ left: node.x, top: node.y }} onPointerDown={(event) => event.stopPropagation()}><button type="button" className={styles.versionTreeOpen} onClick={() => onOpenOutput(node.output.id)}><img src={node.output.url} alt="" /><span>{label}</span></button><label className={styles.versionTreeSelect}><input type="checkbox" checked={selectedOutputIds.includes(node.output.id)} onChange={() => onToggleSelection(node.output.id)} aria-label={`选择下载 ${label}`} /></label><button type="button" className={styles.versionTreeDownload} onClick={() => onDownload(node.output, label)} aria-label={`下载 ${label}`}><Download size={14} /></button></div>; })}
       </div>
     </div>
   </Modal>;

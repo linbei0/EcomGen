@@ -8,6 +8,7 @@ import {
   ITEM_ID,
   OUTPUT_B_FIXTURE,
   OUTPUT_FIXTURE,
+  OUTPUT_ID,
   PROJECT_ID,
   PROVIDER_ID,
   STORYBOARD_FIXTURE,
@@ -38,10 +39,8 @@ function renderResults() {
   );
 }
 
-describe("工作台 · 结果审核", () => {
-  it("按中文分镜名分组，选入时双写 decision 与 reviewDecision", async () => {
-    const user = userEvent.setup();
-    let captured: unknown;
+describe("工作台 · 结果", () => {
+  it("按中文分镜名分组，每张成图提供单图下载入口", async () => {
     server.use(
       http.get(`${BASE}/projects/:projectId`, () =>
         HttpResponse.json(
@@ -54,20 +53,14 @@ describe("工作台 · 结果审核", () => {
       http.get(`${BASE}/projects/:projectId/storyboard`, () =>
         HttpResponse.json(storyboardPayload(confirmed.storyboard, confirmed.items)),
       ),
-      http.patch(`${BASE}/outputs/:outputId/review`, async ({ request }) => {
-        captured = await request.json();
-        return HttpResponse.json({ ...OUTPUT_FIXTURE, reviewDecision: "SELECTED" });
-      }),
     );
 
     renderResults();
     expect(await screen.findByRole("heading", { name: /白底\/纯色底产品主图/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /场景化生活图/ })).toBeInTheDocument();
     expect(screen.queryByText("hero-image")).not.toBeInTheDocument();
-    await user.click(screen.getAllByRole("button", { name: "选入" })[0]!);
-    await waitFor(() => {
-      expect(captured).toMatchObject({ decision: "SELECTED", reviewDecision: "SELECTED" });
-    });
+    const downloadButtons = await screen.findAllByRole("button", { name: "下载原图" });
+    expect(downloadButtons).toHaveLength(2);
   });
 
   it("无成图时引导回生成，不渲染假网格", async () => {
@@ -78,7 +71,6 @@ describe("工作台 · 结果审核", () => {
     );
     renderResults();
     expect(await screen.findByText("还没有成图")).toBeInTheDocument();
-    expect(screen.queryByLabelText("选入")).not.toBeInTheDocument();
   });
 
   it("灯箱可重新生成该分镜", async () => {
@@ -118,5 +110,28 @@ describe("工作台 · 结果审核", () => {
         },
       });
     });
+  });
+
+  it("编辑版本关系画布提供单图下载按钮", async () => {
+    const user = userEvent.setup();
+    const edited = {
+      ...OUTPUT_FIXTURE,
+      id: "eeeeeeee-1111-4222-8333-666666666666",
+      parentOutputId: OUTPUT_ID,
+      rootOutputId: OUTPUT_ID,
+      editSessionId: "edit-session-1",
+      editTurnId: "edit-turn-1",
+    };
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () =>
+        HttpResponse.json(projectDetailPayload({ ...confirmed, outputs: [OUTPUT_FIXTURE, edited] })),
+      ),
+      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
+        HttpResponse.json(storyboardPayload(confirmed.storyboard, confirmed.items)),
+      ),
+    );
+    renderResults();
+    await user.click(await screen.findByRole("button", { name: "查看 1 个编辑版本" }));
+    expect(await screen.findByRole("button", { name: "下载 V2" })).toBeInTheDocument();
   });
 });

@@ -113,10 +113,10 @@ describe("EcomRepository", () => {
     const storyboard = repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero-image", displayName: "杯子首图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
     const item = repository.listStoryboardItems(project.id)[0]!;
     const job = repository.createJob({ id: "edit-lineage-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
-    const root = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/root.png", hash: "root", reviewDecision: "NEEDS_REVIEW", reviewNote: null });
+    const root = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/root.png", hash: "root" });
     const session = repository.createEditSession({ id: "edit-session", projectId: project.id, currentOutputId: root.id, status: "ACTIVE", memorySummary: { constraints: ["保留背景"] } });
     const turn = repository.createEditTurn({ id: "edit-turn", sessionId: session.id, projectId: project.id, baseOutputId: root.id, status: "SUCCEEDED", message: "变亮", annotations: {}, editMaskPath: null, editMaskHash: null, protectMaskPath: null, protectMaskHash: null, referenceAssetIds: [], plan: {}, error: null });
-    const derived = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/derived.png", hash: "derived", reviewDecision: "NEEDS_REVIEW", reviewNote: null, parentOutputId: root.id, rootOutputId: root.id, editSessionId: session.id, editTurnId: turn.id });
+    const derived = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/derived.png", hash: "derived", parentOutputId: root.id, rootOutputId: root.id, editSessionId: session.id, editTurnId: turn.id });
     repository.updateEditSession(session.id, { currentOutputId: derived.id });
     expect(repository.getActiveEditSession(project.id, derived.id)?.id).toBe(session.id);
     expect(repository.getOutput(derived.id)).toMatchObject({ parentOutputId: root.id, rootOutputId: root.id, editTurnId: turn.id });
@@ -127,7 +127,7 @@ describe("EcomRepository", () => {
     database.close();
   });
 
-  it("keeps storyboard items bound to a project version and persists output review", () => {
+  it("keeps storyboard items bound to a project version and persists generated outputs", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
@@ -218,12 +218,9 @@ describe("EcomRepository", () => {
       candidateIndex: 1,
       generationSnapshot: { providerId: provider.id, modelId: "image", resolution: "1K", aspectRatio: "AUTO", size: "1024x1024", candidateIndex: 1 },
       storagePath: "outputs/cup.png",
-      hash: "hash",
-      reviewDecision: "NEEDS_REVIEW",
-      reviewNote: null
+      hash: "hash"
     });
     expect(output.candidateIndex).toBe(1);
-    expect(repository.reviewOutput(output.id, "SELECTED", "approved")?.reviewDecision).toBe("SELECTED");
     database.close();
   });
 
@@ -257,7 +254,7 @@ describe("EcomRepository", () => {
     database.close();
   });
 
-  it("summarizes list covers with earliest product photo, SELECTED cover, and extra previews", () => {
+  it("summarizes list covers with earliest product photo, latest output cover, and extra previews", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
@@ -303,18 +300,18 @@ describe("EcomRepository", () => {
     }]);
     const item = repository.listStoryboardItems(withOutputs.id)[0]!;
     const job = repository.createJob({ id: "job-cover", projectId: withOutputs.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
-    const oldest = repository.createOutput({ projectId: withOutputs.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "out/1.png", hash: "o1", reviewDecision: "NEEDS_REVIEW", reviewNote: null });
-    const selected = repository.createOutput({ projectId: withOutputs.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 2, generationSnapshot: null, storagePath: "out/2.png", hash: "o2", reviewDecision: "SELECTED", reviewNote: null });
-    const newest = repository.createOutput({ projectId: withOutputs.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 3, generationSnapshot: null, storagePath: "out/3.png", hash: "o3", reviewDecision: "NEEDS_REVIEW", reviewNote: null });
+    const oldest = repository.createOutput({ projectId: withOutputs.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "out/1.png", hash: "o1" });
+    const middle = repository.createOutput({ projectId: withOutputs.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 2, generationSnapshot: null, storagePath: "out/2.png", hash: "o2" });
+    const newest = repository.createOutput({ projectId: withOutputs.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 3, generationSnapshot: null, storagePath: "out/3.png", hash: "o3" });
     database.prepare("UPDATE outputs SET created_at=? WHERE id=?").run("2026-08-01T01:00:00.000Z", oldest.id);
-    database.prepare("UPDATE outputs SET created_at=? WHERE id=?").run("2026-08-01T01:01:00.000Z", selected.id);
+    database.prepare("UPDATE outputs SET created_at=? WHERE id=?").run("2026-08-01T01:01:00.000Z", middle.id);
     database.prepare("UPDATE outputs SET created_at=? WHERE id=?").run("2026-08-01T01:02:00.000Z", newest.id);
     expect(storyboard.version).toBe(1);
     const covers = repository.listProjectCovers([withOutputs.id, empty.id]);
     const filled = covers.get(withOutputs.id);
     expect(filled?.productAssetId).toBe(firstAsset.id);
-    expect(filled?.coverOutputId).toBe(selected.id);
-    expect(filled?.previewOutputIds).toEqual([newest.id, oldest.id]);
+    expect(filled?.coverOutputId).toBe(newest.id);
+    expect(filled?.previewOutputIds).toEqual([middle.id, oldest.id]);
     expect(filled?.outputCount).toBe(3);
     expect(covers.get(empty.id)).toEqual({ productAssetId: null, coverOutputId: null, previewOutputIds: [], outputCount: 0 });
     database.close();

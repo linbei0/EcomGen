@@ -63,7 +63,7 @@ describe("views", () => {
       detail({
         assets: [{ id: "a" } as ProjectDetail["assets"][number]],
         storyboard: { projectId: "p1", version: 1, status: "DRAFT", campaignStyleLock: "", items: [] },
-        outputs: [{ reviewDecision: "SELECTED" } as ProjectDetail["outputs"][number]],
+        outputs: [{ id: "o1" } as ProjectDetail["outputs"][number]],
       }),
     );
     expect(done.has("setup")).toBe(true);

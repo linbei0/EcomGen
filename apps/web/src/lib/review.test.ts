@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { Output, StoryboardItem } from "../api/adapters/projectDetail";
-import { applyDecision, groupOutputsByItem } from "./review";
+import { groupOutputsByItem } from "./review";
 
-function output(id: string, itemId: string, createdAt: string, decision: Output["reviewDecision"] = "NEEDS_REVIEW"): Output {
-  return { id, storyboardItemId: itemId, url: `/files/outputs/${id}`, reviewDecision: decision, createdAt };
+function output(id: string, itemId: string, createdAt: string): Output {
+  return { id, storyboardItemId: itemId, url: `/files/outputs/${id}`, createdAt };
 }
 
 function item(id: string, assetType = "hero-image"): StoryboardItem {
@@ -29,13 +29,5 @@ describe("groupOutputsByItem", () => {
     );
     expect(groups.map((group) => group.item.id)).toEqual(["i1", "i2"]);
     expect(groups[0]?.outputs.map((entry) => entry.id)).toEqual(["o1", "o2"]);
-  });
-});
-
-describe("applyDecision", () => {
-  it("只替换目标输出，其余不变", () => {
-    const next = applyDecision([output("o1", "i1", "t"), output("o2", "i1", "t")], "o2", "SELECTED");
-    expect(next[0]?.reviewDecision).toBe("NEEDS_REVIEW");
-    expect(next[1]?.reviewDecision).toBe("SELECTED");
   });
 });

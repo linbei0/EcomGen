@@ -84,11 +84,6 @@ export const JobStatus = Type.Enum({
 });
 export const ReasoningProtocolProfile = Type.Enum({ OPENAI: "openai", DASHSCOPE_QWEN: "dashscope_qwen" });
 export const SearchSourceKind = Type.Enum({ BRAVE: "brave", TAVILY: "tavily", SEARXNG: "searxng" });
-export const OutputReviewDecision = Type.Enum({
-  SELECTED: "SELECTED",
-  REJECTED: "REJECTED",
-  NEEDS_REVIEW: "NEEDS_REVIEW"
-});
 export const EditOperation = Type.Enum({ PRECISE_INPAINT: "PRECISE_INPAINT", PRODUCT_REPLACE: "PRODUCT_REPLACE", SCENE_ADJUST: "SCENE_ADJUST", OUTPAINT: "OUTPAINT", NATURAL_FUSION: "NATURAL_FUSION" });
 export const EditTurnStatus = Type.Enum({ DRAFT: "DRAFT", PLANNING: "PLANNING", PLAN_READY: "PLAN_READY", NEED_INPUT: "NEED_INPUT", AWAITING_CONFIRMATION: "AWAITING_CONFIRMATION", GENERATING: "GENERATING", SUCCEEDED: "SUCCEEDED", FAILED: "FAILED", CANCELLED: "CANCELLED" });
 export const EditSessionStatus = Type.Enum({ ACTIVE: "ACTIVE", ARCHIVED: "ARCHIVED" });
@@ -158,7 +153,6 @@ export type JobType = Static<typeof JobType>;
 export type JobStatus = Static<typeof JobStatus>;
 export type ReasoningProtocolProfile = Static<typeof ReasoningProtocolProfile>;
 export type SearchSourceKind = Static<typeof SearchSourceKind>;
-export type OutputReviewDecision = Static<typeof OutputReviewDecision>;
 export type EditOperation = Static<typeof EditOperation>;
 export type EditTurnStatus = Static<typeof EditTurnStatus>;
 export type EditSessionStatus = Static<typeof EditSessionStatus>;

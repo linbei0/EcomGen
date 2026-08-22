@@ -157,8 +157,6 @@ export const OUTPUT_FIXTURE = {
   jobId: GENERATE_JOB_ID,
   storagePath: `projects/${PROJECT_ID}/outputs/${OUTPUT_ID}.png`,
   hash: "out-a",
-  reviewDecision: "NEEDS_REVIEW" as const,
-  reviewNote: null,
   candidateIndex: 1,
   createdAt: "2026-08-01T00:30:00.000Z",
 };

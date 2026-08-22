@@ -109,9 +109,7 @@ function adaptOutput(raw: unknown): Output | null {
   const id = asString(raw.id);
   const storyboardItemId = asString(raw.storyboardItemId);
   const createdAt = asString(raw.createdAt);
-  const review = asString(raw.reviewDecision);
   if (!id || !storyboardItemId || !createdAt) return null;
-  if (review !== "SELECTED" && review !== "REJECTED" && review !== "NEEDS_REVIEW") return null;
   const snapshot = isRecord(raw.generationSnapshot)
     ? {
         resolution: RESOLUTIONS.has(raw.generationSnapshot.resolution as ImageResolution)
@@ -128,8 +126,6 @@ function adaptOutput(raw: unknown): Output | null {
     id,
     storyboardItemId,
     createdAt,
-    reviewDecision: review,
-    reviewNote: asString(raw.reviewNote) ?? null,
     candidateIndex: asNumber(raw.candidateIndex),
     generationSnapshot: snapshot,
     storagePath: asString(raw.storagePath),

@@ -161,7 +161,6 @@ try {
   assert.doesNotMatch(observed.imagePrompt, /Upstream template|Template fields/);
   const outputs = await requestJson(`${base}/projects/${project.id}/outputs`, "GET");
   assert.equal(outputs.length, 1);
-  await requestJson(`${base}/outputs/${outputs[0].id}/review`, "PATCH", { reviewDecision: "SELECTED" });
   const queuedExport = await requestJson(`${base}/projects/${project.id}/export-jobs`, "POST", { outputIds: [outputs[0].id] });
   const exportJob = await waitJob(base, queuedExport.job.id);
   assert.equal(exportJob.status, "SUCCEEDED");
@@ -171,7 +170,7 @@ try {
   const archive = Buffer.from(await zip.arrayBuffer());
   assert.equal(archive.subarray(0, 2).toString("utf8"), "PK");
   assert.match(archive.toString("binary"), /manifest\.json/);
-  console.log("Mock E2E passed: plan -> confirm -> generate -> review -> export");
+  console.log("Mock E2E passed: plan -> confirm -> generate -> export");
 } finally {
   await Promise.all(children.map(stop));
   if (mock) await new Promise((resolveClose) => mock.close(resolveClose));
