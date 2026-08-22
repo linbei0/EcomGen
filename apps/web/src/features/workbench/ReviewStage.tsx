@@ -115,7 +115,7 @@ export function ReviewStage({
         root={versionRootId ? detail.outputs.find((output) => output.id === versionRootId) : undefined}
         outputs={versionRootId ? [detail.outputs.find((output) => output.id === versionRootId), ...(editedByRoot.get(versionRootId) ?? [])].filter((output): output is Output => Boolean(output)) : []}
         onClose={() => setVersionRootId(null)}
-        onOpenOutput={(outputId) => { setVersionRootId(null); setEditingId(outputId); }}
+        onOpenOutput={setEditingId}
         selectedOutputIds={selectedOutputIds}
         onToggleSelection={toggleSelection}
         onDownload={(output, label) => void download(output, label)}

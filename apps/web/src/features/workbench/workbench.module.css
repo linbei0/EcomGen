@@ -12,7 +12,7 @@
   top: 0;
   z-index: var(--z-sticky);
   display: grid;
-  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(200px, 264px) minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
   padding: 10px 16px;
@@ -21,22 +21,61 @@
   backdrop-filter: blur(10px);
 }
 
+.topLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .brandLink,
 .homeLink {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   color: var(--text-2);
   text-decoration: none;
 }
 
 .projectName {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   color: var(--text-1);
   font-family: var(--font-display);
   font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.panelToggle {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.panelToggle:hover {
+  border-color: var(--line-1);
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+
+.panelToggle:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 1px;
 }
 
 .topActions {
@@ -52,6 +91,10 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.shell[data-collapsed="true"] {
+  grid-template-columns: 56px minmax(0, 1fr);
 }
 
 .left,
@@ -95,6 +138,61 @@
   scrollbar-gutter: stable;
   border-right: 1px solid var(--line-1);
   background: var(--bg-1);
+}
+
+.left[data-collapsed="true"] {
+  padding: 16px 12px;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding-top: 2px;
+  animation: railIn 160ms ease-out;
+}
+
+@keyframes railIn {
+  from { opacity: 0; }
+}
+
+.railExpand {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.railExpand:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.railExpand:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 1px;
+}
+
+.railLabel {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  writing-mode: vertical-rl;
 }
 
 .preview {
@@ -1508,11 +1606,16 @@
 .editOutpaint p { margin: 0; color: var(--text-3); font-size: 12px; }
 .editOutpaint p span { margin-left: 6px; color: var(--text-4); }
 .editOutpaint > div { display: flex; gap: 6px; }
+.editOutpaintInputs { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.editOutpaintInputs label { display: grid; gap: 3px; color: var(--text-3); font-size: 11px; }
+.editOutpaintInputs :global(.ant-input-number) { width: 100%; }
+.editOutpaint small { color: var(--text-4); font-size: 11px; }
 .editOutpaint button { display: grid; width: 30px; height: 30px; place-items: center; color: var(--text-3); border: 1px solid var(--line-1); border-radius: 4px; background: var(--bg-2); cursor: pointer; }
 .editOutpaint button[data-active="true"] { color: #e6f3ff; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--bg-2)); }
 
 @media (max-width: 960px) {
-  .shell {
+  .shell,
+  .shell[data-collapsed="true"] {
     grid-template-columns: 1fr;
   }
 
@@ -1520,6 +1623,19 @@
     border-right: 0;
     border-bottom: 1px solid var(--line-1);
     max-height: 48vh;
+  }
+
+  .left[data-collapsed="true"] {
+    max-height: none;
+    padding: 12px 16px;
+  }
+
+  .rail {
+    flex-direction: row;
+  }
+
+  .railLabel {
+    writing-mode: horizontal-tb;
   }
 
   .paramGrid {

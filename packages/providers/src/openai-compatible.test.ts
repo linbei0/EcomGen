@@ -1,0 +1,52 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { imageEditCapabilitiesFor, OpenAiCompatibleImageProvider } from "./openai-compatible.js";
+
+describe("OpenAI-compatible image editing", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("keeps source image first and sends references, mask, operation and fidelity", async () => {
+    let request: RequestInit | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: URL, init?: RequestInit) => {
+      request = init;
+      return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("generated").toString("base64") }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }));
+
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await provider.editImage({
+      model: "image-model",
+      prompt: "replace the background",
+      operation: "NATURAL_FUSION",
+      inputFidelity: "high",
+      sourceImage: { data: Buffer.from("source"), filename: "source.png", mimeType: "image/png" },
+      referenceImages: [
+        { data: Buffer.from("reference-1"), filename: "reference-1.png", mimeType: "image/png" },
+        { data: Buffer.from("reference-2"), filename: "reference-2.png", mimeType: "image/png" }
+      ],
+      mask: { data: Buffer.from("mask"), filename: "mask.png", mimeType: "image/png" }
+    });
+
+    expect(request?.method).toBe("POST");
+    const body = request?.body as FormData;
+    expect(body.get("operation")).toBe("NATURAL_FUSION");
+    expect(body.get("input_fidelity")).toBe("high");
+    expect((body.getAll("image") as File[]).map((file) => file.name)).toEqual(["source.png", "reference-1.png", "reference-2.png"]);
+    expect((body.get("mask") as File).name).toBe("mask.png");
+  });
+
+  it("derives edit capabilities from the selected image API adapter", () => {
+    const imageModel = { supportsVision: true, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" as const };
+    const textModel = { ...imageModel, imageApiKind: null };
+    expect(imageEditCapabilitiesFor(imageModel)).toMatchObject({
+      supportsMaskEdit: true,
+      supportsMultiReference: true,
+      supportsOutpaint: true,
+      supportsInputFidelity: true,
+      supportsNaturalBlend: true
+    });
+    expect(imageEditCapabilitiesFor(textModel)).toBeNull();
+  });
+});

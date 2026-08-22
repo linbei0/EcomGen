@@ -57,7 +57,6 @@ export function HomePage() {
         <div className={styles.brand}>
           <Aperture size={20} strokeWidth={1.75} aria-hidden />
           <span className={styles.brandName}>EcomGen</span>
-          <span className={styles.brandSub}>暗房工作台</span>
         </div>
         <div className={styles.topActions}>
           <HealthBadge />

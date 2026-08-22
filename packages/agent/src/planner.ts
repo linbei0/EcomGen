@@ -134,6 +134,7 @@ export interface EditPlannerInput {
   referenceAssets: Array<{ id: string; name: string; role: string }>;
   memorySummary: { summary?: string; constraints?: string[] };
   projectFacts: string[];
+  imageCapabilities?: { supportsMaskEdit: boolean; supportsMultiReference: boolean; supportsOutpaint: boolean; supportsInputFidelity: boolean; supportsNaturalBlend: boolean };
   sourceImage?: ImageContent;
 }
 
@@ -153,7 +154,7 @@ export async function planImageEdit(input: EditPlannerInput): Promise<PlannedEdi
     getApiKey: () => input.apiKey,
     initialState: {
       model: input.model,
-      systemPrompt: "You are an image-editing planner for an e-commerce workspace. Return only valid JSON. Use the user's words, mask availability, annotations, references, and previous constraints to choose one operation: PRECISE_INPAINT, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION. Never invent asset IDs or annotation IDs. PRODUCT_REPLACE requires a supplied reference asset. PRECISE_INPAINT requires an editable mask or target annotation. Set requiresConfirmation true for PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION. The prompt is a complete final image-edit prompt, preserving product facts and user-protected areas. For PRECISE_INPAINT use MASK_LOCKED; for OUTPAINT use OUTPAINT; otherwise use NATURAL_BLEND.",
+      systemPrompt: "You are an image-editing planner for an e-commerce workspace. Return only valid JSON. Use the user's words, mask availability, annotations, references, previous constraints, and provider capabilities to choose one operation: PRECISE_INPAINT, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION. Never invent asset IDs or annotation IDs, and never silently replace the requested operation with another operation just because a capability is unavailable. PRODUCT_REPLACE requires a supplied reference asset. PRECISE_INPAINT requires an editable mask or target annotation. Set requiresConfirmation true for PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION. The prompt is a complete final image-edit prompt, preserving product facts and user-protected areas. For PRECISE_INPAINT use MASK_LOCKED; for OUTPAINT use OUTPAINT; otherwise use NATURAL_BLEND.",
       thinkingLevel: input.model.reasoning ? "medium" : "off",
       tools: []
     }

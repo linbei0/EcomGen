@@ -7,9 +7,9 @@ import sharp from "sharp";
 import { planImageEdit, planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
 import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
 import { getTemplate } from "@ecomgen/ecom-skill";
-import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
+import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
-import { OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel } from "@ecomgen/providers";
+import { OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 
 const masterKey = process.env.ECOMGEN_MASTER_KEY;
 if (!masterKey) throw new Error("ECOMGEN_MASTER_KEY must be a base64-encoded 32-byte key");
@@ -208,6 +208,8 @@ async function executeEditPlan(job: JobRecord): Promise<void> {
   await updateJob(job, { progress: 25 });
   const session = repository.getEditSession(turn.sessionId); if (!session) throw new Error("Edit session is missing");
   const assets = repository.listAssets(project.id);
+  const imageProvider = providerFor(project.imageProviderId);
+  const imageModel = imageProvider.models.find((candidate) => candidate.id === project.imageModelId);
   const references = assets.filter((asset) => turn.referenceAssetIds.includes(asset.id)).map((asset) => ({ id: asset.id, name: asset.originalName, role: asset.role }));
   const source = repository.getOutput(turn.baseOutputId); if (!source) throw new Error("Edit source output is missing");
   let plan;
@@ -222,6 +224,7 @@ async function executeEditPlan(job: JobRecord): Promise<void> {
       referenceAssets: references,
       memorySummary: effectiveEditMemory(session, turn.baseOutputId),
       projectFacts: project.verifiedFacts,
+      imageCapabilities: imageModel ? imageEditCapabilitiesFor(imageModel) ?? undefined : undefined,
       sourceImage: model.supportsVision ? { type: "image", mimeType: mimeForStoredPath(source.storagePath), data: (await storage.read(source.storagePath)).toString("base64") } : undefined
     });
   } catch (error) {
@@ -252,12 +255,14 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   const source = repository.getOutput(turn.baseOutputId); if (!source || source.projectId !== project.id) throw new Error("Edit source output is missing or belongs to another project");
   const plan = turn.plan as { operation?: string; prompt?: string; compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT"; memoryPatch?: { summary?: string; constraints?: string[] } } | null;
   if (!plan?.operation || !plan.prompt || !plan.compositePolicy) throw new Error("Edit turn has no executable plan");
+  if (plan.operation === "PRECISE_INPAINT" && !turn.editMaskPath) throw new Error("EDIT_TARGET_REQUIRED: 局部编辑需要先标记可编辑区域");
   const outpaintExpansion = plan.compositePolicy === "OUTPAINT" ? canvasExpansionFor(turn) : null;
   if (plan.compositePolicy === "OUTPAINT" && !outpaintExpansion) throw new Error("OUTPAINT_CANVAS_REQUIRED");
   if (plan.compositePolicy === "MASK_LOCKED" && !turn.editMaskPath) throw new Error("EDIT_TARGET_REQUIRED");
   const provider = providerFor(project.imageProviderId);
   const model = provider.models.find((candidate) => candidate.id === project.imageModelId);
-  if (!model || model.imageApiKind !== "openai_images") throw new Error("CAPABILITY_UNSUPPORTED: selected image model cannot execute masked edits");
+  if (!model || model.imageApiKind !== "openai_images") throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持图像编辑");
+  const capabilities = imageEditCapabilitiesFor(model); if (!capabilities) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持图像编辑");
   await updateJob(job, { progress: 30 });
   const sourceImage = await storage.read(source.storagePath);
   const mask = turn.editMaskPath ? await storage.read(turn.editMaskPath) : undefined;
@@ -265,14 +270,21 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
   const assets = repository.listAssets(project.id);
   const references = await Promise.all(assets.filter((asset) => turn.referenceAssetIds.includes(asset.id)).map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType })));
+  assertEditCapabilities(capabilities, plan.operation as EditOperation, Boolean(mask), references.length);
   const outpaintCanvas = outpaintExpansion ? await createOutpaintCanvas(sourceImage, outpaintExpansion) : null;
   const inputImage = outpaintCanvas?.image ?? sourceImage;
   const providerMask = outpaintCanvas?.mask ?? (mask ? await providerMaskFor(sourceImage, mask, turn.protectMaskPath ? await storage.read(turn.protectMaskPath) : undefined) : undefined);
-  const result = await generator.generate({ model: model.id, prompt: plan.prompt, quality: "high", images: [{ data: inputImage, filename: "source.png", mimeType: "image/png" }, ...references], mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined, inputFidelity: "high" });
+  const result = await generator.editImage({ model: model.id, prompt: plan.prompt, quality: "high", sourceImage: { data: inputImage, filename: "source.png", mimeType: "image/png" }, referenceImages: references, mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined, operation: plan.operation as EditOperation, inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined });
   throwIfCancelled(job);
   await updateJob(job, { progress: 75, providerTaskId: result.providerTaskId ?? null });
   const protectedMask = turn.protectMaskPath ? await storage.read(turn.protectMaskPath) : undefined;
-  const composed = plan.compositePolicy === "MASK_LOCKED" && mask ? await compositeMaskedEdit(sourceImage, result.image, mask, protectedMask) : outpaintCanvas ? await sharp(result.image).resize(outpaintCanvas.width, outpaintCanvas.height, { fit: "fill" }).png().toBuffer() : await sharp(result.image).png().toBuffer();
+  const composed = plan.compositePolicy === "MASK_LOCKED" && mask
+    ? await compositeMaskedEdit(sourceImage, result.image, mask, protectedMask)
+    : plan.compositePolicy === "NATURAL_BLEND"
+      ? await compositeNaturalBlend(sourceImage, result.image, mask, protectedMask)
+      : outpaintCanvas
+        ? await compositeOutpaint(sourceImage, result.image, outpaintCanvas)
+        : await sharp(result.image).png().toBuffer();
   const stored = await storage.putOutput(project.id, composed, ".png");
   const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex: 1, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: project.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex: 1, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy }, storagePath: stored.path, hash: stored.hash, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
   const inheritedMemory = effectiveEditMemory(session, source.id);
@@ -340,14 +352,20 @@ function canvasExpansionFor(turn: EditTurnRecord): { top: number; right: number;
   const result = { top: read("top"), right: read("right"), bottom: read("bottom"), left: read("left") };
   return result.top || result.right || result.bottom || result.left ? result : null;
 }
-async function createOutpaintCanvas(source: Buffer, expansion: { top: number; right: number; bottom: number; left: number }): Promise<{ image: Buffer; mask: Buffer; width: number; height: number }> {
+function assertEditCapabilities(capabilities: { supportsMaskEdit: boolean; supportsMultiReference: boolean; supportsOutpaint: boolean; supportsNaturalBlend: boolean }, operation: EditOperation, hasMask: boolean, referenceCount: number): void {
+  if ((operation === "PRECISE_INPAINT" || hasMask) && !capabilities.supportsMaskEdit) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持遮罩编辑");
+  if (referenceCount > 1 && !capabilities.supportsMultiReference) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持多参考图编辑");
+  if (operation === "OUTPAINT" && !capabilities.supportsOutpaint) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持扩展画布");
+  if (["SCENE_ADJUST", "NATURAL_FUSION"].includes(operation) && !capabilities.supportsNaturalBlend) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持自然融合编辑");
+}
+async function createOutpaintCanvas(source: Buffer, expansion: { top: number; right: number; bottom: number; left: number }): Promise<{ image: Buffer; mask: Buffer; width: number; height: number; left: number; top: number }> {
   const meta = await sharp(source).metadata(); if (!meta.width || !meta.height) throw new Error("Source image dimensions are unavailable");
   const width = meta.width + expansion.left + expansion.right; const height = meta.height + expansion.top + expansion.bottom;
   const original = await sharp(source).ensureAlpha().png().toBuffer();
   const image = await sharp({ create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: original, left: expansion.left, top: expansion.top }]).png().toBuffer();
   const protectedOriginal = await sharp({ create: { width: meta.width, height: meta.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } }).png().toBuffer();
   const mask = await sharp({ create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: protectedOriginal, left: expansion.left, top: expansion.top }]).png().toBuffer();
-  return { image, mask, width, height };
+  return { image, mask, width, height, left: expansion.left, top: expansion.top };
 }
 async function assertMaskDimensions(source: Buffer, mask: Buffer): Promise<void> { const [sourceMeta, maskMeta] = await Promise.all([sharp(source).metadata(), sharp(mask).metadata()]); if (!sourceMeta.width || !sourceMeta.height || sourceMeta.width !== maskMeta.width || sourceMeta.height !== maskMeta.height) throw new Error("MASK_DIMENSION_MISMATCH"); }
 async function compositeMaskedEdit(source: Buffer, generated: Buffer, editMask: Buffer, protectMask?: Buffer): Promise<Buffer> {
@@ -362,6 +380,24 @@ async function compositeMaskedEdit(source: Buffer, generated: Buffer, editMask: 
   const resized = await sharp(generated).resize(sourceMeta.width, sourceMeta.height, { fit: "fill" }).png().toBuffer();
   const foreground = await sharp(resized).removeAlpha().joinChannel(alphaMask).png().toBuffer();
   return sharp(source).resize(sourceMeta.width, sourceMeta.height, { fit: "fill" }).composite([{ input: foreground }]).png().toBuffer();
+}
+async function compositeNaturalBlend(source: Buffer, generated: Buffer, editMask?: Buffer, protectMask?: Buffer): Promise<Buffer> {
+  const meta = await sharp(source).metadata(); if (!meta.width || !meta.height) throw new Error("Source image dimensions are unavailable");
+  let pixels = editMask
+    ? await sharp(editMask).greyscale().removeAlpha().resize(meta.width, meta.height, { fit: "fill" }).raw().toBuffer()
+    : Buffer.alloc(meta.width * meta.height, 255);
+  if (protectMask) {
+    const protect = await sharp(protectMask).greyscale().removeAlpha().resize(meta.width, meta.height, { fit: "fill" }).raw().toBuffer();
+    pixels = Buffer.from(pixels);
+    for (let index = 0; index < pixels.length; index += 1) pixels[index] = Math.max(0, pixels[index]! - protect[index]!);
+  }
+  const radius = Math.min(48, Math.max(4, Math.round(Math.min(meta.width, meta.height) * 0.01)));
+  const alphaMask = await sharp(pixels, { raw: { width: meta.width, height: meta.height, channels: 1 } }).blur(radius).png().toBuffer();
+  const resized = await sharp(generated).resize(meta.width, meta.height, { fit: "fill" }).removeAlpha().joinChannel(alphaMask).png().toBuffer();
+  return sharp(source).resize(meta.width, meta.height, { fit: "fill" }).composite([{ input: resized }]).png().toBuffer();
+}
+async function compositeOutpaint(source: Buffer, generated: Buffer, canvas: { width: number; height: number; left: number; top: number }): Promise<Buffer> {
+  return sharp(generated).resize(canvas.width, canvas.height, { fit: "fill" }).composite([{ input: await sharp(source).png().toBuffer(), left: canvas.left, top: canvas.top }]).png().toBuffer();
 }
 function mimeForStoredPath(path: string): string { return path.endsWith(".jpg") || path.endsWith(".jpeg") ? "image/jpeg" : path.endsWith(".webp") ? "image/webp" : "image/png"; }
 async function providerMaskFor(source: Buffer, editMask: Buffer, protectMask?: Buffer): Promise<Buffer> {

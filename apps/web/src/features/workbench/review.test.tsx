@@ -134,4 +134,44 @@ describe("工作台 · 结果", () => {
     await user.click(await screen.findByRole("button", { name: "查看 1 个编辑版本" }));
     expect(await screen.findByRole("button", { name: "下载 V2" })).toBeInTheDocument();
   });
+
+  it("关闭编辑器后返回编辑版本关系画布", async () => {
+    const user = userEvent.setup();
+    const edited = {
+      ...OUTPUT_FIXTURE,
+      id: "eeeeeeee-1111-4222-8333-666666666666",
+      parentOutputId: OUTPUT_ID,
+      rootOutputId: OUTPUT_ID,
+      editSessionId: "edit-session-1",
+      editTurnId: "edit-turn-1",
+    };
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () =>
+        HttpResponse.json(projectDetailPayload({ ...confirmed, outputs: [OUTPUT_FIXTURE, edited] })),
+      ),
+      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
+        HttpResponse.json(storyboardPayload(confirmed.storyboard, confirmed.items)),
+      ),
+      http.post(`${BASE}/projects/:projectId/outputs/:outputId/edit-sessions`, ({ params }) =>
+        HttpResponse.json({
+          id: "edit-session-1",
+          projectId: params.projectId,
+          currentOutputId: params.outputId,
+          status: "ACTIVE",
+          memorySummary: {},
+          turns: [],
+          versions: [OUTPUT_FIXTURE, edited],
+        }, { status: 201 }),
+      ),
+    );
+    renderResults();
+
+    await user.click(await screen.findByRole("button", { name: "查看 1 个编辑版本" }));
+    await user.click(screen.getByRole("button", { name: "原图" }));
+    const editorTitle = await screen.findByText("编辑图片");
+    const editorCloseButton = editorTitle.closest(".ant-modal")?.querySelector<HTMLButtonElement>(".ant-modal-close");
+    expect(editorCloseButton).not.toBeNull();
+    await user.click(editorCloseButton!);
+    expect(screen.getByText("编辑版本关系")).toBeVisible();
+  });
 });

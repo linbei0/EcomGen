@@ -66,11 +66,13 @@ interface Props {
 export function ProviderFormView({ view, onDone }: Props) {
   const editing = view.kind === "edit" ? view.provider : null;
   const [form] = Form.useForm<ProviderFormValues>();
+  const models = Form.useWatch("models", form);
   const createProvider = useCreateProvider();
   const updateProvider = useUpdateProvider();
   const testProvider = useTestProvider();
   const { notification } = App.useApp();
   const [testRows, setTestRows] = useState<Record<number, TestRowState>>({});
+  const [modelKinds, setModelKinds] = useState<Record<number, "" | ImageApiKindValue>>({});
 
   const initialValues: ProviderFormValues = editing
     ? {
@@ -202,6 +204,7 @@ export function ProviderFormView({ view, onDone }: Props) {
           <div className={styles.modelList}>
             {fields.map((field, index) => {
               const testRow = testRows[index];
+              const imageApiKind = modelKinds[field.key] ?? models?.[field.name]?.imageApiKind ?? "";
               return (
                 <div key={field.key} className={styles.modelRow}>
                   <div className={styles.modelRowMain}>
@@ -212,33 +215,38 @@ export function ProviderFormView({ view, onDone }: Props) {
                     >
                       <Input placeholder="模型 ID，如 gpt-image-1" className="font-mono" />
                     </Form.Item>
-                    <label className={styles.switchItem}>
-                      <Form.Item name={[field.name, "supportsVision"]} valuePropName="checked" noStyle>
-                        <Switch size="small" />
-                      </Form.Item>
-                      <span>视觉</span>
-                    </label>
-                    <label className={styles.switchItem}>
-                      <Form.Item name={[field.name, "supportsThinking"]} valuePropName="checked" noStyle>
-                        <Switch size="small" />
-                      </Form.Item>
-                      <span>思考</span>
-                    </label>
-                    <label className={styles.switchItem}>
-                      <Form.Item name={[field.name, "supportsTools"]} valuePropName="checked" noStyle>
-                        <Switch size="small" />
-                      </Form.Item>
-                      <span>工具</span>
-                    </label>
-                    <label className={styles.switchItem}>
-                      <Form.Item name={[field.name, "supportsStructuredOutput"]} valuePropName="checked" noStyle>
-                        <Switch size="small" />
-                      </Form.Item>
-                      <span>结构化</span>
-                    </label>
+                    {imageApiKind === "" && (
+                      <>
+                        <label className={styles.switchItem}>
+                          <Form.Item name={[field.name, "supportsVision"]} valuePropName="checked" noStyle>
+                            <Switch size="small" />
+                          </Form.Item>
+                          <span>视觉</span>
+                        </label>
+                        <label className={styles.switchItem}>
+                          <Form.Item name={[field.name, "supportsThinking"]} valuePropName="checked" noStyle>
+                            <Switch size="small" />
+                          </Form.Item>
+                          <span>思考</span>
+                        </label>
+                        <label className={styles.switchItem}>
+                          <Form.Item name={[field.name, "supportsTools"]} valuePropName="checked" noStyle>
+                            <Switch size="small" />
+                          </Form.Item>
+                          <span>工具</span>
+                        </label>
+                        <label className={styles.switchItem}>
+                          <Form.Item name={[field.name, "supportsStructuredOutput"]} valuePropName="checked" noStyle>
+                            <Switch size="small" />
+                          </Form.Item>
+                          <span>结构化</span>
+                        </label>
+                      </>
+                    )}
                     <Form.Item name={[field.name, "imageApiKind"]} className={styles.kindSelect} noStyle>
                       <Select
-                        aria-label="生图 API 类型"
+                        aria-label={`模型 ${index + 1} 的生图 API 类型`}
+                        onChange={(value: "" | ImageApiKindValue) => setModelKinds((current) => ({ ...current, [field.key]: value }))}
                         options={[
                           { value: "", label: "无（推理）" },
                           { value: "openai_images", label: "openai_images" },

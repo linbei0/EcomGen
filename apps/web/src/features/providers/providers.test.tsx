@@ -91,6 +91,17 @@ describe("设置抽屉 · Provider", () => {
     });
   });
 
+  it("生图模型隐藏推理能力开关", async () => {
+    const user = userEvent.setup();
+    openDrawer();
+    await user.click(await screen.findByRole("button", { name: "编辑 OpenAI 官方" }));
+
+    expect(screen.getAllByText("视觉")).toHaveLength(1);
+    expect(screen.getAllByText("思考")).toHaveLength(1);
+    expect(screen.getAllByText("工具")).toHaveLength(1);
+    expect(screen.getAllByText("结构化")).toHaveLength(1);
+  });
+
   it("删除 Provider：Popconfirm 确认后调用 DELETE", async () => {
     const user = userEvent.setup();
     let deletedId: string | undefined;

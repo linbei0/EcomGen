@@ -984,6 +984,10 @@ export interface components {
             memorySummary: {
                 summary?: string;
                 constraints?: string[];
+                /**
+                 * Format: uuid
+                 * @description Output node that owns the effective branch memory.
+                 */
                 sourceOutputId?: string;
             };
             /** Format: date-time */
@@ -1907,6 +1911,10 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Output node whose branch memory should be updated. Defaults to currentOutputId.
+                     */
                     outputId?: string;
                     summary: string;
                     constraints: string[];

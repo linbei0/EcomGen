@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { Route, Routes } from "react-router";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   ASSET_FIXTURE,
@@ -237,5 +237,39 @@ describe("工作台 · 左栏编辑", () => {
     await waitFor(() =>
       expect(patches.at(-1)).toMatchObject({ reasoningModel: { providerId: PROVIDER_ID, modelId: "claude-sonnet" } }),
     );
+  });
+});
+
+describe("工作台 · 左栏收缩", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("收起后隐藏配置表单并显示窄栏，再次点击恢复", async () => {
+    const user = userEvent.setup();
+    renderWorkbench();
+    expect(await screen.findByLabelText("项目名称")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收起配置面板" })).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(screen.getByRole("button", { name: "收起配置面板" }));
+    expect(screen.queryByLabelText("项目名称")).not.toBeInTheDocument();
+    expect(screen.getByText("配置面板")).toBeInTheDocument();
+
+    const expandButtons = await screen.findAllByRole("button", { name: "展开配置面板" });
+    await user.click(expandButtons[0]!);
+    expect(await screen.findByLabelText("项目名称")).toBeInTheDocument();
+  });
+
+  it("收缩状态写入 localStorage，重新渲染后保持", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderWorkbench();
+    await screen.findByLabelText("项目名称");
+    await user.click(screen.getByRole("button", { name: "收起配置面板" }));
+    expect(localStorage.getItem("ecomgen.workspace.sidebarCollapsed")).toBe("1");
+    unmount();
+
+    renderWorkbench();
+    expect((await screen.findAllByRole("button", { name: "展开配置面板" })).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("项目名称")).not.toBeInTheDocument();
   });
 });

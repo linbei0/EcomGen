@@ -1,4 +1,4 @@
-import type { ModelCapabilities } from "@ecomgen/contracts";
+import type { EditOperation, ModelCapabilities } from "@ecomgen/contracts";
 
 export interface ProviderConnection {
   baseUrl: string;
@@ -13,7 +13,41 @@ export interface ImageGenerationInput {
   images?: Array<{ data: Buffer; filename: string; mimeType: string }>;
   mask?: { data: Buffer; filename: string; mimeType: string };
   inputFidelity?: "low" | "high";
+  operation?: EditOperation;
 }
+
+export interface ImageInput {
+  data: Buffer;
+  filename: string;
+  mimeType: string;
+}
+
+export interface ImageEditInput {
+  model: string;
+  prompt: string;
+  quality?: "low" | "medium" | "high";
+  sourceImage: ImageInput;
+  referenceImages?: ImageInput[];
+  mask?: ImageInput;
+  operation: EditOperation;
+  inputFidelity?: "low" | "high";
+}
+
+export interface ImageEditCapabilities {
+  supportsMaskEdit: boolean;
+  supportsMultiReference: boolean;
+  supportsOutpaint: boolean;
+  supportsInputFidelity: boolean;
+  supportsNaturalBlend: boolean;
+}
+
+const OPENAI_COMPATIBLE_EDIT_CAPABILITIES: ImageEditCapabilities = {
+  supportsMaskEdit: true,
+  supportsMultiReference: true,
+  supportsOutpaint: true,
+  supportsInputFidelity: true,
+  supportsNaturalBlend: true
+};
 
 export interface ImageGenerationResult {
   image: Buffer;
@@ -43,6 +77,18 @@ export class OpenAiCompatibleImageProvider {
     return this.readImageResponse(response);
   }
 
+  public async editImage(input: ImageEditInput): Promise<ImageGenerationResult> {
+    return this.edit({
+      model: input.model,
+      prompt: input.prompt,
+      quality: input.quality,
+      images: [input.sourceImage, ...(input.referenceImages ?? [])],
+      mask: input.mask,
+      inputFidelity: input.inputFidelity,
+      operation: input.operation
+    });
+  }
+
   public async probe(): Promise<ProviderProbeResult> {
     // 只读取 /models，不调用生图接口，避免“测试连接”产生模型费用或副作用。
     const started = Date.now();
@@ -57,6 +103,7 @@ export class OpenAiCompatibleImageProvider {
     form.set("model", input.model);
     form.set("prompt", input.prompt);
     form.set("response_format", "b64_json");
+    if (input.operation) form.set("operation", input.operation);
     if (input.size) form.set("size", input.size);
     if (input.quality) form.set("quality", input.quality);
     if (input.inputFidelity) form.set("input_fidelity", input.inputFidelity);
@@ -104,4 +151,9 @@ export class ProviderError extends Error {
 
 export function supportsImageGeneration(capabilities: ModelCapabilities): boolean {
   return capabilities.imageApiKind !== null;
+}
+
+/** 能力由已选 API 适配器决定，避免让卖家为 Provider 协议做技术判断。 */
+export function imageEditCapabilitiesFor(capabilities: ModelCapabilities): ImageEditCapabilities | null {
+  return capabilities.imageApiKind === "openai_images" ? OPENAI_COMPATIBLE_EDIT_CAPABILITIES : null;
 }
