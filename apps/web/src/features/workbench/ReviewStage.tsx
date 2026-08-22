@@ -135,7 +135,7 @@ export function ReviewStage({
         }}
         onEdit={() => { if (lightbox) setEditingId(lightbox.id); }}
       />
-      <EditImageWorkspace projectId={detail.id} output={detail.outputs.find((output) => output.id === editingId)} outputs={detail.outputs} assets={detail.assets} onSelectOutput={setEditingId} onClose={() => setEditingId(null)} />
+      <EditImageWorkspace projectId={detail.id} project={detail} output={detail.outputs.find((output) => output.id === editingId)} outputs={detail.outputs} assets={detail.assets} onSelectOutput={setEditingId} onClose={() => setEditingId(null)} />
     </div>
   );
 }

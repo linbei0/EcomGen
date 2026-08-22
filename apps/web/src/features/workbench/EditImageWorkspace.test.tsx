@@ -51,10 +51,11 @@ Object.defineProperties(offscreenCanvasContext, {
   globalCompositeOperation: { get: () => "source-over", set: () => {} },
 });
 
-function renderEditor() {
+function renderEditor(project?: { reasoningProviderId: string; reasoningModelId: string; imageProviderId: string; imageModelId: string; imageResolution: "1K" | "2K" | "4K"; candidatesPerType: number }) {
   return renderWithProviders(
     <EditImageWorkspace
       projectId={PROJECT_ID}
+      project={project}
       output={OUTPUT_FIXTURE}
       outputs={[OUTPUT_FIXTURE]}
       assets={[]}
@@ -149,6 +150,42 @@ describe("图片编辑画布", () => {
 
     expect(submittedAnnotations).toMatchObject({
       annotations: [{ type: "rect", bounds: { x: 300, y: 250, width: 200, height: 200 } }],
+    });
+  });
+
+  it("默认收起本次生成设置，展开后提交自定义模型、分辨率和出图数", async () => {
+    const user = userEvent.setup();
+    let submittedAnnotations: Record<string, unknown> | undefined;
+    server.use(
+      http.get(`${BASE}/providers`, () => HttpResponse.json({ items: [
+        { id: "reasoning-2", name: "推理 Provider", models: [{ id: "reasoning-model-2", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null }] },
+        { id: "image-2", name: "生图 Provider", models: [{ id: "image-model-2", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" }] },
+      ], nextCursor: null })),
+      http.post(`${BASE}/edit-sessions/:sessionId/turns`, async ({ request }) => {
+        submittedAnnotations = JSON.parse(String((await request.formData()).get("annotations"))) as Record<string, unknown>;
+        return HttpResponse.json({ turnId: "turn-1" });
+      }),
+    );
+    renderEditor({ reasoningProviderId: "reasoning-1", reasoningModelId: "reasoning-model-1", imageProviderId: "image-1", imageModelId: "image-model-1", imageResolution: "1K", candidatesPerType: 1 });
+
+    expect(screen.getByRole("button", { name: /本次生成设置/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("推理模型")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /本次生成设置/ }));
+    expect(screen.getByLabelText("推理模型")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("推理模型"), "reasoning-2::reasoning-model-2");
+    await user.selectOptions(screen.getByLabelText("生图模型"), "image-2::image-model-2");
+    await user.selectOptions(screen.getByLabelText("分辨率"), "2K");
+    fireEvent.change(screen.getByLabelText("出图数"), { target: { value: "3" } });
+    await user.type(screen.getByPlaceholderText(/把选中的菠萝颜色/), "使用本次配置");
+    await user.click(screen.getByRole("button", { name: "生成计划" }));
+
+    expect(submittedAnnotations?.generationConfig).toEqual({
+      reasoningProviderId: "reasoning-2",
+      reasoningModelId: "reasoning-model-2",
+      imageProviderId: "image-2",
+      imageModelId: "image-model-2",
+      imageResolution: "2K",
+      candidateCount: 3,
     });
   });
 

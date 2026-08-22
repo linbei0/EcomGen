@@ -1572,6 +1572,16 @@
 .editAgentPanel h2 { margin: 3px 0 0; color: var(--text-1); font-family: var(--font-display); font-size: 20px; font-weight: 400; }
 .editEyebrow { margin: 0; color: var(--accent); font-size: 11px; letter-spacing: 0.1em; }
 .editHint { margin: 8px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.5; }
+.editGenerationSettings { display: grid; gap: 8px; }
+.editSettingsToggle { display: flex; align-items: center; gap: 7px; width: 100%; padding: 8px 9px; border: 1px solid var(--line-1); border-radius: 5px; background: var(--bg-2); color: var(--text-2); cursor: pointer; text-align: left; }
+.editSettingsToggle span { font-size: 12px; }
+.editSettingsToggle small { margin-left: auto; color: var(--text-4); font-size: 10px; }
+.editSettingsToggle svg:last-child { color: var(--text-4); transition: transform 160ms ease; }
+.editSettingsToggle[aria-expanded="true"] svg:last-child { transform: rotate(180deg); }
+.editSettingsBody { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line-1); border-radius: 5px; background: var(--bg-2); }
+.editSettingsBody label { display: grid; gap: 4px; color: var(--text-3); font-size: 11px; }
+.editSettingsBody select, .editSettingsBody input { width: 100%; min-height: 30px; padding: 4px 7px; border: 1px solid var(--line-1); border-radius: 4px; background: var(--bg-1); color: var(--text-1); font: inherit; }
+.editSettingsGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .editBrushSize { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 12px; }
 .editBrushSize input { flex: 1; accent-color: var(--accent); }
 .editPlan { padding: 12px; border-left: 2px solid var(--accent); background: var(--accent-subtle); }

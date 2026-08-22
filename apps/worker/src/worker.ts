@@ -202,14 +202,15 @@ async function executeGeneration(job: JobRecord): Promise<void> {
 async function executeEditPlan(job: JobRecord): Promise<void> {
   const turn = editTurnFor(job);
   const project = projectFor(job);
-  const provider = providerFor(project.reasoningProviderId);
-  const model = provider.models.find((candidate) => candidate.id === project.reasoningModelId);
+  const config = editGenerationConfigFor(project, turn);
+  const provider = providerFor(config.reasoningProviderId);
+  const model = provider.models.find((candidate) => candidate.id === config.reasoningModelId);
   if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
   await updateJob(job, { progress: 25 });
   const session = repository.getEditSession(turn.sessionId); if (!session) throw new Error("Edit session is missing");
   const assets = repository.listAssets(project.id);
-  const imageProvider = providerFor(project.imageProviderId);
-  const imageModel = imageProvider.models.find((candidate) => candidate.id === project.imageModelId);
+  const imageProvider = providerFor(config.imageProviderId);
+  const imageModel = imageProvider.models.find((candidate) => candidate.id === config.imageModelId);
   const references = assets.filter((asset) => turn.referenceAssetIds.includes(asset.id)).map((asset) => ({ id: asset.id, name: asset.originalName, role: asset.role }));
   const source = repository.getOutput(turn.baseOutputId); if (!source) throw new Error("Edit source output is missing");
   let plan;
@@ -242,7 +243,7 @@ async function executeEditPlan(job: JobRecord): Promise<void> {
   repository.updateEditTurn(turn.id, { status, plan: plan as unknown as Record<string, unknown>, error: null });
   await events.publish(project.id, "edit-turn.updated", { turn: repository.getEditTurn(turn.id) });
   if (!plan.requiresConfirmation) {
-    const generation = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "EDIT_GENERATE", input: { editTurnId: turn.id }, requestFingerprint: null, providerId: project.imageProviderId, modelId: project.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const generation = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "EDIT_GENERATE", input: { editTurnId: turn.id }, requestFingerprint: null, providerId: config.imageProviderId, modelId: config.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueue(executionQueue, { jobId: generation.id, kind: "edit_generate" });
   }
   await updateJob(job, { progress: 90 });
@@ -251,6 +252,7 @@ async function executeEditPlan(job: JobRecord): Promise<void> {
 async function executeEditGeneration(job: JobRecord): Promise<void> {
   const turn = editTurnFor(job);
   const project = projectFor(job);
+  const config = editGenerationConfigFor(project, turn);
   const session = repository.getEditSession(turn.sessionId); if (!session) throw new Error("Edit session is missing");
   const source = repository.getOutput(turn.baseOutputId); if (!source || source.projectId !== project.id) throw new Error("Edit source output is missing or belongs to another project");
   const plan = turn.plan as { operation?: string; prompt?: string; compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT"; memoryPatch?: { summary?: string; constraints?: string[] } } | null;
@@ -259,8 +261,8 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   const outpaintExpansion = plan.compositePolicy === "OUTPAINT" ? canvasExpansionFor(turn) : null;
   if (plan.compositePolicy === "OUTPAINT" && !outpaintExpansion) throw new Error("OUTPAINT_CANVAS_REQUIRED");
   if (plan.compositePolicy === "MASK_LOCKED" && !turn.editMaskPath) throw new Error("EDIT_TARGET_REQUIRED");
-  const provider = providerFor(project.imageProviderId);
-  const model = provider.models.find((candidate) => candidate.id === project.imageModelId);
+  const provider = providerFor(config.imageProviderId);
+  const model = provider.models.find((candidate) => candidate.id === config.imageModelId);
   if (!model || model.imageApiKind !== "openai_images") throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持图像编辑");
   const capabilities = imageEditCapabilitiesFor(model); if (!capabilities) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持图像编辑");
   await updateJob(job, { progress: 30 });
@@ -274,25 +276,31 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   const outpaintCanvas = outpaintExpansion ? await createOutpaintCanvas(sourceImage, outpaintExpansion) : null;
   const inputImage = outpaintCanvas?.image ?? sourceImage;
   const providerMask = outpaintCanvas?.mask ?? (mask ? await providerMaskFor(sourceImage, mask, turn.protectMaskPath ? await storage.read(turn.protectMaskPath) : undefined) : undefined);
-  const result = await generator.editImage({ model: model.id, prompt: plan.prompt, quality: "high", sourceImage: { data: inputImage, filename: "source.png", mimeType: "image/png" }, referenceImages: references, mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined, operation: plan.operation as EditOperation, inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined });
-  throwIfCancelled(job);
-  await updateJob(job, { progress: 75, providerTaskId: result.providerTaskId ?? null });
   const protectedMask = turn.protectMaskPath ? await storage.read(turn.protectMaskPath) : undefined;
-  const composed = plan.compositePolicy === "MASK_LOCKED" && mask
-    ? await compositeMaskedEdit(sourceImage, result.image, mask, protectedMask)
-    : plan.compositePolicy === "NATURAL_BLEND"
-      ? await compositeNaturalBlend(sourceImage, result.image, mask, protectedMask)
-      : outpaintCanvas
-        ? await compositeOutpaint(sourceImage, result.image, outpaintCanvas)
-        : await sharp(result.image).png().toBuffer();
-  const stored = await storage.putOutput(project.id, composed, ".png");
-  const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex: 1, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: project.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex: 1, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy }, storagePath: stored.path, hash: stored.hash, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
+  const createdOutputs: Array<ReturnType<typeof repository.createOutput>> = [];
+  for (let candidateIndex = 1; candidateIndex <= config.candidateCount; candidateIndex += 1) {
+    const result = await generator.editImage({ model: model.id, prompt: plan.prompt, quality: "high", size: resolveImageSize(config.imageResolution, project.imageAspectRatio, "1024x1024"), sourceImage: { data: inputImage, filename: "source.png", mimeType: "image/png" }, referenceImages: references, mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined, operation: plan.operation as EditOperation, inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined });
+    throwIfCancelled(job);
+    await updateJob(job, { progress: 30 + Math.round((candidateIndex / config.candidateCount) * 45), providerTaskId: result.providerTaskId ?? null });
+    const composed = plan.compositePolicy === "MASK_LOCKED" && mask
+      ? await compositeMaskedEdit(sourceImage, result.image, mask, protectedMask)
+      : plan.compositePolicy === "NATURAL_BLEND"
+        ? await compositeNaturalBlend(sourceImage, result.image, mask, protectedMask)
+        : outpaintCanvas
+          ? await compositeOutpaint(sourceImage, result.image, outpaintCanvas)
+          : await sharp(result.image).png().toBuffer();
+    const stored = await storage.putOutput(project.id, composed, ".png");
+    const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: config.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy }, storagePath: stored.path, hash: stored.hash, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
+    createdOutputs.push(output);
+  }
+  const output = createdOutputs.at(-1);
+  if (!output) throw new Error("Edit generation produced no outputs");
   const inheritedMemory = effectiveEditMemory(session, source.id);
   const nextMemory = { summary: plan.memoryPatch?.summary ?? inheritedMemory.summary, constraints: plan.memoryPatch?.constraints ?? inheritedMemory.constraints };
   const updatedSession = repository.updateEditSession(session.id, { currentOutputId: output.id, memorySummary: { ...session.memorySummary, scopes: { ...(session.memorySummary.scopes ?? {}), [output.id]: nextMemory } } });
   repository.updateEditTurn(turn.id, { status: "SUCCEEDED", error: null });
   if (updatedSession) await events.publish(project.id, "edit-session.updated", { session: updatedSession });
-  await events.publish(project.id, "output.created", { output });
+  for (const createdOutput of createdOutputs) await events.publish(project.id, "output.created", { output: createdOutput });
   await events.publish(project.id, "edit-turn.updated", { turn: repository.getEditTurn(turn.id) });
 }
 
@@ -309,6 +317,17 @@ async function executeExport(job: JobRecord): Promise<void> {
 
 function projectFor(job: JobRecord): ProjectRecord { const project = repository.getProject(job.projectId); if (!project) throw new Error(`Project not found for job ${job.id}`); return project; }
 function providerFor(id: string) { const provider = repository.getProvider(id); if (!provider) throw new Error(`Configured provider not found: ${id}`); return provider; }
+interface EditGenerationConfig { reasoningProviderId: string; reasoningModelId: string; imageProviderId: string; imageModelId: string; imageResolution: ImageResolution; candidateCount: number; }
+function editGenerationConfigFor(project: ProjectRecord, turn: EditTurnRecord): EditGenerationConfig {
+  const defaults = { reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId, imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, imageResolution: project.imageResolution, candidateCount: Math.min(4, Math.max(1, Math.round(project.candidatesPerType))) };
+  const raw = (turn.annotations as Record<string, unknown>).generationConfig;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
+  const config = raw as Record<string, unknown>;
+  const readId = (key: keyof Pick<EditGenerationConfig, "reasoningProviderId" | "reasoningModelId" | "imageProviderId" | "imageModelId">) => typeof config[key] === "string" && config[key] ? config[key] as string : defaults[key];
+  const resolution = config.imageResolution === "1K" || config.imageResolution === "2K" || config.imageResolution === "4K" ? config.imageResolution : defaults.imageResolution;
+  const candidateCount = typeof config.candidateCount === "number" && Number.isFinite(config.candidateCount) ? Math.min(4, Math.max(1, Math.round(config.candidateCount))) : defaults.candidateCount;
+  return { reasoningProviderId: readId("reasoningProviderId"), reasoningModelId: readId("reasoningModelId"), imageProviderId: readId("imageProviderId"), imageModelId: readId("imageModelId"), imageResolution: resolution, candidateCount };
+}
 function effectiveEditMemory(session: { memorySummary: { summary?: string; constraints?: string[]; scopes?: Record<string, { summary?: string; constraints?: string[] }> } }, outputId: string): { summary?: string; constraints?: string[] } {
   let current = repository.getOutput(outputId);
   while (current) {

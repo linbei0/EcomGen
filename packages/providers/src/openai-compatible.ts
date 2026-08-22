@@ -26,6 +26,7 @@ export interface ImageEditInput {
   model: string;
   prompt: string;
   quality?: "low" | "medium" | "high";
+  size?: string;
   sourceImage: ImageInput;
   referenceImages?: ImageInput[];
   mask?: ImageInput;
@@ -82,6 +83,7 @@ export class OpenAiCompatibleImageProvider {
       model: input.model,
       prompt: input.prompt,
       quality: input.quality,
+      size: input.size,
       images: [input.sourceImage, ...(input.referenceImages ?? [])],
       mask: input.mask,
       inputFidelity: input.inputFidelity,

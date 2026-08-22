@@ -1,11 +1,13 @@
 import { Button, Input, InputNumber, Modal, Tooltip } from "antd";
-import { ArrowUpRight, Brush, Eraser, Hand, Redo2, RotateCcw, Scan, Send, Shield, SquareDashedMousePointer, Type, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowUpRight, Brush, ChevronDown, Eraser, Hand, Redo2, RotateCcw, Scan, Send, Settings2, Shield, SquareDashedMousePointer, Type, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
-import type { Asset, Output } from "../../api/adapters/projectDetail";
+import type { Asset, Output, ProjectDetail } from "../../api/adapters/projectDetail";
+import { useProviders } from "../../api/hooks/useProviders";
 import { API_BASE_URL } from "../../config/env";
 import { errorText } from "../../lib/errorText";
 import { editErrorLabel, editOperationLabel } from "../../lib/userText";
+import { modelOptions } from "../../lib/modelOptions";
 import styles from "./workbench.module.css";
 
 type Tool = "pan" | "rect" | "brush" | "erase" | "protect" | "arrow" | "text";
@@ -18,6 +20,7 @@ interface Snapshot { edit: string; protect: string; annotations: Array<Record<st
 interface EditSessionState { id: string; currentOutputId: string; memorySummary: { summary?: string; constraints?: string[]; sourceOutputId?: string }; versions: Array<{ id: string; createdAt: string }>; }
 type RectHandle = "move" | "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 interface Interaction { start: Point | null; last: Point | null; erased: Bounds | null; rectId: string | null; rectBounds: Bounds | null; rectHandle: RectHandle | null; }
+type EditProjectDefaults = Pick<ProjectDetail, "reasoningProviderId" | "reasoningModelId" | "imageProviderId" | "imageModelId" | "imageResolution" | "candidatesPerType">;
 
 const MARK_COLORS = ["#1888f2", "#ff5c5c", "#ffbf2f", "#25bd7b", "#9968f2"];
 const EDIT_OVERLAY_COLOR = "#006dff";
@@ -86,7 +89,8 @@ function drawMaskOverlay(context: CanvasRenderingContext2D, mask: HTMLCanvasElem
   context.restore();
 }
 
-export function EditImageWorkspace({ projectId, output, outputs, assets, onSelectOutput, onClose }: { projectId: string; output: Output | undefined; outputs: Output[]; assets: Asset[]; onSelectOutput: (outputId: string) => void; onClose: () => void }) {
+export function EditImageWorkspace({ projectId, project, output, outputs, assets, onSelectOutput, onClose }: { projectId: string; project?: EditProjectDefaults; output: Output | undefined; outputs: Output[]; assets: Asset[]; onSelectOutput: (outputId: string) => void; onClose: () => void }) {
+  const providers = useProviders();
   const imageRef = useRef<HTMLImageElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
@@ -121,8 +125,22 @@ export function EditImageWorkspace({ projectId, output, outputs, assets, onSelec
   const [memoryConstraints, setMemoryConstraints] = useState("");
   const [memorySourceOutputId, setMemorySourceOutputId] = useState<string | undefined>();
   const [compareOutputId, setCompareOutputId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [reasoningModel, setReasoningModel] = useState("");
+  const [imageModel, setImageModel] = useState("");
+  const [imageResolution, setImageResolution] = useState<EditProjectDefaults["imageResolution"]>("1K");
+  const [candidateCount, setCandidateCount] = useState(1);
   const panRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
   const pendingAutoSelectRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!project) return;
+    setReasoningModel(`${project.reasoningProviderId}::${project.reasoningModelId}`);
+    setImageModel(`${project.imageProviderId}::${project.imageModelId}`);
+    setImageResolution(project.imageResolution);
+    setCandidateCount(project.candidatesPerType);
+    setSettingsOpen(false);
+  }, [project?.reasoningProviderId, project?.reasoningModelId, project?.imageProviderId, project?.imageModelId, project?.imageResolution, project?.candidatesPerType]);
 
   const redrawOverlay = (nextAnnotations = annotations, nextSelectedRectId = selectedRectId) => {
     const overlay = overlayRef.current; const edit = editMaskRef.current; const protect = protectMaskRef.current; const editTint = editTintRef.current; const protectTint = protectTintRef.current;
@@ -314,7 +332,7 @@ export function EditImageWorkspace({ projectId, output, outputs, assets, onSelec
   const hasInk = (canvas: HTMLCanvasElement | null) => { if (!canvas) return false; const pixels = canvas.getContext("2d")?.getImageData(0, 0, canvas.width, canvas.height).data; return Boolean(pixels?.some((_, index) => index % 4 === 3 && pixels[index] !== 0)); };
   const submit = async () => {
     if (!output || !message.trim()) return; commitText();
-    try { const currentEditMask = editMaskForSubmit(); const [editMask, protectMask, id] = await Promise.all([hasInk(currentEditMask) ? canvasBlob(currentEditMask) : null, hasInk(protectMaskRef.current) ? canvasBlob(protectMaskRef.current) : null, ensureSession()]); const sourceWidth = editMaskRef.current?.width ?? 0; const sourceHeight = editMaskRef.current?.height ?? 0; const canvasExpansion = Object.values(outpaintEdges).some((value) => value > 0) ? outpaintEdges : undefined; const form = new FormData(); form.set("baseOutputId", output.id); form.set("message", message.trim()); form.set("annotations", JSON.stringify({ sourceWidth, sourceHeight, annotations, canvasExpansion })); form.set("referenceAssetIds", JSON.stringify(referenceAssetIds)); if (editMask) form.set("editMask", editMask, "edit-mask.png"); if (protectMask) form.set("protectMask", protectMask, "protect-mask.png"); const response = await fetch(`${API_BASE_URL}/edit-sessions/${id}/turns`, { method: "POST", body: form }); if (!response.ok) throw new Error(await response.text()); const result = await response.json() as { turnId: string }; setTurn({ id: result.turnId, status: "PLANNING", plan: null, error: null }); } catch (error) { setTurn({ id: "", status: "FAILED", plan: null, error: { message: errorText(error) } }); }
+    try { const currentEditMask = editMaskForSubmit(); const [editMask, protectMask, id] = await Promise.all([hasInk(currentEditMask) ? canvasBlob(currentEditMask) : null, hasInk(protectMaskRef.current) ? canvasBlob(protectMaskRef.current) : null, ensureSession()]); const sourceWidth = editMaskRef.current?.width ?? 0; const sourceHeight = editMaskRef.current?.height ?? 0; const canvasExpansion = Object.values(outpaintEdges).some((value) => value > 0) ? outpaintEdges : undefined; const generationConfig = project && reasoningModel && imageModel ? { reasoningProviderId: reasoningModel.split("::")[0], reasoningModelId: reasoningModel.split("::")[1], imageProviderId: imageModel.split("::")[0], imageModelId: imageModel.split("::")[1], imageResolution, candidateCount } : undefined; const form = new FormData(); form.set("baseOutputId", output.id); form.set("message", message.trim()); form.set("annotations", JSON.stringify({ sourceWidth, sourceHeight, annotations, canvasExpansion, ...(generationConfig ? { generationConfig } : {}) })); form.set("referenceAssetIds", JSON.stringify(referenceAssetIds)); if (editMask) form.set("editMask", editMask, "edit-mask.png"); if (protectMask) form.set("protectMask", protectMask, "protect-mask.png"); const response = await fetch(`${API_BASE_URL}/edit-sessions/${id}/turns`, { method: "POST", body: form }); if (!response.ok) throw new Error(await response.text()); const result = await response.json() as { turnId: string }; setTurn({ id: result.turnId, status: "PLANNING", plan: null, error: null }); } catch (error) { setTurn({ id: "", status: "FAILED", plan: null, error: { message: errorText(error) } }); }
   };
   const refreshSession = async (id: string, autoSelect = false) => { const response = await fetch(`${API_BASE_URL}/edit-sessions/${id}`); if (!response.ok) return; const value = await response.json() as EditSessionState; if (autoSelect) pendingAutoSelectRef.current = value.currentOutputId; setSession(value); setMemorySummary(value.memorySummary?.summary ?? ""); setMemoryConstraints((value.memorySummary?.constraints ?? []).join("\n")); setMemorySourceOutputId(value.memorySummary?.sourceOutputId); };
   const refreshTurn = async (id: string) => { const response = await fetch(`${API_BASE_URL}/edit-turns/${id}`); if (!response.ok) return; const value = await response.json() as EditTurn; setTurn(value); if (value.status === "SUCCEEDED" && sessionId) void refreshSession(sessionId, true); };
@@ -339,6 +357,9 @@ export function EditImageWorkspace({ projectId, output, outputs, assets, onSelec
   const compareOutput = compareOutputId ? outputs.find((item) => item.id === compareOutputId) : undefined;
   const productIntent = /替换|换成|换为|商品|产品|货品/.test(message);
   const showReferencePicker = referenceAssetIds.length > 0 || productIntent || turn?.plan?.operation === "PRODUCT_REPLACE" || (turn?.status === "NEED_INPUT" && turn.error?.message === "REFERENCE_ASSET_REQUIRED");
+  const providerItems = (providers.data?.items ?? []) as Array<{ id: string; name: string; models: Array<{ id: string; supportsVision: boolean; imageApiKind?: string | null }> }>;
+  const reasoningOptions = modelOptions(providerItems, "reasoning");
+  const imageOptions = modelOptions(providerItems, "image");
 
   return <Modal open={Boolean(output)} onCancel={onClose} footer={null} width="min(1380px, calc(100vw - 32px))" className={styles.editModal} title="编辑图片">
     {output ? <div className={styles.editWorkspace}>
@@ -358,6 +379,17 @@ export function EditImageWorkspace({ projectId, output, outputs, assets, onSelec
       </section>
       <aside className={styles.editAgentPanel}>
         <div><p className={styles.editEyebrow}>AI 编辑</p><h2>告诉我想怎么改</h2><p className={styles.editHint}>蓝色为可编辑区域，橙色为保护区域。当前视图 {Math.round(zoom * 100)}%</p></div>
+        {project ? <div className={styles.editGenerationSettings}>
+          <button type="button" className={styles.editSettingsToggle} aria-expanded={settingsOpen} onClick={() => setSettingsOpen((current) => !current)}><Settings2 size={15} /><span>本次生成设置</span><small>项目默认</small><ChevronDown size={15} /></button>
+          {settingsOpen ? <div className={styles.editSettingsBody}>
+            <label>推理模型<select aria-label="推理模型" value={reasoningModel} onChange={(event) => setReasoningModel(event.target.value)}><option value="">项目默认</option>{reasoningOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            <label>生图模型<select aria-label="生图模型" value={imageModel} onChange={(event) => setImageModel(event.target.value)}><option value="">项目默认</option>{imageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            <div className={styles.editSettingsGrid}>
+              <label>分辨率<select aria-label="分辨率" value={imageResolution} onChange={(event) => setImageResolution(event.target.value as EditProjectDefaults["imageResolution"])}><option value="1K">1K</option><option value="2K">2K</option><option value="4K">4K</option></select></label>
+              <label>出图数<input aria-label="出图数" type="number" min={1} max={4} value={candidateCount} onChange={(event) => setCandidateCount(Math.min(4, Math.max(1, Number(event.target.value) || 1)))} /></label>
+            </div>
+          </div> : null}
+        </div> : null}
         <div className={styles.editOutpaint}><p>扩展画布 <span>输入新增像素</span></p><div className={styles.editOutpaintInputs}><label>上<InputNumber min={0} max={4096} value={outpaintEdges.top} onChange={(value) => setOutpaintEdge("top", value)} /></label><label>右<InputNumber min={0} max={4096} value={outpaintEdges.right} onChange={(value) => setOutpaintEdge("right", value)} /></label><label>下<InputNumber min={0} max={4096} value={outpaintEdges.bottom} onChange={(value) => setOutpaintEdge("bottom", value)} /></label><label>左<InputNumber min={0} max={4096} value={outpaintEdges.left} onChange={(value) => setOutpaintEdge("left", value)} /></label></div>{Object.values(outpaintEdges).some((value) => value > 0) ? <small>生成后画布约为 {((editMaskRef.current?.width ?? 0) + outpaintEdges.left + outpaintEdges.right)} × {((editMaskRef.current?.height ?? 0) + outpaintEdges.top + outpaintEdges.bottom)} px</small> : null}</div>
         {["arrow", "text"].includes(tool) ? <label className={styles.editColorPicker}><span>{tool === "text" ? "文字颜色" : "标注颜色"}</span><div>{MARK_COLORS.map((color) => <button key={color} type="button" aria-label={`使用 ${color} 标注`} data-active={markColor === color} style={{ backgroundColor: color }} onClick={() => setMarkColor(color)} />)}</div></label> : null}
         {(tool === "brush" || tool === "erase" || tool === "protect") ? <label className={styles.editBrushSize}>笔刷大小<input type="range" min="12" max="160" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} /></label> : null}

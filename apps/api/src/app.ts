@@ -5,7 +5,7 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type EditSessionRecord, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type EditSessionRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, ModelDefinition, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind } from "@ecomgen/contracts";
@@ -336,9 +336,10 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const protectStored = protectMask ? await storage.putEditArtifact(session.projectId, session.id, turnId, "protect-mask.png", protectMask.content) : undefined;
     const fingerprint = requestFingerprint({ type: "EDIT_PLAN", projectId: session.projectId, sessionId: session.id, baseOutputId, message, annotations, editMaskHash: editStored?.hash ?? null, protectMaskHash: protectStored?.hash ?? null, referenceAssetIds, idempotencyKey: request.headers["idempotency-key"] ?? null });
     const existing = repository.findJobByFingerprint(session.projectId, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ turnId: existing.input.editTurnId, planJobId: existing.id, status: existing.status });
-    const turn = repository.createEditTurn({ id: turnId, sessionId: session.id, projectId: session.projectId, baseOutputId, status: "PLANNING", message, annotations, editMaskPath: editStored?.path ?? null, editMaskHash: editStored?.hash ?? null, protectMaskPath: protectStored?.path ?? null, protectMaskHash: protectStored?.hash ?? null, referenceAssetIds, plan: null, error: null });
     const project = repository.getProject(session.projectId); if (!project) missing("project", session.projectId);
-    const job = repository.createJob({ id: randomUUID(), projectId: session.projectId, storyboardItemId: null, type: "EDIT_PLAN", input: { editTurnId: turn.id }, requestFingerprint: fingerprint, providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const generationConfig = editGenerationConfigFor(repository, project, annotations);
+    const turn = repository.createEditTurn({ id: turnId, sessionId: session.id, projectId: session.projectId, baseOutputId, status: "PLANNING", message, annotations, editMaskPath: editStored?.path ?? null, editMaskHash: editStored?.hash ?? null, protectMaskPath: protectStored?.path ?? null, protectMaskHash: protectStored?.hash ?? null, referenceAssetIds, plan: null, error: null });
+    const job = repository.createJob({ id: randomUUID(), projectId: session.projectId, storyboardItemId: null, type: "EDIT_PLAN", input: { editTurnId: turn.id }, requestFingerprint: fingerprint, providerId: generationConfig.reasoningProviderId, modelId: generationConfig.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueue(queue, { jobId: job.id, kind: "edit_plan" }); return reply.code(202).send({ turnId: turn.id, planJobId: job.id, status: turn.status });
   });
   app.get("/api/v1/edit-turns/:turnId", async (request) => { const turn = repository.getEditTurn(parameter(request, "turnId")); if (!turn) missing("edit turn", parameter(request, "turnId")); return turn; });
@@ -346,10 +347,11 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const turn = repository.getEditTurn(parameter(request, "turnId")); if (!turn) missing("edit turn", parameter(request, "turnId"));
     if (turn.status !== "AWAITING_CONFIRMATION" && turn.status !== "PLAN_READY") throw new ApiError(409, "CONFLICT", "Edit turn is not ready for generation");
     const project = repository.getProject(turn.projectId); if (!project) missing("project", turn.projectId);
+    const generationConfig = editGenerationConfigFor(repository, project, turn.annotations);
     const fingerprint = requestFingerprint({ type: "EDIT_GENERATE", projectId: turn.projectId, editTurnId: turn.id, plan: turn.plan });
     const existing = repository.findJobByFingerprint(turn.projectId, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, turn: repository.getEditTurn(turn.id) });
     repository.updateEditTurn(turn.id, { status: "GENERATING", error: null });
-    const job = repository.createJob({ id: randomUUID(), projectId: turn.projectId, storyboardItemId: null, type: "EDIT_GENERATE", input: { editTurnId: turn.id }, requestFingerprint: fingerprint, providerId: project.imageProviderId, modelId: project.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const job = repository.createJob({ id: randomUUID(), projectId: turn.projectId, storyboardItemId: null, type: "EDIT_GENERATE", input: { editTurnId: turn.id }, requestFingerprint: fingerprint, providerId: generationConfig.imageProviderId, modelId: generationConfig.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueue(queue, { jobId: job.id, kind: "edit_generate" }); return reply.code(202).send({ job, turn: repository.getEditTurn(turn.id) });
   });
   app.post("/api/v1/edit-sessions/:sessionId/select-output", async (request) => {
@@ -464,6 +466,19 @@ function verifyCopywritingModel(repository: EcomRepository, providerId: string, 
   const model = provider.models.find((candidate) => candidate.id === modelId);
   if (!model) throw new ApiError(400, "VALIDATION_ERROR", "Configured reasoning model is not declared by its provider");
   if (!model.supportsVision) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected reasoning model must support Vision for AI copywriting");
+}
+interface EditGenerationConfig { reasoningProviderId: string; reasoningModelId: string; imageProviderId: string; imageModelId: string; imageResolution: ImageResolution; candidateCount: number; }
+function editGenerationConfigFor(repository: EcomRepository, project: ProjectRecord, annotations: Record<string, unknown>): EditGenerationConfig {
+  const raw = annotations.generationConfig;
+  if (raw === undefined) return { reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId, imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, imageResolution: project.imageResolution, candidateCount: clampCandidates(project.candidatesPerType) };
+  const config = object(raw, "annotations.generationConfig");
+  const reasoningProviderId = string(config.reasoningProviderId, "annotations.generationConfig.reasoningProviderId");
+  const reasoningModelId = string(config.reasoningModelId, "annotations.generationConfig.reasoningModelId");
+  const imageProviderId = string(config.imageProviderId, "annotations.generationConfig.imageProviderId");
+  const imageModelId = string(config.imageModelId, "annotations.generationConfig.imageModelId");
+  verifyModel(repository, reasoningProviderId, reasoningModelId, "reasoning");
+  verifyModel(repository, imageProviderId, imageModelId, "image");
+  return { reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, imageResolution: config.imageResolution === undefined ? project.imageResolution : enumValue<ImageResolution>(config.imageResolution, IMAGE_RESOLUTIONS, "annotations.generationConfig.imageResolution"), candidateCount: config.candidateCount === undefined ? clampCandidates(project.candidatesPerType) : candidatesPerType(config.candidateCount) };
 }
 function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "PLAN") return "plan";
