@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { adaptProject, adaptProjectDetail, type CreateProjectInput, type UpdateProjectInput } from "../adapters/projectDetail";
+import { adaptProject, adaptProjectDetail, type CreateProjectInput, type Project, type UpdateProjectInput } from "../adapters/projectDetail";
 import { api, unwrap } from "../client";
 import { qk } from "../queryKeys";
 
-export function useProjects() {
+export function useProjects(options: { archived?: boolean } = {}) {
+  const archived = options.archived ?? false;
   return useQuery({
-    queryKey: qk.projects,
+    queryKey: qk.projects(archived),
     queryFn: async () => {
-      const data = await unwrap(api.GET("/projects"));
+      const data = await unwrap(api.GET("/projects", { params: { query: { archived } } }));
       return {
         items: data.items.map(adaptProject).filter((item) => item !== null),
         nextCursor: data.nextCursor,
@@ -40,7 +41,7 @@ export function useCreateProject() {
   return useMutation({
     mutationFn: (body: CreateProjectInput) => unwrap(api.POST("/projects", { body })),
     onSuccess: (project) => {
-      void queryClient.invalidateQueries({ queryKey: qk.projects });
+      void queryClient.invalidateQueries({ queryKey: qk.projects() });
       void queryClient.invalidateQueries({ queryKey: qk.project(project.id) });
     },
   });
@@ -53,7 +54,35 @@ export function useUpdateProject(projectId: string | undefined) {
       unwrap(api.PATCH("/projects/{projectId}", { params: { path: { projectId: projectId! } }, body })),
     onSuccess: (project) => {
       void queryClient.invalidateQueries({ queryKey: qk.project(project.id) });
-      void queryClient.invalidateQueries({ queryKey: qk.projects });
+      void queryClient.invalidateQueries({ queryKey: qk.projects() });
+    },
+  });
+}
+
+export function useArchiveProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, archived }: { projectId: string; archived: boolean }) =>
+      unwrap(api.PATCH("/projects/{projectId}", { params: { path: { projectId } }, body: { archived } })),
+    onSuccess: (project) => {
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: qk.project(project.id) });
+    },
+  });
+}
+
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      await api.DELETE("/projects/{projectId}", { params: { path: { projectId } } });
+    },
+    onSuccess: (_, projectId) => {
+      queryClient.setQueryData<{ items: Project[]; nextCursor: string | null }>(qk.projects(true), (current) =>
+        current ? { ...current, items: current.items.filter((project) => project.id !== projectId) } : current,
+      );
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.removeQueries({ queryKey: qk.project(projectId) });
     },
   });
 }

@@ -97,7 +97,10 @@ export const handlers = [
 
   http.get(`${BASE}/ecom-templates`, () => HttpResponse.json(TEMPLATE_FIXTURES)),
 
-  http.get(`${BASE}/projects`, () => HttpResponse.json({ items: [], nextCursor: null })),
+  http.get(`${BASE}/projects`, ({ request }) => {
+    const archived = new URL(request.url).searchParams.get("archived") === "true";
+    return HttpResponse.json({ items: archived ? [] : [], nextCursor: null });
+  }),
 
   http.post(`${BASE}/projects`, async ({ request }) => {
     const body = (await request.json()) as { name: string };
@@ -110,8 +113,15 @@ export const handlers = [
 
   http.patch(`${BASE}/projects/:projectId`, async ({ request, params }) => {
     const body = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ ...PROJECT_FIXTURE, id: params.projectId as string, ...body });
+    return HttpResponse.json({
+      ...PROJECT_FIXTURE,
+      id: params.projectId as string,
+      ...body,
+      archivedAt: typeof body.archived === "boolean" ? (body.archived ? "2026-08-01T01:00:00.000Z" : null) : PROJECT_FIXTURE.archivedAt,
+    });
   }),
+
+  http.delete(`${BASE}/projects/:projectId`, () => new HttpResponse(null, { status: 204 })),
 
   http.delete(`${BASE}/assets/:assetId`, () => new HttpResponse(null, { status: 204 })),
 

@@ -21,7 +21,8 @@ export const antdTheme: ThemeConfig = {
     colorPrimaryActive: "var(--accent-active)",
     colorSuccess: "var(--success)",
     colorWarning: "var(--warning)",
-    colorError: "var(--danger)",
+    // AntD 需要具体色值来派生危险按钮的 hover/active 色，CSS 变量会被误算为黑色。
+    colorError: "#d95f4e",
     colorInfo: "var(--accent)",
     colorFillAlter: "var(--bg-2)",
     fontSize: 13,
@@ -31,9 +32,16 @@ export const antdTheme: ThemeConfig = {
     fontFamilyCode: "'JetBrains Mono', ui-monospace, Consolas, monospace",
   },
   components: {
-    Button: { primaryShadow: "none" },
+    Button: { primaryShadow: "none", dangerColor: "#ffffff" },
     Modal: { contentBg: "var(--bg-2)" },
     Drawer: { colorBgElevated: "var(--bg-1)" },
+    Menu: {
+      dangerItemColor: "var(--danger)",
+      dangerItemHoverColor: "var(--danger)",
+      dangerItemSelectedColor: "var(--danger)",
+      dangerItemActiveBg: "color-mix(in srgb, var(--danger) 18%, var(--bg-2))",
+      dangerItemSelectedBg: "color-mix(in srgb, var(--danger) 18%, var(--bg-2))",
+    },
     Upload: { colorFillAlter: "var(--bg-2)" },
     Tabs: { itemSelectedColor: "var(--accent)" },
     Progress: { remainingColor: "var(--bg-3)" },

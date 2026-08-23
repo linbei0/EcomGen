@@ -186,6 +186,10 @@ paths:
       operationId: listProjects
       parameters:
         - $ref: '#/components/parameters/Cursor'
+        - name: archived
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: Projects.
@@ -240,6 +244,7 @@ paths:
       operationId: deleteProject
       responses:
         '204': { description: Project deleted. }
+        '409': { $ref: '#/components/responses/Conflict' }
   /projects/{projectId}/assets:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -868,6 +873,7 @@ components:
         imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
         webResearchEnabled: { type: boolean, description: Enable restricted visual-direction web research during Agent planning. }
+        archivedAt: { type: [string, 'null'], format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         cover: { $ref: '#/components/schemas/ProjectCover' }
@@ -929,6 +935,7 @@ components:
         imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         candidatesPerType: { type: integer, minimum: 1, maximum: 4 }
         webResearchEnabled: { type: boolean, description: Enable restricted visual-direction web research during Agent planning. }
+        archived: { type: boolean, description: Archive or restore the project. }
     ProjectList:
       type: object
       required: [items, nextCursor]

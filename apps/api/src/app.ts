@@ -92,8 +92,17 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.delete("/api/v1/search-sources/:sourceId", async (request, reply) => { const id = parameter(request, "sourceId"); if (!repository.deleteSearchSource(id)) missing("search source", id); return reply.code(204).send(); });
 
-  app.get("/api/v1/projects", async () => {
-    const projects = repository.listProjects();
+  app.get("/api/v1/projects", async (request) => {
+    const query = typeof request.query === "object" && request.query ? request.query as Record<string, unknown> : {};
+    const archivedValue = query.archived;
+    const archived = archivedValue === undefined
+      ? false
+      : archivedValue === true || archivedValue === "true"
+        ? true
+        : archivedValue === false || archivedValue === "false"
+          ? false
+          : booleanValue(archivedValue, "archived");
+    const projects = repository.listProjects(archived);
     const covers = repository.listProjectCovers(projects.map((project) => project.id));
     return {
       items: projects.map((project) => ({ ...project, cover: covers.get(project.id) ?? { productAssetId: null, coverOutputId: null, previewOutputIds: [], outputCount: 0 } })),
@@ -143,8 +152,25 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (body.imageAspectRatio !== undefined) update.imageAspectRatio = enumValue<ImageAspectRatio>(body.imageAspectRatio, IMAGE_ASPECT_RATIOS, "imageAspectRatio");
     if (body.candidatesPerType !== undefined) update.candidatesPerType = candidatesPerType(body.candidatesPerType);
     if (body.webResearchEnabled !== undefined) update.webResearchEnabled = booleanValue(body.webResearchEnabled, "webResearchEnabled");
+    if (body.archived !== undefined) update.archivedAt = booleanValue(body.archived, "archived") ? new Date().toISOString() : null;
     applyModelFields(body, update, (providerId, modelId, kind) => verifyModel(repository, providerId, modelId, kind));
     return repository.updateProject(id, update) as object;
+  });
+  app.delete("/api/v1/projects/:projectId", async (request, reply) => {
+    const id = parameter(request, "projectId");
+    const project = repository.getProject(id);
+    if (!project) {
+      // DELETE 保持幂等，并补清上一次数据库已删除但文件清理失败留下的目录。
+      await storage.deleteProject(id);
+      return reply.code(204).send();
+    }
+    if (!project.archivedAt) throw new ApiError(409, "CONFLICT", "Only archived projects can be deleted");
+    // 先清文件再删数据库：文件清理失败时保留项目记录，前端可准确重试。
+    await storage.deleteProject(id);
+    const result = repository.deleteArchivedProject(id);
+    if (result === "missing") return reply.code(204).send();
+    if (result === "not_archived") throw new ApiError(409, "CONFLICT", "Only archived projects can be deleted");
+    return reply.code(204).send();
   });
   app.post("/api/v1/projects/:projectId/assets", async (request) => {
     const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const data = await request.file(); if (!data) throw new ApiError(400, "VALIDATION_ERROR", "A file is required");

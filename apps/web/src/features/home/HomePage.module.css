@@ -90,6 +90,8 @@
 
 .gallery {
   display: flex;
+  min-width: 0;
+  flex-direction: column;
   padding: 64px 56px;
   background:
     linear-gradient(var(--line-1) 1px, transparent 1px) 0 0 / 100% 25%,
@@ -98,10 +100,38 @@
 
 .grid {
   display: grid;
+  min-width: 0;
   grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
   align-content: start;
   gap: 16px;
   width: 100%;
+}
+
+.galleryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+.galleryHeader .galleryTitle,
+.galleryHeader .galleryHint {
+  margin: 0;
+}
+
+.archiveGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.archiveDrawer :global(.ant-drawer-content),
+.archiveDrawer :global(.ant-drawer-header) {
+  background: var(--bg-1);
+}
+
+.archiveDrawer :global(.ant-drawer-body) {
+  padding: 20px;
 }
 
 .galleryInner {

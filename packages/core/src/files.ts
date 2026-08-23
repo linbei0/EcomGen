@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 export class LocalAssetStore {
@@ -66,6 +66,15 @@ export class LocalAssetStore {
 
   public async delete(relativePath: string): Promise<void> {
     await unlink(this.absolute(relativePath)).catch(() => undefined);
+  }
+
+  /** 永久删除项目的全部本地产物；路径仍通过 absolute 校验，不能越出数据根目录。 */
+  public async deleteProject(projectId: string): Promise<void> {
+    await Promise.all(
+      ["assets", "outputs", "exports", "edits"].map((part) =>
+        rm(this.absolute(join(part, projectId)), { recursive: true, force: true }),
+      ),
+    );
   }
 
   public absolute(relativePath: string): string {

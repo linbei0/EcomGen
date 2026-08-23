@@ -59,6 +59,7 @@ export interface ProjectRecord {
   imageAspectRatio: ImageAspectRatio;
   candidatesPerType: number;
   webResearchEnabled: boolean;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -297,7 +298,10 @@ export class EcomRepository {
     return this.db.prepare("DELETE FROM search_sources WHERE id=?").run(id).changes > 0;
   }
 
-  public listProjects(): ProjectRecord[] { return (this.db.prepare("SELECT * FROM projects ORDER BY updated_at DESC").all() as Row[]).map(mapProject); }
+  public listProjects(archived = false): ProjectRecord[] {
+    const order = archived ? "archived_at DESC, updated_at DESC" : "updated_at DESC";
+    return (this.db.prepare(`SELECT * FROM projects WHERE archived_at IS ${archived ? "NOT " : ""}NULL ORDER BY ${order}`).all() as Row[]).map(mapProject);
+  }
   public listProjectCovers(projectIds: string[]): Map<string, ProjectCoverSummary> {
     const covers = new Map<string, ProjectCoverSummary>();
     for (const id of projectIds) covers.set(id, emptyCover());
@@ -333,19 +337,27 @@ export class EcomRepository {
     return covers;
   }
   public getProject(id: string): ProjectRecord | undefined { const row = this.db.prepare("SELECT * FROM projects WHERE id = ?").get(id); return row ? mapProject(row as Row) : undefined; }
-  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled"> & Partial<Pick<ProjectRecord, "webResearchEnabled">>): ProjectRecord {
-    const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,created_at,updated_at)
-      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@createdAt,@updatedAt)`)
+  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled" | "archivedAt"> & Partial<Pick<ProjectRecord, "webResearchEnabled" | "archivedAt">>): ProjectRecord {
+    const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, archivedAt: input.archivedAt ?? null, id: randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,created_at,updated_at)
+      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@archivedAt,@createdAt,@updatedAt)`)
       .run({ ...record, webResearchEnabled: record.webResearchEnabled ? 1 : 0, platformTargets: json(record.platformTargets), verifiedFacts: json(record.verifiedFacts), prohibitedClaims: json(record.prohibitedClaims), brandGuidelines: json(record.brandGuidelines) });
     return record;
   }
   public updateProject(id: string, patch: Partial<Omit<ProjectRecord, "id" | "createdAt">>): ProjectRecord | undefined {
     const current = this.getProject(id); if (!current) return undefined;
     const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,updated_at=@updatedAt WHERE id=@id`)
+    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,archived_at=@archivedAt,updated_at=@updatedAt WHERE id=@id`)
       .run({ ...next, webResearchEnabled: next.webResearchEnabled ? 1 : 0, platformTargets: json(next.platformTargets), verifiedFacts: json(next.verifiedFacts), prohibitedClaims: json(next.prohibitedClaims), brandGuidelines: json(next.brandGuidelines) });
     return next;
+  }
+
+  public deleteArchivedProject(id: string): "deleted" | "not_archived" | "missing" {
+    const current = this.getProject(id);
+    if (!current) return "missing";
+    if (!current.archivedAt) return "not_archived";
+    const result = this.db.prepare("DELETE FROM projects WHERE id=? AND archived_at IS NOT NULL").run(id);
+    return result.changes > 0 ? "deleted" : "not_archived";
   }
 
   public listAssets(projectId: string): AssetRecord[] { return (this.db.prepare("SELECT * FROM assets WHERE project_id=? ORDER BY created_at").all(projectId) as Row[]).map(mapAsset); }
@@ -540,6 +552,7 @@ function mapProject(row: Row): ProjectRecord {
     imageAspectRatio: (row.image_aspect_ratio as ImageAspectRatio | undefined) ?? "AUTO",
     candidatesPerType: Number(row.candidates_per_type ?? 1),
     webResearchEnabled: Boolean(row.web_research_enabled),
+    archivedAt: row.archived_at ? String(row.archived_at) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at)
   };

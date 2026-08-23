@@ -318,6 +318,7 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
     imageAspectRatio: ASPECTS.has(aspect as ImageAspectRatio) ? (aspect as ImageAspectRatio) : "AUTO",
     candidatesPerType: Math.min(4, Math.max(1, candidates)),
     webResearchEnabled,
+    archivedAt: asString(raw.archivedAt) ?? null,
     createdAt,
     updatedAt,
     category: asString(raw.category) ?? null,

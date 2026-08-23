@@ -17,9 +17,10 @@ describe("首页 · 项目画廊", () => {
 
     expect(screen.getByText(/上传一张商品图/)).toBeInTheDocument();
     expect(await screen.findByText("项目画廊 · 暂无项目")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "已归档" })).toBeInTheDocument();
     expect(await screen.findByText("API 已连接")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /配置 Provider/ }));
+    await user.click(screen.getByRole("button", { name: "设置" }));
     expect(await screen.findByText("设置 · Provider")).toBeInTheDocument();
   });
 
@@ -61,6 +62,50 @@ describe("首页 · 项目画廊", () => {
     expect(screen.getByText("生成 3 张套图")).toBeInTheDocument();
     expect(screen.queryByText("国内平台")).not.toBeInTheDocument();
     expect(screen.queryByText("创意")).not.toBeInTheDocument();
+  });
+
+  it("可从卡片菜单归档项目", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    server.use(
+      http.get(`${BASE}/projects`, () => HttpResponse.json({ items: [{ ...PROJECT_FIXTURE, archivedAt: null }], nextCursor: null })),
+      http.patch(`${BASE}/projects/:projectId`, async ({ request }) => {
+        const body = (await request.json()) as { archived?: boolean };
+        archived = body.archived === true;
+        return HttpResponse.json({ ...PROJECT_FIXTURE, archivedAt: archived ? "2026-08-01T01:00:00.000Z" : null });
+      }),
+    );
+    renderWithProviders(<HomePage />);
+    await user.click(await screen.findByRole("button", { name: /项目操作：归档/ }));
+    await user.click(await screen.findByText("归档项目"));
+    await waitFor(() => expect(archived).toBe(true));
+  });
+
+  it("归档项目经用户确认后才永久删除", async () => {
+    const user = userEvent.setup();
+    let deleted = false;
+    const archivedProject = { ...PROJECT_FIXTURE, archivedAt: "2026-08-01T01:00:00.000Z" };
+    server.use(
+      http.get(`${BASE}/projects`, ({ request }) => {
+        const archived = new URL(request.url).searchParams.get("archived") === "true";
+        return HttpResponse.json({ items: archived && !deleted ? [archivedProject] : [], nextCursor: null });
+      }),
+      http.delete(`${BASE}/projects/:projectId`, () => {
+        deleted = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderWithProviders(<HomePage />);
+
+    await user.click(await screen.findByRole("button", { name: /已归档/ }));
+    await user.click(await screen.findByRole("button", { name: "项目操作：恢复或删除" }));
+    await user.click(await screen.findByText("删除项目"));
+    expect((await screen.findAllByText("永久删除项目？")).length).toBeGreaterThan(0);
+    expect(deleted).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "永久删除" }));
+    await waitFor(() => expect(deleted).toBe(true));
+    await waitFor(() => expect(screen.queryByRole("link", { name: PROJECT_FIXTURE.name })).not.toBeInTheDocument());
   });
 });
 

@@ -1,10 +1,10 @@
-import { App, Button } from "antd";
-import { Aperture, Images, PlugZap, Plus, Settings2 } from "lucide-react";
+import { App, Button, Drawer } from "antd";
+import { Aperture, Archive, Images, Plus, Settings2, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
-import { useCreateProject, useProjects } from "../../api/hooks/useProjects";
+import { useArchiveProject, useCreateProject, useDeleteProject, useProjects } from "../../api/hooks/useProjects";
 import { useProviders } from "../../api/hooks/useProviders";
 import { HealthBadge } from "../../components/HealthBadge";
 import { fadeUp, staggerContainer } from "../../design/motion";
@@ -16,13 +16,47 @@ import styles from "./HomePage.module.css";
 
 export function HomePage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { notification } = App.useApp();
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const { modal, notification } = App.useApp();
   const navigate = useNavigate();
   const projects = useProjects();
+  const archivedProjects = useProjects({ archived: true });
   const providers = useProviders();
   const createProject = useCreateProject();
+  const archiveProject = useArchiveProject();
+  const deleteProject = useDeleteProject();
   const items = projects.data?.items ?? [];
   const empty = !projects.isPending && items.length === 0;
+  const archivedItems = archivedProjects.data?.items ?? [];
+
+  const changeArchive = async (projectId: string, archived: boolean) => {
+    try {
+      await archiveProject.mutateAsync({ projectId, archived });
+      notification.success({ title: archived ? "项目已归档" : "项目已恢复" });
+    } catch (error) {
+      notification.error({ title: archived ? "归档失败" : "恢复失败", description: errorText(error) });
+    }
+  };
+
+  const confirmDelete = (projectId: string, projectName: string) => {
+    modal.confirm({
+      title: "永久删除项目？",
+      icon: <Trash2 size={20} strokeWidth={1.75} color="var(--danger)" />,
+      content: `“${projectName}”的素材、生成结果、编辑记录和导出文件都将被永久删除，且无法恢复。`,
+      okText: "永久删除",
+      okType: "danger",
+      cancelText: "取消",
+      async onOk() {
+        try {
+          await deleteProject.mutateAsync(projectId);
+          notification.success({ title: "项目已删除" });
+        } catch (error) {
+          notification.error({ title: "删除失败", description: errorText(error) });
+          throw error;
+        }
+      },
+    });
+  };
 
   /** 一键创建：凑齐一对模型才 POST，缺一对就引导去设置，不产生建不出来的项目。 */
   const create = async () => {
@@ -88,13 +122,23 @@ export function HomePage() {
             >
               新建项目
             </Button>
-            <Button icon={<PlugZap size={16} strokeWidth={1.75} />} onClick={() => setSettingsOpen(true)}>
-              配置 Provider
-            </Button>
           </div>
         </motion.section>
 
         <motion.section className={styles.gallery} variants={fadeUp} aria-label="项目画廊">
+          <div className={styles.galleryHeader}>
+            <div>
+              <p className={styles.galleryTitle}>项目画廊</p>
+              <p className={styles.galleryHint}>{projects.isPending ? "正在加载项目…" : `${items.length} 个活跃项目`}</p>
+            </div>
+            <Button
+              type="text"
+              icon={<Archive size={15} strokeWidth={1.75} />}
+              onClick={() => setArchiveOpen(true)}
+            >
+              已归档{archivedItems.length > 0 ? ` ${archivedItems.length}` : ""}
+            </Button>
+          </div>
           {projects.isError ? (
             <div className={styles.galleryInner}>
               <p className={styles.galleryTitle}>项目列表加载失败</p>
@@ -110,7 +154,7 @@ export function HomePage() {
           ) : (
             <div className={styles.grid}>
               {items.map((project) => (
-                <ProjectCard key={project.id} project={project} />
+                <ProjectCard key={project.id} project={project} onArchiveChange={(archived) => void changeArchive(project.id, archived)} />
               ))}
             </div>
           )}
@@ -118,6 +162,41 @@ export function HomePage() {
       </motion.main>
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <Drawer
+        title="已归档项目"
+        placement="right"
+        size={420}
+        open={archiveOpen}
+        onClose={() => setArchiveOpen(false)}
+        rootClassName={styles.archiveDrawer}
+      >
+        {archivedProjects.isError ? (
+          <div className={styles.galleryInner}>
+            <p className={styles.galleryTitle}>归档列表加载失败</p>
+            <p className={styles.galleryHint}>{errorText(archivedProjects.error)}</p>
+            <Button onClick={() => void archivedProjects.refetch()}>重试</Button>
+          </div>
+        ) : archivedProjects.isPending ? (
+          <div className={styles.galleryInner}><p className={styles.galleryHint}>正在加载归档项目…</p></div>
+        ) : archivedItems.length === 0 ? (
+          <div className={styles.galleryInner}>
+            <Archive size={20} strokeWidth={1.5} aria-hidden className={styles.galleryIcon} />
+            <p className={styles.galleryTitle}>暂无归档项目</p>
+            <p className={styles.galleryHint}>从项目卡片的更多菜单归档不常用项目。</p>
+          </div>
+        ) : (
+          <div className={styles.archiveGrid}>
+            {archivedItems.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onArchiveChange={(archived) => void changeArchive(project.id, archived)}
+                onDeleteRequest={() => confirmDelete(project.id, project.name)}
+              />
+            ))}
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }

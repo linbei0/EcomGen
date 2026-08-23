@@ -748,6 +748,8 @@ export interface components {
             /** @description Enable restricted visual-direction web research during Agent planning. */
             webResearchEnabled: boolean;
             /** Format: date-time */
+            archivedAt?: string | null;
+            /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
@@ -814,6 +816,8 @@ export interface components {
             candidatesPerType?: number;
             /** @description Enable restricted visual-direction web research during Agent planning. */
             webResearchEnabled?: boolean;
+            /** @description Archive or restore the project. */
+            archived?: boolean;
         };
         ProjectList: {
             items: (components["schemas"]["Project"] & Record<string, never>)[];
@@ -1408,6 +1412,7 @@ export interface operations {
         parameters: {
             query?: {
                 cursor?: components["parameters"]["Cursor"];
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -1491,6 +1496,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            409: components["responses"]["Conflict"];
         };
     };
     updateProject: {

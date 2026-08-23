@@ -33,6 +33,7 @@ export const PROJECT_FIXTURE = {
   imageAspectRatio: "AUTO" as const,
   candidatesPerType: 1,
   webResearchEnabled: false,
+  archivedAt: null as string | null,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
   cover: EMPTY_COVER,

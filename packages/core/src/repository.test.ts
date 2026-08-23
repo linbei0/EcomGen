@@ -20,6 +20,35 @@ function seedProvider(repository: EcomRepository) {
 }
 
 describe("EcomRepository", () => {
+  it("按归档状态隔离项目并支持恢复", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const input: Parameters<EcomRepository["createProject"]>[0] = { name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["DOMESTIC"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 };
+    const project = repository.createProject(input);
+    expect(project.archivedAt).toBeNull();
+    expect(repository.listProjects()).toHaveLength(1);
+    repository.updateProject(project.id, { archivedAt: "2026-08-01T01:00:00.000Z" });
+    expect(repository.listProjects()).toHaveLength(0);
+    expect(repository.listProjects(true).map((item) => item.id)).toEqual([project.id]);
+    repository.updateProject(project.id, { archivedAt: null });
+    expect(repository.listProjects().map((item) => item.id)).toEqual([project.id]);
+    database.close();
+  });
+
+  it("只允许永久删除已归档项目", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["DOMESTIC"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    expect(repository.deleteArchivedProject(project.id)).toBe("not_archived");
+    repository.updateProject(project.id, { archivedAt: "2026-08-01T01:00:00.000Z" });
+    expect(repository.deleteArchivedProject(project.id)).toBe("deleted");
+    expect(repository.getProject(project.id)).toBeUndefined();
+    expect(repository.deleteArchivedProject(project.id)).toBe("missing");
+    database.close();
+  });
+
   it("migrates existing projects with empty market and copy language while preserving platform selection", () => {
     const directory = mkdtempSync(join(tmpdir(), "ecomgen-migration-"));
     const filename = join(directory, "ecomgen.db");
@@ -160,6 +189,9 @@ describe("EcomRepository", () => {
     expect(repository.isOutputInEditSession(session.id, root.id)).toBe(true);
     expect(repository.isOutputInEditSession(session.id, derived.id)).toBe(true);
     expect(repository.isOutputInEditSession(session.id, "other-output")).toBe(false);
+    repository.updateProject(project.id, { archivedAt: "2026-08-01T01:00:00.000Z" });
+    expect(repository.deleteArchivedProject(project.id)).toBe("deleted");
+    expect(repository.getProject(project.id)).toBeUndefined();
     database.close();
   });
 

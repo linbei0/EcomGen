@@ -116,6 +116,7 @@ function migrate(database: SqliteDatabase): void {
       image_aspect_ratio TEXT NOT NULL DEFAULT 'AUTO',
       candidates_per_type INTEGER NOT NULL DEFAULT 1,
       web_research_enabled INTEGER NOT NULL DEFAULT 0,
+      archived_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (reasoning_provider_id) REFERENCES providers(id),
@@ -290,4 +291,7 @@ function migrate(database: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_exports_project_updated ON exports(project_id, updated_at);
     CREATE INDEX IF NOT EXISTS idx_edit_turns_project_updated ON edit_turns(project_id, updated_at);
   `);
+  if (!columnNames(database, "projects").has("archived_at")) {
+    database.exec("ALTER TABLE projects ADD COLUMN archived_at TEXT");
+  }
 }

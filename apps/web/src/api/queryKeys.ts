@@ -4,7 +4,7 @@ export const qk = {
   templates: ["ecom-templates"] as const,
   providers: ["providers"] as const,
   searchSources: ["search-sources"] as const,
-  projects: ["projects"] as const,
+  projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,
   project: (id: string) => ["projects", id] as const,
   storyboard: (id: string) => ["projects", id, "storyboard"] as const,
   job: (id: string) => ["jobs", id] as const,
