@@ -16,6 +16,9 @@ import type {
 import type { EditOperation, EditSessionStatus, EditTurnStatus } from "@ecomgen/contracts";
 import type { SqliteDatabase } from "./database.js";
 
+/** 写入 jobs.provider_task_id 的内部标记：请求已发出但 Provider 尚未返回结果。 */
+export const EXTERNAL_REQUEST_STARTED = "__EXTERNAL_REQUEST_STARTED__";
+
 export interface ProviderRecord {
   id: string;
   name: string;
@@ -189,6 +192,8 @@ export interface OutputRecord {
   generationSnapshot: GenerationSnapshot | null;
   storagePath: string;
   hash: string;
+  /** 外部生成请求的稳定幂等键；编辑版本和普通候选均可用。 */
+  generationKey?: string | null;
   parentOutputId?: string | null;
   rootOutputId?: string | null;
   editSessionId?: string | null;
@@ -442,7 +447,18 @@ export class EcomRepository {
       .run({ ...next, retryable: next.retryable ? 1 : 0, cancelRequested: next.cancelRequested ? 1 : 0, actualCost: next.actualCost ? json(next.actualCost) : null, error: next.error ? json(next.error) : null }); return next;
   }
   public findJobByFingerprint(projectId: string, fingerprint: string): JobRecord | undefined { const row = this.db.prepare("SELECT * FROM jobs WHERE project_id=? AND request_fingerprint=? AND status IN ('QUEUED','RUNNING','SUCCEEDED') ORDER BY created_at DESC LIMIT 1").get(projectId, fingerprint); return row ? mapJob(row as Row) : undefined; }
-  public recoverInterruptedJobs(): JobRecord[] { const rows = this.db.prepare("SELECT * FROM jobs WHERE status='RUNNING'").all() as Row[]; this.db.prepare("UPDATE jobs SET status='QUEUED',progress=0,cancel_requested=0,updated_at=? WHERE status='RUNNING'").run(now()); return rows.map((row) => mapJob({ ...row, status: "QUEUED", progress: 0, cancel_requested: 0 })); }
+  public recoverInterruptedJobs(): JobRecord[] {
+    const rows = this.db.prepare("SELECT * FROM jobs WHERE status='RUNNING'").all() as Row[];
+    const recovered = rows.filter((row) => row.provider_task_id !== EXTERNAL_REQUEST_STARTED);
+    const updatedAt = now();
+    const write = this.db.transaction(() => {
+      this.db.prepare("UPDATE jobs SET status='QUEUED',progress=0,cancel_requested=0,updated_at=? WHERE status='RUNNING' AND (provider_task_id IS NULL OR provider_task_id<>?)").run(updatedAt, EXTERNAL_REQUEST_STARTED);
+      this.db.prepare("UPDATE jobs SET status='FAILED',progress=100,retryable=0,error_json=?,updated_at=? WHERE status='RUNNING' AND provider_task_id=?")
+        .run(JSON.stringify({ message: "外部图像请求结果未知，已停止自动重试以避免重复计费" }), updatedAt, EXTERNAL_REQUEST_STARTED);
+    });
+    write();
+    return recovered.map((row) => mapJob({ ...row, status: "QUEUED", progress: 0, cancel_requested: 0 }));
+  }
   public listJobs(projectId: string): JobRecord[] { return (this.db.prepare("SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapJob); }
   public saveCopywritingResult(input: Omit<CopywritingResultRecord, "createdAt">): CopywritingResultRecord {
     const record: CopywritingResultRecord = { ...input, createdAt: now() };
@@ -475,10 +491,24 @@ export class EcomRepository {
   public listWebResearchAttempts(jobId: string): WebResearchAttemptRecord[] { return (this.db.prepare("SELECT * FROM web_research_attempts WHERE job_id=? ORDER BY rowid").all(jobId) as Row[]).map(mapWebResearchAttempt); }
 
   public createOutput(input: Omit<OutputRecord, "id" | "createdAt">): OutputRecord {
-    const record: OutputRecord = { ...input, parentOutputId: input.parentOutputId ?? null, rootOutputId: input.rootOutputId ?? null, editSessionId: input.editSessionId ?? null, editTurnId: input.editTurnId ?? null, id: randomUUID(), createdAt: now() };
-    this.db.prepare("INSERT INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationSnapshot,@storagePath,@hash,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
+    const generationKey = input.generationKey ?? null;
+    if (generationKey) {
+      const existing = this.getOutputByGenerationKey(generationKey);
+      if (existing) return existing;
+    }
+    const record: OutputRecord = { ...input, generationKey, parentOutputId: input.parentOutputId ?? null, rootOutputId: input.rootOutputId ?? null, editSessionId: input.editSessionId ?? null, editTurnId: input.editTurnId ?? null, id: randomUUID(), createdAt: now() };
+    const result = this.db.prepare("INSERT OR IGNORE INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_key,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationKey,@generationSnapshot,@storagePath,@hash,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
       .run({ ...record, generationSnapshot: record.generationSnapshot ? json(record.generationSnapshot) : null });
+    if (result.changes === 0 && generationKey) {
+      const existing = this.getOutputByGenerationKey(generationKey);
+      if (existing) return existing;
+      throw new Error(`Output generation key was rejected without an existing output: ${generationKey}`);
+    }
     return record;
+  }
+  public getOutputByGenerationKey(generationKey: string): OutputRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM outputs WHERE generation_key=?").get(generationKey);
+    return row ? mapOutput(row as Row) : undefined;
   }
   public getOutput(id: string): OutputRecord | undefined { const row = this.db.prepare("SELECT * FROM outputs WHERE id=?").get(id); return row ? mapOutput(row as Row) : undefined; }
   public listOutputs(projectId: string): OutputRecord[] { return (this.db.prepare("SELECT * FROM outputs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapOutput); }
@@ -611,6 +641,7 @@ function mapOutput(row: Row): OutputRecord {
     generationSnapshot: row.generation_snapshot_json ? parse(row.generation_snapshot_json) : null,
     storagePath: String(row.storage_path),
     hash: String(row.hash),
+    generationKey: row.generation_key ? String(row.generation_key) : null,
     parentOutputId: row.parent_output_id ? String(row.parent_output_id) : null,
     rootOutputId: row.root_output_id ? String(row.root_output_id) : null,
     editSessionId: row.edit_session_id ? String(row.edit_session_id) : null,

@@ -5,7 +5,7 @@ import { Worker } from "bullmq";
 import archiver from "archiver";
 import sharp from "sharp";
 import { planImageEdit, planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
+import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
 import { getTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
@@ -181,11 +181,21 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const prompt = revision
     ? await reviseGenerationPrompt(project, basePrompt, revision)
     : basePrompt;
+  const generationKey = generationKeyFor(job.id, candidateIndex);
+  const existingOutput = repository.getOutputByGenerationKey(generationKey);
+  if (existingOutput) {
+    repository.updateStoryboardItem(item.id, { status: "GENERATED" });
+    await updateJob(job, { providerTaskId: null });
+    await events.publish(project.id, "output.created", { output: existingOutput });
+    return;
+  }
   repository.updateStoryboardItem(item.id, { status: "GENERATING", compiledPrompt: prompt }); await updateJob(job, { progress: 30 });
   const images = template.supports_image_reference ? await Promise.all(inputs.map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType }))) : [];
-  const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }); const result = await generator.generate({ model: model.id, prompt, size, quality: "high", images: images.length ? images : undefined });
+  const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+  await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED });
+  const result = await generator.generate({ model: model.id, prompt, size, quality: "high", images: images.length ? images : undefined, idempotencyKey: generationKey });
   throwIfCancelled(job);
-  await updateJob(job, { progress: 80, providerTaskId: result.providerTaskId ?? null }); const stored = await storage.putOutput(project.id, result.image, extensionForMime(result.mimeType));
+  await updateJob(job, { progress: 80, providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED }); const stored = await storage.putOutput(project.id, result.image, extensionForMime(result.mimeType), generationKey);
   throwIfCancelled(job);
   const output = repository.createOutput({
     projectId: project.id,
@@ -194,8 +204,10 @@ async function executeGeneration(job: JobRecord): Promise<void> {
     candidateIndex,
     generationSnapshot: { providerId, modelId, resolution, aspectRatio, size, candidateIndex },
     storagePath: stored.path,
-    hash: stored.hash
+    hash: stored.hash,
+    generationKey
   });
+  await updateJob(job, { providerTaskId: null });
   repository.updateStoryboardItem(item.id, { status: "GENERATED" }); await events.publish(project.id, "output.created", { output });
 }
 
@@ -279,9 +291,16 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   const protectedMask = turn.protectMaskPath ? await storage.read(turn.protectMaskPath) : undefined;
   const createdOutputs: Array<ReturnType<typeof repository.createOutput>> = [];
   for (let candidateIndex = 1; candidateIndex <= config.candidateCount; candidateIndex += 1) {
-    const result = await generator.editImage({ model: model.id, prompt: plan.prompt, quality: "high", size: resolveImageSize(config.imageResolution, project.imageAspectRatio, "1024x1024"), sourceImage: { data: inputImage, filename: "source.png", mimeType: "image/png" }, referenceImages: references, mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined, operation: plan.operation as EditOperation, inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined });
+    const generationKey = generationKeyFor(job.id, candidateIndex);
+    const existingOutput = repository.getOutputByGenerationKey(generationKey);
+    if (existingOutput) {
+      createdOutputs.push(existingOutput);
+      continue;
+    }
+    await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED });
+    const result = await generator.editImage({ model: model.id, prompt: plan.prompt, quality: "high", size: resolveImageSize(config.imageResolution, project.imageAspectRatio, "1024x1024"), sourceImage: { data: inputImage, filename: "source.png", mimeType: "image/png" }, referenceImages: references, mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined, operation: plan.operation as EditOperation, inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined, idempotencyKey: generationKey });
     throwIfCancelled(job);
-    await updateJob(job, { progress: 30 + Math.round((candidateIndex / config.candidateCount) * 45), providerTaskId: result.providerTaskId ?? null });
+    await updateJob(job, { progress: 30 + Math.round((candidateIndex / config.candidateCount) * 45), providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED });
     const composed = plan.compositePolicy === "MASK_LOCKED" && mask
       ? await compositeMaskedEdit(sourceImage, result.image, mask, protectedMask)
       : plan.compositePolicy === "NATURAL_BLEND"
@@ -289,12 +308,14 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
         : outpaintCanvas
           ? await compositeOutpaint(sourceImage, result.image, outpaintCanvas)
           : await sharp(result.image).png().toBuffer();
-    const stored = await storage.putOutput(project.id, composed, ".png");
-    const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: config.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy }, storagePath: stored.path, hash: stored.hash, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
+    const stored = await storage.putOutput(project.id, composed, ".png", generationKey);
+    const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: config.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy }, storagePath: stored.path, hash: stored.hash, generationKey, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
+    await updateJob(job, { providerTaskId: null });
     createdOutputs.push(output);
   }
   const output = createdOutputs.at(-1);
   if (!output) throw new Error("Edit generation produced no outputs");
+  await updateJob(job, { providerTaskId: null });
   const inheritedMemory = effectiveEditMemory(session, source.id);
   const nextMemory = { summary: plan.memoryPatch?.summary ?? inheritedMemory.summary, constraints: plan.memoryPatch?.constraints ?? inheritedMemory.constraints };
   const updatedSession = repository.updateEditSession(session.id, { currentOutputId: output.id, memorySummary: { ...session.memorySummary, scopes: { ...(session.memorySummary.scopes ?? {}), [output.id]: nextMemory } } });
@@ -317,6 +338,8 @@ async function executeExport(job: JobRecord): Promise<void> {
 
 function projectFor(job: JobRecord): ProjectRecord { const project = repository.getProject(job.projectId); if (!project) throw new Error(`Project not found for job ${job.id}`); return project; }
 function providerFor(id: string) { const provider = repository.getProvider(id); if (!provider) throw new Error(`Configured provider not found: ${id}`); return provider; }
+/** 一个 Job 的每个候选使用独立稳定键，重试不会再次落库或写出另一份文件。 */
+function generationKeyFor(jobId: string, candidateIndex: number): string { return `ecomgen:generation:${jobId}:candidate:${candidateIndex}`; }
 interface EditGenerationConfig { reasoningProviderId: string; reasoningModelId: string; imageProviderId: string; imageModelId: string; imageResolution: ImageResolution; candidateCount: number; }
 function editGenerationConfigFor(project: ProjectRecord, turn: EditTurnRecord): EditGenerationConfig {
   const defaults = { reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId, imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, imageResolution: project.imageResolution, candidateCount: Math.min(4, Math.max(1, Math.round(project.candidatesPerType))) };

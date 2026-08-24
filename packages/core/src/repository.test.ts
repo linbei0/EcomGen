@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
 import { openDatabase } from "./database.js";
-import { EcomRepository } from "./repository.js";
+import { EcomRepository, EXTERNAL_REQUEST_STARTED } from "./repository.js";
 
 function seedProvider(repository: EcomRepository) {
   return repository.saveProvider({
@@ -20,6 +20,21 @@ function seedProvider(repository: EcomRepository) {
 }
 
 describe("EcomRepository", () => {
+  it("恢复任务时不自动重试结果未知的外部图像请求", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["DOMESTIC"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const safe = repository.createJob({ id: "recover-safe", projectId: project.id, storyboardItemId: null, type: "PLAN", input: {} });
+    const uncertain = repository.createJob({ id: "recover-uncertain", projectId: project.id, storyboardItemId: null, type: "GENERATE", input: {} });
+    database.prepare("UPDATE jobs SET status='RUNNING' WHERE id IN (?, ?)").run(safe.id, uncertain.id);
+    database.prepare("UPDATE jobs SET provider_task_id=? WHERE id=?").run(EXTERNAL_REQUEST_STARTED, uncertain.id);
+    expect(repository.recoverInterruptedJobs().map((job) => job.id)).toEqual([safe.id]);
+    expect(repository.getJob(safe.id)?.status).toBe("QUEUED");
+    expect(repository.getJob(uncertain.id)).toMatchObject({ status: "FAILED", retryable: false, error: { message: "外部图像请求结果未知，已停止自动重试以避免重复计费" } });
+    database.close();
+  });
+
   it("按归档状态隔离项目并支持恢复", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
@@ -286,9 +301,22 @@ describe("EcomRepository", () => {
       candidateIndex: 1,
       generationSnapshot: { providerId: provider.id, modelId: "image", resolution: "1K", aspectRatio: "AUTO", size: "1024x1024", candidateIndex: 1 },
       storagePath: "outputs/cup.png",
-      hash: "hash"
+      hash: "hash",
+      generationKey: "generation-key-1"
     });
     expect(output.candidateIndex).toBe(1);
+    expect(repository.getOutputByGenerationKey("generation-key-1")?.id).toBe(output.id);
+    const duplicate = repository.createOutput({
+      projectId: project.id,
+      storyboardItemId: item.id,
+      jobId: job.id,
+      candidateIndex: 1,
+      generationSnapshot: output.generationSnapshot,
+      storagePath: "outputs/duplicate.png",
+      hash: "duplicate",
+      generationKey: "generation-key-1"
+    });
+    expect(duplicate.id).toBe(output.id);
     database.close();
   });
 

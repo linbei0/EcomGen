@@ -8,6 +8,8 @@ export interface ProviderConnection {
 export interface ImageGenerationInput {
   model: string;
   prompt: string;
+  /** 同一业务执行重试时保持不变，供兼容 Provider 去重。 */
+  idempotencyKey?: string;
   size?: string;
   quality?: "low" | "medium" | "high";
   images?: Array<{ data: Buffer; filename: string; mimeType: string }>;
@@ -25,6 +27,8 @@ export interface ImageInput {
 export interface ImageEditInput {
   model: string;
   prompt: string;
+  /** 同一业务执行重试时保持不变，供兼容 Provider 去重。 */
+  idempotencyKey?: string;
   quality?: "low" | "medium" | "high";
   size?: string;
   sourceImage: ImageInput;
@@ -65,7 +69,10 @@ export class OpenAiCompatibleImageProvider {
     if (input.images?.length) return this.edit(input);
     const response = await fetch(new URL("images/generations", this.baseUrl()), {
       method: "POST",
-      headers: this.headers({ "content-type": "application/json" }),
+      headers: this.headers({
+        "content-type": "application/json",
+        ...(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {})
+      }),
       body: JSON.stringify({
         model: input.model,
         prompt: input.prompt,
@@ -73,7 +80,8 @@ export class OpenAiCompatibleImageProvider {
         quality: input.quality,
         response_format: "b64_json",
         n: 1
-      })
+      }),
+      signal: AbortSignal.timeout(120_000)
     });
     return this.readImageResponse(response);
   }
@@ -87,7 +95,8 @@ export class OpenAiCompatibleImageProvider {
       images: [input.sourceImage, ...(input.referenceImages ?? [])],
       mask: input.mask,
       inputFidelity: input.inputFidelity,
-      operation: input.operation
+      operation: input.operation,
+      idempotencyKey: input.idempotencyKey
     });
   }
 
@@ -115,8 +124,9 @@ export class OpenAiCompatibleImageProvider {
     if (input.mask) form.append("mask", new Blob([new Uint8Array(input.mask.data)], { type: input.mask.mimeType }), input.mask.filename);
     const response = await fetch(new URL("images/edits", this.baseUrl()), {
       method: "POST",
-      headers: this.headers(),
-      body: form
+      headers: this.headers(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {}),
+      body: form,
+      signal: AbortSignal.timeout(120_000)
     });
     return this.readImageResponse(response);
   }

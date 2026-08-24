@@ -37,6 +37,7 @@ function removeLegacyOutputReviewColumns(database: SqliteDatabase): void {
         storyboard_item_id TEXT NOT NULL,
         job_id TEXT NOT NULL,
         candidate_index INTEGER NOT NULL DEFAULT 1,
+        generation_key TEXT,
         generation_snapshot_json TEXT,
         storage_path TEXT NOT NULL,
         hash TEXT NOT NULL,
@@ -50,10 +51,10 @@ function removeLegacyOutputReviewColumns(database: SqliteDatabase): void {
         FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
       );
       INSERT INTO outputs_without_review (
-        id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id
+        id,project_id,storyboard_item_id,job_id,candidate_index,generation_key,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id
       )
       SELECT
-        id,project_id,storyboard_item_id,job_id,candidate_index,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id
+        id,project_id,storyboard_item_id,job_id,candidate_index,NULL,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id
       FROM outputs;
       DROP TABLE outputs;
       ALTER TABLE outputs_without_review RENAME TO outputs;
@@ -228,6 +229,7 @@ function migrate(database: SqliteDatabase): void {
       storyboard_item_id TEXT NOT NULL,
       job_id TEXT NOT NULL,
       candidate_index INTEGER NOT NULL DEFAULT 1,
+      generation_key TEXT,
       generation_snapshot_json TEXT,
       storage_path TEXT NOT NULL,
       hash TEXT NOT NULL,
@@ -288,10 +290,15 @@ function migrate(database: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_jobs_project_status_updated ON jobs(project_id, status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_outputs_project_created ON outputs(project_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_outputs_root_created ON outputs(root_output_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_outputs_generation_key ON outputs(generation_key);
     CREATE INDEX IF NOT EXISTS idx_exports_project_updated ON exports(project_id, updated_at);
     CREATE INDEX IF NOT EXISTS idx_edit_turns_project_updated ON edit_turns(project_id, updated_at);
   `);
   if (!columnNames(database, "projects").has("archived_at")) {
     database.exec("ALTER TABLE projects ADD COLUMN archived_at TEXT");
   }
+  if (!columnNames(database, "outputs").has("generation_key")) {
+    database.exec("ALTER TABLE outputs ADD COLUMN generation_key TEXT");
+  }
+  database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_outputs_generation_key_unique ON outputs(generation_key) WHERE generation_key IS NOT NULL");
 }

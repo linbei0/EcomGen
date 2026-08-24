@@ -15,6 +15,10 @@ Worker 消费 BullMQ 任务。它是“执行器”，不是 Prompt 编译器。
 7. 取得最终 Prompt：普通任务原样使用 `promptInstruction`；revision 任务调用 Pi Agent 改写。
 8. 保存 `compiledPrompt`，调用 Provider，保存输出并发布事件。
 
+每个图像候选都会生成稳定的 `generationKey`。它同时作为 Provider 的 `Idempotency-Key`、输出数据库的唯一键和本地输出文件名的一部分，因此任务恢复或进程崩溃重跑时不会新增第二份本地输出。图像生成 BullMQ 任务不做自动重试，只能由用户显式重试。
+
+Worker 在发起外部图像请求前会写入内部“请求已开始”标记。若进程在 Provider 返回前退出，启动恢复会将任务标记为失败且禁止自动重试，因为此时 Provider 是否已计费无法判定；Provider 已返回任务 ID 的执行仍可通过 `generationKey` 恢复。
+
 ## Prompt 不变量
 
 ```text

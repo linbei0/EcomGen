@@ -64,6 +64,8 @@ Worker 执行以下顺序：
 
 Worker 必须拒绝包含 `Upstream template`、`Template fields` 等内部模板标记的旧 Prompt，并要求重新规划；不能静默替用户清洗旧数据。
 
+图像生成的每个候选都有稳定的 `generationKey`。Worker 将它作为 Provider 的 `Idempotency-Key`，并写入输出记录和确定性文件路径；重复消费同一个 Job 时先查已有输出，避免重复落库。图像生成任务不使用 BullMQ 自动重试。Worker 在外部请求发起前写入“请求已开始”标记；进程在 Provider 返回前退出时，启动恢复会将任务标记为不可自动重试的失败，避免未知计费状态导致再次调用。
+
 ## 字段不变量
 
 | 字段 | 含义 | 约束 |

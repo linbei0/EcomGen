@@ -30,11 +30,23 @@ describe("OpenAI-compatible image editing", () => {
     });
 
     expect(request?.method).toBe("POST");
+    expect(new Headers(request?.headers).get("Idempotency-Key")).toBeNull();
     const body = request?.body as FormData;
     expect(body.get("operation")).toBe("NATURAL_FUSION");
     expect(body.get("input_fidelity")).toBe("high");
     expect((body.getAll("image") as File[]).map((file) => file.name)).toEqual(["source.png", "reference-1.png", "reference-2.png"]);
     expect((body.get("mask") as File).name).toBe("mask.png");
+  });
+
+  it("sends a stable idempotency key for generation retries", async () => {
+    let request: RequestInit | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: URL, init?: RequestInit) => {
+      request = init;
+      return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("generated").toString("base64") }] }), { status: 200 });
+    }));
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await provider.generate({ model: "image-model", prompt: "cup", idempotencyKey: "generation-key-1" });
+    expect(new Headers(request?.headers).get("Idempotency-Key")).toBe("generation-key-1");
   });
 
   it("derives edit capabilities from the selected image API adapter", () => {

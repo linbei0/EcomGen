@@ -22,9 +22,12 @@ export class LocalAssetStore {
     return { path: relativePath, hash };
   }
 
-  public async putOutput(projectId: string, content: Buffer, extension = ".png"): Promise<{ path: string; hash: string }> {
+  public async putOutput(projectId: string, content: Buffer, extension = ".png", idempotencyKey?: string): Promise<{ path: string; hash: string }> {
     const hash = createHash("sha256").update(content).digest("hex");
-    const relativePath = join("outputs", projectId, `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(extension)}`);
+    const name = idempotencyKey
+      ? `${createHash("sha256").update(idempotencyKey).digest("hex")}${this.safeExtension(extension)}`
+      : `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(extension)}`;
+    const relativePath = join("outputs", projectId, name);
     await this.write(relativePath, content);
     return { path: relativePath, hash };
   }

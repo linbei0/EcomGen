@@ -17,7 +17,9 @@ export function createJobQueue(connection: Redis): Queue<EcomJobPayload> {
 }
 
 export async function enqueue(queue: Queue<EcomJobPayload>, payload: EcomJobPayload): Promise<void> {
-  const options: JobsOptions = { jobId: payload.jobId, attempts: 3, backoff: { type: "exponential", delay: 1000 } };
+  // 图像请求可能已经在 Provider 侧生效；生成任务保留手动重试，避免 BullMQ 自动再次计费。
+  const attempts = payload.kind === "generate" || payload.kind === "edit_generate" ? 1 : 3;
+  const options: JobsOptions = { jobId: payload.jobId, attempts, backoff: { type: "exponential", delay: 1000 } };
   await queue.add(payload.kind, payload, options);
 }
 
