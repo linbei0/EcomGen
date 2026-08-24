@@ -13,7 +13,7 @@ import type {
   StoryboardMode,
   TargetMarket
 } from "@ecomgen/contracts";
-import type { EditOperation, EditSessionStatus, EditTurnStatus } from "@ecomgen/contracts";
+import type { EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus } from "@ecomgen/contracts";
 import type { SqliteDatabase } from "./database.js";
 
 /** 写入 jobs.provider_task_id 的内部标记：请求已发出但 Provider 尚未返回结果。 */
@@ -177,10 +177,13 @@ export interface GenerationSnapshot {
   size: string;
   candidateIndex: number;
   operation?: EditOperation;
+  executionMode?: EditExecutionMode;
+  targetDescription?: string;
+  targetConfidence?: number;
   sourceOutputId?: string;
   maskHash?: string | null;
   protectMaskHash?: string | null;
-  compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT";
+  compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT";
 }
 
 export interface OutputRecord {

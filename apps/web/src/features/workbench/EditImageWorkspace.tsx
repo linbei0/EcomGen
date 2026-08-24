@@ -6,13 +6,13 @@ import type { Asset, Output, ProjectDetail } from "../../api/adapters/projectDet
 import { useProviders } from "../../api/hooks/useProviders";
 import { API_BASE_URL } from "../../config/env";
 import { errorText } from "../../lib/errorText";
-import { editErrorLabel, editOperationLabel } from "../../lib/userText";
+import { editErrorLabel, editExecutionModeLabel, editOperationLabel } from "../../lib/userText";
 import { modelOptions } from "../../lib/modelOptions";
 import styles from "./workbench.module.css";
 
 type Tool = "pan" | "rect" | "brush" | "erase" | "protect" | "arrow" | "text";
 type TurnState = "PLANNING" | "PLAN_READY" | "NEED_INPUT" | "AWAITING_CONFIRMATION" | "GENERATING" | "SUCCEEDED" | "FAILED";
-interface EditTurn { id: string; status: TurnState; plan: { userSummary?: string; operation?: string; requiresConfirmation?: boolean } | null; error: { message?: string } | null; }
+interface EditTurn { id: string; status: TurnState; plan: { userSummary?: string; operation?: string; executionMode?: string; targetDescription?: string; targetConfidence?: number; clarification?: string | null; requiresConfirmation?: boolean } | null; error: { message?: string } | null; }
 interface Point { x: number; y: number; }
 interface Bounds { x: number; y: number; width: number; height: number; }
 interface TextDraft { point: Point; value: string; }
@@ -413,7 +413,7 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
         {showReferencePicker && assets.filter((asset) => asset.kind === "REFERENCE").length > 0 ? <div className={styles.editReferences}><p>参考素材</p><div>{assets.filter((asset) => asset.kind === "REFERENCE").map((asset) => <button key={asset.id} type="button" data-selected={referenceAssetIds.includes(asset.id)} onClick={() => setReferenceAssetIds((current) => current.includes(asset.id) ? current.filter((id) => id !== asset.id) : [...current, asset.id])}><img src={asset.url} alt="" /><span>{asset.id.slice(0, 6)}</span></button>)}</div></div> : null}
         {session ? <div className={styles.editMemory}><div className={styles.editMemoryHeading}><p>当前分支记忆</p><small>{memorySourceOutputId && memorySourceOutputId !== output?.id ? `继承自 ${versionLabel(outputs.find((item) => item.id === memorySourceOutputId) ?? output)}` : memorySourceOutputId ? "本节点记忆" : "未设置"}</small></div><Input.TextArea value={memorySummary} onChange={(event) => setMemorySummary(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} placeholder="例如：保持晨光方向和木质台面" /><Input.TextArea value={memoryConstraints} onChange={(event) => setMemoryConstraints(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} placeholder="每行一条约束，例如：不要改变叶片形状" /><Button size="small" onClick={() => void saveMemory()}>保存记忆</Button></div> : null}
         <Input.TextArea value={message} onChange={(event) => setMessage(event.target.value)} autoSize={{ minRows: 4, maxRows: 8 }} placeholder="例如：把选中的菠萝颜色调得更金黄，保留叶片和背景光线" disabled={pending} />
-        {turn?.plan?.userSummary ? <div className={styles.editPlan}><p>{turn.plan.userSummary}</p><span>{editOperationLabel(turn.plan.operation)}</span>{turn.plan.operation === "SCENE_ADJUST" || turn.plan.operation === "NATURAL_FUSION" ? <small>影响范围：{turn.plan.operation === "SCENE_ADJUST" ? "整张场景，主体尽量保持" : "选中区域及其边缘，保护标记优先"}</small> : null}{turn.plan.operation === "OUTPAINT" ? <small>影响范围：新增画布区域，原图区域锁定</small> : null}</div> : null}
+        {turn?.plan?.userSummary ? <div className={styles.editPlan}><p>{turn.plan.userSummary}</p><span>{editOperationLabel(turn.plan.operation)}</span>{turn.plan.executionMode ? <small>执行方式：{editExecutionModeLabel(turn.plan.executionMode)}</small> : null}{turn.plan.targetDescription ? <small>目标：{turn.plan.targetDescription}{typeof turn.plan.targetConfidence === "number" ? ` · 置信度 ${Math.round(turn.plan.targetConfidence * 100)}%` : ""}</small> : null}{turn.plan.operation === "SCENE_ADJUST" || turn.plan.operation === "NATURAL_FUSION" ? <small>影响范围：{turn.plan.operation === "SCENE_ADJUST" ? "整张场景，主体尽量保持" : "选中区域及其边缘，保护标记优先"}</small> : null}{turn.plan.operation === "OUTPAINT" ? <small>影响范围：新增画布区域，原图区域锁定</small> : null}</div> : null}
         {turn?.status === "NEED_INPUT" || turn?.status === "FAILED" ? <p className={styles.editError}>{editErrorLabel(turn.error?.message)}</p> : null}{turn?.status === "SUCCEEDED" ? <p className={styles.editSuccess}>新版本已生成，可关闭后继续在结果区编辑。</p> : null}
         <div className={styles.editCommands}>{turn?.status === "AWAITING_CONFIRMATION" || turn?.status === "PLAN_READY" ? <Button type="primary" onClick={() => void approve()}>确认修改</Button> : <Button type="primary" icon={<Send size={15} />} disabled={!message.trim() || pending} loading={pending} onClick={() => void submit()}>生成计划</Button>}</div>
       </aside>

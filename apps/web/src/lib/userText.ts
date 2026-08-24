@@ -6,10 +6,18 @@ export const EDIT_OPERATION_LABEL = {
   NATURAL_FUSION: "自然融合",
 } as const;
 
+export const EDIT_EXECUTION_MODE_LABEL = {
+  MODEL_DIRECTED: "模型根据图片自行判断修改范围",
+  MASKED: "仅修改已标记区域",
+  OUTPAINT: "仅生成新增画布区域",
+  NEED_INPUT: "需要补充编辑信息",
+} as const;
+
 const EDIT_ERROR_LABEL: Record<string, string> = {
   REFERENCE_ASSET_REQUIRED: "请先选择参考素材",
   EDIT_TARGET_REQUIRED: "请先标注要修改的区域",
   OUTPAINT_CANVAS_REQUIRED: "请先选择扩展画布方向",
+  EDIT_VISION_REQUIRED: "当前推理模型无法看图，请标注区域或更换支持视觉的模型",
   CAPABILITY_UNSUPPORTED: "当前模型不支持此编辑操作",
 };
 
@@ -23,6 +31,11 @@ const ERROR_MESSAGE_LABEL: Array<[string, string]> = [
 export function editOperationLabel(operation: string | undefined): string {
   if (!operation) return "编辑操作";
   return EDIT_OPERATION_LABEL[operation as keyof typeof EDIT_OPERATION_LABEL] ?? "编辑操作";
+}
+
+export function editExecutionModeLabel(mode: string | undefined): string {
+  if (!mode) return "执行方式";
+  return EDIT_EXECUTION_MODE_LABEL[mode as keyof typeof EDIT_EXECUTION_MODE_LABEL] ?? "执行方式";
 }
 
 export function editErrorLabel(message: string | undefined): string {

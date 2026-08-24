@@ -40,6 +40,7 @@ export interface ImageEditInput {
 
 export interface ImageEditCapabilities {
   supportsMaskEdit: boolean;
+  supportsUnmaskedEdit: boolean;
   supportsMultiReference: boolean;
   supportsOutpaint: boolean;
   supportsInputFidelity: boolean;
@@ -48,6 +49,7 @@ export interface ImageEditCapabilities {
 
 const OPENAI_COMPATIBLE_EDIT_CAPABILITIES: ImageEditCapabilities = {
   supportsMaskEdit: true,
+  supportsUnmaskedEdit: true,
   supportsMultiReference: true,
   supportsOutpaint: true,
   supportsInputFidelity: true,

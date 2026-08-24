@@ -49,11 +49,23 @@ describe("OpenAI-compatible image editing", () => {
     expect(new Headers(request?.headers).get("Idempotency-Key")).toBe("generation-key-1");
   });
 
+  it("does not upload a mask for unmasked edits", async () => {
+    let request: RequestInit | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: URL, init?: RequestInit) => {
+      request = init;
+      return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("generated").toString("base64") }] }), { status: 200 });
+    }));
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await provider.editImage({ model: "image-model", prompt: "edit the target", operation: "NATURAL_FUSION", sourceImage: { data: Buffer.from("source"), filename: "source.png", mimeType: "image/png" } });
+    expect((request?.body as FormData).get("mask")).toBeNull();
+  });
+
   it("derives edit capabilities from the selected image API adapter", () => {
     const imageModel = { supportsVision: true, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" as const };
     const textModel = { ...imageModel, imageApiKind: null };
     expect(imageEditCapabilitiesFor(imageModel)).toMatchObject({
       supportsMaskEdit: true,
+      supportsUnmaskedEdit: true,
       supportsMultiReference: true,
       supportsOutpaint: true,
       supportsInputFidelity: true,

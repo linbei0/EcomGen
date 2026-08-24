@@ -144,6 +144,41 @@ describe("EcomRepository", () => {
     }
   });
 
+  it("adds generation keys before creating their indexes on legacy outputs", () => {
+    const directory = mkdtempSync(join(tmpdir(), "ecomgen-generation-key-migration-"));
+    const filename = join(directory, "ecomgen.db");
+    try {
+      const legacy = new Database(filename);
+      legacy.exec(`
+        CREATE TABLE outputs (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          storyboard_item_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          candidate_index INTEGER NOT NULL,
+          generation_snapshot_json TEXT,
+          storage_path TEXT NOT NULL,
+          hash TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          parent_output_id TEXT,
+          root_output_id TEXT,
+          edit_session_id TEXT,
+          edit_turn_id TEXT
+        );
+        INSERT INTO outputs VALUES ('root','p','item','job',1,NULL,'root.png','hash','2026-01-01T00:00:00.000Z',NULL,NULL,NULL,NULL);
+      `);
+      legacy.close();
+
+      const migrated = openDatabase(filename);
+      expect(migrated.prepare("PRAGMA table_info(outputs)").all()).toEqual(expect.arrayContaining([expect.objectContaining({ name: "generation_key" })]));
+      expect(migrated.prepare("SELECT id, generation_key FROM outputs").get()).toEqual({ id: "root", generation_key: null });
+      expect(migrated.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_outputs_generation_key'").get()).toEqual({ name: "idx_outputs_generation_key" });
+      migrated.close();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("persists search sources in ascending priority order without exposing a key through the record mapper", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);

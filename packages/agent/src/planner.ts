@@ -1,7 +1,7 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { ImageContent, Model } from "@earendil-works/pi-ai";
-import type { EditOperation, PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
+import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createPlanningTools, readPlatformGuidance, type WebResearchConfig } from "./tools.js";
@@ -134,17 +134,21 @@ export interface EditPlannerInput {
   referenceAssets: Array<{ id: string; name: string; role: string }>;
   memorySummary: { summary?: string; constraints?: string[] };
   projectFacts: string[];
-  imageCapabilities?: { supportsMaskEdit: boolean; supportsMultiReference: boolean; supportsOutpaint: boolean; supportsInputFidelity: boolean; supportsNaturalBlend: boolean };
+  imageCapabilities?: { supportsMaskEdit: boolean; supportsUnmaskedEdit: boolean; supportsMultiReference: boolean; supportsOutpaint: boolean; supportsInputFidelity: boolean; supportsNaturalBlend: boolean };
   sourceImage?: ImageContent;
 }
 
 export interface PlannedEdit {
   operation: EditOperation;
+  executionMode: EditExecutionMode;
   userSummary: string;
   prompt: string;
   targetAnnotationIds: string[];
+  targetDescription: string;
+  targetConfidence: number;
+  clarification: string | null;
   requiresConfirmation: boolean;
-  compositePolicy: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT";
+  compositePolicy: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT";
   memoryPatch: { summary?: string; constraints?: string[] };
 }
 
@@ -154,13 +158,13 @@ export async function planImageEdit(input: EditPlannerInput): Promise<PlannedEdi
     getApiKey: () => input.apiKey,
     initialState: {
       model: input.model,
-      systemPrompt: "You are an image-editing planner for an e-commerce workspace. Return only valid JSON. Use the user's words, mask availability, annotations, references, previous constraints, and provider capabilities to choose one operation: PRECISE_INPAINT, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION. Never invent asset IDs or annotation IDs, and never silently replace the requested operation with another operation just because a capability is unavailable. PRODUCT_REPLACE requires a supplied reference asset. PRECISE_INPAINT requires an editable mask or target annotation. Set requiresConfirmation true for PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION. The prompt is a complete final image-edit prompt, preserving product facts and user-protected areas. For PRECISE_INPAINT use MASK_LOCKED; for OUTPAINT use OUTPAINT; otherwise use NATURAL_BLEND.",
+      systemPrompt: "You are an image-editing planner for an e-commerce workspace. Return only valid JSON. Use the user's words, source image, mask availability, annotations, references, previous constraints, and provider capabilities to choose one operation: PRECISE_INPAINT, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION, and one executionMode: MODEL_DIRECTED, MASKED, OUTPAINT, NEED_INPUT. operation describes what the user wants; executionMode describes how it can be executed. If an editable mask is supplied, you MUST use MASKED and must not ignore it. Use OUTPAINT when canvas expansion is supplied. For a clear request that the vision-capable image model can execute without a mask, use MODEL_DIRECTED and let the image model judge the target from the source image. If the user demands strict pixel-level protection without a mask, the target is ambiguous, or you cannot see the source image, use NEED_INPUT and ask a concrete clarification. PRODUCT_REPLACE requires a supplied reference asset. PRECISE_INPAINT is only for masked execution. MODEL_DIRECTED, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT and NATURAL_FUSION require confirmation; NEED_INPUT does not. For MASKED use MASK_LOCKED; for OUTPAINT use OUTPAINT; for MODEL_DIRECTED use PROVIDER_RESULT. The prompt is a complete final image-edit prompt, preserving product facts and user-protected areas.",
       thinkingLevel: input.model.reasoning ? "medium" : "off",
       tools: []
     }
   });
   const annotationIds = annotationIdList(input.annotations);
-  await agent.prompt(`Plan this edit. Return {"operation":string,"userSummary":string,"prompt":string,"targetAnnotationIds":string[],"requiresConfirmation":boolean,"compositePolicy":string,"memoryPatch":{"summary":string,"constraints":string[]}}.\n${JSON.stringify({ ...input, model: undefined, apiKey: undefined, sourceImage: undefined, annotationIds })}`, input.model.input.includes("image") ? [input.sourceImage].filter((image): image is ImageContent => Boolean(image)) : undefined);
+  await agent.prompt(`Plan this edit. Return {"operation":string,"executionMode":string,"userSummary":string,"prompt":string,"targetAnnotationIds":string[],"targetDescription":string,"targetConfidence":number,"clarification":string|null,"requiresConfirmation":boolean,"compositePolicy":string,"memoryPatch":{"summary":string,"constraints":string[]}}. For NEED_INPUT, prompt may be empty but clarification must explain the missing decision.\n${JSON.stringify({ ...input, model: undefined, apiKey: undefined, sourceImage: undefined, annotationIds })}`, input.model.input.includes("image") ? [input.sourceImage].filter((image): image is ImageContent => Boolean(image)) : undefined);
   if (agent.state.errorMessage) throw new Error(`Edit planning model request failed: ${agent.state.errorMessage}`);
   const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
   const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n") : "";
@@ -175,14 +179,21 @@ function annotationIdList(annotations: Record<string, unknown>): string[] {
 
 function validateEditPlan(plan: PlannedEdit, input: EditPlannerInput, annotationIds: string[]): PlannedEdit {
   const operations: EditOperation[] = ["PRECISE_INPAINT", "PRODUCT_REPLACE", "SCENE_ADJUST", "OUTPAINT", "NATURAL_FUSION"];
-  if (!plan || !operations.includes(plan.operation) || !plan.userSummary?.trim() || !plan.prompt?.trim()) throw new Error("Edit planning model returned an invalid plan");
+  const executionModes: EditExecutionMode[] = ["MODEL_DIRECTED", "MASKED", "OUTPAINT", "NEED_INPUT"];
+  if (!plan || !operations.includes(plan.operation) || !executionModes.includes(plan.executionMode) || !plan.userSummary?.trim() || typeof plan.targetDescription !== "string" || typeof plan.targetConfidence !== "number" || !Number.isFinite(plan.targetConfidence) || plan.targetConfidence < 0 || plan.targetConfidence > 1) throw new Error("Edit planning model returned an invalid plan");
   const targets = Array.isArray(plan.targetAnnotationIds) ? plan.targetAnnotationIds.filter((id): id is string => typeof id === "string" && annotationIds.includes(id)) : [];
   if (plan.operation === "PRODUCT_REPLACE" && input.referenceAssets.length === 0) throw new Error("REFERENCE_ASSET_REQUIRED");
-  if (plan.operation === "PRECISE_INPAINT" && !input.hasEditMask && targets.length === 0) throw new Error("EDIT_TARGET_REQUIRED");
   if (plan.operation === "OUTPAINT" && !input.hasCanvasExpansion) throw new Error("OUTPAINT_CANVAS_REQUIRED");
-  const requiresConfirmation = ["PRODUCT_REPLACE", "SCENE_ADJUST", "OUTPAINT", "NATURAL_FUSION"].includes(plan.operation);
-  const compositePolicy = plan.operation === "PRECISE_INPAINT" ? "MASK_LOCKED" : plan.operation === "OUTPAINT" ? "OUTPAINT" : "NATURAL_BLEND";
-  return { operation: plan.operation, userSummary: plan.userSummary.trim(), prompt: plan.prompt.trim(), targetAnnotationIds: targets, requiresConfirmation, compositePolicy, memoryPatch: plan.memoryPatch ?? {} };
+  if (input.hasEditMask && plan.executionMode !== "MASKED") throw new Error("EDIT_PLAN_MASK_REQUIRED");
+  if (plan.operation === "PRECISE_INPAINT" && plan.executionMode !== "MASKED") throw new Error("EDIT_PLAN_MASK_REQUIRED");
+  if (plan.executionMode === "MASKED" && !input.hasEditMask) throw new Error("EDIT_TARGET_REQUIRED");
+  if (plan.executionMode === "OUTPAINT" && !input.hasCanvasExpansion) throw new Error("OUTPAINT_CANVAS_REQUIRED");
+  if (plan.executionMode === "MODEL_DIRECTED" && !input.hasEditMask && !input.sourceImage) throw new Error("EDIT_VISION_REQUIRED");
+  if (plan.executionMode === "NEED_INPUT" && !plan.clarification?.trim()) throw new Error("Edit planning model returned an invalid plan");
+  if (plan.executionMode !== "NEED_INPUT" && !plan.prompt?.trim()) throw new Error("Edit planning model returned an invalid plan");
+  const requiresConfirmation = plan.executionMode !== "NEED_INPUT" && (plan.executionMode === "MODEL_DIRECTED" || ["PRODUCT_REPLACE", "SCENE_ADJUST", "OUTPAINT", "NATURAL_FUSION"].includes(plan.operation));
+  const compositePolicy = plan.executionMode === "MASKED" ? "MASK_LOCKED" : plan.executionMode === "OUTPAINT" ? "OUTPAINT" : "PROVIDER_RESULT";
+  return { operation: plan.operation, executionMode: plan.executionMode, userSummary: plan.userSummary.trim(), prompt: plan.prompt?.trim() ?? "", targetAnnotationIds: targets, targetDescription: plan.targetDescription.trim(), targetConfidence: plan.targetConfidence, clarification: plan.clarification?.trim() || null, requiresConfirmation, compositePolicy, memoryPatch: plan.memoryPatch ?? {} };
 }
 
 function stripJsonFence(value: string): string { return value.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, ""); }

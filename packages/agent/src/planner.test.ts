@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1 }));
+const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, editResponse: undefined as Record<string, unknown> | undefined }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
@@ -13,6 +13,10 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
     public async prompt(message: string): Promise<void> {
       if (captured.errorMessage) return;
       captured.prompt = message;
+      if (message.includes("Plan this edit")) {
+        this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify(captured.editResponse ?? { operation: "NATURAL_FUSION", executionMode: "MODEL_DIRECTED", userSummary: "直接编辑", prompt: "edit", targetAnnotationIds: [], targetDescription: "主要商品", targetConfidence: 0.9, clarification: null, requiresConfirmation: true, compositePolicy: "PROVIDER_RESULT", memoryPatch: {} }) }] }];
+        return;
+      }
       if (captured.simulateResearchFailure) {
         const researchTool = captured.options?.initialState?.tools?.find((tool) => tool.name === "research_visual_direction");
         try { await researchTool?.execute("research-call", { query: "product photography lighting" }); } catch { /* Pi 将工具错误返回给模型并继续规划。 */ }
@@ -26,7 +30,7 @@ vi.mock("@earendil-works/pi-ai/api/openai-completions.lazy", () => ({
   openAICompletionsApi: () => ({ stream: vi.fn() }),
 }));
 
-import { planStoryboard, type PlannerInput } from "./planner.js";
+import { planImageEdit, planStoryboard, type EditPlannerInput, type PlannerInput } from "./planner.js";
 
 const input: PlannerInput = {
   model: {
@@ -113,5 +117,37 @@ describe("planStoryboard", () => {
       fetchMock.mockRestore();
       captured.simulateResearchFailure = false;
     }
+  });
+});
+
+const editInput: EditPlannerInput = {
+  model: { ...input.model, input: ["text", "image"] },
+  apiKey: "secret",
+  message: "调整目标对象外观",
+  annotations: {},
+  hasEditMask: false,
+  hasCanvasExpansion: false,
+  referenceAssets: [],
+  memorySummary: {},
+  projectFacts: [],
+  imageCapabilities: { supportsMaskEdit: true, supportsUnmaskedEdit: true, supportsMultiReference: true, supportsOutpaint: true, supportsInputFidelity: true, supportsNaturalBlend: true },
+  sourceImage: { type: "image", mimeType: "image/png", data: "encoded" }
+};
+
+describe("planImageEdit", () => {
+  it("无蒙版且目标明确时选择模型自行判断范围", async () => {
+    captured.errorMessage = undefined;
+    captured.editResponse = { operation: "NATURAL_FUSION", executionMode: "MODEL_DIRECTED", userSummary: "调整目标对象外观", prompt: "edit", targetAnnotationIds: [], targetDescription: "主要商品", targetConfidence: 0.9, clarification: null, requiresConfirmation: false, compositePolicy: "PROVIDER_RESULT", memoryPatch: {} };
+    const result = await planImageEdit(editInput);
+    expect(result.executionMode).toBe("MODEL_DIRECTED");
+    expect(result.requiresConfirmation).toBe(true);
+  });
+
+  it("严格蒙版和歧义计划必须要求用户补充", async () => {
+    captured.errorMessage = undefined;
+    captured.editResponse = { operation: "NATURAL_FUSION", executionMode: "NEED_INPUT", userSummary: "需要确认目标", prompt: "", targetAnnotationIds: [], targetDescription: "多个可能目标", targetConfidence: 0.4, clarification: "请确认要修改哪一个目标。", requiresConfirmation: false, compositePolicy: "PROVIDER_RESULT", memoryPatch: {} };
+    const result = await planImageEdit(editInput);
+    expect(result.executionMode).toBe("NEED_INPUT");
+    expect(result.clarification).toContain("请确认");
   });
 });

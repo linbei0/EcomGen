@@ -976,6 +976,7 @@ export interface components {
         };
         /** @enum {string} */
         EditTurnStatus: "DRAFT" | "PLANNING" | "PLAN_READY" | "NEED_INPUT" | "AWAITING_CONFIRMATION" | "GENERATING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+        EditExecutionMode: "MODEL_DIRECTED" | "MASKED" | "OUTPAINT" | "NEED_INPUT";
         EditSession: {
             /** Format: uuid */
             id: string;
@@ -1014,7 +1015,19 @@ export interface components {
             editMaskPath?: string | null;
             protectMaskPath?: string | null;
             referenceAssetIds: string[];
-            plan?: Record<string, never> | null;
+            plan?: {
+                operation?: "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "OUTPAINT" | "NATURAL_FUSION";
+                executionMode?: components["schemas"]["EditExecutionMode"];
+                userSummary?: string;
+                prompt?: string;
+                targetAnnotationIds?: string[];
+                targetDescription?: string;
+                targetConfidence?: number;
+                clarification?: string | null;
+                requiresConfirmation?: boolean;
+                compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT";
+                memoryPatch?: Record<string, never>;
+            } | null;
             error?: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;

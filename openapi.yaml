@@ -1088,6 +1088,9 @@ components:
     EditTurnStatus:
       type: string
       enum: [DRAFT, PLANNING, PLAN_READY, NEED_INPUT, AWAITING_CONFIRMATION, GENERATING, SUCCEEDED, FAILED, CANCELLED]
+    EditExecutionMode:
+      type: string
+      enum: [MODEL_DIRECTED, MASKED, OUTPAINT, NEED_INPUT]
     EditSession:
       type: object
       required: [id, projectId, currentOutputId, status, memorySummary, createdAt, updatedAt]
@@ -1118,7 +1121,20 @@ components:
         editMaskPath: { type: [string, 'null'] }
         protectMaskPath: { type: [string, 'null'] }
         referenceAssetIds: { type: array, items: { type: string, format: uuid } }
-        plan: { type: [object, 'null'] }
+        plan:
+          type: [object, 'null']
+          properties:
+            operation: { type: string, enum: [PRECISE_INPAINT, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION] }
+            executionMode: { $ref: '#/components/schemas/EditExecutionMode' }
+            userSummary: { type: string }
+            prompt: { type: string }
+            targetAnnotationIds: { type: array, items: { type: string } }
+            targetDescription: { type: string }
+            targetConfidence: { type: number, minimum: 0, maximum: 1 }
+            clarification: { type: [string, 'null'] }
+            requiresConfirmation: { type: boolean }
+            compositePolicy: { type: string, enum: [MASK_LOCKED, NATURAL_BLEND, OUTPAINT, PROVIDER_RESULT] }
+            memoryPatch: { type: object }
         error: { type: [object, 'null'] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }

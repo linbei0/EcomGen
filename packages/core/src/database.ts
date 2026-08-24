@@ -290,7 +290,6 @@ function migrate(database: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_jobs_project_status_updated ON jobs(project_id, status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_outputs_project_created ON outputs(project_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_outputs_root_created ON outputs(root_output_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_outputs_generation_key ON outputs(generation_key);
     CREATE INDEX IF NOT EXISTS idx_exports_project_updated ON exports(project_id, updated_at);
     CREATE INDEX IF NOT EXISTS idx_edit_turns_project_updated ON edit_turns(project_id, updated_at);
   `);
@@ -300,5 +299,6 @@ function migrate(database: SqliteDatabase): void {
   if (!columnNames(database, "outputs").has("generation_key")) {
     database.exec("ALTER TABLE outputs ADD COLUMN generation_key TEXT");
   }
+  database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_generation_key ON outputs(generation_key)");
   database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_outputs_generation_key_unique ON outputs(generation_key) WHERE generation_key IS NOT NULL");
 }
