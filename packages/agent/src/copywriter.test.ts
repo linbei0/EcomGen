@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ prompt: "", response: "" }));
+const captured = vi.hoisted(() => ({ prompt: "", images: [] as unknown[], response: "" }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
     public state = { messages: [] as Array<{ role: string; content: Array<{ type: string; text?: string }> }>, errorMessage: undefined as string | undefined };
 
-    public async prompt(message: string): Promise<void> {
+    public async prompt(message: string, images?: unknown[]): Promise<void> {
       captured.prompt = message;
+      captured.images = images ?? [];
       this.state.messages = [{ role: "assistant", content: [{ type: "text", text: captured.response }] }];
     }
   },
@@ -59,6 +60,19 @@ describe("writeCopywriting", () => {
     expect(result.content).toContain("期望场景：通勤、办公和居家休闲");
     expect(captured.prompt).toContain("PRODUCT_TRUTH");
     expect(captured.prompt).toContain("STYLE_REFERENCE");
+  });
+
+  it("sends the supplied visual attachment mapping with its images", async () => {
+    captured.response = JSON.stringify({ content: "产品居中展示，保留右侧留白。" });
+    await writeCopywriting({
+      ...input,
+      target: "PLANNING_INSTRUCTION",
+      referenceImages: [{ type: "image", mimeType: "image/png", data: "encoded" }],
+      visionAttachments: [{ attachmentIndex: 1, assetId: "product-1", role: "PRODUCT_TRUTH", name: "earbuds.png", mimeType: "image/png" }],
+    });
+    expect(captured.images).toHaveLength(1);
+    expect(captured.prompt).toContain("visionAttachments");
+    expect(captured.prompt).toContain("product-1");
   });
 
   it("接受画面规划说明，并拒绝不完整的商品描述", () => {

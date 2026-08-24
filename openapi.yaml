@@ -267,7 +267,7 @@ paths:
               type: object
               required: [file]
               properties:
-                file: { type: string, format: binary }
+                file: { type: string, format: binary, description: Each project accepts at most 6 product images and 6 reference images; byte-identical content is rejected as a duplicate. }
                 role: { $ref: '#/components/schemas/AssetRole' }
                 kind: { $ref: '#/components/schemas/UserAssetKind' }
       responses:

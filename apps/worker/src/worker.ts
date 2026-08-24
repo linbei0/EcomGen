@@ -10,6 +10,7 @@ import { getTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
+import { selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata } from "./visual-assets.js";
 
 const masterKey = process.env.ECOMGEN_MASTER_KEY;
 if (!masterKey) throw new Error("ECOMGEN_MASTER_KEY must be a base64-encoded 32-byte key");
@@ -73,8 +74,8 @@ async function executePlan(job: JobRecord): Promise<void> {
   if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
   await updateJob(job, { progress: 25 });
   const assets = repository.listAssets(project.id);
-  const productImages = assets.filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/")).slice(0, 4);
-  const referenceImages = model.supportsVision ? await Promise.all(productImages.map(async (asset) => ({ type: "image" as const, mimeType: asset.mimeType, data: (await storage.read(asset.storagePath)).toString("base64") }))) : undefined;
+  const visualAssets = selectVisionAssets(assets);
+  const referenceImages = model.supportsVision ? await imageContents(visualAssets) : undefined;
   const input = job.input as { planningMode?: PlanningMode; requestedTypes?: string[]; userInstruction?: string; candidatesPerType?: number; targetImageCount?: number; imageResolution?: ImageResolution; imageAspectRatio?: ImageAspectRatio };
   if (input.imageResolution || input.imageAspectRatio || input.candidatesPerType) {
     repository.updateProject(project.id, {
@@ -83,7 +84,7 @@ async function executePlan(job: JobRecord): Promise<void> {
       candidatesPerType: input.candidatesPerType ?? project.candidatesPerType
     });
   }
-  const plannerAssets = assets.map((asset) => ({ id: asset.id, role: asset.role, kind: userAssetKindForRole(asset.role), name: asset.originalName, mimeType: asset.mimeType }));
+  const plannerAssets = visualAssets.map((asset) => ({ id: asset.id, role: asset.role, kind: userAssetKindForRole(asset.role), name: asset.originalName, mimeType: asset.mimeType }));
   const webResearch = project.webResearchEnabled ? configuredWebResearch() : undefined;
   repository.createWebResearchAudit(job.id, webResearch ? "AVAILABLE" : project.webResearchEnabled ? "UNAVAILABLE" : "DISABLED");
   const plan = await planStoryboard({
@@ -101,6 +102,7 @@ async function executePlan(job: JobRecord): Promise<void> {
       defaultMode: project.defaultMode,
       assets: plannerAssets,
       referenceImages,
+      visionAttachments: visionAttachmentMetadata(visualAssets.map((asset) => ({ ...asset, name: asset.originalName }))),
       planningMode: input.planningMode ?? "AI",
       requestedTypes: input.requestedTypes,
       userInstruction: input.userInstruction,
@@ -126,7 +128,7 @@ async function executeCopywriting(job: JobRecord): Promise<void> {
   const model = provider.models.find((candidate) => candidate.id === project.reasoningModelId);
   if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
   if (!model.supportsVision) throw new Error("Selected reasoning model must support Vision for AI copywriting");
-  const assets = repository.listAssets(project.id).filter((asset) => asset.mimeType.startsWith("image/"));
+  const assets = selectVisionAssets(repository.listAssets(project.id));
   if (!assets.some((asset) => asset.role === "PRODUCT_TRUTH")) throw new Error("AI copywriting requires at least one product image");
   const target = job.input.target;
   if (target !== "PRODUCT_DESCRIPTION" && target !== "PLANNING_INSTRUCTION") throw new Error("Copywriting job has an invalid target");
@@ -150,6 +152,7 @@ async function executeCopywriting(job: JobRecord): Promise<void> {
     copyLanguage: project.copyLanguage,
     assets: assets.map((asset) => ({ id: asset.id, role: asset.role, name: asset.originalName, mimeType: asset.mimeType })),
     referenceImages: visualAttachments,
+    visionAttachments: visionAttachmentMetadata(assets.map((asset) => ({ ...asset, name: asset.originalName }))),
   });
   throwIfCancelled(job);
   repository.saveCopywritingResult({ jobId: job.id, projectId: project.id, target: result.target, content: result.content });
@@ -172,7 +175,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const modelId = job.modelId ?? item.imageModelId;
   const provider = providerFor(providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images") throw new Error("Only OpenAI-compatible Images API models are currently executable");
   const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`);
-  const inputs = generationAssets(project, item.mode);
+  const inputs = selectGenerationAssets(repository.listAssets(project.id), item);
   if (item.mode === "PIXEL_PROTECTED" && inputs.length === 0) throw new Error("PIXEL_PROTECTED generation requires a PRODUCT_TRUTH image on the project");
   const revision = typeof job.input.revision === "string" ? job.input.revision.trim() : "";
   const candidateIndex = typeof job.input.candidateIndex === "number" ? job.input.candidateIndex : 1;
@@ -384,9 +387,8 @@ function effectiveEditMemory(session: { memorySummary: { summary?: string; const
   const output = repository.getOutput(outputId);
   return output && !output.parentOutputId ? { summary: session.memorySummary.summary, constraints: session.memorySummary.constraints } : {};
 }
-function generationAssets(project: ProjectRecord, mode: string): AssetRecord[] {
-  const all = repository.listAssets(project.id).filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/"));
-  return mode === "PIXEL_PROTECTED" ? all : all.slice(0, 4);
+async function imageContents(assets: AssetRecord[]): Promise<Array<{ type: "image"; mimeType: string; data: string }>> {
+  return Promise.all(assets.map(async (asset) => ({ type: "image" as const, mimeType: asset.mimeType, data: (await storage.read(asset.storagePath)).toString("base64") })));
 }
 async function reviseGenerationPrompt(project: ProjectRecord, prompt: string, revision: string): Promise<string> {
   const provider = providerFor(project.reasoningProviderId);

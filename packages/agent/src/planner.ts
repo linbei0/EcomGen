@@ -2,7 +2,7 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { ImageContent, Model } from "@earendil-works/pi-ai";
 import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
-import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
+import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createPlanningTools, readPlatformGuidance, type WebResearchConfig } from "./tools.js";
 export type { WebResearchConfig } from "./tools.js";
@@ -22,6 +22,7 @@ export interface PlannerInput {
   defaultMode: StoryboardMode;
   assets: Array<{ id: string; role: string; kind: "PRODUCT" | "REFERENCE"; name: string; mimeType: string }>;
   referenceImages?: ImageContent[];
+  visionAttachments?: Array<{ attachmentIndex: number; assetId: string; role: string; name: string; mimeType: string }>;
   planningMode?: PlanningMode;
   requestedTypes?: string[];
   userInstruction?: string;
@@ -55,6 +56,8 @@ Critical rules:
 - displayName is a human-facing Chinese scene title generated from the actual product, viewpoint, setting, and conversion purpose. Keep it concise (usually 4-12 Chinese characters), specific, and distinct for each item. Do not copy the catalog template name, internal template ID, generic labels such as “分镜/场景图/产品主图”, numbered labels, platform names, or unsupported product facts. The title may describe the visual treatment, such as “整机斜侧展示首图”, while assetType remains the exact template ID.
 - candidateCount is how many image candidates to generate for that type; keep it between 1 and the supplied candidatesPerType.
 - referencedAssets lists asset IDs this item should consider. Prefer PRODUCT assets as product truth and REFERENCE assets only as style or layout hints.
+- visionAttachments maps each image attachment index to an asset ID and role. Inspect the supplied images, then use only those real asset IDs in referencedAssets.
+- PRODUCT attachments are the only source of product appearance truth. REFERENCE attachments may guide style, composition, packaging, labels, or layout, but never replace or redefine the product.
 - When planningMode is MANUAL, requestedTypes is the exact deliverable list: include every requested template exactly once, do not add, remove, or substitute types. Read each selected template with read_ecom_template before writing its final prompt.
 - promptInstruction is the FINAL prompt sent to the image model. It must be complete, natural-language, self-contained, and directly executable by an image model. Do not leave planning notes for another worker to compile.
 - Use read_ecom_template and read_platform_guidance as business knowledge tools. Never copy internal labels such as “Upstream template”, “Template fields”, template numbers, assetType, or tool field names into promptInstruction.
@@ -81,6 +84,7 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
     apiKey: undefined,
     model: undefined,
     referenceImages: undefined,
+    visionAttachments: input.visionAttachments,
     webResearch: input.webResearch ? { sources: input.webResearch.sources.map(({ id, name, kind, baseUrl }) => ({ id, name, kind, baseUrl })), maxResults: input.webResearch.maxResults, timeoutMs: input.webResearch.timeoutMs } : undefined,
     platformGuidance,
     upstream: ECOM_DETAILS_IMAGE_SOURCE,
@@ -220,7 +224,11 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
     assertFinalPrompt(item.promptInstruction);
     const displayName = item.displayName.trim();
     if (displayName === template.name || displayName === item.assetType) throw new Error(`Planning model returned a generic storyboard display name for ${item.assetType}`);
-    const referencedAssets = Array.isArray(item.referencedAssets) ? item.referencedAssets.filter((id) => knownAssetIds.has(id)) : [];
+    const referencedAssets = Array.isArray(item.referencedAssets) ? [...new Set(item.referencedAssets.filter((id) => knownAssetIds.has(id)))] : [];
+    const nonProductReferences = referencedAssets.filter((id) => input.assets.find((asset) => asset.id === id)?.kind === "REFERENCE");
+    if (nonProductReferences.length > MAX_GENERATION_REFERENCE_IMAGES) {
+      throw new Error(`Storyboard item may reference at most ${MAX_GENERATION_REFERENCE_IMAGES} non-product images`);
+    }
     return {
       assetType: item.assetType,
       displayName,

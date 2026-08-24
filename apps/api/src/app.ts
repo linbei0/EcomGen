@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import sharp from "sharp";
 import cors from "@fastify/cors";
@@ -9,7 +9,7 @@ import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFinger
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, ModelDefinition, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, roleForUserAssetKind } from "@ecomgen/contracts";
+import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, roleForUserAssetKind } from "@ecomgen/contracts";
 import { OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -177,7 +177,10 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (!data.mimetype.startsWith("image/")) throw new ApiError(400, "VALIDATION_ERROR", "Only image files are supported");
     const fields = data.fields as Record<string, { value?: unknown }>;
     const role = parseAssetRole(fields.kind?.value ?? fields.role?.value);
-    const stored = await storage.putAsset(projectId, data.filename, await data.toBuffer());
+    const content = await data.toBuffer(); const hash = contentHash(content);
+    assertProjectAssetCapacity(repository, projectId, role);
+    assertProjectAssetHashUnique(repository, projectId, hash);
+    const stored = await storage.putAsset(projectId, data.filename, content);
     return repository.createAsset({ projectId, role, storagePath: stored.path, hash: stored.hash, originalName: data.filename, mimeType: data.mimetype, width: null, height: null });
   });
   // 先删文件再删行：行删了就找不到 storagePath；不级联分镜/输出/任务（契约 deleteAsset）
@@ -344,6 +347,11 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       } else if (part.fieldname === "purpose") purpose = enumValue<ReferencePurpose>(part.value, ["PRODUCT_APPEARANCE", "PACKAGING", "LABEL", "STYLE", "LAYOUT"], "purpose");
     }
     if (!file) throw new ApiError(400, "VALIDATION_ERROR", "file is required");
+    const hash = contentHash(file.content);
+    assertProjectAssetHashUnique(repository, session.projectId, hash);
+    if (repository.listEditReferenceAssets(session.id).some((asset) => asset.turnId === null && asset.expiresAt > new Date().toISOString() && asset.hash === hash)) {
+      throw new ApiError(400, "VALIDATION_ERROR", "相同图片已作为本次编辑的临时参考素材上传");
+    }
     const stored = await storage.putEditReferenceAsset(session.projectId, session.id, file.name, file.content);
     const record = repository.createEditReferenceAsset({ id: randomUUID(), projectId: session.projectId, sessionId: session.id, turnId: null, storagePath: stored.path, hash: stored.hash, originalName: file.name, mimeType: file.mimeType, purpose, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() });
     return reply.code(201).send(publicReferenceAsset(record));
@@ -359,8 +367,10 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
     const temporary = repository.getEditReferenceAsset(parameter(request, "referenceAssetId"));
     if (!temporary || temporary.sessionId !== session.id) missing("reference asset", parameter(request, "referenceAssetId"));
+    const role = roleForReferencePurpose(temporary.purpose); assertProjectAssetCapacity(repository, session.projectId, role);
+    assertProjectAssetHashUnique(repository, session.projectId, temporary.hash);
     const content = await storage.read(temporary.storagePath); const stored = await storage.putAsset(session.projectId, temporary.originalName, content);
-    const role = roleForReferencePurpose(temporary.purpose); const asset = repository.createAsset({ projectId: session.projectId, role, storagePath: stored.path, hash: stored.hash, originalName: temporary.originalName, mimeType: temporary.mimeType, width: null, height: null });
+    const asset = repository.createAsset({ projectId: session.projectId, role, storagePath: stored.path, hash: stored.hash, originalName: temporary.originalName, mimeType: temporary.mimeType, width: null, height: null });
     repository.deleteEditReferenceAsset(temporary.id); await storage.delete(temporary.storagePath); return reply.code(201).send(publicReferenceAsset(asset));
   });
   app.patch("/api/v1/edit-sessions/:sessionId/memory", async (request) => {
@@ -399,9 +409,11 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       ? submittedReferenceSelections
       : legacyReferenceAssetIds.map((id, order) => ({ id, source: "PROJECT" as const, purpose: "PRODUCT_APPEARANCE" as const, order }));
     const referenceAssetIds = referenceSelections.filter((selection) => selection.source === "PROJECT").map((selection) => selection.id);
-    const knownAssets = new Set(repository.listAssets(session.projectId).map((asset) => asset.id));
+    const projectAssets = repository.listAssets(session.projectId); const knownAssets = new Set(projectAssets.map((asset) => asset.id));
     const temporary = repository.listEditReferenceAssets(session.id).filter((asset) => asset.expiresAt > new Date().toISOString()); const knownTemporary = new Set(temporary.map((asset) => asset.id));
     if (referenceSelections.some((selection) => selection.source === "PROJECT" ? !knownAssets.has(selection.id) : !knownTemporary.has(selection.id))) throw new ApiError(400, "VALIDATION_ERROR", "referenceSelections must belong to this project or edit session");
+    const nonProductReferences = referenceSelections.filter((selection) => selection.source === "TEMPORARY" || projectAssets.find((asset) => asset.id === selection.id)?.role !== "PRODUCT_TRUTH");
+    if (nonProductReferences.length > MAX_GENERATION_REFERENCE_IMAGES) throw new ApiError(400, "VALIDATION_ERROR", `单次编辑最多选择 ${MAX_GENERATION_REFERENCE_IMAGES} 张非商品参考图`);
     if (editMask) await validateMaskDimensions(baseOutput.storagePath, editMask.content, storage);
     if (protectMask) await validateMaskDimensions(baseOutput.storagePath, protectMask.content, storage);
     const turnId = randomUUID();
@@ -592,6 +604,21 @@ function jsonStringArray(value: string | undefined, path: string): string[] {
   if (!value) return [];
   try { return stringArray(JSON.parse(value), path); } catch { throw new ApiError(400, "VALIDATION_ERROR", `${path} must be a JSON array of strings`); }
 }
+export function assertProjectAssetCapacity(repository: Pick<EcomRepository, "listAssets">, projectId: string, role: AssetRole): void {
+  const assets = repository.listAssets(projectId).filter((asset) => asset.mimeType.startsWith("image/"));
+  const limit = role === "PRODUCT_TRUTH" ? MAX_PRODUCT_IMAGE_ASSETS : MAX_REFERENCE_IMAGE_ASSETS;
+  const count = assets.filter((asset) => asset.role === role || (role !== "PRODUCT_TRUTH" && asset.role !== "PRODUCT_TRUTH")).length;
+  if (count >= limit) {
+    const label = role === "PRODUCT_TRUTH" ? "商品图" : "参考图";
+    throw new ApiError(400, "VALIDATION_ERROR", `项目最多上传 ${limit} 张${label}`);
+  }
+}
+export function assertProjectAssetHashUnique(repository: Pick<EcomRepository, "listAssets">, projectId: string, hash: string): void {
+  if (repository.listAssets(projectId).some((asset) => asset.hash === hash)) {
+    throw new ApiError(400, "VALIDATION_ERROR", "相同图片已上传到项目");
+  }
+}
+function contentHash(content: Buffer): string { return createHash("sha256").update(content).digest("hex"); }
 function parseReferenceSelections(value: string | undefined): ReferenceSelection[] {
   if (!value) return [];
   let parsed: unknown;
@@ -599,12 +626,13 @@ function parseReferenceSelections(value: string | undefined): ReferenceSelection
   if (!Array.isArray(parsed)) throw new ApiError(400, "VALIDATION_ERROR", "referenceSelections must be an array");
   const purposes: ReferencePurpose[] = ["PRODUCT_APPEARANCE", "PACKAGING", "LABEL", "STYLE", "LAYOUT"];
   const seen = new Set<string>();
-  return parsed.map((item, index) => {
+  const selections = parsed.map((item, index) => {
     const entry = object(item, `referenceSelections[${index}]`);
     const id = string(entry.id, `referenceSelections[${index}].id`); const source = enumValue<"PROJECT" | "TEMPORARY">(entry.source, ["PROJECT", "TEMPORARY"], `referenceSelections[${index}].source`); const purpose = enumValue<ReferencePurpose>(entry.purpose, purposes, `referenceSelections[${index}].purpose`);
     if (seen.has(`${source}:${id}`)) throw new ApiError(400, "VALIDATION_ERROR", "referenceSelections cannot contain duplicates");
     seen.add(`${source}:${id}`); return { id, source, purpose, order: index };
   });
+  return selections;
 }
 async function validateMaskDimensions(sourcePath: string, mask: Buffer, storage: LocalAssetStore): Promise<void> {
   const [source, candidate] = await Promise.all([sharp(await storage.read(sourcePath)).metadata(), sharp(mask).metadata()]);

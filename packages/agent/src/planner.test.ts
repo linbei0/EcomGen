@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, editResponse: undefined as Record<string, unknown> | undefined }));
+const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", images: [] as unknown[], errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, referencedAssets: [] as string[], editResponse: undefined as Record<string, unknown> | undefined }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
@@ -10,9 +10,10 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
       captured.options = options;
     }
 
-    public async prompt(message: string): Promise<void> {
+    public async prompt(message: string, images?: unknown[]): Promise<void> {
       if (captured.errorMessage) return;
       captured.prompt = message;
+      captured.images = images ?? [];
       if (message.includes("Plan this edit")) {
         this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify(captured.editResponse ?? { operation: "NATURAL_FUSION", executionMode: "MODEL_DIRECTED", userSummary: "直接编辑", prompt: "edit", targetAnnotationIds: [], targetDescription: "主要商品", targetConfidence: 0.9, clarification: null, requiresConfirmation: true, compositePolicy: "PROVIDER_RESULT", memoryPatch: {} }) }] }];
         return;
@@ -21,7 +22,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
         const researchTool = captured.options?.initialState?.tools?.find((tool) => tool.name === "research_visual_direction");
         try { await researchTool?.execute("research-call", { query: "product photography lighting" }); } catch { /* Pi 将工具错误返回给模型并继续规划。 */ }
       }
-      this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify({ campaignStyleLock: "clean", items: Array.from({ length: captured.itemCount }, (_, index) => ({ assetType: "hero-image", displayName: index === 0 ? "整机斜侧展示首图" : `展示场景${index + 1}`, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: index })) }) }] }];
+      this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify({ campaignStyleLock: "clean", items: Array.from({ length: captured.itemCount }, (_, index) => ({ assetType: "hero-image", displayName: index === 0 ? "整机斜侧展示首图" : `展示场景${index + 1}`, templateVariant: null, candidateCount: 1, referencedAssets: captured.referencedAssets, mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: index })) }) }] }];
     }
   },
 }));
@@ -96,6 +97,41 @@ describe("planStoryboard", () => {
     expect(captured.prompt).toContain("platformGuidance");
     expect(captured.prompt).toContain("ja-JP");
     expect(captured.prompt).toContain("日本");
+  });
+
+  it("passes visual attachments and their asset mapping to the vision model", async () => {
+    captured.errorMessage = undefined;
+    captured.prompt = "";
+    captured.images = [];
+    await planStoryboard({
+      ...input,
+      model: { ...input.model, input: ["text", "image"] },
+      referenceImages: [
+        { type: "image", mimeType: "image/png", data: "product-bytes" },
+        { type: "image", mimeType: "image/jpeg", data: "style-bytes" },
+      ],
+      visionAttachments: [
+        { attachmentIndex: 1, assetId: "product-1", role: "PRODUCT_TRUTH", name: "product.png", mimeType: "image/png" },
+        { attachmentIndex: 2, assetId: "style-1", role: "STYLE_REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
+      ],
+      assets: [
+        { id: "product-1", role: "PRODUCT_TRUTH", kind: "PRODUCT", name: "product.png", mimeType: "image/png" },
+        { id: "style-1", role: "STYLE_REFERENCE", kind: "REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
+      ],
+    });
+    expect(captured.images).toHaveLength(2);
+    expect(captured.prompt).toContain("visionAttachments");
+    expect(captured.prompt).toContain("product-1");
+    expect(captured.prompt).toContain("style-1");
+  });
+
+  it("rejects a storyboard item that references more than four non-product images", async () => {
+    captured.referencedAssets = ["reference-1", "reference-2", "reference-3", "reference-4", "reference-5"];
+    await expect(planStoryboard({
+      ...input,
+      assets: captured.referencedAssets.map((id) => ({ id, role: "STYLE_REFERENCE", kind: "REFERENCE" as const, name: `${id}.png`, mimeType: "image/png" })),
+    })).rejects.toThrow("at most 4 non-product images");
+    captured.referencedAssets = [];
   });
 
   it("preserves the Agent error when no assistant text is produced", async () => {
