@@ -1592,12 +1592,34 @@
 .editSuccess { color: var(--accent); }
 .editCommands { margin-top: auto; }
 .editCommands :global(.ant-btn) { width: 100%; }
-.editReferences > p { margin: 0 0 8px; color: var(--text-3); font-size: 12px; }
-.editReferences > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.editReferences button { overflow: hidden; padding: 0; border: 1px solid var(--line-1); border-radius: 5px; background: var(--bg-2); color: var(--text-3); cursor: pointer; }
-.editReferences button[data-selected="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.editReferences img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
-.editReferences span { display: block; padding: 3px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.editReferences { display: grid; gap: 7px; }
+.editReferencesHeader { display: flex; align-items: center; justify-content: space-between; color: var(--text-3); font-size: 12px; }
+.editReferencesHeader button, .editReferenceReuse { padding: 0; border: 0; background: none; color: var(--accent); font-size: 11px; cursor: pointer; }
+.editReferenceStrip { display: flex; align-items: center; gap: 5px; min-height: 34px; }
+.editReferenceStrip > small { color: var(--text-4); font-size: 11px; }
+.editReferenceChip { position: relative; display: grid; width: 38px; height: 38px; overflow: hidden; border: 1px solid var(--line-1); border-radius: 4px; background: var(--bg-2); }
+.editReferenceChip img { width: 100%; height: 100%; object-fit: cover; }
+.editReferenceChip span { position: absolute; right: 0; bottom: 0; left: 0; padding: 2px; overflow: hidden; background: rgb(0 0 0 / 0.68); color: #fff; font-size: 9px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.editReferenceChip button { position: absolute; top: 1px; right: 1px; display: grid; width: 15px; height: 15px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.7); color: #fff; cursor: pointer; }
+.editReferenceMore { color: var(--text-3); font-size: 11px; }
+.referencePopover { display: grid; width: 340px; max-width: calc(100vw - 48px); gap: 10px; }
+.referencePopoverDragActive { outline: 1px dashed var(--accent); outline-offset: -5px; background: color-mix(in srgb, var(--accent) 8%, var(--bg-1)); }
+.referencePopoverHeading, .referencePopoverActions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.referencePopoverHeading span { color: var(--text-4); font-size: 11px; }
+.referenceTabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line-1); }
+.referenceTabs button { padding: 5px 8px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-3); font-size: 11px; cursor: pointer; }
+.referenceTabs button[data-active="true"] { border-color: var(--accent); color: var(--text-1); }
+.referenceList { display: grid; max-height: 260px; gap: 5px; overflow: auto; }
+.referenceLoading { padding: 22px; color: var(--text-4); font-size: 11px; text-align: center; }
+.referenceRow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 5px; }
+.referencePick { display: flex; min-width: 0; align-items: center; gap: 7px; padding: 4px; border: 1px solid var(--line-1); border-radius: 4px; background: var(--bg-2); color: var(--text-2); cursor: pointer; text-align: left; }
+.referencePick[data-selected="true"] { border-color: var(--accent); }
+.referencePick img { width: 46px; height: 46px; flex: 0 0 46px; object-fit: cover; border-radius: 3px; }
+.referencePick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.referenceRowActions { display: flex; align-items: center; }
+.referenceRowActions button { display: grid; min-width: 25px; height: 25px; place-items: center; padding: 0 4px; border: 0; background: none; color: var(--text-4); font-size: 10px; cursor: pointer; }
+.referencePopoverActions { padding-top: 2px; border-top: 1px solid var(--line-1); }
+.referencePopoverAnchor { display: block; width: 1px; height: 1px; }
 .editVersions, .editMemory { display: grid; gap: 7px; }
 .editVersions > p, .editMemory > p { margin: 0; color: var(--text-3); font-size: 12px; }
 .editMemoryHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }

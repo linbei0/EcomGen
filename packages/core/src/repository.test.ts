@@ -385,6 +385,23 @@ describe("EcomRepository", () => {
     database.close();
   });
 
+  it("persists ordered project and temporary references on an edit turn", () => {
+    const database = openDatabase(":memory:"); const repository = new EcomRepository(database); const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["DOMESTIC"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    repository.saveStoryboard(project.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "主图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    const item = repository.listStoryboardItems(project.id)[0]!; const job = repository.createJob({ id: "reference-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
+    const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/base.png", hash: "base" });
+    const session = repository.createEditSession({ id: "reference-session", projectId: project.id, currentOutputId: output.id, status: "ACTIVE", memorySummary: {} });
+    const projectAsset = repository.createAsset({ projectId: project.id, role: "PACKAGING", storagePath: "assets/package.png", hash: "package", originalName: "package.png", mimeType: "image/png", width: null, height: null });
+    const temporary = repository.createEditReferenceAsset({ id: "temporary-reference", projectId: project.id, sessionId: session.id, turnId: null, storagePath: "edits/reference.png", hash: "temporary", originalName: "label.png", mimeType: "image/png", purpose: "LABEL", expiresAt: "2099-01-01T00:00:00.000Z" });
+    const selections = [{ id: projectAsset.id, source: "PROJECT" as const, purpose: "PACKAGING" as const, order: 0 }, { id: temporary.id, source: "TEMPORARY" as const, purpose: "LABEL" as const, order: 1 }];
+    const turn = repository.createEditTurn({ id: "reference-turn", sessionId: session.id, projectId: project.id, baseOutputId: output.id, status: "PLANNING", message: "replace", annotations: {}, editMaskPath: null, editMaskHash: null, protectMaskPath: null, protectMaskHash: null, referenceAssetIds: [projectAsset.id], referenceSelections: selections, plan: null, error: null });
+    repository.attachEditReferenceAssets(session.id, turn.id, [temporary.id]);
+    expect(repository.getEditTurn(turn.id)?.referenceSelections).toEqual(selections);
+    expect(repository.getEditReferenceAsset(temporary.id)?.turnId).toBe(turn.id);
+    database.close();
+  });
+
   it("summarizes list covers with earliest product photo, latest output cover, and extra previews", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);

@@ -524,6 +524,75 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/EditSession' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /edit-sessions/{sessionId}/reference-assets:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listEditReferenceAssets
+      responses:
+        '200':
+          description: Project and temporary reference assets available to this edit session.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, suggestedSelections]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/EditReferenceAsset' } }
+                  suggestedSelections: { type: array, items: { $ref: '#/components/schemas/ReferenceSelection' } }
+    post:
+      operationId: uploadEditReferenceAsset
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, purpose]
+              properties:
+                file: { type: string, format: binary }
+                purpose: { $ref: '#/components/schemas/ReferencePurpose' }
+      responses:
+        '201':
+          description: Temporary reference asset uploaded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EditReferenceAsset' }
+  /edit-sessions/{sessionId}/reference-assets/{referenceAssetId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: referenceAssetId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: deleteEditReferenceAsset
+      responses:
+        '204': { description: Temporary reference asset deleted. }
+  /edit-sessions/{sessionId}/reference-assets/{referenceAssetId}/promote:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: referenceAssetId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: promoteEditReferenceAsset
+      responses:
+        '201':
+          description: Temporary reference asset saved to the project.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EditReferenceAsset' }
   /edit-sessions/{sessionId}/turns:
     parameters:
       - name: sessionId
@@ -545,7 +614,7 @@ paths:
                 annotations: { type: string, description: JSON encoded annotation document. }
                 editMask: { type: string, format: binary }
                 protectMask: { type: string, format: binary }
-                referenceAssetIds: { type: string, description: JSON encoded asset ID array. }
+                referenceSelections: { type: string, description: JSON encoded ReferenceSelection array. }
       responses:
         '202':
           description: Edit plan queued.
@@ -960,6 +1029,8 @@ components:
         url: { type: string }
         storagePath: { type: string }
         mimeType: { type: string }
+        originalName: { type: string }
+        hash: { type: string }
         width: { type: [integer, 'null'] }
         height: { type: [integer, 'null'] }
         createdAt: { type: string, format: date-time }
@@ -1091,6 +1162,34 @@ components:
     EditExecutionMode:
       type: string
       enum: [MODEL_DIRECTED, MASKED, OUTPAINT, NEED_INPUT]
+    ReferenceSource:
+      type: string
+      enum: [PROJECT, TEMPORARY]
+    ReferencePurpose:
+      type: string
+      enum: [PRODUCT_APPEARANCE, PACKAGING, LABEL, STYLE, LAYOUT]
+    ReferenceSelection:
+      type: object
+      required: [id, source, purpose, order]
+      properties:
+        id: { type: string, format: uuid }
+        source: { $ref: '#/components/schemas/ReferenceSource' }
+        purpose: { $ref: '#/components/schemas/ReferencePurpose' }
+        order: { type: integer, minimum: 0 }
+    EditReferenceAsset:
+      type: object
+      required: [id, source, purpose, originalName, mimeType, hash, createdAt, url]
+      properties:
+        id: { type: string, format: uuid }
+        source: { $ref: '#/components/schemas/ReferenceSource' }
+        purpose: { $ref: '#/components/schemas/ReferencePurpose' }
+        role: { oneOf: [{ $ref: '#/components/schemas/AssetRole' }, { type: 'null' }] }
+        originalName: { type: string }
+        mimeType: { type: string }
+        hash: { type: string }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        url: { type: string }
     EditSession:
       type: object
       required: [id, projectId, currentOutputId, status, memorySummary, createdAt, updatedAt]
@@ -1109,7 +1208,7 @@ components:
         updatedAt: { type: string, format: date-time }
     EditTurn:
       type: object
-      required: [id, sessionId, projectId, baseOutputId, status, message, annotations, referenceAssetIds, createdAt, updatedAt]
+      required: [id, sessionId, projectId, baseOutputId, status, message, annotations, referenceAssetIds, referenceSelections, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         sessionId: { type: string, format: uuid }
@@ -1121,6 +1220,7 @@ components:
         editMaskPath: { type: [string, 'null'] }
         protectMaskPath: { type: [string, 'null'] }
         referenceAssetIds: { type: array, items: { type: string, format: uuid } }
+        referenceSelections: { type: array, items: { $ref: '#/components/schemas/ReferenceSelection' } }
         plan:
           type: [object, 'null']
           properties:

@@ -373,6 +373,62 @@ export interface paths {
         patch: operations["updateEditSessionMemory"];
         trace?: never;
     };
+    "/edit-sessions/{sessionId}/reference-assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["listEditReferenceAssets"];
+        put?: never;
+        post: operations["uploadEditReferenceAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/edit-sessions/{sessionId}/reference-assets/{referenceAssetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+                referenceAssetId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteEditReferenceAsset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/edit-sessions/{sessionId}/reference-assets/{referenceAssetId}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+                referenceAssetId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["promoteEditReferenceAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/edit-sessions/{sessionId}/turns": {
         parameters: {
             query?: never;
@@ -835,6 +891,8 @@ export interface components {
             url?: string;
             storagePath?: string;
             mimeType: string;
+            originalName?: string;
+            hash?: string;
             width?: number | null;
             height?: number | null;
             /** Format: date-time */
@@ -976,7 +1034,34 @@ export interface components {
         };
         /** @enum {string} */
         EditTurnStatus: "DRAFT" | "PLANNING" | "PLAN_READY" | "NEED_INPUT" | "AWAITING_CONFIRMATION" | "GENERATING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+        /** @enum {string} */
         EditExecutionMode: "MODEL_DIRECTED" | "MASKED" | "OUTPAINT" | "NEED_INPUT";
+        /** @enum {string} */
+        ReferenceSource: "PROJECT" | "TEMPORARY";
+        /** @enum {string} */
+        ReferencePurpose: "PRODUCT_APPEARANCE" | "PACKAGING" | "LABEL" | "STYLE" | "LAYOUT";
+        ReferenceSelection: {
+            /** Format: uuid */
+            id: string;
+            source: components["schemas"]["ReferenceSource"];
+            purpose: components["schemas"]["ReferencePurpose"];
+            order: number;
+        };
+        EditReferenceAsset: {
+            /** Format: uuid */
+            id: string;
+            source: components["schemas"]["ReferenceSource"];
+            purpose: components["schemas"]["ReferencePurpose"];
+            role?: components["schemas"]["AssetRole"] | null;
+            originalName: string;
+            mimeType: string;
+            hash: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt?: string | null;
+            url: string;
+        };
         EditSession: {
             /** Format: uuid */
             id: string;
@@ -1015,7 +1100,9 @@ export interface components {
             editMaskPath?: string | null;
             protectMaskPath?: string | null;
             referenceAssetIds: string[];
+            referenceSelections: components["schemas"]["ReferenceSelection"][];
             plan?: {
+                /** @enum {string} */
                 operation?: "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "OUTPAINT" | "NATURAL_FUSION";
                 executionMode?: components["schemas"]["EditExecutionMode"];
                 userSummary?: string;
@@ -1025,6 +1112,7 @@ export interface components {
                 targetConfidence?: number;
                 clarification?: string | null;
                 requiresConfirmation?: boolean;
+                /** @enum {string} */
                 compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT";
                 memoryPatch?: Record<string, never>;
             } | null;
@@ -1953,6 +2041,105 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listEditReferenceAssets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Project and temporary reference assets available to this edit session. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["EditReferenceAsset"][];
+                        suggestedSelections: components["schemas"]["ReferenceSelection"][];
+                    };
+                };
+            };
+        };
+    };
+    uploadEditReferenceAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    purpose: components["schemas"]["ReferencePurpose"];
+                };
+            };
+        };
+        responses: {
+            /** @description Temporary reference asset uploaded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditReferenceAsset"];
+                };
+            };
+        };
+    };
+    deleteEditReferenceAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+                referenceAssetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Temporary reference asset deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    promoteEditReferenceAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+                referenceAssetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Temporary reference asset saved to the project. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditReferenceAsset"];
+                };
+            };
+        };
+    };
     createEditTurn: {
         parameters: {
             query?: never;
@@ -1974,8 +2161,8 @@ export interface operations {
                     editMask?: string;
                     /** Format: binary */
                     protectMask?: string;
-                    /** @description JSON encoded asset ID array. */
-                    referenceAssetIds?: string;
+                    /** @description JSON encoded ReferenceSelection array. */
+                    referenceSelections?: string;
                 };
             };
         };

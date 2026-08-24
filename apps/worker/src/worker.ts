@@ -24,6 +24,12 @@ const recoveryRedis = redis.duplicate();
 const recoveryQueue = createJobQueue(recoveryRedis);
 const executionRedis = redis.duplicate();
 const executionQueue = createJobQueue(executionRedis);
+async function cleanupExpiredEditReferences(): Promise<void> {
+  for (const asset of repository.listExpiredEditReferenceAssets()) { await storage.delete(asset.storagePath); repository.deleteEditReferenceAsset(asset.id); }
+}
+await cleanupExpiredEditReferences();
+const referenceCleanupTimer = setInterval(() => { void cleanupExpiredEditReferences(); }, 60 * 60 * 1000);
+referenceCleanupTimer.unref();
 // 进程异常退出后，数据库中的 RUNNING 任务会被重新置为 QUEUED 并再次交给 BullMQ。
 for (const recovered of repository.recoverInterruptedJobs()) await enqueue(recoveryQueue, { jobId: recovered.id, kind: queueKindForJobType(recovered.type) });
 await recoveryQueue.close();
@@ -57,7 +63,7 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
 }, { connection: redis, concurrency: Number(process.env.WORKER_CONCURRENCY ?? 2) });
 
 worker.on("failed", (job, error) => { console.error(`Queue job ${job?.id ?? "unknown"} failed: ${error instanceof Error ? error.message : String(error)}`); });
-async function stop(): Promise<void> { await worker.close(); await executionQueue.close(); await executionRedis.quit(); await events.close(); await redis.quit(); }
+async function stop(): Promise<void> { clearInterval(referenceCleanupTimer); await worker.close(); await executionQueue.close(); await executionRedis.quit(); await events.close(); await redis.quit(); }
 process.once("SIGINT", () => { void stop().then(() => process.exit(0)); });
 process.once("SIGTERM", () => { void stop().then(() => process.exit(0)); });
 
@@ -223,7 +229,11 @@ async function executeEditPlan(job: JobRecord): Promise<void> {
   const assets = repository.listAssets(project.id);
   const imageProvider = providerFor(config.imageProviderId);
   const imageModel = imageProvider.models.find((candidate) => candidate.id === config.imageModelId);
-  const references = assets.filter((asset) => turn.referenceAssetIds.includes(asset.id)).map((asset) => ({ id: asset.id, name: asset.originalName, role: asset.role }));
+  const temporaryAssets = repository.listEditReferenceAssets(turn.sessionId).filter((asset) => asset.expiresAt > new Date().toISOString());
+  const references = turn.referenceSelections.slice().sort((left, right) => left.order - right.order).flatMap((selection) => {
+    const asset = selection.source === "PROJECT" ? assets.find((candidate) => candidate.id === selection.id) : temporaryAssets.find((candidate) => candidate.id === selection.id);
+    return asset ? [{ id: asset.id, name: asset.originalName, role: "role" in asset ? asset.role : "TEMPORARY", source: selection.source, purpose: selection.purpose, order: selection.order }] : [];
+  });
   const source = repository.getOutput(turn.baseOutputId); if (!source) throw new Error("Edit source output is missing");
   let plan;
   try {
@@ -291,7 +301,12 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   if (mask) await assertMaskDimensions(sourceImage, mask);
   const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
   const assets = repository.listAssets(project.id);
-  const references = await Promise.all(assets.filter((asset) => turn.referenceAssetIds.includes(asset.id)).map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType })));
+  const temporaryAssets = repository.listEditReferenceAssets(turn.sessionId).filter((asset) => asset.expiresAt > new Date().toISOString());
+  const references = await Promise.all(turn.referenceSelections.slice().sort((left, right) => left.order - right.order).map(async (selection) => {
+    const asset = selection.source === "PROJECT" ? assets.find((candidate) => candidate.id === selection.id) : temporaryAssets.find((candidate) => candidate.id === selection.id);
+    if (!asset) throw new Error(`Reference asset is missing: ${selection.id}`);
+    return { data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType };
+  }));
   assertEditCapabilities(capabilities, plan.operation as EditOperation, plan.executionMode, Boolean(mask), references.length);
   const outpaintCanvas = outpaintExpansion ? await createOutpaintCanvas(sourceImage, outpaintExpansion) : null;
   const inputImage = outpaintCanvas?.image ?? sourceImage;
@@ -317,7 +332,7 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
           ? await compositeOutpaint(sourceImage, result.image, outpaintCanvas)
           : await sharp(result.image).png().toBuffer();
     const stored = await storage.putOutput(project.id, composed, ".png", generationKey);
-    const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: config.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", executionMode: plan.executionMode, targetDescription: plan.targetDescription, targetConfidence: plan.targetConfidence, sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy }, storagePath: stored.path, hash: stored.hash, generationKey, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
+    const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: config.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", executionMode: plan.executionMode, targetDescription: plan.targetDescription, targetConfidence: plan.targetConfidence, sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy, referenceSelections: turn.referenceSelections, referenceHashes: Object.fromEntries(turn.referenceSelections.map((selection) => { const asset = selection.source === "PROJECT" ? assets.find((candidate) => candidate.id === selection.id) : temporaryAssets.find((candidate) => candidate.id === selection.id); return [selection.id, asset?.hash ?? null]; })) }, storagePath: stored.path, hash: stored.hash, generationKey, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
     await updateJob(job, { providerTaskId: null });
     createdOutputs.push(output);
   }

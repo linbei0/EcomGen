@@ -3,11 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { OUTPUT_FIXTURE, PROJECT_ID } from "../../test/msw/fixtures";
+import { ASSET_FIXTURE, OUTPUT_FIXTURE, PROJECT_ID } from "../../test/msw/fixtures";
 import { BASE } from "../../test/msw/handlers";
 import { server } from "../../test/msw/server";
 import { renderWithProviders } from "../../test/render";
-import { EditImageWorkspace } from "./EditImageWorkspace";
+import { EditImageWorkspace, resolveReferenceImageUrl } from "./EditImageWorkspace";
 
 const alphaValues: number[] = [];
 const fillStyles: string[] = [];
@@ -51,14 +51,14 @@ Object.defineProperties(offscreenCanvasContext, {
   globalCompositeOperation: { get: () => "source-over", set: () => {} },
 });
 
-function renderEditor(project?: { reasoningProviderId: string; reasoningModelId: string; imageProviderId: string; imageModelId: string; imageResolution: "1K" | "2K" | "4K"; candidatesPerType: number }) {
+function renderEditor(project?: { reasoningProviderId: string; reasoningModelId: string; imageProviderId: string; imageModelId: string; imageResolution: "1K" | "2K" | "4K"; candidatesPerType: number }, assets = [] as Parameters<typeof EditImageWorkspace>[0]["assets"]) {
   return renderWithProviders(
     <EditImageWorkspace
       projectId={PROJECT_ID}
       project={project}
       output={OUTPUT_FIXTURE}
       outputs={[OUTPUT_FIXTURE]}
-      assets={[]}
+      assets={assets}
       onSelectOutput={() => {}}
       onClose={() => {}}
     />,
@@ -121,6 +121,11 @@ describe("图片编辑画布", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it("相对 API 前缀下能解析参考图片地址", () => {
+    expect(resolveReferenceImageUrl("/files/assets/reference.png", "/api/v1")).toBe("/api/v1/files/assets/reference.png");
+    expect(resolveReferenceImageUrl("/api/v1/files/assets/reference.png", "/api/v1")).toBe("/api/v1/files/assets/reference.png");
   });
 
   it("拖动已框选区域后只提交移动后的选择框", async () => {
@@ -187,6 +192,49 @@ describe("图片编辑画布", () => {
       imageResolution: "2K",
       candidateCount: 3,
     });
+  });
+
+  it("始终提供参考素材入口并提交用途明确的选择快照", async () => {
+    const user = userEvent.setup(); let submittedSelections: unknown;
+    server.use(
+      http.get(`${BASE}/edit-sessions/:sessionId/reference-assets`, () => HttpResponse.json({ items: [{ id: "aaaaaaaa-1111-4222-8333-444444444444", source: "PROJECT", purpose: "PRODUCT_APPEARANCE", role: "PRODUCT_TRUTH", originalName: "phone-front.png", mimeType: "image/png", hash: "hash", createdAt: "2026-08-01T00:00:00.000Z", expiresAt: null, url: "/api/v1/files/assets/aaaaaaaa-1111-4222-8333-444444444444" }], suggestedSelections: [] })),
+      http.post(`${BASE}/edit-sessions/:sessionId/turns`, async ({ request }) => { submittedSelections = JSON.parse(String((await request.formData()).get("referenceSelections"))); return HttpResponse.json({ turnId: "turn-1" }); }),
+    );
+    renderEditor();
+    await user.click(screen.getByRole("button", { name: "选择" }));
+    await user.click(await screen.findByRole("button", { name: /phone-front\.png/ }));
+    await user.type(screen.getByPlaceholderText(/把选中的菠萝颜色/), "替换商品");
+    await user.click(screen.getByRole("button", { name: "生成计划" }));
+    expect(submittedSelections).toEqual([{ id: "aaaaaaaa-1111-4222-8333-444444444444", source: "PROJECT", purpose: "PRODUCT_APPEARANCE", order: 0 }]);
+  });
+
+  it("参考素材接口失败时仍显示项目详情中的素材", async () => {
+    const user = userEvent.setup();
+    server.use(http.get(`${BASE}/edit-sessions/:sessionId/reference-assets`, () => HttpResponse.json({ error: "failed" }, { status: 500 })));
+    renderEditor(undefined, [{ ...ASSET_FIXTURE, url: `${BASE}/files/assets/${ASSET_FIXTURE.id}` }]);
+    await user.click(screen.getByRole("button", { name: "选择" }));
+    expect(await screen.findByText("product.png")).toBeInTheDocument();
+  });
+
+  it("从未选择成图切换到编辑状态时不会清空项目素材", async () => {
+    const user = userEvent.setup(); const assets = [{ ...ASSET_FIXTURE, url: `${BASE}/files/assets/${ASSET_FIXTURE.id}` }];
+    server.use(http.get(`${BASE}/edit-sessions/:sessionId/reference-assets`, () => HttpResponse.json({ error: "failed" }, { status: 500 })));
+    const view = renderWithProviders(<EditImageWorkspace projectId={PROJECT_ID} output={undefined} outputs={[OUTPUT_FIXTURE]} assets={assets} onSelectOutput={() => {}} onClose={() => {}} />);
+    view.rerender(<EditImageWorkspace projectId={PROJECT_ID} output={OUTPUT_FIXTURE} outputs={[OUTPUT_FIXTURE]} assets={assets} onSelectOutput={() => {}} onClose={() => {}} />);
+    await user.click(await screen.findByRole("button", { name: "选择" }));
+    expect(await screen.findByText("product.png")).toBeInTheDocument();
+  });
+
+  it("拖入参考图片时显示接收状态", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await user.click(screen.getByRole("button", { name: "选择" }));
+
+    const dropZone = await screen.findByTestId("reference-drop-zone");
+    fireEvent.dragEnter(dropZone, { dataTransfer: { files: [] } });
+    expect(dropZone.className).toContain("referencePopoverDragActive");
+    fireEvent.dragLeave(dropZone, { relatedTarget: null });
+    expect(dropZone.className).not.toContain("referencePopoverDragActive");
   });
 
   it("以不同的高可见度颜色渲染可编辑与保护涂抹", async () => {

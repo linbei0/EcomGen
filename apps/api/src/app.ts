@@ -5,10 +5,10 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type EditSessionRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
-import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, ModelDefinition, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind } from "@ecomgen/contracts";
+import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, ModelDefinition, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
 import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, roleForUserAssetKind } from "@ecomgen/contracts";
 import { OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
@@ -326,6 +326,43 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
     return editSessionDetails(repository, session);
   });
+  app.get("/api/v1/edit-sessions/:sessionId/reference-assets", async (request) => {
+    const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
+    const projectAssets = repository.listAssets(session.projectId).map((asset) => publicReferenceAsset(asset));
+    const nowIso = new Date().toISOString();
+    const temporaryAssets = repository.listEditReferenceAssets(session.id).filter((asset) => asset.expiresAt > nowIso).map((asset) => publicReferenceAsset(asset));
+    const previousTurn = repository.listEditTurns(session.id).at(-1);
+    return { items: [...projectAssets, ...temporaryAssets], suggestedSelections: previousTurn?.referenceSelections ?? [] };
+  });
+  app.post("/api/v1/edit-sessions/:sessionId/reference-assets", async (request, reply) => {
+    const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
+    const parts = request.parts(); let file: { name: string; mimeType: string; content: Buffer } | undefined; let purpose: ReferencePurpose = "PRODUCT_APPEARANCE";
+    for await (const part of parts) {
+      if (part.type === "file") {
+        if (part.fieldname !== "file" || !part.mimetype.startsWith("image/")) throw new ApiError(400, "VALIDATION_ERROR", "file must be an image");
+        file = { name: part.filename, mimeType: part.mimetype, content: await part.toBuffer() };
+      } else if (part.fieldname === "purpose") purpose = enumValue<ReferencePurpose>(part.value, ["PRODUCT_APPEARANCE", "PACKAGING", "LABEL", "STYLE", "LAYOUT"], "purpose");
+    }
+    if (!file) throw new ApiError(400, "VALIDATION_ERROR", "file is required");
+    const stored = await storage.putEditReferenceAsset(session.projectId, session.id, file.name, file.content);
+    const record = repository.createEditReferenceAsset({ id: randomUUID(), projectId: session.projectId, sessionId: session.id, turnId: null, storagePath: stored.path, hash: stored.hash, originalName: file.name, mimeType: file.mimeType, purpose, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() });
+    return reply.code(201).send(publicReferenceAsset(record));
+  });
+  app.delete("/api/v1/edit-sessions/:sessionId/reference-assets/:referenceAssetId", async (request, reply) => {
+    const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
+    const record = repository.getEditReferenceAsset(parameter(request, "referenceAssetId"));
+    if (!record || record.sessionId !== session.id) missing("reference asset", parameter(request, "referenceAssetId"));
+    if (record.turnId) throw new ApiError(409, "CONFLICT", "Reference asset is already used by an edit turn");
+    repository.deleteEditReferenceAsset(record.id); await storage.delete(record.storagePath); return reply.code(204).send();
+  });
+  app.post("/api/v1/edit-sessions/:sessionId/reference-assets/:referenceAssetId/promote", async (request, reply) => {
+    const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
+    const temporary = repository.getEditReferenceAsset(parameter(request, "referenceAssetId"));
+    if (!temporary || temporary.sessionId !== session.id) missing("reference asset", parameter(request, "referenceAssetId"));
+    const content = await storage.read(temporary.storagePath); const stored = await storage.putAsset(session.projectId, temporary.originalName, content);
+    const role = roleForReferencePurpose(temporary.purpose); const asset = repository.createAsset({ projectId: session.projectId, role, storagePath: stored.path, hash: stored.hash, originalName: temporary.originalName, mimeType: temporary.mimeType, width: null, height: null });
+    repository.deleteEditReferenceAsset(temporary.id); await storage.delete(temporary.storagePath); return reply.code(201).send(publicReferenceAsset(asset));
+  });
   app.patch("/api/v1/edit-sessions/:sessionId/memory", async (request) => {
     const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
     const body = object(request.body, "body");
@@ -356,18 +393,26 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const baseOutput = repository.getOutput(baseOutputId); if (!baseOutput || baseOutput.projectId !== session.projectId) throw new ApiError(400, "VALIDATION_ERROR", "baseOutputId must belong to this project");
     const message = fields.get("message")?.trim(); if (!message) throw new ApiError(400, "VALIDATION_ERROR", "message is required");
     const annotations = jsonObject(fields.get("annotations"), "annotations");
-    const referenceAssetIds = jsonStringArray(fields.get("referenceAssetIds"), "referenceAssetIds");
-    const knownAssets = new Set(repository.listAssets(session.projectId).map((asset) => asset.id)); if (referenceAssetIds.some((id) => !knownAssets.has(id))) throw new ApiError(400, "VALIDATION_ERROR", "referenceAssetIds must belong to this project");
+    const legacyReferenceAssetIds = jsonStringArray(fields.get("referenceAssetIds"), "referenceAssetIds");
+    const submittedReferenceSelections = parseReferenceSelections(fields.get("referenceSelections"));
+    const referenceSelections = submittedReferenceSelections.length > 0
+      ? submittedReferenceSelections
+      : legacyReferenceAssetIds.map((id, order) => ({ id, source: "PROJECT" as const, purpose: "PRODUCT_APPEARANCE" as const, order }));
+    const referenceAssetIds = referenceSelections.filter((selection) => selection.source === "PROJECT").map((selection) => selection.id);
+    const knownAssets = new Set(repository.listAssets(session.projectId).map((asset) => asset.id));
+    const temporary = repository.listEditReferenceAssets(session.id).filter((asset) => asset.expiresAt > new Date().toISOString()); const knownTemporary = new Set(temporary.map((asset) => asset.id));
+    if (referenceSelections.some((selection) => selection.source === "PROJECT" ? !knownAssets.has(selection.id) : !knownTemporary.has(selection.id))) throw new ApiError(400, "VALIDATION_ERROR", "referenceSelections must belong to this project or edit session");
     if (editMask) await validateMaskDimensions(baseOutput.storagePath, editMask.content, storage);
     if (protectMask) await validateMaskDimensions(baseOutput.storagePath, protectMask.content, storage);
     const turnId = randomUUID();
     const editStored = editMask ? await storage.putEditArtifact(session.projectId, session.id, turnId, "edit-mask.png", editMask.content) : undefined;
     const protectStored = protectMask ? await storage.putEditArtifact(session.projectId, session.id, turnId, "protect-mask.png", protectMask.content) : undefined;
-    const fingerprint = requestFingerprint({ type: "EDIT_PLAN", projectId: session.projectId, sessionId: session.id, baseOutputId, message, annotations, editMaskHash: editStored?.hash ?? null, protectMaskHash: protectStored?.hash ?? null, referenceAssetIds, idempotencyKey: request.headers["idempotency-key"] ?? null });
+    const fingerprint = requestFingerprint({ type: "EDIT_PLAN", projectId: session.projectId, sessionId: session.id, baseOutputId, message, annotations, editMaskHash: editStored?.hash ?? null, protectMaskHash: protectStored?.hash ?? null, referenceSelections, idempotencyKey: request.headers["idempotency-key"] ?? null });
     const existing = repository.findJobByFingerprint(session.projectId, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ turnId: existing.input.editTurnId, planJobId: existing.id, status: existing.status });
     const project = repository.getProject(session.projectId); if (!project) missing("project", session.projectId);
     const generationConfig = editGenerationConfigFor(repository, project, annotations);
-    const turn = repository.createEditTurn({ id: turnId, sessionId: session.id, projectId: session.projectId, baseOutputId, status: "PLANNING", message, annotations, editMaskPath: editStored?.path ?? null, editMaskHash: editStored?.hash ?? null, protectMaskPath: protectStored?.path ?? null, protectMaskHash: protectStored?.hash ?? null, referenceAssetIds, plan: null, error: null });
+    const turn = repository.createEditTurn({ id: turnId, sessionId: session.id, projectId: session.projectId, baseOutputId, status: "PLANNING", message, annotations, editMaskPath: editStored?.path ?? null, editMaskHash: editStored?.hash ?? null, protectMaskPath: protectStored?.path ?? null, protectMaskHash: protectStored?.hash ?? null, referenceAssetIds, referenceSelections, plan: null, error: null });
+    repository.attachEditReferenceAssets(session.id, turn.id, referenceSelections.filter((selection) => selection.source === "TEMPORARY").map((selection) => selection.id));
     const job = repository.createJob({ id: randomUUID(), projectId: session.projectId, storyboardItemId: null, type: "EDIT_PLAN", input: { editTurnId: turn.id }, requestFingerprint: fingerprint, providerId: generationConfig.reasoningProviderId, modelId: generationConfig.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueue(queue, { jobId: job.id, kind: "edit_plan" }); return reply.code(202).send({ turnId: turn.id, planJobId: job.id, status: turn.status });
   });
@@ -421,6 +466,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = object(request.body ?? {}, "body"); const input = { outputIds: optionalStringArray(body.outputIds), filenamePrefix: optionalString(body.filenamePrefix) }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueue(queue, { jobId: job.id, kind: "export" }); return reply.code(202).send({ job, export: exportRecord }); });
   app.get("/api/v1/exports/:exportId", async (request) => { const result = repository.getExport(parameter(request, "exportId")); if (!result) missing("export", parameter(request, "exportId")); return result; });
   app.get("/api/v1/files/assets/:assetId", async (request, reply) => sendStored(request, reply, storage, repository.getAsset(parameter(request, "assetId")), "asset"));
+  app.get("/api/v1/files/edit-reference-assets/:referenceAssetId", async (request, reply) => sendStored(request, reply, storage, repository.getEditReferenceAsset(parameter(request, "referenceAssetId")), "reference asset"));
   app.get("/api/v1/files/outputs/:outputId", async (request, reply) => sendStored(request, reply, storage, repository.getOutput(parameter(request, "outputId")), "output"));
   app.get("/api/v1/files/exports/:exportId", async (request, reply) => sendStored(request, reply, storage, repository.getExport(parameter(request, "exportId")), "export"));
   app.get("/api/v1/events", { sse: "only" }, async (request, reply) => {
@@ -432,6 +478,12 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
 
 function publicProvider(value: ProviderRecord): object { const { encryptedApiKey, ...provider } = value; return { ...provider, hasApiKey: Boolean(encryptedApiKey) }; }
 function publicSearchSource(value: SearchSourceRecord): object { const { encryptedApiKey, ...source } = value; return { ...source, hasApiKey: Boolean(encryptedApiKey) }; }
+function publicReferenceAsset(value: AssetRecord | EditReferenceAssetRecord): object {
+  const temporary = "sessionId" in value;
+  return { id: value.id, source: temporary ? "TEMPORARY" : "PROJECT", purpose: temporary ? value.purpose : defaultPurposeForRole(value.role), role: temporary ? null : value.role, originalName: value.originalName, mimeType: value.mimeType, hash: value.hash, createdAt: value.createdAt, expiresAt: temporary ? value.expiresAt : null, url: temporary ? `/files/edit-reference-assets/${value.id}` : `/files/assets/${value.id}` };
+}
+function defaultPurposeForRole(role: AssetRole): ReferencePurpose { return role === "PRODUCT_TRUTH" ? "PRODUCT_APPEARANCE" : role === "PACKAGING" ? "PACKAGING" : role === "STYLE_REFERENCE" ? "STYLE" : "LAYOUT"; }
+function roleForReferencePurpose(purpose: ReferencePurpose): AssetRole { return purpose === "PRODUCT_APPEARANCE" ? "PRODUCT_TRUTH" : purpose === "PACKAGING" || purpose === "LABEL" ? "PACKAGING" : purpose === "STYLE" ? "STYLE_REFERENCE" : "LAYOUT_REFERENCE"; }
 function projectDetail(repository: EcomRepository, id: string): object { const project = repository.getProject(id); if (!project) missing("project", id); return { ...project, assets: repository.listAssets(id), storyboard: repository.getStoryboard(id), items: repository.listStoryboardItems(id), outputs: repository.listOutputs(id), jobs: repository.listJobs(id) }; }
 function editSessionDetails(repository: EcomRepository, session: EditSessionRecord): object {
   const editOutputs = repository.listEditOutputs(session.id);
@@ -539,6 +591,20 @@ function jsonObject(value: string | undefined, path: string): Record<string, unk
 function jsonStringArray(value: string | undefined, path: string): string[] {
   if (!value) return [];
   try { return stringArray(JSON.parse(value), path); } catch { throw new ApiError(400, "VALIDATION_ERROR", `${path} must be a JSON array of strings`); }
+}
+function parseReferenceSelections(value: string | undefined): ReferenceSelection[] {
+  if (!value) return [];
+  let parsed: unknown;
+  try { parsed = JSON.parse(value); } catch { throw new ApiError(400, "VALIDATION_ERROR", "referenceSelections must be valid JSON"); }
+  if (!Array.isArray(parsed)) throw new ApiError(400, "VALIDATION_ERROR", "referenceSelections must be an array");
+  const purposes: ReferencePurpose[] = ["PRODUCT_APPEARANCE", "PACKAGING", "LABEL", "STYLE", "LAYOUT"];
+  const seen = new Set<string>();
+  return parsed.map((item, index) => {
+    const entry = object(item, `referenceSelections[${index}]`);
+    const id = string(entry.id, `referenceSelections[${index}].id`); const source = enumValue<"PROJECT" | "TEMPORARY">(entry.source, ["PROJECT", "TEMPORARY"], `referenceSelections[${index}].source`); const purpose = enumValue<ReferencePurpose>(entry.purpose, purposes, `referenceSelections[${index}].purpose`);
+    if (seen.has(`${source}:${id}`)) throw new ApiError(400, "VALIDATION_ERROR", "referenceSelections cannot contain duplicates");
+    seen.add(`${source}:${id}`); return { id, source, purpose, order: index };
+  });
 }
 async function validateMaskDimensions(sourcePath: string, mask: Buffer, storage: LocalAssetStore): Promise<void> {
   const [source, candidate] = await Promise.all([sharp(await storage.read(sourcePath)).metadata(), sharp(mask).metadata()]);

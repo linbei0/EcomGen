@@ -52,6 +52,10 @@ export const handlers = [
     HttpResponse.json({ items: [PROVIDER_FIXTURE], nextCursor: null }),
   ),
 
+  http.get(`${BASE}/edit-sessions/:sessionId/reference-assets`, () =>
+    HttpResponse.json({ items: [], suggestedSelections: [] }),
+  ),
+
   http.post(`${BASE}/providers`, async ({ request }) => {
     const body = (await request.json()) as {
       name: string;

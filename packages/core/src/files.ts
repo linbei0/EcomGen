@@ -46,6 +46,13 @@ export class LocalAssetStore {
     return { path: relativePath, hash };
   }
 
+  public async putEditReferenceAsset(projectId: string, sessionId: string, name: string, content: Buffer): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const relativePath = join("edits", projectId, sessionId, "references", `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(name)}`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
   public async read(relativePath: string): Promise<Buffer> {
     return readFile(this.absolute(relativePath));
   }

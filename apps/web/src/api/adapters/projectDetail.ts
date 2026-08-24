@@ -96,6 +96,8 @@ export function adaptAsset(raw: unknown): Asset | null {
     role: typedRole,
     kind,
     mimeType,
+    originalName: asString(raw.originalName),
+    hash: asString(raw.hash),
     createdAt,
     width: asNumber(raw.width) ?? null,
     height: asNumber(raw.height) ?? null,

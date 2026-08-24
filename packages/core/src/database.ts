@@ -277,6 +277,7 @@ function migrate(database: SqliteDatabase): void {
       protect_mask_path TEXT,
       protect_mask_hash TEXT,
       reference_asset_ids_json TEXT NOT NULL DEFAULT '[]',
+      reference_selections_json TEXT NOT NULL DEFAULT '[]',
       plan_json TEXT,
       error_json TEXT,
       created_at TEXT NOT NULL,
@@ -284,6 +285,21 @@ function migrate(database: SqliteDatabase): void {
       FOREIGN KEY (session_id) REFERENCES edit_sessions(id) ON DELETE CASCADE,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       FOREIGN KEY (base_output_id) REFERENCES outputs(id)
+    );
+    CREATE TABLE IF NOT EXISTS edit_reference_assets (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      turn_id TEXT,
+      storage_path TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (session_id) REFERENCES edit_sessions(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_assets_project_created ON assets(project_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_storyboard_items_project_sort ON storyboard_items(project_id, storyboard_version, sort_order);
@@ -298,6 +314,31 @@ function migrate(database: SqliteDatabase): void {
   }
   if (!columnNames(database, "outputs").has("generation_key")) {
     database.exec("ALTER TABLE outputs ADD COLUMN generation_key TEXT");
+  }
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS edit_reference_assets (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      turn_id TEXT,
+      storage_path TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (session_id) REFERENCES edit_sessions(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_edit_reference_assets_session ON edit_reference_assets(session_id, created_at);
+  `);
+  if (!columnNames(database, "edit_turns").has("reference_selections_json")) {
+    database.exec("ALTER TABLE edit_turns ADD COLUMN reference_selections_json TEXT NOT NULL DEFAULT '[]'");
+    const rows = database.prepare("SELECT id, reference_asset_ids_json FROM edit_turns WHERE reference_asset_ids_json <> '[]'").all() as Array<{ id: string; reference_asset_ids_json: string }>;
+    const update = database.prepare("UPDATE edit_turns SET reference_selections_json=? WHERE id=?");
+    const migrateSelections = database.transaction(() => { for (const row of rows) { const ids = JSON.parse(row.reference_asset_ids_json) as string[]; update.run(JSON.stringify(ids.map((id, order) => ({ id, source: "PROJECT", purpose: "PRODUCT_APPEARANCE", order }))), row.id); } });
+    migrateSelections();
   }
   database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_generation_key ON outputs(generation_key)");
   database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_outputs_generation_key_unique ON outputs(generation_key) WHERE generation_key IS NOT NULL");
