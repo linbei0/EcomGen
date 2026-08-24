@@ -175,5 +175,6 @@ describe("工作台 · 规划", () => {
     );
     renderSetup();
     expect(await screen.findByText("像素保护需要至少一张产品图，否则生成会失败。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成分镜" })).toBeDisabled();
   });
 });

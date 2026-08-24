@@ -184,7 +184,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const liveJob = useJob(detail.id, activeJobId ?? seedJob?.id);
   const job = liveJob.data ?? seedJob;
   const planning = isActiveJob(job);
-  const productCount = detail.assets.filter((asset) => asset.role === "PRODUCT_TRUTH").length;
+  const productCount = detail.assets.filter((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/")).length;
+  const pixelProtectionUnavailable = defaultMode === "PIXEL_PROTECTED" && productCount === 0;
   const copywritingJobQuery = useJob(detail.id, activeCopywritingJob?.id);
   const copywritingJob = copywritingJobQuery.data;
   const copywritingResult = useCopywritingResult(
@@ -252,6 +253,10 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   }, [copywritingJob, notification]);
 
   const submitPlan = async () => {
+    if (pixelProtectionUnavailable) {
+      notification.error({ title: "请先上传至少一张产品图" });
+      return;
+    }
     if (planningMode === "MANUAL" && selected.length === 0) {
       notification.error({ title: "至少选择一种图片类型" });
       return;
@@ -562,11 +567,11 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
         <p className={styles.jobStatus}>{job.status === "QUEUED" ? "排队中" : "规划中"}</p>
       ) : null}
       {canResubmitPlan(job) && job?.status === "FAILED" ? (
-        <Button loading={retryJob.isPending} onClick={() => job && void retryJob.mutateAsync(job.id).then((next) => setActiveJobId(next.id))}>
+        <Button disabled={pixelProtectionUnavailable} loading={retryJob.isPending} onClick={() => job && void retryJob.mutateAsync(job.id).then((next) => setActiveJobId(next.id))}>
           重试规划
         </Button>
       ) : (
-        <Button type="primary" loading={createPlan.isPending || planning} onClick={() => void submitPlan()}>
+        <Button type="primary" disabled={pixelProtectionUnavailable} loading={createPlan.isPending || planning} onClick={() => void submitPlan()}>
           生成分镜
         </Button>
       )}

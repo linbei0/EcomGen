@@ -183,7 +183,10 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   // 先删文件再删行：行删了就找不到 storagePath；不级联分镜/输出/任务（契约 deleteAsset）
   app.delete("/api/v1/assets/:assetId", async (request, reply) => { const id = parameter(request, "assetId"); const asset = repository.getAsset(id); if (!asset) missing("asset", id); await storage.delete(asset.storagePath); repository.deleteAsset(id); return reply.code(204).send(); });
   app.post("/api/v1/projects/:projectId/planning-jobs", async (request, reply) => {
-    const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = object(request.body ?? {}, "body");
+    const projectId = parameter(request, "projectId"); const project = repository.getProject(projectId); if (!project) missing("project", projectId); const body = object(request.body ?? {}, "body");
+    if (project.defaultMode === "PIXEL_PROTECTED" && !repository.listAssets(projectId).some((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/"))) {
+      throw new ApiError(400, "VALIDATION_ERROR", "PIXEL_PROTECTED planning requires at least one PRODUCT_TRUTH image");
+    }
     const requestedTypes = optionalStringArray(body.requestedTypes ?? body.imageTypes); if (requestedTypes?.length && resolveTemplates(requestedTypes).length !== requestedTypes.length) throw new ApiError(400, "VALIDATION_ERROR", "requestedTypes contains an unknown ecom-details-image template ID or alias");
     const planningMode = body.planningMode === undefined ? "AI" : enumValue<PlanningMode>(body.planningMode, ["AI", "MANUAL"], "planningMode");
     if (planningMode === "MANUAL" && !requestedTypes?.length) throw new ApiError(400, "VALIDATION_ERROR", "MANUAL planning requires requestedTypes");
@@ -202,7 +205,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       regenerationKey: optionalString(body.regenerationKey)
     };
     const fingerprint = requestFingerprint({ type: "PLAN", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
-    const project = repository.getProject(projectId); const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "PLAN", input, requestFingerprint: fingerprint, providerId: project?.reasoningProviderId ?? null, modelId: project?.reasoningModelId ?? null, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "PLAN", input, requestFingerprint: fingerprint, providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueue(queue, { jobId: job.id, kind: "plan" }); return reply.code(202).send(job);
   });
   app.post("/api/v1/projects/:projectId/copywriting-jobs", async (request, reply) => {
