@@ -8,7 +8,7 @@ Worker 消费 BullMQ 任务。它是“执行器”，不是 Prompt 编译器。
 
 1. 检查任务取消状态。
 2. 检查分镜存在且属于当前项目。
-3. 检查 Provider、图像模型和 `openai_images` 能力。
+3. 检查 Provider、图像模型和已声明的 `openai_images` 或 `gemini` 能力。
 4. 检查 `assetType` 是否能映射到 `ecom-skill` 模板。
 5. 检查像素保护所需的商品真值图片。
 6. 解析分辨率、比例和候选序号。

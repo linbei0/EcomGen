@@ -10,7 +10,7 @@ import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplate
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, ModelDefinition, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
 import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, roleForUserAssetKind } from "@ecomgen/contracts";
-import { OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
+import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
 import { applyModelFields } from "./projectPatch.js";
@@ -66,7 +66,10 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
         const probe = await probeReasoning({ providerId, modelId, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: probeModel.supportsVision, supportsThinking: probeModel.supportsThinking, apiKey: secrets.decrypt(provider.encryptedApiKey) });
         return { ok: true, providerId, modelId, kind, latencyMs: probe.latencyMs, models: null, modelAvailable: true };
       }
-      const probe = await new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }).probe(); return { ok: true, providerId, modelId, kind, ...probe, modelAvailable: probe.models === null ? null : probe.models.includes(modelId) };
+      const probe = model.imageApiKind === "gemini"
+        ? await new GeminiImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }).probe()
+        : await new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }).probe();
+      return { ok: true, providerId, modelId, kind, ...probe, modelAvailable: probe.models === null ? null : probe.models.includes(modelId) };
     }
     catch (error) { if (error instanceof ProviderError) throw new ApiError(502, "PROVIDER_ERROR", error.message); throw error; }
   });
@@ -656,7 +659,7 @@ function copyLanguageValue(value: unknown): string | null {
   return language;
 }
 function objectOfStrings(value: unknown, path: string): Record<string, string> { const result = object(value, path); for (const [key, item] of Object.entries(result)) if (typeof item !== "string") throw new ApiError(400, "VALIDATION_ERROR", `${path}.${key} must be a string`); return result as Record<string, string>; }
-function requireModels(value: unknown): ModelDefinition[] { if (!Array.isArray(value) || value.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "models must contain at least one model"); return value.map((model, index) => { const entry = object(model, `models[${index}]`); return { id: string(entry.id, `models[${index}].id`), supportsVision: Boolean(entry.supportsVision), supportsThinking: Boolean(entry.supportsThinking), supportsTools: Boolean(entry.supportsTools), supportsStructuredOutput: Boolean(entry.supportsStructuredOutput), imageApiKind: entry.imageApiKind === "openai_images" || entry.imageApiKind === "custom" ? entry.imageApiKind : null }; }); }
+function requireModels(value: unknown): ModelDefinition[] { if (!Array.isArray(value) || value.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "models must contain at least one model"); return value.map((model, index) => { const entry = object(model, `models[${index}]`); return { id: string(entry.id, `models[${index}].id`), supportsVision: Boolean(entry.supportsVision), supportsThinking: Boolean(entry.supportsThinking), supportsTools: Boolean(entry.supportsTools), supportsStructuredOutput: Boolean(entry.supportsStructuredOutput), imageApiKind: entry.imageApiKind === "openai_images" || entry.imageApiKind === "gemini" || entry.imageApiKind === "custom" ? entry.imageApiKind : null }; }); }
 async function sendStored(request: FastifyRequest, reply: FastifyReply, storage: LocalAssetStore, record: { storagePath: string | null; mimeType?: string; hash?: string } | undefined, name: string): Promise<unknown> {
   if (!record || !record.storagePath) missing(name, "unknown");
   const etag = record.hash ? `"${record.hash}"` : undefined;

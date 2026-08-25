@@ -849,7 +849,7 @@ components:
         supportsThinking: { type: boolean }
         supportsTools: { type: boolean }
         supportsStructuredOutput: { type: boolean }
-        imageApiKind: { type: [string, 'null'], enum: [openai_images, custom, null] }
+        imageApiKind: { type: [string, 'null'], enum: [openai_images, gemini, custom, null] }
     CreateProviderInput:
       type: object
       required: [name, baseUrl, reasoningProtocol, apiKey, models]

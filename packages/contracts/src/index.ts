@@ -108,7 +108,7 @@ export const ModelCapabilities = Type.Object({
   supportsThinking: Type.Boolean(),
   supportsTools: Type.Boolean(),
   supportsStructuredOutput: Type.Boolean(),
-  imageApiKind: Type.Union([Type.Literal("openai_images"), Type.Literal("custom"), Type.Null()])
+  imageApiKind: Type.Union([Type.Literal("openai_images"), Type.Literal("gemini"), Type.Literal("custom"), Type.Null()])
 });
 
 export const ModelDefinition = Type.Intersect([

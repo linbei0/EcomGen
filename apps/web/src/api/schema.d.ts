@@ -702,7 +702,7 @@ export interface components {
             supportsTools: boolean;
             supportsStructuredOutput: boolean;
             /** @enum {string|null} */
-            imageApiKind?: "openai_images" | "custom" | null;
+            imageApiKind?: "openai_images" | "gemini" | "custom" | null;
         };
         CreateProviderInput: {
             name: string;

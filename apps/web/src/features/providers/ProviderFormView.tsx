@@ -250,6 +250,7 @@ export function ProviderFormView({ view, onDone }: Props) {
                         options={[
                           { value: "", label: "无（推理）" },
                           { value: "openai_images", label: "openai_images" },
+                          { value: "gemini", label: "gemini (Nano Banana)" },
                           { value: "custom", label: "custom" },
                         ]}
                       />

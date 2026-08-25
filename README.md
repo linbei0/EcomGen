@@ -19,7 +19,7 @@ EcomGen 是面向个人卖家的本地优先电商 AI 套图工作台。它把�
 - **25 种电商图片模板**：内置改造后的 `ecom-details-image` 模板目录，支持主图、场景图、信息图、包装、对比和社媒等场景。
 - **素材与像素保护**：区分 `PRODUCT_TRUTH`、包装图和参考图；`PIXEL_PROTECTED` 模式要求使用当前项目的商品真值素材。
 - **异步生成与审计**：BullMQ Worker 处理规划、生图、编辑和导出任务，保存 `compiledPrompt`、生成快照和任务状态。
-- **Provider 管理**：配置多个 OpenAI-compatible 推理/生图 Provider，API Key 加密保存，前端不会直连 Provider、Redis 或 SQLite。
+- **Provider 管理**：配置多个推理/生图 Provider，支持 OpenAI-compatible Images 与 Google Gemini 原生生图（Nano Banana），API Key 加密保存，前端不会直连 Provider、Redis 或 SQLite。
 - **编辑、审核与导出**：支持基于输出分支的图像编辑、人工审核和 ZIP 导出。
 
 ## 工作流
@@ -52,7 +52,9 @@ API 负责校验、持久化和入队；Pi Agent 负责理解业务规则并生�
 - pnpm 11（仓库锁定版本为 `11.19.0`）
 - Redis 6.2 或更高版本；本地可使用 Redis 7 Docker 容器
 - 一个 Base64 编码的 32 字节 `ECOMGEN_MASTER_KEY`
-- 至少一个可用的 OpenAI-compatible Provider（用于推理或图像生成）
+- 至少一个可用的推理 Provider；图像生成可使用 OpenAI-compatible Images 或 Google Gemini Nano Banana
+
+Google Gemini 图像模型配置：将 Base URL 填为 `https://generativelanguage.googleapis.com/v1beta`，模型 ID 填 `gemini-2.5-flash-image`，生图 API 类型选择 `gemini`。该适配器使用 Gemini `generateContent` 的原生图像响应，参考图会以内联图片发送；Gemini 不支持 OpenAI 式蒙版，因此局部蒙版编辑和画布外扩会按能力检查显式拒绝。
 
 ## 快速开始
 

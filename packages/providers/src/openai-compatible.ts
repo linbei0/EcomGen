@@ -56,6 +56,15 @@ const OPENAI_COMPATIBLE_EDIT_CAPABILITIES: ImageEditCapabilities = {
   supportsNaturalBlend: true
 };
 
+const GEMINI_EDIT_CAPABILITIES: ImageEditCapabilities = {
+  supportsMaskEdit: false,
+  supportsUnmaskedEdit: true,
+  supportsMultiReference: true,
+  supportsOutpaint: false,
+  supportsInputFidelity: false,
+  supportsNaturalBlend: true
+};
+
 export interface ImageGenerationResult {
   image: Buffer;
   mimeType: string;
@@ -169,5 +178,7 @@ export function supportsImageGeneration(capabilities: ModelCapabilities): boolea
 
 /** 能力由已选 API 适配器决定，避免让卖家为 Provider 协议做技术判断。 */
 export function imageEditCapabilitiesFor(capabilities: ModelCapabilities): ImageEditCapabilities | null {
-  return capabilities.imageApiKind === "openai_images" ? OPENAI_COMPATIBLE_EDIT_CAPABILITIES : null;
+  if (capabilities.imageApiKind === "openai_images") return OPENAI_COMPATIBLE_EDIT_CAPABILITIES;
+  if (capabilities.imageApiKind === "gemini") return GEMINI_EDIT_CAPABILITIES;
+  return null;
 }

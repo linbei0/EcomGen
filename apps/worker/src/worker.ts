@@ -9,7 +9,7 @@ import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, o
 import { getTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
-import { OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
+import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata } from "./visual-assets.js";
 
 const masterKey = process.env.ECOMGEN_MASTER_KEY;
@@ -173,7 +173,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const project = projectFor(job); const item = repository.getStoryboardItem(job.storyboardItemId); if (!item || item.projectId !== project.id) throw new Error("Storyboard item is missing or belongs to another project");
   const providerId = job.providerId ?? item.imageProviderId;
   const modelId = job.modelId ?? item.imageModelId;
-  const provider = providerFor(providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images") throw new Error("Only OpenAI-compatible Images API models are currently executable");
+  const provider = providerFor(providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini") throw new Error("Selected image model has no executable image API");
   const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`);
   const inputs = selectGenerationAssets(repository.listAssets(project.id), item);
   if (item.mode === "PIXEL_PROTECTED" && inputs.length === 0) throw new Error("PIXEL_PROTECTED generation requires a PRODUCT_TRUTH image on the project");
@@ -200,7 +200,9 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   }
   repository.updateStoryboardItem(item.id, { status: "GENERATING", compiledPrompt: prompt }); await updateJob(job, { progress: 30 });
   const images = template.supports_image_reference ? await Promise.all(inputs.map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType }))) : [];
-  const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+  const generator = model.imageApiKind === "gemini"
+    ? new GeminiImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) })
+    : new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
   await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED });
   const result = await generator.generate({ model: model.id, prompt, size, quality: "high", images: images.length ? images : undefined, idempotencyKey: generationKey });
   throwIfCancelled(job);
@@ -295,14 +297,16 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   if (plan.compositePolicy === "MASK_LOCKED" && !turn.editMaskPath) throw new Error("EDIT_TARGET_REQUIRED");
   const provider = providerFor(config.imageProviderId);
   const model = provider.models.find((candidate) => candidate.id === config.imageModelId);
-  if (!model || model.imageApiKind !== "openai_images") throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持图像编辑");
+  if (!model || (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini")) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持图像编辑");
   const capabilities = imageEditCapabilitiesFor(model); if (!capabilities) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持图像编辑");
   if (plan.executionMode === "MODEL_DIRECTED" && !capabilities.supportsUnmaskedEdit) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持无蒙版编辑");
   await updateJob(job, { progress: 30 });
   const sourceImage = await storage.read(source.storagePath);
   const mask = turn.editMaskPath ? await storage.read(turn.editMaskPath) : undefined;
   if (mask) await assertMaskDimensions(sourceImage, mask);
-  const generator = new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+  const generator = model.imageApiKind === "gemini"
+    ? new GeminiImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) })
+    : new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
   const assets = repository.listAssets(project.id);
   const temporaryAssets = repository.listEditReferenceAssets(turn.sessionId).filter((asset) => asset.expiresAt > new Date().toISOString());
   const references = await Promise.all(turn.referenceSelections.slice().sort((left, right) => left.order - right.order).map(async (selection) => {
