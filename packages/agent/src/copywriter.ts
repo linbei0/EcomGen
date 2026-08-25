@@ -2,6 +2,7 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { ImageContent, Model } from "@earendil-works/pi-ai";
 import type { CopywritingTarget, PlatformTarget, TargetMarket } from "@ecomgen/contracts";
+import { parseJsonResponse, withJsonObjectResponse } from "./json-response.js";
 
 export interface CopywritingInput {
   target: CopywritingTarget;
@@ -41,6 +42,7 @@ export async function writeCopywriting(input: CopywritingInput): Promise<Copywri
   const agent = new Agent({
     streamFn: openAICompletionsApi().stream,
     getApiKey: () => input.apiKey,
+    onPayload: (payload, model) => withJsonObjectResponse(payload, model),
     initialState: {
       model: input.model,
       systemPrompt: SYSTEM_PROMPT,
@@ -74,7 +76,7 @@ export async function writeCopywriting(input: CopywritingInput): Promise<Copywri
     ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n")
     : "";
   if (!text) throw new Error("Copywriting model returned no text");
-  return validateCopywriting(input.target, JSON.parse(stripJsonFence(text)));
+  return validateCopywriting(input.target, parseJsonResponse(text));
 }
 
 export function validateCopywriting(target: CopywritingTarget, value: unknown): CopywritingResult {
@@ -106,8 +108,4 @@ function requiredText(value: unknown, field: string): string {
 function checkedLength(value: string, maxLength: number): string {
   if (value.length > maxLength) throw new Error(`Copywriting model returned content longer than ${maxLength} characters`);
   return value;
-}
-
-function stripJsonFence(value: string): string {
-  return value.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, "");
 }

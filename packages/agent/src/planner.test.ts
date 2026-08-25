@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ options: undefined as { initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", images: [] as unknown[], errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, referencedAssets: [] as string[], editResponse: undefined as Record<string, unknown> | undefined }));
+const captured = vi.hoisted(() => ({ options: undefined as { onPayload?: (payload: unknown, model: { id: string; baseUrl: string }) => unknown; initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", images: [] as unknown[], errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, referencedAssets: [] as string[], editResponse: undefined as Record<string, unknown> | undefined, responseText: undefined as string | undefined }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
     public state = { messages: [] as Array<{ role: string; content: Array<{ type: string; text?: string }> }>, errorMessage: captured.errorMessage };
 
-    public constructor(options: { initialState?: { thinkingLevel?: string; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } }) {
+    public constructor(options: { onPayload?: (payload: unknown, model: { id: string; baseUrl: string }) => unknown; initialState?: { thinkingLevel?: string; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } }) {
       captured.options = options;
     }
 
@@ -22,7 +22,8 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
         const researchTool = captured.options?.initialState?.tools?.find((tool) => tool.name === "research_visual_direction");
         try { await researchTool?.execute("research-call", { query: "product photography lighting" }); } catch { /* Pi 将工具错误返回给模型并继续规划。 */ }
       }
-      this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify({ campaignStyleLock: "clean", items: Array.from({ length: captured.itemCount }, (_, index) => ({ assetType: "hero-image", displayName: index === 0 ? "整机斜侧展示首图" : `展示场景${index + 1}`, templateVariant: null, candidateCount: 1, referencedAssets: captured.referencedAssets, mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: index })) }) }] }];
+      const plan = { campaignStyleLock: "clean", items: Array.from({ length: captured.itemCount }, (_, index) => ({ assetType: "hero-image", displayName: index === 0 ? "整机斜侧展示首图" : `展示场景${index + 1}`, templateVariant: null, candidateCount: 1, referencedAssets: captured.referencedAssets, mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: index })) };
+      this.state.messages = [{ role: "assistant", content: [{ type: "text", text: captured.responseText ?? JSON.stringify(plan) }] }];
     }
   },
 }));
@@ -65,6 +66,14 @@ describe("planStoryboard", () => {
 
     expect(captured.options?.initialState?.thinkingLevel).toBe("medium");
     expect(captured.options?.initialState?.model?.compat).toMatchObject({ maxTokensField: "max_tokens", thinkingFormat: "qwen", supportsDeveloperRole: false });
+  });
+
+  it("enables DeepSeek JSON Output without changing generic OpenAI-compatible payloads", async () => {
+    captured.errorMessage = undefined;
+    await planStoryboard(input);
+    const payload = { messages: [] };
+    expect(captured.options?.onPayload?.(payload, { id: "deepseek-v4-flash", baseUrl: "https://api.deepseek.com" })).toMatchObject({ response_format: { type: "json_object" } });
+    expect(captured.options?.onPayload?.(payload, { id: "qwen-plus", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" })).toBe(payload);
   });
 
   it("uses the reasoning model for manual selections and marks them as authoritative", async () => {
@@ -140,6 +149,17 @@ describe("planStoryboard", () => {
     await expect(planStoryboard(input)).rejects.toThrow("provider timed out");
 
     captured.errorMessage = undefined;
+  });
+
+  it("extracts JSON when the planning model adds a natural-language preamble", async () => {
+    captured.errorMessage = undefined;
+    const plan = { campaignStyleLock: "clean", items: [{ assetType: "hero-image", displayName: "整机斜侧展示首图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: 0 }] };
+    captured.responseText = "I have all the details.\\n```json\\n" + JSON.stringify(plan) + "\\n```";
+    try {
+      await expect(planStoryboard(input)).resolves.toMatchObject({ campaignStyleLock: "clean" });
+    } finally {
+      captured.responseText = undefined;
+    }
   });
 
   it("continues planning when visual research fails", async () => {

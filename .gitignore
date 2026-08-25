@@ -24,3 +24,4 @@ data-e2e-*/
 Thumbs.db
 desktop.ini
 .DS_Store
+scripts/deploy-remote.ps1

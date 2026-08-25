@@ -1,5 +1,5 @@
 import { App, Image, Popconfirm } from "antd";
-import { ShieldCheck, Trash2, Upload as UploadIcon } from "lucide-react";
+import { Palette, Package, ShieldCheck, Trash2, Upload as UploadIcon, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
 
 import type { Asset, ProjectDetail, UserAssetKind } from "../../api/adapters/projectDetail";
@@ -118,12 +118,15 @@ export function AssetsStage({
       {USER_ASSET_KIND_ORDER.map((item) => {
         const assets = grouped.get(item) ?? [];
         if (assets.length === 0) return null;
+        const GroupIcon = KIND_ICON[item];
         return (
-          <section key={item} className={styles.groups}>
+          <section key={item} className={styles.groupBlock} data-kind={item}>
             <div className={styles.groupHeader}>
-              <span>{USER_ASSET_KIND_META[item].label}</span>
-              <span>{assets.length}</span>
+              <span className={styles.groupIcon} aria-hidden><GroupIcon size={14} strokeWidth={1.75} /></span>
+              <span className={styles.groupTitle}>{USER_ASSET_KIND_META[item].label}</span>
+              <span className={styles.groupCount}>{assets.length}</span>
             </div>
+            <p className={styles.groupHint}>{USER_ASSET_KIND_META[item].hint}。</p>
             <div className={compact ? styles.assetGridCompact : styles.assetGrid}>
               <Image.PreviewGroup>
                 {assets.map((asset) => (
@@ -197,3 +200,5 @@ function groupAssets(assets: Asset[]): Map<UserAssetKind, Asset[]> {
   }
   return groups;
 }
+
+const KIND_ICON: Record<UserAssetKind, LucideIcon> = { PRODUCT: Package, REFERENCE: Palette };

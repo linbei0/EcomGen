@@ -14,6 +14,7 @@ import { errorText } from "../../lib/errorText";
 import { loadImageTypes, saveImageTypes } from "../../lib/imageTypes";
 import { jobErrorText } from "../../lib/jobError";
 import { modelOptions } from "../../lib/modelOptions";
+import { randomUuid } from "../../lib/randomUuid";
 import { canResubmitPlan, isActiveJob, latestPlanJob } from "../../lib/planJob";
 import { ASPECT_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
@@ -228,7 +229,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       return;
     }
     try {
-      const created = await createCopywriting.mutateAsync({ target, regenerationKey: crypto.randomUUID() });
+      const created = await createCopywriting.mutateAsync({ target, regenerationKey: randomUuid() });
       setActiveCopywritingJob({ id: created.id, target });
     } catch (error) {
       notification.error({ title: "AI 帮写提交失败", description: errorText(error) });
@@ -270,7 +271,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
         ...(planningMode === "AI" ? { targetImageCount } : {}),
         imageResolution,
         imageAspectRatio,
-        regenerationKey: seedJob?.status === "SUCCEEDED" ? crypto.randomUUID() : undefined,
+        regenerationKey: seedJob?.status === "SUCCEEDED" ? randomUuid() : undefined,
       });
       if (selected.length > 0) saveImageTypes(detail.id, selected);
       setActiveJobId(created.id);

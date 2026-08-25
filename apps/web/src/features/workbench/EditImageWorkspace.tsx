@@ -8,6 +8,7 @@ import { API_BASE_URL } from "../../config/env";
 import { errorText } from "../../lib/errorText";
 import { editErrorLabel, editExecutionModeLabel, editOperationLabel } from "../../lib/userText";
 import { modelOptions } from "../../lib/modelOptions";
+import { randomUuid } from "../../lib/randomUuid";
 import styles from "./workbench.module.css";
 
 type Tool = "pan" | "rect" | "brush" | "erase" | "protect" | "arrow" | "text";
@@ -298,7 +299,7 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
   };
   const commitText = () => {
     if (!textDraft) return; const value = textDraft.value.trim(); if (!value) { setTextDraft(null); return; }
-    const next = [...annotations, { id: crypto.randomUUID(), type: "text", point: textDraft.point, text: value, color: markColor, fontSize: textSize, semanticRole: "instruction" }]; setAnnotations(next); setTextDraft(null); pushHistory(next);
+    const next = [...annotations, { id: randomUuid(), type: "text", point: textDraft.point, text: value, color: markColor, fontSize: textSize, semanticRole: "instruction" }]; setAnnotations(next); setTextDraft(null); pushHistory(next);
   };
   const rectHitAt = (point: Point) => {
     const overlay = overlayRef.current; if (!overlay) return null;
@@ -374,10 +375,10 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
         setAnnotations(next);
       } else {
         const bounds = { x: Math.min(current.start.x, point.x), y: Math.min(current.start.y, point.y), width: Math.abs(current.start.x - point.x), height: Math.abs(current.start.y - point.y) };
-        if (bounds.width > 2 && bounds.height > 2) { const id = crypto.randomUUID(); next = [...annotations, { id, type: "rect", bounds, color: EDIT_OVERLAY_COLOR, semanticRole: "target" }]; nextSelectedRectId = id; setSelectedRectId(id); setAnnotations(next); }
+        if (bounds.width > 2 && bounds.height > 2) { const id = randomUuid(); next = [...annotations, { id, type: "rect", bounds, color: EDIT_OVERLAY_COLOR, semanticRole: "target" }]; nextSelectedRectId = id; setSelectedRectId(id); setAnnotations(next); }
       }
     }
-    if (tool === "arrow" && point) { next = [...annotations, { id: crypto.randomUUID(), type: "arrow", points: [current.start, point], color: markColor, semanticRole: "instruction" }]; setAnnotations(next); }
+    if (tool === "arrow" && point) { next = [...annotations, { id: randomUuid(), type: "arrow", points: [current.start, point], color: markColor, semanticRole: "instruction" }]; setAnnotations(next); }
     if (tool === "erase" && current.erased) { next = annotations.filter((annotation) => annotation.type !== "rect" || !annotation.bounds || !intersects(annotation.bounds as Bounds, current.erased!)); if (!next.some((annotation) => annotation.id === nextSelectedRectId)) nextSelectedRectId = null; setSelectedRectId(nextSelectedRectId); setAnnotations(next); }
     redrawOverlay(next, nextSelectedRectId); pushHistory(next); if (point) updateRectCursor(event.currentTarget, point); event.currentTarget.releasePointerCapture(event.pointerId);
   };

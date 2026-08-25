@@ -578,18 +578,66 @@
   margin: 16px 0 24px;
 }
 
-.groups {
+.groupBlock {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-1);
+}
+
+.groupBlock + .groupBlock {
+  margin-top: 24px;
 }
 
 .groupHeader {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
+  align-items: center;
+  gap: 8px;
+}
+
+.groupIcon {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--radius-s);
+  background: var(--bg-2);
+  color: var(--text-3);
+}
+
+.groupBlock[data-kind="PRODUCT"] .groupIcon {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.groupTitle {
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.groupCount {
+  min-width: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.groupHint {
+  margin: 0;
   color: var(--text-3);
   font-size: 12px;
+  line-height: 1.5;
 }
 
 .assetGrid {
@@ -614,7 +662,6 @@
 
 .setupPreview .assetGrid {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  max-width: 720px;
 }
 
 .assetCard {
@@ -622,6 +669,11 @@
   border: 1px solid var(--line-1);
   border-radius: var(--radius-m);
   background: var(--bg-2);
+  transition: border-color 150ms ease;
+}
+
+.assetCard:hover {
+  border-color: var(--line-2);
 }
 
 .thumbWrap {

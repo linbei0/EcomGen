@@ -5,6 +5,7 @@ import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, St
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createPlanningTools, readPlatformGuidance, type WebResearchConfig } from "./tools.js";
+import { parseJsonResponse, withJsonObjectResponse } from "./json-response.js";
 export type { WebResearchConfig } from "./tools.js";
 
 export interface PlannerInput {
@@ -76,6 +77,7 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
   const agent = new Agent({
     streamFn: openAICompletionsApi().stream,
     getApiKey: () => input.apiKey,
+    onPayload: (payload, model) => withJsonObjectResponse(payload, model),
     initialState: { model: input.model, systemPrompt: SYSTEM_PROMPT, thinkingLevel: input.model.reasoning ? "medium" : "off", tools },
   });
   const selectedTemplates = resolveTemplates(input.requestedTypes);
@@ -99,7 +101,7 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
   const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
   const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n") : "";
   if (!text) throw new Error("Planning model returned no text");
-  return validatePlan(JSON.parse(stripJsonFence(text)) as PlannedStoryboard, input);
+  return validatePlan(parseJsonResponse(text) as PlannedStoryboard, input);
 }
 
 export interface PromptRevisionInput {
@@ -113,6 +115,7 @@ export async function reviseImagePrompt(input: PromptRevisionInput): Promise<str
   const agent = new Agent({
     streamFn: openAICompletionsApi().stream,
     getApiKey: () => input.apiKey,
+    onPayload: (payload, model) => withJsonObjectResponse(payload, model),
     initialState: {
       model: input.model,
       systemPrompt: "You revise an existing final image-generation prompt. Return only the complete final prompt text, with no Markdown, planning notes, template metadata, or explanations. Preserve all existing product-truth and safety constraints unless the revision explicitly changes the visual direction.",
@@ -160,6 +163,7 @@ export async function planImageEdit(input: EditPlannerInput): Promise<PlannedEdi
   const agent = new Agent({
     streamFn: openAICompletionsApi().stream,
     getApiKey: () => input.apiKey,
+    onPayload: (payload, model) => withJsonObjectResponse(payload, model),
     initialState: {
       model: input.model,
       systemPrompt: "You are an image-editing planner for an e-commerce workspace. Return only valid JSON. Use the user's words, source image, mask availability, annotations, ordered references, previous constraints, and provider capabilities to choose one operation: PRECISE_INPAINT, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION, and one executionMode: MODEL_DIRECTED, MASKED, OUTPAINT, NEED_INPUT. A reference's purpose is binding: PRODUCT_APPEARANCE supplies product facts, PACKAGING affects packaging only, LABEL affects labels and local details only, STYLE and LAYOUT must not replace product truth. Explain multiple references according to their individual purposes and never promote temporary reference facts into project facts. operation describes what the user wants; executionMode describes how it can be executed. If an editable mask is supplied, you MUST use MASKED and must not ignore it. Use OUTPAINT when canvas expansion is supplied. For a clear request that the vision-capable image model can execute without a mask, use MODEL_DIRECTED and let the image model judge the target from the source image. If the user demands strict pixel-level protection without a mask, the target is ambiguous, or you cannot see the source image, use NEED_INPUT and ask a concrete clarification. PRODUCT_REPLACE requires a supplied reference asset. PRECISE_INPAINT is only for masked execution. MODEL_DIRECTED, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT and NATURAL_FUSION require confirmation; NEED_INPUT does not. For MASKED use MASK_LOCKED; for OUTPAINT use OUTPAINT; for MODEL_DIRECTED use PROVIDER_RESULT. The prompt is a complete final image-edit prompt, preserving product facts and user-protected areas.",
@@ -173,7 +177,7 @@ export async function planImageEdit(input: EditPlannerInput): Promise<PlannedEdi
   const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
   const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n") : "";
   if (!text) throw new Error("Edit planning model returned no text");
-  return validateEditPlan(JSON.parse(stripJsonFence(text)) as PlannedEdit, input, annotationIds);
+  return validateEditPlan(parseJsonResponse(text) as PlannedEdit, input, annotationIds);
 }
 
 function annotationIdList(annotations: Record<string, unknown>): string[] {
