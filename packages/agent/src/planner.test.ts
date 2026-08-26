@@ -32,7 +32,7 @@ vi.mock("@earendil-works/pi-ai/api/openai-completions.lazy", () => ({
   openAICompletionsApi: () => ({ stream: vi.fn() }),
 }));
 
-import { planImageEdit, planStoryboard, type EditPlannerInput, type PlannerInput } from "./planner.js";
+import { planImageEdit, planStoryboard, reviseImagePrompt, type EditPlannerInput, type PlannerInput } from "./planner.js";
 
 const input: PlannerInput = {
   model: {
@@ -172,6 +172,19 @@ describe("planStoryboard", () => {
     } finally {
       fetchMock.mockRestore();
       captured.simulateResearchFailure = false;
+    }
+  });
+});
+
+describe("reviseImagePrompt", () => {
+  it("不为要求纯文本的提示词修订启用 JSON Output", async () => {
+    captured.errorMessage = undefined;
+    captured.responseText = "revised image prompt";
+    try {
+      await expect(reviseImagePrompt({ model: input.model, apiKey: "secret", prompt: "original image prompt", revision: "make it brighter" })).resolves.toBe("revised image prompt");
+      expect(captured.options?.onPayload).toBeUndefined();
+    } finally {
+      captured.responseText = undefined;
     }
   });
 });

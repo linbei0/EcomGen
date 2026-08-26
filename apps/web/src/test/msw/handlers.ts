@@ -145,6 +145,8 @@ export const handlers = [
     HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 0 }),
   ),
 
+  http.get(`${BASE}/projects/:projectId/planning-config-snapshots`, () => HttpResponse.json([])),
+
   http.post(`${BASE}/projects/:projectId/copywriting-jobs`, ({ params }) =>
     HttpResponse.json({ ...COPYWRITING_JOB_FIXTURE, projectId: params.projectId as string }),
   ),

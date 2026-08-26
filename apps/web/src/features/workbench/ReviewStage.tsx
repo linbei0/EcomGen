@@ -11,7 +11,8 @@ import { downloadOriginal, outputFileName } from "../../lib/downloadImage";
 import { errorText } from "../../lib/errorText";
 import { outputPreviewUrl } from "../../lib/assetUrl";
 import { itemDisplayName } from "../../lib/itemName";
-import { groupOutputsByItem } from "../../lib/review";
+import { groupOutputsByGenerationBatch } from "../../lib/review";
+import { formatDateTime } from "../../lib/format";
 import styles from "./workbench.module.css";
 import type { GenerationJobInput } from "../../api/serializeGenerationBody";
 import { ASPECT_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
@@ -27,7 +28,7 @@ export function ReviewStage({
   detail: ProjectDetail;
   selectedOutputIds: string[];
   onSelectionChange: (ids: string[]) => void;
-  onRetryItem: (itemId: string, generationConfig: NonNullable<GenerationJobInput["generationConfig"]>) => void;
+  onRetryItem: (itemId: string, generationConfig: NonNullable<GenerationJobInput["generationConfig"]>, generationBatchId?: string) => void;
 }) {
   const { notification } = App.useApp();
   const board = useStoryboard(detail.id);
@@ -35,7 +36,7 @@ export function ReviewStage({
   const items = board.data?.items ?? detail.items;
   const originalOutputs = useMemo(() => detail.outputs.filter((output) => !output.editSessionId), [detail.outputs]);
   const editedOutputs = useMemo(() => detail.outputs.filter((output) => Boolean(output.editSessionId)), [detail.outputs]);
-  const groups = useMemo(() => groupOutputsByItem(items, originalOutputs), [originalOutputs, items]);
+  const batches = useMemo(() => groupOutputsByGenerationBatch(items, originalOutputs, detail.jobs), [originalOutputs, items, detail.jobs]);
   const editedByRoot = useMemo(() => {
     const grouped = new Map<string, Output[]>();
     for (const output of editedOutputs) {
@@ -83,30 +84,41 @@ export function ReviewStage({
 
   return (
     <div className={styles.lightboxStage}>
-      {groups.map((group) => (
-        <section key={group.item.id} className={styles.reviewGroup}>
-          <h2 className={styles.reviewGroupTitle}>
-            {itemDisplayName(group.item, templates.data ?? [])}
-            <span>{group.outputs.length} 张</span>
-          </h2>
-          <div className={styles.reviewGrid}>
-            {group.outputs.map((output) => {
-              const label = itemDisplayName(group.item, templates.data ?? []);
-              return (
-                <ReviewCard
-                  key={output.id}
-                  output={output}
-                  label={label}
-                  downloading={downloadingId === output.id}
-                  onDownload={() => void download(output, label)}
-                  onOpen={() => setLightboxId(output.id)}
-                  editedOutputs={editedByRoot.get(output.id) ?? []}
-                  onOpenVersions={() => setVersionRootId(output.id)}
-                  selected={selectedOutputIds.includes(output.id)}
-                  onToggleSelection={() => toggleSelection(output.id)}
-                />
-              );
-            })}
+      {batches.map((batch) => (
+        <section key={batch.id} className={styles.generationBatch}>
+          <aside className={styles.generationBatchMeta}>
+            <strong>{formatDateTime(batch.createdAt)}</strong>
+            <span>{batch.groups.reduce((count, group) => count + group.outputs.length, 0)} 张{batch.retryCount ? ` · 重新生成 ${batch.retryCount} 张` : ""}</span>
+            <i className={styles.timelineDot} aria-hidden="true" />
+          </aside>
+          <div className={styles.generationBatchBody}>
+            {batch.groups.map((group) => (
+              <div key={group.item.id} className={styles.reviewGroup}>
+                <h2 className={styles.reviewGroupTitle}>
+                  {itemDisplayName(group.item, templates.data ?? [])}
+                  <span>{group.outputs.length} 张</span>
+                </h2>
+                <div className={styles.reviewGrid}>
+                  {group.outputs.map((output) => {
+                    const label = itemDisplayName(group.item, templates.data ?? []);
+                    return (
+                      <ReviewCard
+                        key={output.id}
+                        output={output}
+                        label={label}
+                        downloading={downloadingId === output.id}
+                        onDownload={() => void download(output, label)}
+                        onOpen={() => setLightboxId(output.id)}
+                        editedOutputs={editedByRoot.get(output.id) ?? []}
+                        onOpenVersions={() => setVersionRootId(output.id)}
+                        selected={selectedOutputIds.includes(output.id)}
+                        onToggleSelection={() => toggleSelection(output.id)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       ))}
@@ -131,7 +143,7 @@ export function ReviewStage({
           if (lightbox) void download(lightbox, lightboxItem ? itemDisplayName(lightboxItem, templates.data ?? []) : "");
         }}
         onRetry={(generationConfig) => {
-          if (lightboxItem) onRetryItem(lightboxItem.id, generationConfig);
+          if (lightboxItem) onRetryItem(lightboxItem.id, generationConfig, lightbox?.generationBatchId ?? undefined);
         }}
         onEdit={() => { if (lightbox) setEditingId(lightbox.id); }}
       />
@@ -169,6 +181,7 @@ function ReviewCard({
           <input type="checkbox" checked={selected} onChange={onToggleSelection} aria-label={`选择下载 ${label}`} />
         </label>
         {editedOutputs.length > 0 ? <button type="button" className={styles.editVersionPeek} onClick={onOpenVersions} aria-label={`查看 ${editedOutputs.length} 个编辑版本`}><span className={styles.editVersionPeekImages}>{editedOutputs.slice(-3).map((version) => <img key={version.id} src={version.url} alt="" />)}</span><span>编辑 {editedOutputs.length} 版</span></button> : null}
+        {output.generationSnapshot?.revision === "retry" ? <span className={styles.retryMark}>重新生成 · {formatDateTime(output.createdAt)}</span> : null}
         <div className={styles.reviewActions}>
           <button type="button" onClick={onDownload} disabled={downloading} aria-label="下载原图">
             <Download size={16} strokeWidth={1.75} />

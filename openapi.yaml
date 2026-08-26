@@ -322,6 +322,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/Job'
         '422': { $ref: '#/components/responses/CapabilityUnsupported' }
+  /projects/{projectId}/planning-config-snapshots:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      operationId: listPlanningConfigSnapshots
+      responses:
+        '200':
+          description: Recent planning configuration snapshots.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PlanningConfigSnapshot' }
+  /projects/{projectId}/planning-config-snapshots/{snapshotId}/apply:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: snapshotId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: applyPlanningConfigSnapshot
+      responses:
+        '200':
+          description: Applied planning configuration snapshot.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [project, snapshot]
+                properties:
+                  project: { $ref: '#/components/schemas/Project' }
+                  snapshot: { $ref: '#/components/schemas/PlanningConfigSnapshot' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /projects/{projectId}/copywriting-jobs:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -439,6 +473,7 @@ paths:
                   type: array
                   minItems: 1
                   items: { type: string, format: uuid }
+                generationBatchId: { type: string, format: uuid }
                 revision: { type: string, maxLength: 2000 }
                 generationConfig:
                   type: object
@@ -1135,10 +1170,11 @@ components:
         updatedAt: { type: string, format: date-time }
     Output:
       type: object
-      required: [id, storyboardItemId, createdAt]
+      required: [id, storyboardItemId, jobId, createdAt]
       properties:
         id: { type: string, format: uuid }
         storyboardItemId: { type: string, format: uuid }
+        jobId: { type: string, format: uuid }
         candidateIndex: { type: integer, minimum: 1 }
         generationSnapshot:
           type: [object, 'null']
@@ -1149,12 +1185,23 @@ components:
             aspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
             size: { type: string }
             candidateIndex: { type: integer, minimum: 1 }
+            revision: { type: string }
         url: { type: string }
         storagePath: { type: string }
         parentOutputId: { type: [string, 'null'], format: uuid }
         rootOutputId: { type: [string, 'null'], format: uuid }
         editSessionId: { type: [string, 'null'], format: uuid }
         editTurnId: { type: [string, 'null'], format: uuid }
+        generationBatchId: { type: [string, 'null'], format: uuid }
+        createdAt: { type: string, format: date-time }
+    PlanningConfigSnapshot:
+      type: object
+      required: [id, projectId, sourceJobId, payload, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        sourceJobId: { type: string, format: uuid }
+        payload: { type: object, additionalProperties: true }
         createdAt: { type: string, format: date-time }
     EditTurnStatus:
       type: string

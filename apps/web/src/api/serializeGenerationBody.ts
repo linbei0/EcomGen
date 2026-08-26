@@ -1,5 +1,6 @@
 export interface GenerationJobInput {
   storyboardItemIds: string[];
+  generationBatchId?: string;
   revision?: string;
   generationConfig?: {
     imageResolution?: "1K" | "2K" | "4K";
@@ -15,6 +16,7 @@ export function serializeGenerationBody(input: GenerationJobInput): string {
   const body: GenerationJobInput = { storyboardItemIds };
   const revision = input.revision?.trim();
   if (revision) body.revision = revision;
+  if (input.generationBatchId) body.generationBatchId = input.generationBatchId;
   if (input.generationConfig) body.generationConfig = input.generationConfig;
   return JSON.stringify(body);
 }

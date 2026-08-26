@@ -214,6 +214,30 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "PLAN", input, requestFingerprint: fingerprint, providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueue(queue, { jobId: job.id, kind: "plan" }); return reply.code(202).send(job);
   });
+  app.get("/api/v1/projects/:projectId/planning-config-snapshots", async (request) => {
+    const projectId = parameter(request, "projectId"); ensureProject(repository, projectId);
+    return repository.listPlanningConfigSnapshots(projectId);
+  });
+  app.post("/api/v1/projects/:projectId/planning-config-snapshots/:snapshotId/apply", async (request) => {
+    const projectId = parameter(request, "projectId"); const snapshotId = parameter(request, "snapshotId");
+    ensureProject(repository, projectId); const snapshot = repository.getPlanningConfigSnapshot(snapshotId);
+    if (!snapshot || snapshot.projectId !== projectId) missing("planning config snapshot", snapshotId);
+    const payload = snapshot.payload;
+    const project = payload.project;
+    verifyModel(repository, project.reasoningProviderId, project.reasoningModelId, "reasoning");
+    verifyModel(repository, project.imageProviderId, project.imageModelId, "image");
+    const updated = repository.updateProject(projectId, {
+      name: project.name, category: project.category, productDescription: project.productDescription,
+      verifiedFacts: project.verifiedFacts, prohibitedClaims: project.prohibitedClaims, brandGuidelines: project.brandGuidelines,
+      platformTargets: project.platformTargets, targetMarket: project.targetMarket, copyLanguage: project.copyLanguage,
+      reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId,
+      imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, defaultMode: project.defaultMode,
+      imageResolution: project.imageResolution, imageAspectRatio: project.imageAspectRatio,
+      candidatesPerType: project.candidatesPerType, webResearchEnabled: project.webResearchEnabled,
+    });
+    if (!updated) missing("project", projectId);
+    return { project: updated, snapshot };
+  });
   app.post("/api/v1/projects/:projectId/copywriting-jobs", async (request, reply) => {
     const projectId = parameter(request, "projectId");
     const project = repository.getProject(projectId);
@@ -291,6 +315,11 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const projectId = parameter(request, "projectId"); const storyboard = repository.getStoryboard(projectId); if (!storyboard || storyboard.status !== "CONFIRMED") throw new ApiError(409, "CONFLICT", "Confirm the storyboard before generation");
     const body = object(request.body, "body"); const itemIds = stringArray(body.storyboardItemIds, "storyboardItemIds"); if (itemIds.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "At least one storyboardItemId is required");
     const config = body.generationConfig === undefined ? null : object(body.generationConfig, "generationConfig");
+    const revision = optionalString(body.revision);
+    const requestedBatchId = optionalString(body.generationBatchId);
+    const generationBatchId = requestedBatchId ?? (revision === "retry"
+      ? repository.listOutputs(projectId).find((output) => itemIds.includes(output.storyboardItemId) && !output.editSessionId)?.generationBatchId ?? randomUUID()
+      : randomUUID());
     const overrideResolution = config?.imageResolution === undefined ? undefined : enumValue<ImageResolution>(config.imageResolution, IMAGE_RESOLUTIONS, "generationConfig.imageResolution");
     const overrideAspect = config?.imageAspectRatio === undefined ? undefined : enumValue<ImageAspectRatio>(config.imageAspectRatio, IMAGE_ASPECT_RATIOS, "generationConfig.imageAspectRatio");
     const overrideCandidates = config?.candidateCount === undefined ? undefined : candidatesPerType(config.candidateCount);
@@ -304,12 +333,14 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       const candidateCount = overrideCandidates ?? clampCandidates(item.candidateCount);
       return Array.from({ length: candidateCount }, (_, index) => {
         const input = {
-          revision: optionalString(body.revision),
+          revision,
+          generationBatchId,
           candidateIndex: index + 1,
           imageResolution: overrideResolution ?? item.imageResolution,
           imageAspectRatio: overrideAspect ?? item.imageAspectRatio
         };
-        const fingerprint = requestFingerprint({ type: "GENERATE", projectId, itemId, storyboardVersion: storyboard.version, itemUpdatedAt: item.updatedAt, input, idempotencyKey: request.headers["idempotency-key"] ?? null });
+        const { generationBatchId: _generationBatchId, ...fingerprintInput } = input;
+        const fingerprint = requestFingerprint({ type: "GENERATE", projectId, itemId, storyboardVersion: storyboard.version, itemUpdatedAt: item.updatedAt, input: fingerprintInput, idempotencyKey: request.headers["idempotency-key"] ?? null });
         const existing = repository.findJobByFingerprint(projectId, fingerprint);
         if (existing) return existing;
         return repository.createJob({ id: randomUUID(), projectId, storyboardItemId: itemId, type: "GENERATE", input, requestFingerprint: fingerprint, providerId: overrideProviderId ?? item.imageProviderId, modelId: overrideModelId ?? item.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
@@ -476,7 +507,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     }
     return repository.updateJob(id, { cancelRequested: true });
   });
-  app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => { const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id); if (!job.retryable) throw new ApiError(409, "CONFLICT", "This job cannot be retried"); const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input: job.input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); await enqueue(queue, { jobId: retry.id, kind: queueKindForJobType(retry.type) }); return reply.code(202).send(retry); });
+  app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => { const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id); if (!job.retryable) throw new ApiError(409, "CONFLICT", "This job cannot be retried"); const input = job.type === "GENERATE" ? { ...job.input, revision: "retry" } : job.input; const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); await enqueue(queue, { jobId: retry.id, kind: queueKindForJobType(retry.type) }); return reply.code(202).send(retry); });
   app.get("/api/v1/projects/:projectId/outputs", async (request) => repository.listOutputs(parameter(request, "projectId")));
   app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = object(request.body ?? {}, "body"); const input = { outputIds: optionalStringArray(body.outputIds), filenamePrefix: optionalString(body.filenamePrefix) }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueue(queue, { jobId: job.id, kind: "export" }); return reply.code(202).send({ job, export: exportRecord }); });
   app.get("/api/v1/exports/:exportId", async (request) => { const result = repository.getExport(parameter(request, "exportId")); if (!result) missing("export", parameter(request, "exportId")); return result; });

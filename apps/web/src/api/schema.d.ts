@@ -210,6 +210,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/planning-config-snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listPlanningConfigSnapshots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/planning-config-snapshots/{snapshotId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+                snapshotId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applyPlanningConfigSnapshot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{projectId}/copywriting-jobs": {
         parameters: {
             query?: never;
@@ -1009,6 +1046,8 @@ export interface components {
             id: string;
             /** Format: uuid */
             storyboardItemId: string;
+            /** Format: uuid */
+            jobId: string;
             candidateIndex?: number;
             generationSnapshot?: {
                 /** Format: uuid */
@@ -1018,6 +1057,7 @@ export interface components {
                 aspectRatio?: components["schemas"]["ImageAspectRatio"];
                 size?: string;
                 candidateIndex?: number;
+                revision?: string;
             } | null;
             url?: string;
             storagePath?: string;
@@ -1029,6 +1069,21 @@ export interface components {
             editSessionId?: string | null;
             /** Format: uuid */
             editTurnId?: string | null;
+            /** Format: uuid */
+            generationBatchId?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PlanningConfigSnapshot: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            sourceJobId: string;
+            payload: {
+                [key: string]: unknown;
+            };
             /** Format: date-time */
             createdAt: string;
         };
@@ -1660,7 +1715,10 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": {
-                    /** Format: binary */
+                    /**
+                     * Format: binary
+                     * @description Each project accepts at most 6 product images and 6 reference images; byte-identical content is rejected as a duplicate.
+                     */
                     file: string;
                     role?: components["schemas"]["AssetRole"];
                     kind?: components["schemas"]["UserAssetKind"];
@@ -1754,6 +1812,55 @@ export interface operations {
                 };
             };
             422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    listPlanningConfigSnapshots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent planning configuration snapshots. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanningConfigSnapshot"][];
+                };
+            };
+        };
+    };
+    applyPlanningConfigSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+                snapshotId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Applied planning configuration snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        project: components["schemas"]["Project"];
+                        snapshot: components["schemas"]["PlanningConfigSnapshot"];
+                    };
+                };
+            };
+            409: components["responses"]["Conflict"];
         };
     };
     createCopywritingJob: {
@@ -1929,6 +2036,8 @@ export interface operations {
             content: {
                 "application/json": {
                     storyboardItemIds: string[];
+                    /** Format: uuid */
+                    generationBatchId?: string;
                     revision?: string;
                     generationConfig?: {
                         imageResolution?: components["schemas"]["ImageResolution"];

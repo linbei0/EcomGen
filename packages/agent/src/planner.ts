@@ -115,7 +115,6 @@ export async function reviseImagePrompt(input: PromptRevisionInput): Promise<str
   const agent = new Agent({
     streamFn: openAICompletionsApi().stream,
     getApiKey: () => input.apiKey,
-    onPayload: (payload, model) => withJsonObjectResponse(payload, model),
     initialState: {
       model: input.model,
       systemPrompt: "You revise an existing final image-generation prompt. Return only the complete final prompt text, with no Markdown, planning notes, template metadata, or explanations. Preserve all existing product-truth and safety constraints unless the revision explicitly changes the visual direction.",

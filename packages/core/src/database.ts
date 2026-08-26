@@ -229,6 +229,7 @@ function migrate(database: SqliteDatabase): void {
       storyboard_item_id TEXT NOT NULL,
       job_id TEXT NOT NULL,
       candidate_index INTEGER NOT NULL DEFAULT 1,
+      generation_batch_id TEXT,
       generation_key TEXT,
       generation_snapshot_json TEXT,
       storage_path TEXT NOT NULL,
@@ -241,6 +242,15 @@ function migrate(database: SqliteDatabase): void {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       FOREIGN KEY (storyboard_item_id) REFERENCES storyboard_items(id) ON DELETE CASCADE,
       FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS planning_config_snapshots (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      source_job_id TEXT NOT NULL UNIQUE,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (source_job_id) REFERENCES jobs(id) ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS exports (
       id TEXT PRIMARY KEY,
@@ -315,6 +325,10 @@ function migrate(database: SqliteDatabase): void {
   if (!columnNames(database, "outputs").has("generation_key")) {
     database.exec("ALTER TABLE outputs ADD COLUMN generation_key TEXT");
   }
+  if (!columnNames(database, "outputs").has("generation_batch_id")) {
+    database.exec("ALTER TABLE outputs ADD COLUMN generation_batch_id TEXT");
+    database.exec("UPDATE outputs SET generation_batch_id=job_id WHERE edit_session_id IS NULL AND generation_batch_id IS NULL");
+  }
   database.exec(`
     CREATE TABLE IF NOT EXISTS edit_reference_assets (
       id TEXT PRIMARY KEY,
@@ -342,4 +356,6 @@ function migrate(database: SqliteDatabase): void {
   }
   database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_generation_key ON outputs(generation_key)");
   database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_outputs_generation_key_unique ON outputs(generation_key) WHERE generation_key IS NOT NULL");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_generation_batch ON outputs(project_id, generation_batch_id, created_at)");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_planning_config_snapshots_project_created ON planning_config_snapshots(project_id, created_at DESC)");
 }

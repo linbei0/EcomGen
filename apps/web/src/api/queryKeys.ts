@@ -7,6 +7,7 @@ export const qk = {
   projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,
   project: (id: string) => ["projects", id] as const,
   storyboard: (id: string) => ["projects", id, "storyboard"] as const,
+  planningSnapshots: (id: string) => ["projects", id, "planning-config-snapshots"] as const,
   job: (id: string) => ["jobs", id] as const,
   editTurn: (id: string) => ["edit-turns", id] as const,
   export: (id: string) => ["exports", id] as const,

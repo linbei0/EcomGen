@@ -122,8 +122,8 @@ export function ResultsWorkspace({
         detail={detail}
         selectedOutputIds={selectedOutputIds}
         onSelectionChange={setSelectedOutputIds}
-        onRetryItem={(itemId, generationConfig) => {
-          void generate.mutateAsync({ storyboardItemIds: [itemId], revision: "retry", generationConfig }).catch((error: unknown) => {
+        onRetryItem={(itemId, generationConfig, generationBatchId) => {
+          void generate.mutateAsync({ storyboardItemIds: [itemId], revision: "retry", generationBatchId, generationConfig }).catch((error: unknown) => {
             notification.error({ title: "重新生成失败", description: errorText(error) });
           });
         }}

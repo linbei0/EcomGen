@@ -20,6 +20,24 @@ function seedProvider(repository: EcomRepository) {
 }
 
 describe("EcomRepository", () => {
+  it("保留每个项目最近 20 份规划配置，并按 source job 去重", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["DOMESTIC"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const payload = { project: { ...project }, planning: { planningMode: "AI" as const, requestedTypes: [], targetImageCount: 6, userInstruction: null } };
+    for (let index = 0; index < 21; index += 1) {
+      const job = repository.createJob({ id: `plan-${index}`, projectId: project.id, storyboardItemId: null, type: "PLAN", input: {} });
+      repository.createPlanningConfigSnapshot({ projectId: project.id, sourceJobId: job.id, payload });
+    }
+    const snapshots = repository.listPlanningConfigSnapshots(project.id);
+    expect(snapshots).toHaveLength(20);
+    expect(snapshots.some((snapshot) => snapshot.sourceJobId === "plan-0")).toBe(false);
+    const existing = repository.createPlanningConfigSnapshot({ projectId: project.id, sourceJobId: "plan-20", payload });
+    expect(existing.sourceJobId).toBe("plan-20");
+    expect(repository.listPlanningConfigSnapshots(project.id)).toHaveLength(20);
+    database.close();
+  });
   it("恢复任务时不自动重试结果未知的外部图像请求", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);

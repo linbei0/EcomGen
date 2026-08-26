@@ -1328,15 +1328,92 @@
   object-fit: cover;
 }
 
-/* 分组作为网格单元横向排列：每组出图数少时不再单列堆叠、右侧留空 */
+/* 生成历史用时间线语言：左栏时间元数据 + 贯穿竖线分隔批次，图片直接铺陈不套批次卡片；
+   相邻批次线段首尾相接形成连续时间轴 */
 .lightboxStage {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
-  gap: 20px;
-  align-items: start;
   min-height: 100%;
-  padding: 8px 4px 88px;
+  padding: 12px 8px 88px;
   background: var(--bg-lightbox);
+}
+
+.generationBatch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 0 24px;
+  padding-bottom: 40px;
+}
+
+.generationBatch::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 160px;
+  width: 1px;
+  background: var(--line-2);
+}
+
+.generationBatchMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+}
+
+.generationBatchMeta strong {
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.generationBatchMeta span {
+  color: var(--text-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 节点压在竖线上（148 + 24/2 = 160）；最新批次用唯一强调色标出"最近一次生成" */
+.timelineDot {
+  position: absolute;
+  top: 7px;
+  left: 156px;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background: var(--bg-3);
+}
+
+.generationBatch:first-child .timelineDot {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.generationBatchBody {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .generationBatch {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding-bottom: 32px;
+  }
+
+  .generationBatch::before,
+  .timelineDot {
+    display: none;
+  }
+
+  .generationBatchMeta {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
+    text-align: left;
+  }
 }
 
 .reviewGroup {
@@ -1361,7 +1438,7 @@
 
 .reviewGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 12px;
   content-visibility: auto;
   contain-intrinsic-size: auto 560px;
@@ -1437,7 +1514,46 @@
   border: 1px solid var(--line-1);
   border-radius: var(--radius-m);
   background: var(--bg-2);
+  transition: border-color 160ms ease;
 }
+
+.reviewCard:hover {
+  border-color: var(--line-2);
+}
+
+.generationBatch .reviewGroup + .reviewGroup { margin-top: 28px; }
+.retryMark { position: absolute; right: 8px; bottom: 8px; z-index: 2; padding: 3px 7px; border: 1px solid rgb(255 255 255 / 0.18); border-radius: 999px; background: rgb(12 14 16 / 0.72); color: var(--text-2); font-size: 10px; line-height: 1.2; backdrop-filter: blur(6px); }
+.snapshotTrigger { width: 100%; margin-top: 8px; justify-content: center; }
+/* 限高滚动：快照多时弹层不无限拉长；露出下一条上边缘暗示可滚 */
+.snapshotList {
+  display: grid;
+  min-width: 256px;
+  max-height: 264px;
+  padding: 2px;
+  gap: 6px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+/* 弹层底色为 bg-3，全局滚动条 thumb 同为 bg-3 会隐形，这里单独提亮 */
+.snapshotList::-webkit-scrollbar { width: 8px; }
+.snapshotList::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 8px; }
+.snapshotList::-webkit-scrollbar-track { background: transparent; }
+.snapshotList p { margin: 10px 8px; color: var(--text-3); font-size: 12px; text-align: center; }
+.snapshotList button { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line-1); border-radius: var(--radius-s); background: var(--bg-1); color: var(--text-2); cursor: pointer; text-align: left; transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease; }
+.snapshotList button:hover:not(:disabled) { border-color: var(--accent-line); background: var(--bg-2); color: var(--text-1); }
+.snapshotList button:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+.snapshotList button:disabled { cursor: default; opacity: 0.6; }
+.snapshotMain { display: grid; min-width: 0; gap: 4px; }
+.snapshotList strong { color: var(--text-1); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.snapshotMode { justify-self: start; padding: 1px 7px; border: 1px solid var(--line-1); border-radius: 999px; background: var(--bg-2); color: var(--text-3); font-size: 10px; line-height: 16px; }
+.snapshotMode[data-ai="true"] { border-color: var(--accent-line); background: var(--accent-subtle); color: var(--text-2); }
+.snapshotCount { flex: none; color: var(--text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+/* 悬停详情：时间与模式在列表项上已展示，这里只补差异信息；描述超两行截断控制信息量 */
+.snapshotPreview { display: grid; min-width: 200px; gap: 4px; }
+.snapshotPreviewText { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.snapshotPreviewDesc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 0; color: var(--text-3); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 
 .reviewThumb {
   position: relative;

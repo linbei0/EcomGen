@@ -118,6 +118,25 @@ async function executePlan(job: JobRecord): Promise<void> {
     });
   throwIfCancelled(job);
   const storyboard = repository.saveStoryboard(project.id, plan.campaignStyleLock, "DRAFT", plan.items.map((item) => ({ ...item, status: "DRAFT", compiledPrompt: null })));
+  repository.createPlanningConfigSnapshot({
+    projectId: project.id,
+    sourceJobId: job.id,
+    payload: {
+      project: {
+        name: project.name, category: project.category, productDescription: project.productDescription,
+        verifiedFacts: project.verifiedFacts, prohibitedClaims: project.prohibitedClaims, brandGuidelines: project.brandGuidelines,
+        platformTargets: project.platformTargets, targetMarket: project.targetMarket, copyLanguage: project.copyLanguage,
+        reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId,
+        imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, defaultMode: project.defaultMode,
+        imageResolution: input.imageResolution ?? project.imageResolution, imageAspectRatio: input.imageAspectRatio ?? project.imageAspectRatio,
+        candidatesPerType: input.candidatesPerType ?? project.candidatesPerType, webResearchEnabled: project.webResearchEnabled,
+      },
+      planning: {
+        planningMode: input.planningMode ?? "AI", requestedTypes: input.requestedTypes ?? [],
+        targetImageCount: input.targetImageCount ?? null, userInstruction: input.userInstruction ?? null,
+      },
+    },
+  });
   await updateJob(job, { progress: 90 }); await events.publish(project.id, "storyboard.updated", { storyboard, items: repository.listStoryboardItems(project.id) });
 }
 
@@ -178,6 +197,8 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const inputs = selectGenerationAssets(repository.listAssets(project.id), item);
   if (item.mode === "PIXEL_PROTECTED" && inputs.length === 0) throw new Error("PIXEL_PROTECTED generation requires a PRODUCT_TRUTH image on the project");
   const revision = typeof job.input.revision === "string" ? job.input.revision.trim() : "";
+  const isRetry = revision === "retry";
+  const generationBatchId = typeof job.input.generationBatchId === "string" ? job.input.generationBatchId : job.id;
   const candidateIndex = typeof job.input.candidateIndex === "number" ? job.input.candidateIndex : 1;
   const resolution = (typeof job.input.imageResolution === "string" ? job.input.imageResolution : item.imageResolution) as ImageResolution;
   const aspectRatio = (typeof job.input.imageAspectRatio === "string" ? job.input.imageAspectRatio : item.imageAspectRatio) as ImageAspectRatio;
@@ -187,7 +208,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   if (/upstream template|template fields|anti-ai guidance|category guidance|promptcontract/i.test(basePrompt)) {
     throw new Error("This storyboard contains an old internal template prompt; re-plan the storyboard before generating");
   }
-  const prompt = revision
+  const prompt = revision && !isRetry
     ? await reviseGenerationPrompt(project, basePrompt, revision)
     : basePrompt;
   const generationKey = generationKeyFor(job.id, candidateIndex);
@@ -213,10 +234,11 @@ async function executeGeneration(job: JobRecord): Promise<void> {
     storyboardItemId: item.id,
     jobId: job.id,
     candidateIndex,
-    generationSnapshot: { providerId, modelId, resolution, aspectRatio, size, candidateIndex },
+    generationSnapshot: { providerId, modelId, resolution, aspectRatio, size, candidateIndex, ...(revision ? { revision } : {}) },
     storagePath: stored.path,
     hash: stored.hash,
-    generationKey
+    generationKey,
+    generationBatchId,
   });
   await updateJob(job, { providerTaskId: null });
   repository.updateStoryboardItem(item.id, { status: "GENERATED" }); await events.publish(project.id, "output.created", { output });

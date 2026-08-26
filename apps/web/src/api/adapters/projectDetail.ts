@@ -17,6 +17,16 @@ export type Output = components["schemas"]["Output"];
 export type Job = components["schemas"]["Job"];
 export type CreateProjectInput = components["schemas"]["CreateProjectInput"];
 export type UpdateProjectInput = components["schemas"]["UpdateProjectInput"];
+export interface PlanningConfigSnapshot {
+  id: string;
+  projectId: string;
+  sourceJobId: string;
+  payload: {
+    project: Pick<Project, "name" | "category" | "productDescription" | "verifiedFacts" | "prohibitedClaims" | "brandGuidelines" | "platformTargets" | "targetMarket" | "copyLanguage" | "reasoningProviderId" | "reasoningModelId" | "imageProviderId" | "imageModelId" | "defaultMode" | "imageResolution" | "imageAspectRatio" | "candidatesPerType" | "webResearchEnabled">;
+    planning: { planningMode: PlanningMode; requestedTypes: string[]; targetImageCount: number | null; userInstruction: string | null };
+  };
+  createdAt: string;
+}
 
 export interface ProjectDetail extends Project {
   assets: Asset[];
@@ -110,8 +120,9 @@ function adaptOutput(raw: unknown): Output | null {
   if (!isRecord(raw)) return null;
   const id = asString(raw.id);
   const storyboardItemId = asString(raw.storyboardItemId);
+  const jobId = asString(raw.jobId);
   const createdAt = asString(raw.createdAt);
-  if (!id || !storyboardItemId || !createdAt) return null;
+  if (!id || !storyboardItemId || !jobId || !createdAt) return null;
   const snapshot = isRecord(raw.generationSnapshot)
     ? {
         resolution: RESOLUTIONS.has(raw.generationSnapshot.resolution as ImageResolution)
@@ -122,13 +133,16 @@ function adaptOutput(raw: unknown): Output | null {
           : undefined,
         size: asString(raw.generationSnapshot.size),
         candidateIndex: asNumber(raw.generationSnapshot.candidateIndex),
+        revision: asString(raw.generationSnapshot.revision),
       }
     : null;
   return {
     id,
     storyboardItemId,
+    jobId,
     createdAt,
     candidateIndex: asNumber(raw.candidateIndex),
+    generationBatchId: asString(raw.generationBatchId) ?? null,
     generationSnapshot: snapshot,
     storagePath: asString(raw.storagePath),
     parentOutputId: asString(raw.parentOutputId) ?? null,

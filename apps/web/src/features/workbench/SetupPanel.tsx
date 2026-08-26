@@ -1,8 +1,9 @@
-import { App, AutoComplete, Button, Input, Select, Switch, Tooltip } from "antd";
-import { ChevronDown, Globe2, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store, WandSparkles } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { App, AutoComplete, Button, Input, Popover, Select, Switch, Tooltip } from "antd";
+import { ChevronDown, Globe2, History, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store, WandSparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import type { PlanningMode, ProjectDetail, TargetMarket, UpdateProjectInput } from "../../api/adapters/projectDetail";
+import { useApplyPlanningConfigSnapshot, usePlanningConfigSnapshots } from "../../api/hooks/usePlanningConfigSnapshots";
 import { useCreatePlanningJob } from "../../api/hooks/usePlanning";
 import { useCopywritingResult, useCreateCopywritingJob, type CopywritingTarget } from "../../api/hooks/useCopywriting";
 import { useJob, useRetryJob } from "../../api/hooks/useJobs";
@@ -11,6 +12,7 @@ import { useProviders } from "../../api/hooks/useProviders";
 import { useUpdateProject } from "../../api/hooks/useProjects";
 import { useTemplates } from "../../api/hooks/useTemplates";
 import { errorText } from "../../lib/errorText";
+import { formatDateTime } from "../../lib/format";
 import { loadImageTypes, saveImageTypes } from "../../lib/imageTypes";
 import { jobErrorText } from "../../lib/jobError";
 import { modelOptions } from "../../lib/modelOptions";
@@ -40,6 +42,12 @@ const MARKET_OPTIONS: Array<{ value: Exclude<TargetMarket, null>; label: string 
   { value: "JAPAN", label: "日本" }, { value: "SOUTH_KOREA", label: "韩国" },
 ];
 
+// 快照弹层与面板卡片同为 bg-2，叠放时区分度不足；用 bg-3 + 描边抬升一级，保持 1px 边框不扩缩布局
+const snapshotPopoverStyle: CSSProperties = {
+  background: "var(--bg-3)",
+  border: "1px solid var(--line-2)",
+};
+
 const COPY_LANGUAGE_OPTIONS = [
   { value: "zh-Hans", label: "简体中文 (zh-Hans)" }, { value: "zh-Hant", label: "繁体中文 (zh-Hant)" },
   { value: "en-US", label: "英语（美国）" }, { value: "en-GB", label: "英语（英国）" },
@@ -55,6 +63,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const health = useHealth();
   const templates = useTemplates();
   const createPlan = useCreatePlanningJob(detail.id);
+  const planningSnapshots = usePlanningConfigSnapshots(detail.id);
+  const applyPlanningSnapshot = useApplyPlanningConfigSnapshot(detail.id);
   const createCopywriting = useCreateCopywritingJob(detail.id);
   const retryJob = useRetryJob(detail.id);
   const catalog = templates.data ?? [];
@@ -286,6 +296,26 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
     }
   };
 
+  const applySnapshot = async (snapshotId: string) => {
+    try {
+      const { snapshot } = await applyPlanningSnapshot.mutateAsync(snapshotId);
+      const { project, planning } = snapshot.payload;
+      setName(project.name); setDescription(project.productDescription ?? "");
+      setFacts(toLines(project.verifiedFacts)); setClaims(toLines(project.prohibitedClaims));
+      setCopyLanguage(project.copyLanguage ?? ""); setSavedCopyLanguage(project.copyLanguage ?? "");
+      setPlatformTarget(project.platformTargets[0]); setTargetMarket(project.targetMarket ?? undefined);
+      setDefaultMode(project.defaultMode); setReasoningKeyDraft(`${project.reasoningProviderId}::${project.reasoningModelId}`);
+      setImageKeyDraft(`${project.imageProviderId}::${project.imageModelId}`); setImageResolution(project.imageResolution);
+      setImageAspectRatio(project.imageAspectRatio); candidateRef.current = project.candidatesPerType; setCandidatesPerType(project.candidatesPerType);
+      setPlanningMode(planning.planningMode); setSelected(planning.requestedTypes);
+      setTargetImageCount(planning.targetImageCount ?? DEFAULT_TARGET_IMAGE_COUNT); setInstruction(planning.userInstruction ?? "");
+      if (planning.requestedTypes.length > 0) saveImageTypes(detail.id, planning.requestedTypes);
+      notification.success({ title: "已套用最近配置" });
+    } catch (error) {
+      notification.error({ title: "套用配置失败", description: errorText(error) });
+    }
+  };
+
   return (
     <div className={styles.setup}>
       <p className={styles.sectionTitle}>
@@ -300,6 +330,36 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
         onChange={(event) => setName(event.target.value)}
         onBlur={() => void commitName()}
       />
+      <Popover
+        placement="bottom"
+        trigger="click"
+        arrow={false}
+        styles={{ container: snapshotPopoverStyle }}
+        content={<div className={styles.snapshotList}>{planningSnapshots.data?.length ? planningSnapshots.data.map((snapshot) => {
+          const aiMode = snapshot.payload.planning.planningMode === "AI";
+          const imageCount = snapshot.payload.planning.targetImageCount ?? snapshot.payload.planning.requestedTypes.length;
+          const platform = snapshot.payload.project.platformTargets[0] === "DOMESTIC" ? "大陆电商" : snapshot.payload.project.platformTargets[0] === "AMAZON" ? "亚马逊" : "—";
+          const market = MARKET_OPTIONS.find((option) => option.value === snapshot.payload.project.targetMarket)?.label ?? "—";
+          const mode = snapshot.payload.project.defaultMode === "PIXEL_PROTECTED" ? "像素保护" : "创意模式";
+          return (
+            <Tooltip key={snapshot.id} placement="right" arrow={false} mouseEnterDelay={0.3} title={<div className={styles.snapshotPreview}>
+              <p className={styles.snapshotPreviewText}>{platform} · {market} · {mode} · {imageCount} 张</p>
+              {snapshot.payload.project.productDescription ? <p className={styles.snapshotPreviewDesc}>{snapshot.payload.project.productDescription}</p> : null}
+              {snapshot.payload.planning.userInstruction ? <p className={styles.snapshotPreviewText}>补充说明：{snapshot.payload.planning.userInstruction}</p> : null}
+            </div>}>
+              <button type="button" disabled={applyPlanningSnapshot.isPending} onClick={() => void applySnapshot(snapshot.id)}>
+                <span className={styles.snapshotMain}>
+                  <strong>{formatDateTime(snapshot.createdAt)}</strong>
+                  <span className={styles.snapshotMode} data-ai={aiMode}>{aiMode ? "AI 规划" : "手动选择"}</span>
+                </span>
+                <span className={styles.snapshotCount}>{imageCount} 张</span>
+              </button>
+            </Tooltip>
+          );
+        }) : <p>生成分镜后会自动保留配置。</p>}</div>}
+      >
+        <Button className={styles.snapshotTrigger} size="small" icon={<History size={14} strokeWidth={1.75} />}>最近配置</Button>
+      </Popover>
       <Section title="市场与创作" icon={<Globe2 size={14} strokeWidth={1.75} aria-hidden />}>
         <div className={styles.compactFields}>
           <label className={styles.fieldLabel}>

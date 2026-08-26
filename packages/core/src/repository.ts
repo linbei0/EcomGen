@@ -194,6 +194,7 @@ export interface OutputRecord {
   storyboardItemId: string;
   jobId: string;
   candidateIndex: number;
+  generationBatchId?: string | null;
   generationSnapshot: GenerationSnapshot | null;
   storagePath: string;
   hash: string;
@@ -203,6 +204,43 @@ export interface OutputRecord {
   rootOutputId?: string | null;
   editSessionId?: string | null;
   editTurnId?: string | null;
+  createdAt: string;
+}
+
+export interface PlanningConfigSnapshotPayload {
+  project: {
+    name: string;
+    category: string | null;
+    productDescription: string | null;
+    verifiedFacts: string[];
+    prohibitedClaims: string[];
+    brandGuidelines: Record<string, string>;
+    platformTargets: PlatformTarget[];
+    targetMarket: TargetMarket | null;
+    copyLanguage: string | null;
+    reasoningProviderId: string;
+    reasoningModelId: string;
+    imageProviderId: string;
+    imageModelId: string;
+    defaultMode: StoryboardMode;
+    imageResolution: ImageResolution;
+    imageAspectRatio: ImageAspectRatio;
+    candidatesPerType: number;
+    webResearchEnabled: boolean;
+  };
+  planning: {
+    planningMode: "AI" | "MANUAL";
+    requestedTypes: string[];
+    targetImageCount: number | null;
+    userInstruction: string | null;
+  };
+}
+
+export interface PlanningConfigSnapshotRecord {
+  id: string;
+  projectId: string;
+  sourceJobId: string;
+  payload: PlanningConfigSnapshotPayload;
   createdAt: string;
 }
 
@@ -503,8 +541,8 @@ export class EcomRepository {
       const existing = this.getOutputByGenerationKey(generationKey);
       if (existing) return existing;
     }
-    const record: OutputRecord = { ...input, generationKey, parentOutputId: input.parentOutputId ?? null, rootOutputId: input.rootOutputId ?? null, editSessionId: input.editSessionId ?? null, editTurnId: input.editTurnId ?? null, id: randomUUID(), createdAt: now() };
-    const result = this.db.prepare("INSERT OR IGNORE INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_key,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationKey,@generationSnapshot,@storagePath,@hash,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
+    const record: OutputRecord = { ...input, generationBatchId: input.generationBatchId ?? null, generationKey, parentOutputId: input.parentOutputId ?? null, rootOutputId: input.rootOutputId ?? null, editSessionId: input.editSessionId ?? null, editTurnId: input.editTurnId ?? null, id: randomUUID(), createdAt: now() };
+    const result = this.db.prepare("INSERT OR IGNORE INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_batch_id,generation_key,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationBatchId,@generationKey,@generationSnapshot,@storagePath,@hash,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
       .run({ ...record, generationSnapshot: record.generationSnapshot ? json(record.generationSnapshot) : null });
     if (result.changes === 0 && generationKey) {
       const existing = this.getOutputByGenerationKey(generationKey);
@@ -519,6 +557,24 @@ export class EcomRepository {
   }
   public getOutput(id: string): OutputRecord | undefined { const row = this.db.prepare("SELECT * FROM outputs WHERE id=?").get(id); return row ? mapOutput(row as Row) : undefined; }
   public listOutputs(projectId: string): OutputRecord[] { return (this.db.prepare("SELECT * FROM outputs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapOutput); }
+  public createPlanningConfigSnapshot(input: Omit<PlanningConfigSnapshotRecord, "id" | "createdAt">): PlanningConfigSnapshotRecord {
+    const existing = this.db.prepare("SELECT * FROM planning_config_snapshots WHERE source_job_id=?").get(input.sourceJobId) as Row | undefined;
+    if (existing) return mapPlanningConfigSnapshot(existing);
+    const record: PlanningConfigSnapshotRecord = { ...input, id: randomUUID(), createdAt: now() };
+    const write = this.db.transaction(() => {
+      this.db.prepare("INSERT INTO planning_config_snapshots (id,project_id,source_job_id,payload_json,created_at) VALUES (@id,@projectId,@sourceJobId,@payload,@createdAt)").run({ ...record, payload: json(record.payload) });
+      this.db.prepare("DELETE FROM planning_config_snapshots WHERE project_id=? AND id NOT IN (SELECT id FROM planning_config_snapshots WHERE project_id=? ORDER BY created_at DESC, rowid DESC LIMIT 20)").run(record.projectId, record.projectId);
+    });
+    write();
+    return record;
+  }
+  public listPlanningConfigSnapshots(projectId: string): PlanningConfigSnapshotRecord[] {
+    return (this.db.prepare("SELECT * FROM planning_config_snapshots WHERE project_id=? ORDER BY created_at DESC, rowid DESC LIMIT 20").all(projectId) as Row[]).map(mapPlanningConfigSnapshot);
+  }
+  public getPlanningConfigSnapshot(id: string): PlanningConfigSnapshotRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM planning_config_snapshots WHERE id=?").get(id);
+    return row ? mapPlanningConfigSnapshot(row as Row) : undefined;
+  }
   public listEditOutputs(sessionId: string): OutputRecord[] { return (this.db.prepare("SELECT * FROM outputs WHERE edit_session_id=? ORDER BY created_at ASC").all(sessionId) as Row[]).map(mapOutput); }
   public isOutputInEditSession(sessionId: string, outputId: string): boolean {
     const row = this.db.prepare("SELECT 1 FROM edit_sessions s WHERE s.id=? AND (s.current_output_id=? OR EXISTS (SELECT 1 FROM outputs o WHERE o.id=? AND o.edit_session_id=s.id) OR EXISTS (SELECT 1 FROM outputs o WHERE o.edit_session_id=s.id AND o.root_output_id=?)) LIMIT 1").get(sessionId, outputId, outputId, outputId);
@@ -657,6 +713,7 @@ function mapOutput(row: Row): OutputRecord {
     storyboardItemId: String(row.storyboard_item_id),
     jobId: String(row.job_id),
     candidateIndex: Number(row.candidate_index ?? 1),
+    generationBatchId: row.generation_batch_id ? String(row.generation_batch_id) : null,
     generationSnapshot: row.generation_snapshot_json ? parse(row.generation_snapshot_json) : null,
     storagePath: String(row.storage_path),
     hash: String(row.hash),
@@ -667,6 +724,9 @@ function mapOutput(row: Row): OutputRecord {
     editTurnId: row.edit_turn_id ? String(row.edit_turn_id) : null,
     createdAt: String(row.created_at)
   };
+}
+function mapPlanningConfigSnapshot(row: Row): PlanningConfigSnapshotRecord {
+  return { id: String(row.id), projectId: String(row.project_id), sourceJobId: String(row.source_job_id), payload: parse(row.payload_json), createdAt: String(row.created_at) };
 }
 function mapEditSession(row: Row): EditSessionRecord { return { id: String(row.id), projectId: String(row.project_id), currentOutputId: String(row.current_output_id), status: row.status as EditSessionStatus, memorySummary: parse(row.memory_summary_json ?? "{}"), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapEditTurn(row: Row): EditTurnRecord { const ids = parse(row.reference_asset_ids_json ?? "[]") as string[]; const selections = parse(row.reference_selections_json ?? "[]") as ReferenceSelection[]; return { id: String(row.id), sessionId: String(row.session_id), projectId: String(row.project_id), baseOutputId: String(row.base_output_id), status: row.status as EditTurnStatus, message: String(row.message), annotations: parse(row.annotations_json ?? "{}"), editMaskPath: row.edit_mask_path ? String(row.edit_mask_path) : null, editMaskHash: row.edit_mask_hash ? String(row.edit_mask_hash) : null, protectMaskPath: row.protect_mask_path ? String(row.protect_mask_path) : null, protectMaskHash: row.protect_mask_hash ? String(row.protect_mask_hash) : null, referenceAssetIds: ids, referenceSelections: selections.length ? selections : ids.map((id, order) => ({ id, source: "PROJECT", purpose: "PRODUCT_APPEARANCE", order })), plan: row.plan_json ? parse(row.plan_json) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
