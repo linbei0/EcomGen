@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ options: undefined as { onPayload?: (payload: unknown, model: { id: string; baseUrl: string }) => unknown; initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", images: [] as unknown[], errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, referencedAssets: [] as string[], editResponse: undefined as Record<string, unknown> | undefined, responseText: undefined as string | undefined }));
+const captured = vi.hoisted(() => ({ streamMock: vi.fn(), options: undefined as { onPayload?: (payload: unknown, model: { id: string; baseUrl: string }) => unknown; streamFn?: (...args: unknown[]) => unknown; initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", images: [] as unknown[], errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, referencedAssets: [] as string[], editResponse: undefined as Record<string, unknown> | undefined, responseText: undefined as string | undefined, promptCount: 0, firstResponseText: undefined as string | undefined }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
     public state = { messages: [] as Array<{ role: string; content: Array<{ type: string; text?: string }> }>, errorMessage: captured.errorMessage };
 
-    public constructor(options: { onPayload?: (payload: unknown, model: { id: string; baseUrl: string }) => unknown; initialState?: { thinkingLevel?: string; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } }) {
+    public constructor(options: { onPayload?: (payload: unknown, model: { id: string; baseUrl: string }) => unknown; streamFn?: (...args: unknown[]) => unknown; initialState?: { thinkingLevel?: string; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } }) {
       captured.options = options;
     }
 
@@ -14,6 +14,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
       if (captured.errorMessage) return;
       captured.prompt = message;
       captured.images = images ?? [];
+      captured.promptCount += 1;
       if (message.includes("Plan this edit")) {
         this.state.messages = [{ role: "assistant", content: [{ type: "text", text: JSON.stringify(captured.editResponse ?? { operation: "NATURAL_FUSION", executionMode: "MODEL_DIRECTED", userSummary: "直接编辑", prompt: "edit", targetAnnotationIds: [], targetDescription: "主要商品", targetConfidence: 0.9, clarification: null, requiresConfirmation: true, compositePolicy: "PROVIDER_RESULT", memoryPatch: {} }) }] }];
         return;
@@ -23,13 +24,14 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
         try { await researchTool?.execute("research-call", { query: "product photography lighting" }); } catch { /* Pi 将工具错误返回给模型并继续规划。 */ }
       }
       const plan = { campaignStyleLock: "clean", items: Array.from({ length: captured.itemCount }, (_, index) => ({ assetType: "hero-image", displayName: index === 0 ? "整机斜侧展示首图" : `展示场景${index + 1}`, templateVariant: null, candidateCount: 1, referencedAssets: captured.referencedAssets, mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: index })) };
-      this.state.messages = [{ role: "assistant", content: [{ type: "text", text: captured.responseText ?? JSON.stringify(plan) }] }];
+      const text = captured.promptCount === 1 && captured.firstResponseText !== undefined ? captured.firstResponseText : captured.responseText ?? JSON.stringify(plan);
+      this.state.messages = [{ role: "assistant", content: [{ type: "text", text }] }];
     }
   },
 }));
 
 vi.mock("@earendil-works/pi-ai/api/openai-completions.lazy", () => ({
-  openAICompletionsApi: () => ({ stream: vi.fn() }),
+  openAICompletionsApi: () => ({ stream: captured.streamMock }),
 }));
 
 import { planImageEdit, planStoryboard, reviseImagePrompt, type EditPlannerInput, type PlannerInput } from "./planner.js";
@@ -66,6 +68,17 @@ describe("planStoryboard", () => {
 
     expect(captured.options?.initialState?.thinkingLevel).toBe("medium");
     expect(captured.options?.initialState?.model?.compat).toMatchObject({ maxTokensField: "max_tokens", thinkingFormat: "qwen", supportsDeveloperRole: false });
+  });
+
+  it("为每轮流式请求注入超时上限与瞬时错误重试", async () => {
+    captured.errorMessage = undefined;
+    await planStoryboard(input);
+    const streamFn = captured.options?.streamFn;
+    expect(typeof streamFn).toBe("function");
+    captured.streamMock.mockReset().mockReturnValueOnce("events");
+    const returned = streamFn?.({ id: "model" }, { messages: [] }, { temperature: 0.2 });
+    expect(returned).toBe("events");
+    expect(captured.streamMock).toHaveBeenCalledWith({ id: "model" }, { messages: [] }, { temperature: 0.2, timeoutMs: 240_000, maxRetries: 2 });
   });
 
   it("enables DeepSeek JSON Output without changing generic OpenAI-compatible payloads", async () => {
@@ -158,6 +171,36 @@ describe("planStoryboard", () => {
     try {
       await expect(planStoryboard(input)).resolves.toMatchObject({ campaignStyleLock: "clean" });
     } finally {
+      captured.responseText = undefined;
+    }
+  });
+
+  it("把校验失败回传给模型修复一轮，而不是直接判定任务失败", async () => {
+    captured.errorMessage = undefined;
+    captured.promptCount = 0;
+    captured.firstResponseText = "I have all the details.";
+    try {
+      const result = await planStoryboard(input);
+      expect(result.items[0]?.displayName).toBe("整机斜侧展示首图");
+      expect(captured.promptCount).toBe(2);
+      expect(captured.prompt).toContain("could not be used");
+    } finally {
+      captured.promptCount = 0;
+      captured.firstResponseText = undefined;
+    }
+  });
+
+  it("修复后仍无效时按原校验错误失败", async () => {
+    captured.errorMessage = undefined;
+    captured.promptCount = 0;
+    captured.firstResponseText = "I have all the details.";
+    captured.responseText = "still not json";
+    try {
+      await expect(planStoryboard(input)).rejects.toThrow();
+      expect(captured.promptCount).toBe(2);
+    } finally {
+      captured.promptCount = 0;
+      captured.firstResponseText = undefined;
       captured.responseText = undefined;
     }
   });

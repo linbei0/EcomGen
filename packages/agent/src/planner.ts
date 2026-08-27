@@ -1,10 +1,10 @@
 import { Agent } from "@earendil-works/pi-agent-core";
-import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { ImageContent, Model } from "@earendil-works/pi-ai";
 import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createPlanningTools, readPlatformGuidance, type WebResearchConfig } from "./tools.js";
+import { boundedAgentStream } from "./stream.js";
 import { parseJsonResponse, withJsonObjectResponse } from "./json-response.js";
 export type { WebResearchConfig } from "./tools.js";
 
@@ -46,6 +46,11 @@ export interface PlannedStoryboardItem {
 }
 export interface PlannedStoryboard { campaignStyleLock: string; items: PlannedStoryboardItem[]; }
 
+// 大项目（多图、多分镜）的规划轮次可能持续数分钟；pi-ai 默认无超时且 maxRetries=0，
+// 长连接挂起会一直阻塞到任务失败，因此显式给出每轮超时和瞬时错误重试。
+const AGENT_TURN_TIMEOUT_MS = 240_000;
+const AGENT_TURN_MAX_RETRIES = 2;
+
 const SYSTEM_PROMPT = `You are the planning agent for an e-commerce image-suite product. Your visual playbook is derived from liangdabiao/ecom-details-image (MIT): use a coherent campaign style lock, select a conversion-oriented progression, and make every requested deliverable an editable storyboard item. Work for general products and both DOMESTIC Chinese marketplace and Amazon.
 
 Critical rules:
@@ -75,10 +80,15 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
   const tools = createPlanningTools(marketContext, input.webResearch);
   const platformGuidance = readPlatformGuidance(marketContext);
   const agent = new Agent({
-    streamFn: openAICompletionsApi().stream,
+    streamFn: boundedAgentStream(),
     getApiKey: () => input.apiKey,
     onPayload: (payload, model) => withJsonObjectResponse(payload, model),
-    initialState: { model: input.model, systemPrompt: SYSTEM_PROMPT, thinkingLevel: input.model.reasoning ? "medium" : "off", tools },
+    initialState: {
+      model: input.model,
+      systemPrompt: SYSTEM_PROMPT,
+      thinkingLevel: input.model.reasoning ? "medium" : "off",
+      tools,
+    },
   });
   const selectedTemplates = resolveTemplates(input.requestedTypes);
   const payload = {
@@ -98,10 +108,29 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
     : `Use the catalog and project context to choose a conversion-oriented storyboard with exactly ${targetImageCount} planned items. Read the current market and platform guidance with the business tool before writing final prompts.`;
   await agent.prompt(`Plan this project. ${modeInstruction} Return {"campaignStyleLock":string,"items":[{"assetType":string,"displayName":string,"templateVariant":string|null,"candidateCount":number,"referencedAssets":string[],"mode":"CREATIVE"|"PIXEL_PROTECTED","promptInstruction":string,"factClaims":string[],"riskFlags":string[],"sortOrder":number}]}.\n${JSON.stringify(payload)}`, input.model.input.includes("image") ? input.referenceImages : undefined);
   if (agent.state.errorMessage) throw new Error(`Planning model request failed: ${agent.state.errorMessage}`);
+  // 一次规划动辄数分钟，JSON 解析或校验失败时先带着错误回传给模型修复一轮，避免整体作废。
+  const firstFailure = planFailureReason(assistantText(agent), input);
+  if (!firstFailure) return validatePlan(parseJsonResponse(assistantText(agent)) as PlannedStoryboard, input);
+  await agent.prompt(`Your previous response could not be used: ${firstFailure}\nReturn the complete corrected storyboard JSON object matching the requested schema. Output only valid JSON, no Markdown fences, no explanations.`);
+  if (agent.state.errorMessage) throw new Error(`Planning model request failed: ${agent.state.errorMessage}`);
+  return validatePlan(parseJsonResponse(assistantText(agent)) as PlannedStoryboard, input);
+}
+
+function assistantText(agent: Agent): string {
   const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
   const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n") : "";
   if (!text) throw new Error("Planning model returned no text");
-  return validatePlan(parseJsonResponse(text) as PlannedStoryboard, input);
+  return text;
+}
+
+/** 返回导致规划结果不可用的原因；可用时返回 null，作为修复回环的判定依据。 */
+function planFailureReason(text: string, input: PlannerInput): string | null {
+  try {
+    validatePlan(parseJsonResponse(text) as PlannedStoryboard, input);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
 }
 
 export interface PromptRevisionInput {
@@ -113,7 +142,7 @@ export interface PromptRevisionInput {
 
 export async function reviseImagePrompt(input: PromptRevisionInput): Promise<string> {
   const agent = new Agent({
-    streamFn: openAICompletionsApi().stream,
+    streamFn: boundedAgentStream(),
     getApiKey: () => input.apiKey,
     initialState: {
       model: input.model,
@@ -160,7 +189,7 @@ export interface PlannedEdit {
 
 export async function planImageEdit(input: EditPlannerInput): Promise<PlannedEdit> {
   const agent = new Agent({
-    streamFn: openAICompletionsApi().stream,
+    streamFn: boundedAgentStream(),
     getApiKey: () => input.apiKey,
     onPayload: (payload, model) => withJsonObjectResponse(payload, model),
     initialState: {

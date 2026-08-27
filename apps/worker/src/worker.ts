@@ -75,7 +75,7 @@ async function executePlan(job: JobRecord): Promise<void> {
   await updateJob(job, { progress: 25 });
   const assets = repository.listAssets(project.id);
   const visualAssets = selectVisionAssets(assets);
-  const referenceImages = model.supportsVision ? await imageContents(visualAssets) : undefined;
+  const referenceImages = model.supportsVision ? await visionImageContents(visualAssets) : undefined;
   const input = job.input as { planningMode?: PlanningMode; requestedTypes?: string[]; userInstruction?: string; candidatesPerType?: number; targetImageCount?: number; imageResolution?: ImageResolution; imageAspectRatio?: ImageAspectRatio };
   if (input.imageResolution || input.imageAspectRatio || input.candidatesPerType) {
     repository.updateProject(project.id, {
@@ -88,34 +88,34 @@ async function executePlan(job: JobRecord): Promise<void> {
   const webResearch = project.webResearchEnabled ? configuredWebResearch() : undefined;
   repository.createWebResearchAudit(job.id, webResearch ? "AVAILABLE" : project.webResearchEnabled ? "UNAVAILABLE" : "DISABLED");
   const plan = await planStoryboard({
-      model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
-      apiKey: secrets.decrypt(provider.encryptedApiKey),
-      projectName: project.name,
-      productCategory: project.category,
-      productDescription: project.productDescription,
-      verifiedFacts: project.verifiedFacts,
-      prohibitedClaims: project.prohibitedClaims,
-      brandGuidelines: project.brandGuidelines,
-      platformTargets: project.platformTargets,
-      targetMarket: project.targetMarket,
-      copyLanguage: project.copyLanguage,
-      defaultMode: project.defaultMode,
-      assets: plannerAssets,
-      referenceImages,
-      visionAttachments: visionAttachmentMetadata(visualAssets.map((asset) => ({ ...asset, name: asset.originalName }))),
-      planningMode: input.planningMode ?? "AI",
-      requestedTypes: input.requestedTypes,
-      userInstruction: input.userInstruction,
-      candidatesPerType: input.candidatesPerType ?? project.candidatesPerType,
-      targetImageCount: input.targetImageCount,
-      webResearch: webResearch ? {
-        ...webResearch,
-        audit: {
-          onSearchStarted: () => repository.recordWebResearchSearch(job.id),
-          onSourceAttempt: (attempt) => repository.recordWebResearchAttempt({ jobId: job.id, ...attempt })
-        }
-      } : undefined
-    });
+    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
+    apiKey: secrets.decrypt(provider.encryptedApiKey),
+    projectName: project.name,
+    productCategory: project.category,
+    productDescription: project.productDescription,
+    verifiedFacts: project.verifiedFacts,
+    prohibitedClaims: project.prohibitedClaims,
+    brandGuidelines: project.brandGuidelines,
+    platformTargets: project.platformTargets,
+    targetMarket: project.targetMarket,
+    copyLanguage: project.copyLanguage,
+    defaultMode: project.defaultMode,
+    assets: plannerAssets,
+    referenceImages,
+    visionAttachments: visionAttachmentMetadata(visualAssets.map((asset) => ({ ...asset, name: asset.originalName }))),
+    planningMode: input.planningMode ?? "AI",
+    requestedTypes: input.requestedTypes,
+    userInstruction: input.userInstruction,
+    candidatesPerType: input.candidatesPerType ?? project.candidatesPerType,
+    targetImageCount: input.targetImageCount,
+    webResearch: webResearch ? {
+      ...webResearch,
+      audit: {
+        onSearchStarted: () => repository.recordWebResearchSearch(job.id),
+        onSourceAttempt: (attempt) => repository.recordWebResearchAttempt({ jobId: job.id, ...attempt })
+      }
+    } : undefined
+  });
   throwIfCancelled(job);
   const storyboard = repository.saveStoryboard(project.id, plan.campaignStyleLock, "DRAFT", plan.items.map((item) => ({ ...item, status: "DRAFT", compiledPrompt: null })));
   repository.createPlanningConfigSnapshot({
@@ -152,11 +152,7 @@ async function executeCopywriting(job: JobRecord): Promise<void> {
   const target = job.input.target;
   if (target !== "PRODUCT_DESCRIPTION" && target !== "PLANNING_INSTRUCTION") throw new Error("Copywriting job has an invalid target");
   await updateJob(job, { progress: 25 });
-  const visualAttachments = await Promise.all(assets.map(async (asset) => ({
-    type: "image" as const,
-    mimeType: asset.mimeType,
-    data: (await storage.read(asset.storagePath)).toString("base64"),
-  })));
+  const visualAttachments = await visionImageContents(assets);
   const result = await writeCopywriting({
     target: target as CopywritingTarget,
     model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
@@ -282,7 +278,7 @@ async function executeEditPlan(job: JobRecord): Promise<void> {
       memorySummary: effectiveEditMemory(session, turn.baseOutputId),
       projectFacts: project.verifiedFacts,
       imageCapabilities: imageModel ? imageEditCapabilitiesFor(imageModel) ?? undefined : undefined,
-      sourceImage: model.supportsVision ? { type: "image", mimeType: mimeForStoredPath(source.storagePath), data: (await storage.read(source.storagePath)).toString("base64") } : undefined
+      sourceImage: model.supportsVision ? await visionSourceImage(source.storagePath) : undefined
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -431,8 +427,33 @@ function effectiveEditMemory(session: { memorySummary: { summary?: string; const
   const output = repository.getOutput(outputId);
   return output && !output.parentOutputId ? { summary: session.memorySummary.summary, constraints: session.memorySummary.constraints } : {};
 }
-async function imageContents(assets: AssetRecord[]): Promise<Array<{ type: "image"; mimeType: string; data: string }>> {
-  return Promise.all(assets.map(async (asset) => ({ type: "image" as const, mimeType: asset.mimeType, data: (await storage.read(asset.storagePath)).toString("base64") })));
+// 推理模型只做视觉理解，各 Provider 内部也会把图缩到有限分辨率再切 token；
+// 上传原图只增加传输体积，且 Pi Agent 多轮工具调用会把全部历史大图成倍重发。
+// 生图与像素保护仍读取原始文件，不受此压缩影响。
+const VISION_MAX_EDGE = 1024;
+const VISION_JPEG_QUALITY = 80;
+const VISION_PASSTHROUGH_BYTES = 512 * 1024;
+
+async function compressForVision(buffer: Buffer): Promise<{ data: Buffer; mimeType: string }> {
+  const meta = await sharp(buffer).metadata();
+  const withinBounds = (meta.width ?? 0) <= VISION_MAX_EDGE && (meta.height ?? 0) <= VISION_MAX_EDGE;
+  if (withinBounds && buffer.byteLength <= VISION_PASSTHROUGH_BYTES) {
+    const mimeType = meta.format === "png" ? "image/png" : meta.format === "webp" ? "image/webp" : "image/jpeg";
+    return { data: buffer, mimeType };
+  }
+  return { data: await sharp(buffer).resize(VISION_MAX_EDGE, VISION_MAX_EDGE, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: VISION_JPEG_QUALITY }).toBuffer(), mimeType: "image/jpeg" };
+}
+
+async function visionImageContents(assets: AssetRecord[]): Promise<Array<{ type: "image"; mimeType: string; data: string }>> {
+  return Promise.all(assets.map(async (asset) => {
+    const compressed = await compressForVision(await storage.read(asset.storagePath));
+    return { type: "image" as const, mimeType: compressed.mimeType, data: compressed.data.toString("base64") };
+  }));
+}
+
+async function visionSourceImage(storagePath: string): Promise<{ type: "image"; mimeType: string; data: string }> {
+  const compressed = await compressForVision(await storage.read(storagePath));
+  return { type: "image", mimeType: compressed.mimeType, data: compressed.data.toString("base64") };
 }
 async function reviseGenerationPrompt(project: ProjectRecord, prompt: string, revision: string): Promise<string> {
   const provider = providerFor(project.reasoningProviderId);
@@ -511,7 +532,6 @@ async function compositeNaturalBlend(source: Buffer, generated: Buffer, editMask
 async function compositeOutpaint(source: Buffer, generated: Buffer, canvas: { width: number; height: number; left: number; top: number }): Promise<Buffer> {
   return sharp(generated).resize(canvas.width, canvas.height, { fit: "fill" }).composite([{ input: await sharp(source).png().toBuffer(), left: canvas.left, top: canvas.top }]).png().toBuffer();
 }
-function mimeForStoredPath(path: string): string { return path.endsWith(".jpg") || path.endsWith(".jpeg") ? "image/jpeg" : path.endsWith(".webp") ? "image/webp" : "image/png"; }
 async function providerMaskFor(source: Buffer, editMask: Buffer, protectMask?: Buffer): Promise<Buffer> {
   const meta = await sharp(source).metadata(); if (!meta.width || !meta.height) throw new Error("Source image dimensions are unavailable");
   const edit = await sharp(editMask).greyscale().removeAlpha().resize(meta.width, meta.height, { fit: "fill" }).raw().toBuffer();
@@ -523,7 +543,7 @@ async function providerMaskFor(source: Buffer, editMask: Buffer, protectMask?: B
   }
   return sharp(rgba, { raw: { width: meta.width, height: meta.height, channels: 4 } }).png().toBuffer();
 }
-class JobCancelled extends Error {}
+class JobCancelled extends Error { }
 function throwIfCancelled(job: JobRecord): void { const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") throw new JobCancelled(`Job ${job.id} was cancelled`); }
 function extensionForMime(mimeType: string): string { return mimeType.includes("webp") ? ".webp" : mimeType.includes("jpeg") ? ".jpg" : ".png"; }
 function exportFileName(project: ProjectRecord, output: { storyboardItemId: string; storagePath: string }, index: number): string { const item = repository.getStoryboardItem(output.storyboardItemId); const extension = output.storagePath.slice(output.storagePath.lastIndexOf(".")); return `${safeName(project.name)}_${String(index + 1).padStart(2, "0")}_${safeName(item?.assetType ?? "image")}${extension}`; }

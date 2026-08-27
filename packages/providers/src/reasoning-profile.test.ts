@@ -27,6 +27,7 @@ describe("reasoning protocol profiles", () => {
 
     expect(model.reasoning).toBe(true);
     expect(model.input).toEqual(["text"]);
+    expect(model.maxTokens).toBe(16_384);
     expect(model.compat).toEqual({ maxTokensField: "max_tokens", thinkingFormat: "qwen", supportsDeveloperRole: false });
   });
 });

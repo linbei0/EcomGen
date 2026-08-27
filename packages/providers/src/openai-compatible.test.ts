@@ -91,4 +91,33 @@ describe("OpenAI-compatible image editing", () => {
     });
     expect(imageEditCapabilitiesFor(textModel)).toBeNull();
   });
+
+  it("对瞬时 5xx 重试一次后成功", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("provider busy", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("generated").toString("base64") }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    const result = await provider.generate({ model: "image-model", prompt: "cup", idempotencyKey: "key-1" });
+    expect(result.mimeType).toBe("image/png");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("网络失败重试一次，非瞬时 4xx 不重试", async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(new Response("bad request", { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await expect(provider.generate({ model: "image-model", prompt: "cup" })).rejects.toThrow("bad request");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("瞬时错误连续出现时按上限重试后抛出", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await expect(provider.generate({ model: "image-model", prompt: "cup" })).rejects.toThrow("fetch failed");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

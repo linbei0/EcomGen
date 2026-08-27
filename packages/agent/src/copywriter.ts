@@ -1,7 +1,7 @@
 import { Agent } from "@earendil-works/pi-agent-core";
-import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { ImageContent, Model } from "@earendil-works/pi-ai";
 import type { CopywritingTarget, PlatformTarget, TargetMarket } from "@ecomgen/contracts";
+import { boundedAgentStream } from "./stream.js";
 import { parseJsonResponse, withJsonObjectResponse } from "./json-response.js";
 
 export interface CopywritingInput {
@@ -37,16 +37,18 @@ Critical rules:
 - For PRODUCT_DESCRIPTION, return a concise, natural product description with a product name, core selling points, suitable audience, and expected scenarios. Keep the final formatted content within 400 characters.
 - For PLANNING_INSTRUCTION, return a concise, directly usable visual-planning instruction covering composition, style, lighting, product presentation, and exclusions. Do not add product facts. Keep it within 4000 characters.`;
 
+// 帮写是单轮结构化任务，thinking 只会增加时延并挤占输出配额；超时与瞬时错误
+// 重试由 boundedAgentStream 注入。
 /** 使用 Pi Agent 将项目事实和带角色的视觉输入转换为可编辑文案。 */
 export async function writeCopywriting(input: CopywritingInput): Promise<CopywritingResult> {
   const agent = new Agent({
-    streamFn: openAICompletionsApi().stream,
+    streamFn: boundedAgentStream(),
     getApiKey: () => input.apiKey,
     onPayload: (payload, model) => withJsonObjectResponse(payload, model),
     initialState: {
       model: input.model,
       systemPrompt: SYSTEM_PROMPT,
-      thinkingLevel: input.model.reasoning ? "medium" : "off",
+      thinkingLevel: "off",
       tools: [],
     },
   });

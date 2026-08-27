@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ prompt: "", images: [] as unknown[], response: "" }));
+const captured = vi.hoisted(() => ({ streamMock: vi.fn(), options: undefined as { streamFn?: (...args: unknown[]) => unknown; initialState?: { thinkingLevel?: string } } | undefined, prompt: "", images: [] as unknown[], response: "" }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
     public state = { messages: [] as Array<{ role: string; content: Array<{ type: string; text?: string }> }>, errorMessage: undefined as string | undefined };
+
+    public constructor(options: { streamFn?: (...args: unknown[]) => unknown; initialState?: { thinkingLevel?: string } }) {
+      captured.options = options;
+    }
 
     public async prompt(message: string, images?: unknown[]): Promise<void> {
       captured.prompt = message;
@@ -15,7 +19,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
 }));
 
 vi.mock("@earendil-works/pi-ai/api/openai-completions.lazy", () => ({
-  openAICompletionsApi: () => ({ stream: vi.fn() }),
+  openAICompletionsApi: () => ({ stream: captured.streamMock }),
 }));
 
 import { validateCopywriting, writeCopywriting, type CopywritingInput } from "./copywriter.js";
@@ -60,6 +64,16 @@ describe("writeCopywriting", () => {
     expect(result.content).toContain("期望场景：通勤、办公和居家休闲");
     expect(captured.prompt).toContain("PRODUCT_TRUTH");
     expect(captured.prompt).toContain("STYLE_REFERENCE");
+  });
+
+  it("帮写关闭 thinking 并为每轮流式请求注入超时与重试", async () => {
+    captured.response = JSON.stringify({ productName: "耳机", coreSellingPoints: ["小巧"], suitableAudience: "通勤", expectedScenarios: "通勤" });
+    await writeCopywriting(input);
+    expect(captured.options?.initialState?.thinkingLevel).toBe("off");
+    captured.streamMock.mockReset().mockReturnValueOnce("events");
+    const returned = captured.options?.streamFn?.({ id: "model" }, { messages: [] }, undefined);
+    expect(returned).toBe("events");
+    expect(captured.streamMock).toHaveBeenCalledWith({ id: "model" }, { messages: [] }, { timeoutMs: 240_000, maxRetries: 2 });
   });
 
   it("sends the supplied visual attachment mapping with its images", async () => {
