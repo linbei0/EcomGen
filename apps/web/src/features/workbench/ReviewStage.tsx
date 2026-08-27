@@ -52,6 +52,20 @@ export function ReviewStage({
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [versionRootId, setVersionRootId] = useState<string | null>(null);
+  // 超过 4 张的分镜默认折叠，展开状态按"批次:分镜"记录，避免跨批次串扰
+  const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
+
+  const toggleExpanded = (key: string) => {
+    setExpandedGroups((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const toggleSelection = (outputId: string) => {
     onSelectionChange(selectedOutputIds.includes(outputId)
@@ -92,33 +106,45 @@ export function ReviewStage({
             <i className={styles.timelineDot} aria-hidden="true" />
           </aside>
           <div className={styles.generationBatchBody}>
-            {batch.groups.map((group) => (
-              <div key={group.item.id} className={styles.reviewGroup}>
-                <h2 className={styles.reviewGroupTitle}>
-                  {itemDisplayName(group.item, templates.data ?? [])}
-                  <span>{group.outputs.length} 张</span>
-                </h2>
-                <div className={styles.reviewGrid}>
-                  {group.outputs.map((output) => {
-                    const label = itemDisplayName(group.item, templates.data ?? []);
-                    return (
-                      <ReviewCard
-                        key={output.id}
-                        output={output}
-                        label={label}
-                        downloading={downloadingId === output.id}
-                        onDownload={() => void download(output, label)}
-                        onOpen={() => setLightboxId(output.id)}
-                        editedOutputs={editedByRoot.get(output.id) ?? []}
-                        onOpenVersions={() => setVersionRootId(output.id)}
-                        selected={selectedOutputIds.includes(output.id)}
-                        onToggleSelection={() => toggleSelection(output.id)}
-                      />
-                    );
-                  })}
+            {batch.groups.map((group) => {
+              const label = itemDisplayName(group.item, templates.data ?? []);
+              const groupKey = `${batch.id}:${group.item.id}`;
+              const expanded = expandedGroups.has(groupKey);
+              // 折叠时优先展示最新 4 张（重试图生成时间靠后、最值得关注），按时间正序排列
+              const visibleOutputs = expanded ? group.outputs : group.outputs.slice(-4);
+              const overflowCount = group.outputs.length - visibleOutputs.length;
+              return (
+                <div key={group.item.id} className={styles.reviewGroup}>
+                  <h2 className={styles.reviewGroupTitle}>
+                    {label}
+                    <span>{group.outputs.length} 张</span>
+                    {expanded ? (
+                      <button type="button" className={styles.reviewCollapse} onClick={() => toggleExpanded(groupKey)}>收起</button>
+                    ) : null}
+                  </h2>
+                  <div className={styles.reviewGrid}>
+                    {visibleOutputs.map((output, index) => {
+                      return (
+                        <ReviewCard
+                          key={output.id}
+                          output={output}
+                          label={label}
+                          downloading={downloadingId === output.id}
+                          onDownload={() => void download(output, label)}
+                          onOpen={() => setLightboxId(output.id)}
+                          editedOutputs={editedByRoot.get(output.id) ?? []}
+                          onOpenVersions={() => setVersionRootId(output.id)}
+                          selected={selectedOutputIds.includes(output.id)}
+                          onToggleSelection={() => toggleSelection(output.id)}
+                          overflowCount={index === visibleOutputs.length - 1 ? overflowCount : 0}
+                          onExpand={() => toggleExpanded(groupKey)}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       ))}
@@ -162,6 +188,8 @@ function ReviewCard({
   onOpenVersions,
   selected,
   onToggleSelection,
+  overflowCount = 0,
+  onExpand,
 }: {
   output: Output;
   label: string;
@@ -172,26 +200,39 @@ function ReviewCard({
   onOpenVersions?: () => void;
   selected: boolean;
   onToggleSelection: () => void;
+  /** 折叠时最后一张图上叠加的隐藏数量；为 0 时不渲染遮罩 */
+  overflowCount?: number;
+  onExpand?: () => void;
 }) {
   return (
     <article className={styles.reviewCard} title={label}>
       <div className={styles.reviewThumb}>
         <img src={output.url} alt={label} className={styles.outputImage} loading="lazy" decoding="async" />
-        <label className={styles.outputSelect}>
-          <input type="checkbox" checked={selected} onChange={onToggleSelection} aria-label={`选择下载 ${label}`} />
-        </label>
+        {/* +N 遮罩卡的唯一交互是展开：不渲染选择框和操作条，避免透过半透明遮罩露出来 */}
+        {overflowCount > 0 ? null : (
+          <label className={styles.outputSelect}>
+            <input type="checkbox" checked={selected} onChange={onToggleSelection} aria-label={`选择下载 ${label}`} />
+          </label>
+        )}
         {editedOutputs.length > 0 ? <button type="button" className={styles.editVersionPeek} onClick={onOpenVersions} aria-label={`查看 ${editedOutputs.length} 个编辑版本`}><span className={styles.editVersionPeekImages}>{editedOutputs.slice(-3).map((version) => <img key={version.id} src={version.url} alt="" />)}</span><span>编辑 {editedOutputs.length} 版</span></button> : null}
         {output.generationSnapshot?.revision === "retry" ? <span className={styles.retryMark}>重新生成 · {formatDateTime(output.createdAt)}</span> : null}
-        <div className={styles.reviewActions}>
-          <button type="button" onClick={onDownload} disabled={downloading} aria-label="下载原图">
-            <Download size={16} strokeWidth={1.75} />
-            下载
+        {overflowCount > 0 ? (
+          <button type="button" className={styles.reviewOverflow} onClick={onExpand} aria-label={`展开其余 ${overflowCount} 张`}>
+            +{overflowCount}
           </button>
-          <button type="button" onClick={onOpen} aria-label="灯箱">
-            <Maximize2 size={16} strokeWidth={1.75} />
-            灯箱
-          </button>
-        </div>
+        ) : null}
+        {overflowCount > 0 ? null : (
+          <div className={styles.reviewActions}>
+            <button type="button" onClick={onDownload} disabled={downloading} aria-label="下载原图">
+              <Download size={16} strokeWidth={1.75} />
+              下载
+            </button>
+            <button type="button" onClick={onOpen} aria-label="灯箱">
+              <Maximize2 size={16} strokeWidth={1.75} />
+              灯箱
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );
@@ -239,35 +280,35 @@ function LightboxModal({
   };
   return (
     <>
-    <Modal open={Boolean(output)} onCancel={onClose} footer={null} width={920} title="灯箱">
-      {output && item ? (
-        <div className={styles.lightboxBody}>
-          <Image src={output.url} alt={label} />
-          <div className={styles.lightboxMeta}>
-            <p className={styles.shotType}>{label}</p>
-            <ModeBadge mode={item.mode} />
-            <p className={styles.promptPreview}>{item.promptInstruction}</p>
-            <Button
-              icon={<Download size={14} strokeWidth={1.75} />}
-              loading={downloading}
-              onClick={onDownload}
-            >
-              下载原图
-            </Button>
-            <Button onClick={openRetry}>用此分镜重新生成</Button>
-            <Button type="primary" onClick={onEdit}>编辑图片</Button>
+      <Modal open={Boolean(output)} onCancel={onClose} footer={null} width={920} title="灯箱">
+        {output && item ? (
+          <div className={styles.lightboxBody}>
+            <Image src={output.url} alt={label} />
+            <div className={styles.lightboxMeta}>
+              <p className={styles.shotType}>{label}</p>
+              <ModeBadge mode={item.mode} />
+              <p className={styles.promptPreview}>{item.promptInstruction}</p>
+              <Button
+                icon={<Download size={14} strokeWidth={1.75} />}
+                loading={downloading}
+                onClick={onDownload}
+              >
+                下载原图
+              </Button>
+              <Button onClick={openRetry}>用此分镜重新生成</Button>
+              <Button type="primary" onClick={onEdit}>编辑图片</Button>
+            </div>
           </div>
+        ) : null}
+      </Modal>
+      <Modal open={retryOpen} title="重新生成配置" okText="开始生成" cancelText="取消" onOk={submitRetry} onCancel={() => setRetryOpen(false)} okButtonProps={{ disabled: !modelKey }}>
+        <div className={styles.inspectorSettingGrid}>
+          <label className={styles.fieldLabel}>图片比例<Select value={aspectRatio} options={Object.entries(ASPECT_LABEL).map(([value, label]) => ({ value, label }))} onChange={setAspectRatio} /></label>
+          <label className={styles.fieldLabel}>分辨率<Select value={resolution} options={Object.entries(RESOLUTION_LABEL).map(([value, label]) => ({ value, label }))} onChange={setResolution} /></label>
+          <label className={styles.fieldLabel}>候选数<InputNumber min={1} max={4} value={candidateCount} onChange={(value) => setCandidateCount(value ?? 1)} /></label>
+          <label className={styles.fieldLabel}>生图模型<Select value={modelKey} options={imageOptions} placeholder="选择生图模型" onChange={setModelKey} /></label>
         </div>
-      ) : null}
-    </Modal>
-    <Modal open={retryOpen} title="重新生成配置" okText="开始生成" cancelText="取消" onOk={submitRetry} onCancel={() => setRetryOpen(false)} okButtonProps={{ disabled: !modelKey }}>
-      <div className={styles.inspectorSettingGrid}>
-        <label className={styles.fieldLabel}>图片比例<Select value={aspectRatio} options={Object.entries(ASPECT_LABEL).map(([value, label]) => ({ value, label }))} onChange={setAspectRatio} /></label>
-        <label className={styles.fieldLabel}>分辨率<Select value={resolution} options={Object.entries(RESOLUTION_LABEL).map(([value, label]) => ({ value, label }))} onChange={setResolution} /></label>
-        <label className={styles.fieldLabel}>候选数<InputNumber min={1} max={4} value={candidateCount} onChange={(value) => setCandidateCount(value ?? 1)} /></label>
-        <label className={styles.fieldLabel}>生图模型<Select value={modelKey} options={imageOptions} placeholder="选择生图模型" onChange={setModelKey} /></label>
-      </div>
-    </Modal>
+      </Modal>
     </>
   );
 }
