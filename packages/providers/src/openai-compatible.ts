@@ -11,6 +11,10 @@ export interface ImageGenerationInput {
   /** 同一业务执行重试时保持不变，供兼容 Provider 去重。 */
   idempotencyKey?: string;
   size?: string;
+  /** Gemini 使用的输出宽高比；OpenAI Images 适配器不读取此字段。 */
+  imageAspectRatio?: string;
+  /** Gemini 使用的输出分辨率（1K/2K/4K）；OpenAI Images 适配器不读取此字段。 */
+  imageResolution?: string;
   quality?: "low" | "medium" | "high";
   images?: Array<{ data: Buffer; filename: string; mimeType: string }>;
   mask?: { data: Buffer; filename: string; mimeType: string };
@@ -31,6 +35,8 @@ export interface ImageEditInput {
   idempotencyKey?: string;
   quality?: "low" | "medium" | "high";
   size?: string;
+  imageAspectRatio?: string;
+  imageResolution?: string;
   sourceImage: ImageInput;
   referenceImages?: ImageInput[];
   mask?: ImageInput;
@@ -72,6 +78,11 @@ export interface ImageGenerationResult {
 }
 
 export interface ProviderProbeResult { latencyMs: number; models: string[] | null; }
+
+/** GPT Image 1 系列支持 input_fidelity；gpt-image-2 已默认使用高保真输入。 */
+export function highInputFidelityForOpenAiImageModel(modelId: string): "high" | undefined {
+  return /^(gpt-image-1|gpt-image-1-mini|gpt-image-1\.5)$/i.test(modelId.trim()) ? "high" : undefined;
+}
 
 export class OpenAiCompatibleImageProvider {
   public constructor(private readonly connection: ProviderConnection) {}

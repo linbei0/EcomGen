@@ -9,8 +9,8 @@ import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, o
 import { getTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
-import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
-import { selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata } from "./visual-assets.js";
+import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
+import { assertPixelProtectedInputs, selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata, withGenerationAssetRoles } from "./visual-assets.js";
 
 const masterKey = process.env.ECOMGEN_MASTER_KEY;
 if (!masterKey) throw new Error("ECOMGEN_MASTER_KEY must be a base64-encoded 32-byte key");
@@ -195,7 +195,8 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const provider = providerFor(providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini") throw new Error("Selected image model has no executable image API");
   const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`);
   const inputs = selectGenerationAssets(repository.listAssets(project.id), item);
-  if (item.mode === "PIXEL_PROTECTED" && inputs.length === 0) throw new Error("PIXEL_PROTECTED generation requires a PRODUCT_TRUTH image on the project");
+  const generationInputs = template.supports_image_reference ? inputs : [];
+  if (item.mode === "PIXEL_PROTECTED") assertPixelProtectedInputs(generationInputs);
   const revision = typeof job.input.revision === "string" ? job.input.revision.trim() : "";
   const isRetry = revision === "retry";
   const generationBatchId = typeof job.input.generationBatchId === "string" ? job.input.generationBatchId : job.id;
@@ -211,6 +212,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const prompt = revision && !isRetry
     ? await reviseGenerationPrompt(project, basePrompt, revision)
     : basePrompt;
+  const compiledPrompt = withGenerationAssetRoles(prompt, generationInputs);
   const generationKey = generationKeyFor(job.id, candidateIndex);
   const existingOutput = repository.getOutputByGenerationKey(generationKey);
   if (existingOutput) {
@@ -219,13 +221,18 @@ async function executeGeneration(job: JobRecord): Promise<void> {
     await events.publish(project.id, "output.created", { output: existingOutput });
     return;
   }
-  repository.updateStoryboardItem(item.id, { status: "GENERATING", compiledPrompt: prompt }); await updateJob(job, { progress: 30 });
-  const images = template.supports_image_reference ? await Promise.all(inputs.map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType }))) : [];
+  repository.updateStoryboardItem(item.id, { status: "GENERATING", compiledPrompt }); await updateJob(job, { progress: 30 });
+  const images = await Promise.all(generationInputs.map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType })));
   const generator = model.imageApiKind === "gemini"
     ? new GeminiImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) })
     : new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
   await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED });
-  const result = await generator.generate({ model: model.id, prompt, size, quality: "high", images: images.length ? images : undefined, idempotencyKey: generationKey });
+  const inputFidelity = model.imageApiKind === "openai_images" && generationInputs.some((asset) => asset.role === "PRODUCT_TRUTH")
+    ? highInputFidelityForOpenAiImageModel(model.id)
+    : undefined;
+  const result = await generator.generate(model.imageApiKind === "gemini"
+    ? { model: model.id, prompt: compiledPrompt, imageAspectRatio: aspectRatio, imageResolution: resolution, images: images.length ? images : undefined, idempotencyKey: generationKey }
+    : { model: model.id, prompt: compiledPrompt, size, quality: "high", images: images.length ? images : undefined, inputFidelity, idempotencyKey: generationKey });
   throwIfCancelled(job);
   await updateJob(job, { progress: 80, providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED }); const stored = await storage.putOutput(project.id, result.image, extensionForMime(result.mimeType), generationKey);
   throwIfCancelled(job);
@@ -350,7 +357,18 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
       continue;
     }
     await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED });
-    const result = await generator.editImage({ model: model.id, prompt: plan.prompt, quality: "high", size: resolveImageSize(config.imageResolution, project.imageAspectRatio, "1024x1024"), sourceImage: { data: inputImage, filename: "source.png", mimeType: "image/png" }, referenceImages: references, mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined, operation: plan.operation as EditOperation, inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined, idempotencyKey: generationKey });
+    const editInput = {
+      model: model.id,
+      prompt: plan.prompt,
+      sourceImage: { data: inputImage, filename: "source.png", mimeType: "image/png" },
+      referenceImages: references,
+      mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined,
+      operation: plan.operation as EditOperation,
+      idempotencyKey: generationKey
+    };
+    const result = await generator.editImage(model.imageApiKind === "gemini"
+      ? { ...editInput, imageAspectRatio: project.imageAspectRatio, imageResolution: config.imageResolution }
+      : { ...editInput, quality: "high", size: resolveImageSize(config.imageResolution, project.imageAspectRatio, "1024x1024"), inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined });
     throwIfCancelled(job);
     await updateJob(job, { progress: 30 + Math.round((candidateIndex / config.candidateCount) * 45), providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED });
     const composed = plan.executionMode === "MASKED" && plan.compositePolicy === "MASK_LOCKED" && mask

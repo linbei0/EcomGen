@@ -22,8 +22,8 @@ Worker 在发起外部图像请求前会写入内部“请求已开始”标记�
 ## Prompt 不变量
 
 ```text
-普通生成：compiledPrompt === promptInstruction.trim()
-revision： compiledPrompt === reviseImagePrompt(promptInstruction, revision)
+普通生成：compiledPrompt === withGenerationAssetRoles(promptInstruction.trim(), selectedImages)
+revision： compiledPrompt === withGenerationAssetRoles(reviseImagePrompt(promptInstruction, revision), selectedImages)
 ```
 
 Worker 不得做以下事情：
@@ -32,6 +32,8 @@ Worker 不得做以下事情：
 - 追加 Campaign Style Lock、平台规则或固定负面词；
 - 根据 `displayName` 猜测图片内容并覆盖 Prompt；
 - 发现旧 Prompt 有问题时静默删除内容。
+
+Worker 只会基于实际发送的图片顺序追加固定角色说明：`PRODUCT_TRUTH` 是商品外观的唯一真值，其他素材只能作为包装、风格或版式参考。这段说明会写入 `compiledPrompt`，以便审计 Provider 实际收到的内容。
 
 旧数据如果含有 `Upstream template`、`Template fields` 等内部标记，会明确失败并提示重新规划。这样可以避免用户看到的 Prompt 和 Provider 实际收到的 Prompt 不一致。
 

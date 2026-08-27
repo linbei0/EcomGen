@@ -747,9 +747,10 @@ paths:
       - $ref: '#/components/parameters/JobId'
     post:
       operationId: retryJob
+      description: Supersedes the original failed job as CANCELLED and queues a replacement job. Repeated retries on the same job respond with 409.
       responses:
         '202':
-          description: New retry job queued.
+          description: New retry job queued; the original job is now CANCELLED.
           content:
             application/json:
               schema:
@@ -1134,7 +1135,7 @@ components:
         referencedAssets: { type: array, items: { type: string, format: uuid } }
         mode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
         status: { type: string, enum: [DRAFT, CONFIRMED, GENERATING, GENERATED] }
-        promptInstruction: { type: string, description: Final image-generation prompt produced by Pi Agent; Worker sends this text to the image model without template concatenation. }
+        promptInstruction: { type: string, description: Final image-generation prompt produced by Pi Agent. Worker prefixes selected image roles in their actual request order before sending it to the image model. }
         factClaims: { type: array, items: { type: string } }
         riskFlags: { type: array, items: { type: string } }
     UpdateStoryboardItemInput:
@@ -1149,7 +1150,7 @@ components:
         imageAspectRatio: { $ref: '#/components/schemas/ImageAspectRatio' }
         referencedAssets: { type: array, items: { type: string, format: uuid } }
         mode: { type: string, enum: [CREATIVE, PIXEL_PROTECTED] }
-        promptInstruction: { type: string, maxLength: 4000, description: Editable final image-generation prompt; the saved value is sent as-is to the image model. }
+        promptInstruction: { type: string, maxLength: 4000, description: Editable final image-generation prompt. Worker prefixes selected image roles in their actual request order before sending it to the image model. }
     Job:
       type: object
       required: [id, type, status, progress, retryable, createdAt]

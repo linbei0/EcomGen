@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { imageEditCapabilitiesFor, OpenAiCompatibleImageProvider } from "./openai-compatible.js";
+import { highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor, OpenAiCompatibleImageProvider } from "./openai-compatible.js";
 
 describe("OpenAI-compatible image editing", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -47,6 +47,24 @@ describe("OpenAI-compatible image editing", () => {
     const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
     await provider.generate({ model: "image-model", prompt: "cup", idempotencyKey: "generation-key-1" });
     expect(new Headers(request?.headers).get("Idempotency-Key")).toBe("generation-key-1");
+  });
+
+  it("forwards high input fidelity when generating from product images", async () => {
+    let request: RequestInit | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: URL, init?: RequestInit) => {
+      request = init;
+      return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("generated").toString("base64") }] }), { status: 200 });
+    }));
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await provider.generate({
+      model: "gpt-image-1",
+      prompt: "Use the supplied product image.",
+      inputFidelity: highInputFidelityForOpenAiImageModel("gpt-image-1"),
+      images: [{ data: Buffer.from("product"), filename: "product.png", mimeType: "image/png" }],
+    });
+    expect((request?.body as FormData).get("input_fidelity")).toBe("high");
+    expect(highInputFidelityForOpenAiImageModel("gpt-image-2")).toBeUndefined();
+    expect(highInputFidelityForOpenAiImageModel("third-party-image")).toBeUndefined();
   });
 
   it("does not upload a mask for unmasked edits", async () => {

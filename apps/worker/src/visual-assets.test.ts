@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectGenerationAssets, selectVisionAssets } from "./visual-assets.js";
+import { assertPixelProtectedInputs, selectGenerationAssets, selectVisionAssets, withGenerationAssetRoles } from "./visual-assets.js";
 
 function asset(id: string, role: string, createdAt: string) {
   return { id, role, mimeType: "image/png", createdAt };
@@ -27,5 +27,22 @@ describe("visual asset selection", () => {
   it("keeps all product truth images for pixel-protected generation", () => {
     const assets = [asset("product-1", "PRODUCT_TRUTH", "2026-01-01"), asset("product-2", "PRODUCT_TRUTH", "2026-01-02"), asset("style", "STYLE_REFERENCE", "2026-01-03")];
     expect(selectGenerationAssets(assets, { mode: "PIXEL_PROTECTED", referencedAssets: ["style"] }).map((item) => item.id)).toEqual(["product-1", "product-2", "style"]);
+  });
+
+  it("rejects pixel-protected generation when its inputs contain no product truth", () => {
+    expect(() => assertPixelProtectedInputs([asset("style", "STYLE_REFERENCE", "2026-01-01")])).toThrow("PRODUCT_TRUTH");
+  });
+
+  it("adds the actual input order and role semantics to the generation prompt", () => {
+    const prompt = withGenerationAssetRoles("Create a hero image.", [
+      asset("product", "PRODUCT_TRUTH", "2026-01-01"),
+      asset("layout", "LAYOUT_REFERENCE", "2026-01-02"),
+      asset("style", "STYLE_REFERENCE", "2026-01-03"),
+    ]);
+    expect(prompt).toContain("Image 1: PRODUCT TRUTH");
+    expect(prompt).toContain("Image 2: LAYOUT REFERENCE ONLY");
+    expect(prompt).toContain("Image 3: STYLE REFERENCE ONLY");
+    expect(prompt).toContain("Never use a non-product reference as the product");
+    expect(prompt.endsWith("Create a hero image.")).toBe(true);
   });
 });

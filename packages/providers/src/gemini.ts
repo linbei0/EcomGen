@@ -6,11 +6,11 @@ export class GeminiImageProvider {
   public constructor(private readonly connection: ProviderConnection) {}
 
   public async generate(input: ImageGenerationInput): Promise<ImageGenerationResult> {
-    return this.request(input.model, input.prompt, input.images, input.idempotencyKey);
+    return this.request(input.model, input.prompt, input.images, input.idempotencyKey, input.imageAspectRatio, input.imageResolution);
   }
 
   public async editImage(input: ImageEditInput): Promise<ImageGenerationResult> {
-    return this.request(input.model, input.prompt, [input.sourceImage, ...(input.referenceImages ?? [])], input.idempotencyKey);
+    return this.request(input.model, input.prompt, [input.sourceImage, ...(input.referenceImages ?? [])], input.idempotencyKey, input.imageAspectRatio, input.imageResolution);
   }
 
   public async probe(): Promise<ProviderProbeResult> {
@@ -24,7 +24,7 @@ export class GeminiImageProvider {
     return { latencyMs: Date.now() - started, models };
   }
 
-  private async request(model: string, prompt: string, images?: ImageInput[], idempotencyKey?: string): Promise<ImageGenerationResult> {
+  private async request(model: string, prompt: string, images?: ImageInput[], idempotencyKey?: string, imageAspectRatio?: string, imageResolution?: string): Promise<ImageGenerationResult> {
     const parts = [
       { text: prompt },
       ...(images ?? []).map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.data.toString("base64") } }))
@@ -37,7 +37,15 @@ export class GeminiImageProvider {
       }),
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
-        generationConfig: { responseModalities: ["IMAGE"] }
+        generationConfig: {
+          responseModalities: ["IMAGE"],
+          ...((imageAspectRatio && imageAspectRatio !== "AUTO") || (imageResolution && supportsImageResolution(model))
+            ? { imageConfig: {
+              ...(imageAspectRatio && imageAspectRatio !== "AUTO" ? { aspectRatio: imageAspectRatio } : {}),
+              ...(imageResolution && supportsImageResolution(model) ? { imageSize: imageResolution } : {})
+            } }
+            : {})
+        }
       }),
       signal: AbortSignal.timeout(120_000)
     });
@@ -58,3 +66,7 @@ export class GeminiImageProvider {
   }
 }
 
+/** Gemini 3 图像模型才接受 imageConfig.imageSize；旧模型仅使用比例和默认分辨率。 */
+function supportsImageResolution(model: string): boolean {
+  return /^gemini-3(?:\.\d+)?-/i.test(model.trim());
+}

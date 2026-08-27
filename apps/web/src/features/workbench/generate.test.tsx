@@ -107,9 +107,16 @@ describe("工作台 · 确认并生成", () => {
     });
   });
 
-  it("失败任务可在结果区重试，不展示虚假百分比", async () => {
+  it("失败任务可在结果区重试且原卡片消失，不展示虚假百分比", async () => {
     const user = userEvent.setup();
     let retried = false;
+    const failedJob = {
+      ...GENERATE_JOB_FIXTURE,
+      status: "FAILED" as const,
+      progress: 30,
+      retryable: true,
+      error: { message: "生图失败", requestId: "gen-1" },
+    };
     const items = [
       { ...STORYBOARD_ITEM_FIXTURE, status: "GENERATED" as const },
       { ...STORYBOARD_ITEM_B_FIXTURE, status: "CONFIRMED" as const },
@@ -120,15 +127,13 @@ describe("工作台 · 确认并生成", () => {
           projectDetailPayload({
             storyboard: confirmedBoard.storyboard,
             items,
-            jobs: [
-              {
-                ...GENERATE_JOB_FIXTURE,
-                status: "FAILED",
-                progress: 30,
-                retryable: true,
-                error: { message: "生图失败", requestId: "gen-1" },
-              },
-            ],
+            // 与真实 retry 端点契约一致：原失败任务被标记 CANCELLED，替换为新的 QUEUED 重试任务
+            jobs: retried
+              ? [
+                  { ...failedJob, status: "CANCELLED" as const, cancelRequested: true, retryable: false },
+                  { ...failedJob, id: "eeeeeeee-ffff-4000-8111-222222222222", status: "QUEUED" as const, progress: 0, retryable: false, error: null },
+                ]
+              : [failedJob],
             outputs: [],
           }),
         ),
@@ -136,25 +141,9 @@ describe("工作台 · 确认并生成", () => {
       http.get(`${BASE}/projects/:projectId/storyboard`, () =>
         HttpResponse.json(storyboardPayload(confirmedBoard.storyboard, items)),
       ),
-      http.get(`${BASE}/jobs/:jobId`, () =>
-        HttpResponse.json({
-          ...GENERATE_JOB_FIXTURE,
-          status: "FAILED",
-          progress: 30,
-          retryable: true,
-          error: { message: "生图失败", requestId: "gen-1" },
-        }),
-      ),
       http.post(`${BASE}/jobs/:jobId/retry`, () => {
         retried = true;
-        return HttpResponse.json({
-          ...GENERATE_JOB_FIXTURE,
-          id: "eeeeeeee-ffff-4000-8111-222222222222",
-          status: "QUEUED",
-          progress: 0,
-          retryable: false,
-          error: null,
-        });
+        return HttpResponse.json({ ...failedJob, id: "eeeeeeee-ffff-4000-8111-222222222222", status: "QUEUED", progress: 0, retryable: false, error: null });
       }),
     );
 
@@ -169,6 +158,7 @@ describe("工作台 · 确认并生成", () => {
     await user.click(screen.getByRole("button", { name: "重试生成" }));
     await waitFor(() => {
       expect(retried).toBe(true);
+      expect(screen.queryByText("生图失败（请求 ID：gen-1）")).not.toBeInTheDocument();
     });
   });
 
