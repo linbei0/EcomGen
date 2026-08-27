@@ -1340,7 +1340,8 @@
   object-fit: cover;
 }
 
-/* 生成历史用时间线语言：左栏时间元数据 + 贯穿竖线分隔批次，图片直接铺陈不套批次卡片；
+/* 生成历史保留时间线语言：竖线与节点收窄到左缘，批次时间元数据横排为头部，
+   回收原 148px 左栏空间，版面重心与瀑布流对齐；
    相邻批次线段首尾相接形成连续时间轴 */
 .lightboxStage {
   min-height: 100%;
@@ -1350,10 +1351,7 @@
 
 .generationBatch {
   position: relative;
-  display: grid;
-  grid-template-columns: 148px minmax(0, 1fr);
-  gap: 0 24px;
-  padding-bottom: 40px;
+  padding: 0 0 40px 20px;
 }
 
 .generationBatch::before {
@@ -1361,17 +1359,16 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 160px;
+  left: 4px;
   width: 1px;
   background: var(--line-2);
 }
 
 .generationBatchMeta {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  text-align: right;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .generationBatchMeta strong {
@@ -1387,11 +1384,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 节点压在竖线上（148 + 24/2 = 160）；最新批次用唯一强调色标出"最近一次生成" */
+/* 节点压在左缘竖线上（线在 4px，节点 9px 居中于 4.5px）；最新批次用唯一强调色标出"最近一次生成" */
 .timelineDot {
   position: absolute;
-  top: 7px;
-  left: 156px;
+  top: 4px;
+  left: 0;
   width: 9px;
   height: 9px;
   border: 1px solid var(--line-2);
@@ -1414,8 +1411,6 @@
 
 @media (max-width: 760px) {
   .generationBatch {
-    grid-template-columns: 1fr;
-    gap: 12px;
     padding-bottom: 32px;
   }
 
@@ -1425,10 +1420,7 @@
   }
 
   .generationBatchMeta {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 10px;
-    text-align: left;
+    flex-wrap: wrap;
   }
 }
 
@@ -2080,18 +2072,46 @@
   gap: 20px;
 }
 
+/* 高图时限制图片不超出视口，避免弹层整体滚动 */
+.lightboxBody :global(.ant-image img) {
+  max-height: calc(100vh - 220px);
+  object-fit: contain;
+}
+
+/* 尺寸隔离：meta 不参与行高计算（行高完全由左侧图片决定），
+   Prompt 占据标题与按钮之间的剩余空间，高度随图片自适应，超出内部滚动 */
 .lightboxMeta {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
+  contain: size;
 }
 
 .promptPreview {
   margin: 0;
+  flex: 1 1 auto;
+  min-height: 48px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
   color: var(--text-2);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.promptPreview::-webkit-scrollbar {
+  width: 8px;
+}
+
+.promptPreview::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 8px;
+}
+
+.promptPreview::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 
