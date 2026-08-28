@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { categoryTipFor } from "./product-family.js";
 
 export type ConversionDriver = "VISUAL" | "PAIN_POINT" | "EMOTIONAL";
 export interface UpstreamVariant { description: string; overrides: Record<string, string>; }
@@ -91,17 +92,37 @@ export function templateGuidance(template: EcomTemplate, platformTargets: readon
     productOccupancy: template.productOccupancy,
     whitespace: template.whitespace,
     camera: template.camera,
-    platformReservations: platformTargets.includes("DOMESTIC") ? ["预留顶部居中的价格叠加区", "预留左上角 Logo 区", "不要生成价格、Logo 或促销文字"] : [],
-    categoryGuidance: category ? template.category_tips[category] ?? null : null,
+    platformReservations: platformReservationsFor(template.id, platformTargets),
+    categoryGuidance: categoryTipFor(template.category_tips, category),
     antiAiTips: template.anti_ai_tips
   };
 }
 export function templatePromptContract(template: EcomTemplate, platformTargets: readonly string[], variantName?: string | null, category?: string | null): string {
   const variant = variantName ? template.variants[variantName] : undefined;
-  const categoryTip = category ? template.category_tips[category] : undefined;
+  const categoryTip = categoryTipFor(template.category_tips, category);
   const base = Object.entries({ ...template.prompt_template, ...template.defaults, ...(variant?.overrides ?? {}) }).map(([key, value]) => `${key}: ${value}`).join("; ");
-  const domestic = platformTargets.includes("DOMESTIC") ? " Reserve a blank top-center 200x100 price-overlay zone and blank top-left 200x100 logo zone." : "";
-  return `Upstream template ${String(template.upstreamNumber).padStart(2, "0")} ${template.name}. Template fields: ${base}. Product occupies ${template.productOccupancy}; whitespace ${template.whitespace}; camera: ${template.camera}. Use hex colors and explicit negative constraints.${domestic}${categoryTip ? ` Category guidance: ${categoryTip}.` : ""}${template.anti_ai_tips ? ` Anti-AI guidance: ${template.anti_ai_tips}` : ""}`;
+  const reservations = platformReservationsFor(template.id, platformTargets);
+  return `Upstream template ${String(template.upstreamNumber).padStart(2, "0")} ${template.name}. Template fields: ${base}. Product occupies ${template.productOccupancy}; whitespace ${template.whitespace}; camera: ${template.camera}. Use hex colors and explicit negative constraints.${reservations.length ? ` Platform reservations: ${reservations.join("; ")}.` : ""}${categoryTip ? ` Category guidance: ${categoryTip}.` : ""}${template.anti_ai_tips ? ` Anti-AI guidance: ${template.anti_ai_tips}` : ""}`;
+}
+
+const PACKSHOT_IDS = new Set(["hero-image", "ghost-mannequin", "multi-angle-grid", "flat-lay"]);
+const INFO_IDS = new Set(["infographic", "poster-banner", "size-spec"]);
+
+/** 平台规则按模板职责套用，不按分镜列表第几张；价签区不再套在每张大陆电商图上。 */
+function platformReservationsFor(templateId: string, platformTargets: readonly string[]): string[] {
+  const rules = new Set<string>();
+  const packshot = PACKSHOT_IDS.has(templateId);
+  const info = INFO_IDS.has(templateId);
+  for (const platform of platformTargets) {
+    if (platform === "AMAZON" && packshot) rules.add("纯白背景 #FFFFFF，主体占画面至少 85%，不要任何文字、徽章、Logo、边框或无关道具");
+    else if (platform === "JD" && packshot) rules.add("纯白背景，商品居中，主体约占 80%，不要文字、拼接或诱导点击");
+    else if ((platform === "TAOBAO" || platform === "PDD") && packshot) rules.add("主体占画面 70-85%，高对比，几乎不要文字；不要生成价格或 Logo");
+    else if (platform === "DOUYIN" && (packshot || templateId === "lifestyle-scene" || templateId === "social-media" || templateId === "ugc-style")) rules.add("按商品卡可读来构图：中心主体、高对比，文字极少；不要二维码或他平台标识");
+    else if (platform === "SHOPIFY" && packshot) rules.add("干净统一背景，集合页缩略图可识别，不要促销标");
+    if (info) rules.add("仅使用已核验事实的短文案；不要生成价格、认证或未提供的承诺");
+  }
+  if (platformTargets.length) rules.add("不要生成价格、Logo 或促销文字");
+  return [...rules];
 }
 
 function loadTemplates(): EcomTemplate[] {

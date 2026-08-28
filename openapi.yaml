@@ -966,7 +966,7 @@ components:
         verifiedFacts: { type: array, items: { type: string } }
         prohibitedClaims: { type: array, items: { type: string } }
         brandGuidelines: { type: object, additionalProperties: { type: string } }
-        platformTargets: { type: array, maxItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        platformTargets: { type: array, maxItems: 1, items: { type: string, enum: [TAOBAO, JD, PDD, DOUYIN, AMAZON, SHOPIFY] } }
         targetMarket: { type: [string, 'null'], enum: [CHINA_MAINLAND, HONG_KONG, MACAU, TAIWAN, UNITED_STATES, UNITED_KINGDOM, GERMANY, FRANCE, ITALY, SPAIN, JAPAN, SOUTH_KOREA, null] }
         copyLanguage: { type: [string, 'null'], minLength: 1, maxLength: 64 }
         reasoningProviderId: { type: string, format: uuid }
@@ -1009,7 +1009,7 @@ components:
         verifiedFacts: { type: array, items: { type: string } }
         prohibitedClaims: { type: array, items: { type: string } }
         brandGuidelines: { type: object, additionalProperties: { type: string } }
-        platformTargets: { type: array, maxItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        platformTargets: { type: array, maxItems: 1, items: { type: string, enum: [TAOBAO, JD, PDD, DOUYIN, AMAZON, SHOPIFY] } }
         targetMarket: { type: [string, 'null'], enum: [CHINA_MAINLAND, HONG_KONG, MACAU, TAIWAN, UNITED_STATES, UNITED_KINGDOM, GERMANY, FRANCE, ITALY, SPAIN, JAPAN, SOUTH_KOREA, null] }
         copyLanguage: { type: [string, 'null'], minLength: 1, maxLength: 64 }
         reasoningProviderId: { type: string, format: uuid }
@@ -1030,7 +1030,7 @@ components:
         verifiedFacts: { type: array, items: { type: string } }
         prohibitedClaims: { type: array, items: { type: string } }
         brandGuidelines: { type: object, additionalProperties: { type: string } }
-        platformTargets: { type: array, maxItems: 1, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        platformTargets: { type: array, maxItems: 1, items: { type: string, enum: [TAOBAO, JD, PDD, DOUYIN, AMAZON, SHOPIFY] } }
         targetMarket: { type: [string, 'null'], enum: [CHINA_MAINLAND, HONG_KONG, MACAU, TAIWAN, UNITED_STATES, UNITED_KINGDOM, GERMANY, FRANCE, ITALY, SPAIN, JAPAN, SOUTH_KOREA, null] }
         copyLanguage: { type: [string, 'null'], minLength: 1, maxLength: 64 }
         reasoningModel: { $ref: '#/components/schemas/ModelRef' }
@@ -1291,7 +1291,7 @@ components:
       properties:
         outputIds: { type: array, items: { type: string, format: uuid } }
         filenamePrefix: { type: string }
-        platformTargets: { type: array, items: { type: string, enum: [DOMESTIC, AMAZON] } }
+        platformTargets: { type: array, items: { type: string, enum: [TAOBAO, JD, PDD, DOUYIN, AMAZON, SHOPIFY] } }
         includeDetailPageSlices: { type: boolean, default: false }
     Export:
       type: object

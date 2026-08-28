@@ -823,7 +823,7 @@ export interface components {
             brandGuidelines?: {
                 [key: string]: string;
             };
-            platformTargets: ("DOMESTIC" | "AMAZON")[];
+            platformTargets: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
             /** @enum {string|null} */
             targetMarket: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
             copyLanguage: string | null;
@@ -869,7 +869,7 @@ export interface components {
             brandGuidelines?: {
                 [key: string]: string;
             };
-            platformTargets?: ("DOMESTIC" | "AMAZON")[];
+            platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
             /** @enum {string|null} */
             targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
             copyLanguage?: string | null;
@@ -896,7 +896,7 @@ export interface components {
             brandGuidelines?: {
                 [key: string]: string;
             };
-            platformTargets?: ("DOMESTIC" | "AMAZON")[];
+            platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
             /** @enum {string|null} */
             targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
             copyLanguage?: string | null;
@@ -1180,7 +1180,7 @@ export interface components {
         CreateExportJobInput: {
             outputIds?: string[];
             filenamePrefix?: string;
-            platformTargets?: ("DOMESTIC" | "AMAZON")[];
+            platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
             /** @default false */
             includeDetailPageSlices: boolean;
         };

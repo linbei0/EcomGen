@@ -13,12 +13,13 @@ import { useUpdateProject } from "../../api/hooks/useProjects";
 import { useTemplates } from "../../api/hooks/useTemplates";
 import { errorText } from "../../lib/errorText";
 import { formatDateTime } from "../../lib/format";
+import { COPY_LANGUAGE_AUTOCOMPLETE_OPTIONS, copyLanguageLabel, copyLanguageOptionMatches, resolveCopyLanguage } from "../../lib/copyLanguage";
 import { loadImageTypes, saveImageTypes } from "../../lib/imageTypes";
 import { jobErrorText } from "../../lib/jobError";
 import { modelOptions } from "../../lib/modelOptions";
 import { randomUuid } from "../../lib/randomUuid";
 import { canResubmitPlan, isActiveJob, latestPlanJob } from "../../lib/planJob";
-import { ASPECT_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
+import { ASPECT_LABEL, PLATFORM_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import styles from "./workbench.module.css";
 
@@ -48,14 +49,6 @@ const snapshotPopoverStyle: CSSProperties = {
   border: "1px solid var(--line-2)",
 };
 
-const COPY_LANGUAGE_OPTIONS = [
-  { value: "zh-Hans", label: "简体中文 (zh-Hans)" }, { value: "zh-Hant", label: "繁体中文 (zh-Hant)" },
-  { value: "en-US", label: "英语（美国）" }, { value: "en-GB", label: "英语（英国）" },
-  { value: "de-DE", label: "德语" }, { value: "fr-FR", label: "法语" },
-  { value: "it-IT", label: "意大利语" }, { value: "es-ES", label: "西班牙语" },
-  { value: "ja-JP", label: "日语" }, { value: "ko-KR", label: "韩语" },
-];
-
 export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const { notification } = App.useApp();
   const updateProject = useUpdateProject(detail.id);
@@ -79,7 +72,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const [instruction, setInstruction] = useState("");
   const [activeJobId, setActiveJobId] = useState<string | undefined>(undefined);
   const [activeCopywritingJob, setActiveCopywritingJob] = useState<{ id: string; target: CopywritingTarget } | undefined>(undefined);
-  const [copyLanguage, setCopyLanguage] = useState(detail.copyLanguage ?? "");
+  const [copyLanguage, setCopyLanguage] = useState(copyLanguageLabel(detail.copyLanguage));
   const [savedCopyLanguage, setSavedCopyLanguage] = useState(detail.copyLanguage ?? "");
   const [platformTarget, setPlatformTarget] = useState(detail.platformTargets[0]);
   const [targetMarket, setTargetMarket] = useState(detail.targetMarket ?? undefined);
@@ -103,7 +96,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   }, [detail.productDescription, detail.verifiedFacts, detail.prohibitedClaims]);
   useEffect(() => {
     const next = detail.copyLanguage ?? "";
-    setCopyLanguage(next);
+    setCopyLanguage(copyLanguageLabel(next));
     setSavedCopyLanguage(next);
   }, [detail.copyLanguage]);
   useEffect(() => setPlatformTarget(detail.platformTargets[0]), [detail.platformTargets]);
@@ -184,9 +177,9 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   };
 
   const commitCopyLanguage = (value: string) => {
-    const next = value.trim();
+    const next = resolveCopyLanguage(value);
+    setCopyLanguage(copyLanguageLabel(next));
     if (next === savedCopyLanguage) return;
-    setCopyLanguage(next);
     setSavedCopyLanguage(next);
     void save({ copyLanguage: next || null }, "保存文案语种失败");
   };
@@ -302,7 +295,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       const { project, planning } = snapshot.payload;
       setName(project.name); setDescription(project.productDescription ?? "");
       setFacts(toLines(project.verifiedFacts)); setClaims(toLines(project.prohibitedClaims));
-      setCopyLanguage(project.copyLanguage ?? ""); setSavedCopyLanguage(project.copyLanguage ?? "");
+      setCopyLanguage(copyLanguageLabel(project.copyLanguage)); setSavedCopyLanguage(project.copyLanguage ?? "");
       setPlatformTarget(project.platformTargets[0]); setTargetMarket(project.targetMarket ?? undefined);
       setDefaultMode(project.defaultMode); setReasoningKeyDraft(`${project.reasoningProviderId}::${project.reasoningModelId}`);
       setImageKeyDraft(`${project.imageProviderId}::${project.imageModelId}`); setImageResolution(project.imageResolution);
@@ -338,7 +331,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
         content={<div className={styles.snapshotList}>{planningSnapshots.data?.length ? planningSnapshots.data.map((snapshot) => {
           const aiMode = snapshot.payload.planning.planningMode === "AI";
           const imageCount = snapshot.payload.planning.targetImageCount ?? snapshot.payload.planning.requestedTypes.length;
-          const platform = snapshot.payload.project.platformTargets[0] === "DOMESTIC" ? "大陆电商" : snapshot.payload.project.platformTargets[0] === "AMAZON" ? "亚马逊" : "—";
+          const platform = snapshot.payload.project.platformTargets[0] ? PLATFORM_LABEL[snapshot.payload.project.platformTargets[0]] ?? "—" : "—";
           const market = MARKET_OPTIONS.find((option) => option.value === snapshot.payload.project.targetMarket)?.label ?? "—";
           const mode = snapshot.payload.project.defaultMode === "PIXEL_PROTECTED" ? "像素保护" : "创意模式";
           return (
@@ -369,8 +362,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
               allowClear
               placeholder="请选择目标平台"
               value={platformTarget}
-              options={[{ value: "DOMESTIC", label: "大陆电商" }, { value: "AMAZON", label: "亚马逊" }]}
-              onChange={(value: "DOMESTIC" | "AMAZON" | undefined) => void saveOptimistic(value, setPlatformTarget, platformTarget, { platformTargets: value ? [value] : [] }, "保存平台失败")}
+              options={(Object.entries(PLATFORM_LABEL) as Array<[keyof typeof PLATFORM_LABEL, string]>).map(([value, label]) => ({ value, label }))}
+              onChange={(value: keyof typeof PLATFORM_LABEL | undefined) => void saveOptimistic(value, setPlatformTarget, platformTarget, { platformTargets: value ? [value] : [] }, "保存平台失败")}
             />
           </label>
           <label className={styles.fieldLabel}>
@@ -392,8 +385,9 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
               aria-label="文案语种"
               allowClear
               value={copyLanguage || undefined}
-              options={COPY_LANGUAGE_OPTIONS}
+              options={COPY_LANGUAGE_AUTOCOMPLETE_OPTIONS}
               placeholder="请选择或输入文案语种"
+              filterOption={(input, option) => copyLanguageOptionMatches(input, String(option?.value ?? ""))}
               onChange={(value) => setCopyLanguage(value)}
               onSelect={(value) => commitCopyLanguage(value)}
               onBlur={() => commitCopyLanguage(copyLanguage)}

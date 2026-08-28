@@ -7,7 +7,7 @@ function detail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
   return {
     id: "p1",
     name: "demo",
-    platformTargets: ["DOMESTIC"],
+    platformTargets: ["TAOBAO"],
     targetMarket: null,
     copyLanguage: null,
     reasoningProviderId: "r",

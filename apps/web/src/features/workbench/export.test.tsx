@@ -57,7 +57,7 @@ describe("工作台 · 导出", () => {
     await waitFor(() => {
       expect(captured).toMatchObject({
         outputIds: [OUTPUT_ID, OUTPUT_ID_B],
-        platformTargets: ["DOMESTIC"],
+        platformTargets: ["TAOBAO"],
         includeDetailPageSlices: false,
       });
     });

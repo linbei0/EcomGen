@@ -1,7 +1,9 @@
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
-import type { PlatformTarget, TargetMarket } from "@ecomgen/contracts";
 import { getTemplate, templateGuidance } from "@ecomgen/ecom-skill";
+import { readPlatformGuidance, type MarketGuidanceContext } from "./platform-guidance.js";
+
+export { readPlatformGuidance, type MarketGuidanceContext } from "./platform-guidance.js";
 
 export interface WebResearchConfig {
   sources: WebResearchSource[];
@@ -57,51 +59,6 @@ function textResult<T>(details: T): AgentToolResult<T> {
   return { content: [{ type: "text", text: JSON.stringify(details) }], details };
 }
 
-export interface MarketGuidanceContext {
-  platformTargets: readonly PlatformTarget[];
-  targetMarket: TargetMarket | null;
-  copyLanguage: string | null;
-}
-
-interface MarketGuidance {
-  name: string;
-  defaultCopyLanguage: string;
-}
-
-const MARKET_GUIDANCE: Record<TargetMarket, MarketGuidance> = {
-  CHINA_MAINLAND: { name: "中国大陆", defaultCopyLanguage: "zh-Hans" },
-  HONG_KONG: { name: "香港", defaultCopyLanguage: "zh-Hant" },
-  MACAU: { name: "澳门", defaultCopyLanguage: "zh-Hant" },
-  TAIWAN: { name: "台湾", defaultCopyLanguage: "zh-Hant" },
-  UNITED_STATES: { name: "美国", defaultCopyLanguage: "en-US" },
-  UNITED_KINGDOM: { name: "英国", defaultCopyLanguage: "en-GB" },
-  GERMANY: { name: "德国", defaultCopyLanguage: "de-DE" },
-  FRANCE: { name: "法国", defaultCopyLanguage: "fr-FR" },
-  ITALY: { name: "意大利", defaultCopyLanguage: "it-IT" },
-  SPAIN: { name: "西班牙", defaultCopyLanguage: "es-ES" },
-  JAPAN: { name: "日本", defaultCopyLanguage: "ja-JP" },
-  SOUTH_KOREA: { name: "韩国", defaultCopyLanguage: "ko-KR" }
-};
-
-export function readPlatformGuidance(context: MarketGuidanceContext) {
-  const market = context.targetMarket ? MARKET_GUIDANCE[context.targetMarket] : null;
-  const targets = context.platformTargets.map((target) => target === "DOMESTIC"
-    ? { target, market: "中国大陆电商", rules: ["优先适配中文电商首图与详情页视觉", "如项目需要营销叠加，预留顶部居中的价格区和左上角 Logo 区；不要让生图模型生成价格或 Logo，只有分镜确需时才生成已核验事实文案"] }
-    : { target, market: "Amazon 等国际电商", rules: ["优先保持主体清晰、背景克制、产品占比稳定", "避免未经提供的认证、参数、品牌承诺和可读促销文字"] });
-  return {
-    targets,
-    market: market ? { id: context.targetMarket, name: market.name } : null,
-    effectiveCopyLanguage: context.copyLanguage ?? market?.defaultCopyLanguage ?? null,
-    copyLanguageSource: context.copyLanguage ? "explicit" : market ? "market-default" : "none",
-    copyPolicy: [
-      "Only use copy when the storyboard type needs it or the user explicitly requests it; a selected language never requires copy in every image.",
-      "When copy is needed, use the effective copy language and only verified product facts.",
-      "Do not derive visual style from the selected market. Use templates, verified product facts, brand guidance, reference assets, and user instruction for visual direction.",
-      "Do not introduce stereotypes, landmarks, holidays, cultural symbols, prices, certifications, guarantees, or unsupported claims unless explicitly supplied as verified input."
-    ]
-  };
-}
-
 /** Pi 只能通过只读业务工具读取电商规范；联网研究必须使用受控搜索工具。 */
 export function createPlanningTools(context: MarketGuidanceContext, webResearch?: WebResearchConfig): AgentTool[] {
   const readTemplate: AgentTool<typeof readTemplateParameters> = {
@@ -117,7 +74,7 @@ export function createPlanningTools(context: MarketGuidanceContext, webResearch?
         id: template.id,
         name: template.name,
         variant: params.variant ?? null,
-        guidance: templateGuidance(template, context.platformTargets, params.variant, params.category),
+        guidance: templateGuidance(template, context.platformTargets, params.variant, params.category ?? context.productCategory),
         variants: Object.fromEntries(Object.entries(template.variants).map(([key, value]) => [key, value.description])),
         supportsImageReference: template.supports_image_reference
       });
@@ -127,7 +84,7 @@ export function createPlanningTools(context: MarketGuidanceContext, webResearch?
   const readPlatform: AgentTool<typeof readPlatformParameters> = {
     name: "read_platform_guidance",
     label: "读取市场与平台规范",
-    description: "读取当前项目的目标市场、文案语种和目标平台的版式、文字与合规约束。只返回业务规则，最终 Prompt 必须把它们改写成生图模型能直接执行的自然语言。",
+    description: "读取当前项目的目标市场、文案语种、商品品类和目标平台的版式、文字与合规约束。只返回业务规则，最终 Prompt 必须把它们改写成生图模型能直接执行的自然语言。",
     parameters: readPlatformParameters,
     execute: async (_toolCallId: string, _params: ReadPlatformParameters): Promise<AgentToolResult<unknown>> => {
       return textResult(readPlatformGuidance(context));

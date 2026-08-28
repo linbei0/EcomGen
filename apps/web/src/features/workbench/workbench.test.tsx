@@ -157,10 +157,34 @@ describe("工作台 · 左栏编辑", () => {
     await user.type(language, "pt-BR");
     fireEvent.blur(language);
     await waitFor(() => expect(patches.at(-1)).toMatchObject({ copyLanguage: "pt-BR" }));
+    expect(language).toHaveValue("pt-BR");
 
     await user.click(section);
     expect(section).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByLabelText("目标市场")).not.toBeInTheDocument();
+  });
+
+  it("文案语种显示中文名，选择后仍提交语言代码", async () => {
+    const user = userEvent.setup();
+    const patches: Record<string, unknown>[] = [];
+    let copyLanguage: string | null = "zh-Hans";
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload({ copyLanguage }))),
+      http.patch(`${BASE}/projects/:projectId`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        patches.push(body);
+        if ("copyLanguage" in body) copyLanguage = typeof body.copyLanguage === "string" ? body.copyLanguage : null;
+        return HttpResponse.json({ ...PROJECT_FIXTURE, ...body, copyLanguage });
+      }),
+    );
+    renderWorkbench();
+
+    const language = await screen.findByLabelText("文案语种");
+    expect(language).toHaveValue("简体中文");
+    await user.click(language);
+    await user.click(await screen.findByText("英语（美国）"));
+    await waitFor(() => expect(patches.at(-1)).toMatchObject({ copyLanguage: "en-US" }));
+    expect(language).toHaveValue("英语（美国）");
   });
 
   it("名称失焦提交，平台与模式点击即提交", async () => {

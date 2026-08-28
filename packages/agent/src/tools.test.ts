@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPlanningTools } from "./tools.js";
 
-const domesticContext = { platformTargets: ["DOMESTIC"] as const, targetMarket: null, copyLanguage: null };
-const amazonContext = { platformTargets: ["AMAZON"] as const, targetMarket: null, copyLanguage: null };
+const taobaoContext = { platformTargets: ["TAOBAO"] as const, targetMarket: null, copyLanguage: null, productCategory: "服装" };
+const amazonContext = { platformTargets: ["AMAZON"] as const, targetMarket: null, copyLanguage: null, productCategory: null };
 
 describe("Pi planning business tools", () => {
   it("returns structured template guidance without exposing a prompt contract string", async () => {
-    const tool = createPlanningTools(domesticContext)[0];
+    const tool = createPlanningTools(taobaoContext)[0];
     const result = await tool.execute("call-1", { templateId: "hero-image" });
-    const guidance = result.details as { guidance: { visualFields: Record<string, string>; platformReservations: string[] } };
+    const guidance = result.details as { guidance: { visualFields: Record<string, string>; platformReservations: string[]; categoryGuidance: string | null } };
     expect(guidance.guidance.visualFields).toHaveProperty("type");
-    expect(guidance.guidance.platformReservations).toContain("预留顶部居中的价格叠加区");
+    expect(guidance.guidance.platformReservations.join(" ")).toContain("70-85%");
+    expect(guidance.guidance.categoryGuidance).toMatch(/fabric|drape|stitching/i);
     expect(JSON.stringify(guidance)).not.toContain("Upstream template");
   });
 
@@ -18,11 +19,15 @@ describe("Pi planning business tools", () => {
     const tools = createPlanningTools(amazonContext);
     await expect(tools[0].execute("call-1", { templateId: "missing-template" })).rejects.toThrow("Unknown ecom-details-image template");
     const result = await tools[1].execute("call-2", {});
-    expect(result.details).toMatchObject({ targets: [{ target: "AMAZON" }], effectiveCopyLanguage: null });
+    const details = result.details as { targets: Array<{ target: string; hero: { textBudget: string; occupancy: string } }>; planningPolicy: string[] };
+    expect(details).toMatchObject({ targets: [{ target: "AMAZON" }], effectiveCopyLanguage: null });
+    expect(details.targets[0]?.hero.textBudget).toBe("none");
+    expect(details.targets[0]?.hero.occupancy).toContain("85%");
+    expect(details.planningPolicy.some((rule) => rule.startsWith("MANUAL:"))).toBe(true);
   });
 
   it("uses an explicit language before the selected market default", async () => {
-    const tool = createPlanningTools({ platformTargets: [], targetMarket: "JAPAN", copyLanguage: "en-US" })[1];
+    const tool = createPlanningTools({ platformTargets: [], targetMarket: "JAPAN", copyLanguage: "en-US", productCategory: null })[1];
     const result = await tool.execute("call-market", {});
     expect(result.details).toMatchObject({
       market: { id: "JAPAN" },
@@ -32,11 +37,12 @@ describe("Pi planning business tools", () => {
   });
 
   it("derives the market language only when the user did not select one", async () => {
-    const tool = createPlanningTools({ platformTargets: [], targetMarket: "TAIWAN", copyLanguage: null })[1];
+    const tool = createPlanningTools({ platformTargets: [], targetMarket: "TAIWAN", copyLanguage: null, productCategory: "消费电子" })[1];
     const result = await tool.execute("call-market", {});
-    const guidance = result.details as { market: { id: string; visualDirection?: unknown }; effectiveCopyLanguage: string; copyLanguageSource: string; copyPolicy: string[] };
+    const guidance = result.details as { market: { id: string; visualDirection?: unknown }; effectiveCopyLanguage: string; copyLanguageSource: string; copyPolicy: string[]; product: { family: string | null } };
     expect(guidance).toMatchObject({ effectiveCopyLanguage: "zh-Hant", copyLanguageSource: "market-default" });
     expect(guidance.market).not.toHaveProperty("visualDirection");
+    expect(guidance.product).toMatchObject({ family: "electronics" });
     expect(guidance.copyPolicy).toContain("Do not derive visual style from the selected market. Use templates, verified product facts, brand guidance, reference assets, and user instruction for visual direction.");
   });
 

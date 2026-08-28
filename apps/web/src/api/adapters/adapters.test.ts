@@ -38,7 +38,7 @@ describe("adapters", () => {
     const detail = adaptProjectDetail({
       id: "p1",
       name: "耳机",
-      platformTargets: ["DOMESTIC"],
+      platformTargets: ["TAOBAO"],
       targetMarket: null,
       copyLanguage: null,
       reasoningProviderId: "r",
@@ -74,7 +74,7 @@ describe("adapters", () => {
     const project = adaptProject({
       id: "p1",
       name: "耳机",
-      platformTargets: ["DOMESTIC"],
+      platformTargets: ["TAOBAO"],
       targetMarket: null,
       copyLanguage: null,
       reasoningProviderId: "r",

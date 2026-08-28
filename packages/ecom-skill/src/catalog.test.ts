@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ECOM_TEMPLATES, resolveTemplates, templatePromptContract } from "./catalog.js";
+import { ECOM_TEMPLATES, resolveTemplates, templateGuidance, templatePromptContract } from "./catalog.js";
+import { resolveProductFamily } from "./product-family.js";
 
 describe("ecom-details-image catalog adaptation", () => {
   it("keeps all 25 upstream templates addressable by stable IDs", () => {
@@ -7,9 +8,18 @@ describe("ecom-details-image catalog adaptation", () => {
     expect(resolveTemplates(["主图", "detail-macro", "直播"]).map((template) => template.id)).toEqual(["hero-image", "detail-macro", "livestream"]);
   });
 
-  it("compiles domestic marketplace reservations into the template contract", () => {
+  it("maps free-text categories onto template families without inventing a match", () => {
+    expect(resolveProductFamily("消费电子")).toBe("electronics");
+    expect(resolveProductFamily("女装")).toBe("fashion");
+    expect(resolveProductFamily("unknown-widget")).toBeNull();
+  });
+
+  it("scopes packshot reservations by platform instead of a generic overlay zone", () => {
     const hero = ECOM_TEMPLATES[0];
-    expect(templatePromptContract(hero, ["DOMESTIC"])).toContain("200x100 price-overlay zone");
+    expect(templateGuidance(hero, ["TAOBAO"]).platformReservations.join(" ")).toContain("70-85%");
+    expect(templateGuidance(hero, ["AMAZON"]).platformReservations.join(" ")).toContain("85%");
+    expect(templatePromptContract(hero, ["TAOBAO"])).not.toContain("200x100");
     expect(templatePromptContract(hero, ["AMAZON"])).not.toContain("price-overlay zone");
+    expect(templateGuidance(hero, ["TAOBAO"], null, "服装").categoryGuidance).toMatch(/fabric|drape|stitching/i);
   });
 });

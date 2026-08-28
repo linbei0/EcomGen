@@ -50,7 +50,7 @@ const input: PlannerInput = {
   verifiedFacts: [],
   prohibitedClaims: [],
   brandGuidelines: {},
-  platformTargets: ["DOMESTIC"],
+  platformTargets: ["TAOBAO"],
   targetMarket: null,
   copyLanguage: null,
   defaultMode: "CREATIVE",
@@ -95,6 +95,7 @@ describe("planStoryboard", () => {
     await planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: ["hero-image"] });
 
     expect(captured.prompt).toContain("Manual selection is authoritative");
+    expect(captured.prompt).toContain("Do not add a platform feed extra shot");
     const result = await planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: ["hero-image"] });
     expect(result.items[0]?.displayName).toBe("整机斜侧展示首图");
   });
@@ -119,6 +120,7 @@ describe("planStoryboard", () => {
     expect(captured.prompt).toContain("platformGuidance");
     expect(captured.prompt).toContain("ja-JP");
     expect(captured.prompt).toContain("日本");
+    expect(captured.prompt).toContain("product category/family first");
   });
 
   it("passes visual attachments and their asset mapping to the vision model", async () => {

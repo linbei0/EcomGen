@@ -9,7 +9,7 @@ import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFinger
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, ModelDefinition, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, roleForUserAssetKind } from "@ecomgen/contracts";
+import { DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, roleForUserAssetKind } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -678,7 +678,7 @@ async function validateMaskDimensions(sourcePath: string, mask: Buffer, storage:
 function enumValue<T extends string>(value: unknown, allowed: readonly T[], path: string): T { const item = string(value, path) as T; if (!allowed.includes(item)) throw new ApiError(400, "VALIDATION_ERROR", `${path} must be one of ${allowed.join(", ")}`); return item; }
 function enumArray<T extends string>(value: unknown, allowed: readonly T[], path: string): T[] { const items = stringArray(value, path).map((item) => enumValue<T>(item, allowed, path)); return [...new Set(items)]; }
 function platformTargetsValue(value: unknown): PlatformTarget[] {
-  const targets = value === undefined || value === null ? [] : enumArray<PlatformTarget>(value, ["DOMESTIC", "AMAZON"], "platformTargets");
+  const targets = value === undefined || value === null ? [] : enumArray<PlatformTarget>(value, PLATFORM_TARGETS, "platformTargets");
   if (targets.length > 1) throw new ApiError(400, "VALIDATION_ERROR", "platformTargets must contain at most one target");
   return targets;
 }

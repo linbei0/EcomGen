@@ -1,6 +1,7 @@
 import { Static, Type } from "@sinclair/typebox";
 
-export const PlatformTarget = Type.Enum({ DOMESTIC: "DOMESTIC", AMAZON: "AMAZON" });
+export const PLATFORM_TARGETS = ["TAOBAO", "JD", "PDD", "DOUYIN", "AMAZON", "SHOPIFY"] as const;
+export const PlatformTarget = Type.Enum({ TAOBAO: "TAOBAO", JD: "JD", PDD: "PDD", DOUYIN: "DOUYIN", AMAZON: "AMAZON", SHOPIFY: "SHOPIFY" });
 export const TargetMarket = Type.Enum({
   CHINA_MAINLAND: "CHINA_MAINLAND",
   HONG_KONG: "HONG_KONG",

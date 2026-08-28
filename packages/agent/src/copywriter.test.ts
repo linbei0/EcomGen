@@ -37,7 +37,7 @@ const input: CopywritingInput = {
   productDescription: null,
   verifiedFacts: ["续航 8 小时"],
   prohibitedClaims: ["医用级"],
-  platformTargets: ["DOMESTIC"],
+  platformTargets: ["TAOBAO"],
   targetMarket: "CHINA_MAINLAND",
   copyLanguage: "zh-Hans",
   assets: [

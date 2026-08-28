@@ -21,7 +21,7 @@ export const PROJECT_FIXTURE = {
   verifiedFacts: ["续航 8 小时"],
   prohibitedClaims: ["医用级"],
   brandGuidelines: {},
-  platformTargets: ["DOMESTIC"] as ("DOMESTIC" | "AMAZON")[],
+  platformTargets: ["TAOBAO"] as ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[],
   targetMarket: null,
   copyLanguage: null,
   reasoningProviderId: PROVIDER_ID,

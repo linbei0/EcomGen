@@ -295,7 +295,7 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
   const createdAt = asString(raw.createdAt);
   const updatedAt = asString(raw.updatedAt);
   const platforms = Array.isArray(raw.platformTargets)
-    ? raw.platformTargets.filter((item): item is "DOMESTIC" | "AMAZON" => item === "DOMESTIC" || item === "AMAZON")
+    ? raw.platformTargets.filter((item): item is Project["platformTargets"][number] => item === "TAOBAO" || item === "JD" || item === "PDD" || item === "DOUYIN" || item === "AMAZON" || item === "SHOPIFY")
     : [];
   if (
     !id ||

@@ -12,8 +12,12 @@ export function kindForRole(role: AssetRole): UserAssetKind {
 }
 
 export const PLATFORM_LABEL = {
-  DOMESTIC: "国内平台",
+  TAOBAO: "淘宝/天猫",
+  JD: "京东",
+  PDD: "拼多多",
+  DOUYIN: "抖音",
   AMAZON: "亚马逊",
+  SHOPIFY: "独立站",
 } as const;
 
 export const RESOLUTION_LABEL = {

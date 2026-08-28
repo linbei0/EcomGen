@@ -37,7 +37,7 @@ flowchart LR
 `packages/agent/src/planner.ts` 创建 Pi `Agent`，只注入 `packages/agent/src/tools.ts` 中的业务工具：
 
 - `read_ecom_template`：按稳定模板 ID 返回结构化的构图、镜头、占比、留白、平台预留区和反幻觉规则。
-- `read_platform_guidance`：返回目标市场/平台的版式和合规要求。
+- `read_platform_guidance`：返回当前选中平台的构图/文字/推流规则，以及商品品类对应的模板偏好；市场只定文案语种，不定场景。
 - `research_visual_direction`：仅在配置搜索 API Key 时启用，检索近期视觉趋势与版式灵感；不打开网页、不下载图片，结果不能升级为商品事实。
 
 工具返回的是给 Agent 使用的知识，不是要原样发送给生图模型的 Prompt。外部搜索结果始终按不可信内容处理；最终 Prompt 必须由 Agent 改写成完整、自然、可执行的图像指令。
@@ -102,10 +102,11 @@ Worker 必须拒绝包含 `Upstream template`、`Template fields` 等内部模�
 ### 新增目标市场或平台
 
 1. 在共享契约中增加合法枚举。
-2. 在 `read_platform_guidance` 增加结构化规则。
-3. 明确规则是“画面应如何构图”还是“后期叠加区如何预留”。
-4. 由 Agent 将规则写成最终 Prompt；生图模型不应看到内部规则名称。
-5. 更新 OpenAPI、契约测试和 E2E。
+2. 在 `read_platform_guidance` 增加当前平台的短结构化规则，不要把全部平台全文写入 system prompt。
+3. 明确规则是“画面应如何构图”还是“后期叠加区如何预留”。包图（如 hero-image）按平台占用比和文字预算来写；手动规划不得因平台增删用户选中的类型。
+4. AI 规划先按商品品类选择图型，再按平台改写首图/信息流帧；不要只按平台套固定套图。
+5. 由 Agent 将规则写成最终 Prompt；生图模型不应看到内部规则名称。
+6. 更新 OpenAPI、契约测试和 E2E。
 
 ### 更换生图 Provider
 
