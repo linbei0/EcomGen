@@ -1,9 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { categoryTipFor } from "./product-family.js";
 
-export type ConversionDriver = "VISUAL" | "PAIN_POINT" | "EMOTIONAL";
 export interface UpstreamVariant { description: string; overrides: Record<string, string>; }
 export interface UpstreamTemplate {
   id: string;
@@ -72,20 +70,17 @@ export function resolveTemplates(requestedTypes?: string[]): EcomTemplate[] {
   }
   return [...resolved.values()];
 }
-export function defaultTemplateSequence(driver: ConversionDriver): EcomTemplate[] {
-  const ids = driver === "PAIN_POINT" ? ["hero-image", "infographic", "before-after", "lifestyle-scene", "packaging"] : driver === "EMOTIONAL" ? ["lifestyle-scene", "model-showcase", "hero-image", "ugc-style", "poster-banner"] : ["hero-image", "detail-macro", "lifestyle-scene", "before-after", "poster-banner"];
-  return ids.map((id) => getTemplate(id)).filter((template): template is EcomTemplate => Boolean(template));
-}
 export interface TemplateGuidance {
   visualFields: Record<string, string>;
   productOccupancy: string;
   whitespace: string;
   camera: string;
   platformReservations: string[];
-  categoryGuidance: string | null;
+  /** 上游按品类撰写的完整拍摄提示清单；由规划 Agent 自行挑选与商品最贴合的条目改写，不在代码里代选。 */
+  categoryTips: Record<string, string>;
   antiAiTips: string;
 }
-export function templateGuidance(template: EcomTemplate, platformTargets: readonly string[], variantName?: string | null, category?: string | null): TemplateGuidance {
+export function templateGuidance(template: EcomTemplate, platformTargets: readonly string[], variantName?: string | null): TemplateGuidance {
   const variant = variantName ? template.variants[variantName] : undefined;
   return {
     visualFields: { ...template.prompt_template, ...template.defaults, ...(variant?.overrides ?? {}) },
@@ -93,16 +88,9 @@ export function templateGuidance(template: EcomTemplate, platformTargets: readon
     whitespace: template.whitespace,
     camera: template.camera,
     platformReservations: platformReservationsFor(template.id, platformTargets),
-    categoryGuidance: categoryTipFor(template.category_tips, category),
+    categoryTips: template.category_tips,
     antiAiTips: template.anti_ai_tips
   };
-}
-export function templatePromptContract(template: EcomTemplate, platformTargets: readonly string[], variantName?: string | null, category?: string | null): string {
-  const variant = variantName ? template.variants[variantName] : undefined;
-  const categoryTip = categoryTipFor(template.category_tips, category);
-  const base = Object.entries({ ...template.prompt_template, ...template.defaults, ...(variant?.overrides ?? {}) }).map(([key, value]) => `${key}: ${value}`).join("; ");
-  const reservations = platformReservationsFor(template.id, platformTargets);
-  return `Upstream template ${String(template.upstreamNumber).padStart(2, "0")} ${template.name}. Template fields: ${base}. Product occupies ${template.productOccupancy}; whitespace ${template.whitespace}; camera: ${template.camera}. Use hex colors and explicit negative constraints.${reservations.length ? ` Platform reservations: ${reservations.join("; ")}.` : ""}${categoryTip ? ` Category guidance: ${categoryTip}.` : ""}${template.anti_ai_tips ? ` Anti-AI guidance: ${template.anti_ai_tips}` : ""}`;
 }
 
 const PACKSHOT_IDS = new Set(["hero-image", "ghost-mannequin", "multi-angle-grid", "flat-lay"]);

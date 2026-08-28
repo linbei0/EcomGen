@@ -112,14 +112,14 @@ describe("planStoryboard", () => {
     await expect(planStoryboard({ ...input, targetImageCount: 2 })).rejects.toThrow("AI planning must return exactly 2 storyboard items");
   });
 
-  it("passes the resolved market guidance into the Pi planning context", async () => {
+  it("keeps market guidance tool-only and out of the planning user message", async () => {
     captured.errorMessage = undefined;
     captured.prompt = "";
     await planStoryboard({ ...input, platformTargets: ["AMAZON"], targetMarket: "JAPAN", copyLanguage: null });
 
-    expect(captured.prompt).toContain("platformGuidance");
-    expect(captured.prompt).toContain("ja-JP");
-    expect(captured.prompt).toContain("日本");
+    expect(captured.prompt).not.toContain("platformGuidance");
+    expect(captured.prompt).not.toContain("ja-JP");
+    expect(captured.prompt).not.toContain("日本");
     expect(captured.prompt).toContain("product category/family first");
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ECOM_TEMPLATES, resolveTemplates, templateGuidance, templatePromptContract } from "./catalog.js";
+import { ECOM_TEMPLATES, resolveTemplates, templateGuidance } from "./catalog.js";
 import { resolveProductFamily } from "./product-family.js";
 
 describe("ecom-details-image catalog adaptation", () => {
@@ -14,12 +14,12 @@ describe("ecom-details-image catalog adaptation", () => {
     expect(resolveProductFamily("unknown-widget")).toBeNull();
   });
 
-  it("scopes packshot reservations by platform instead of a generic overlay zone", () => {
+  it("scopes packshot reservations by platform and hands the full category tips to the planning agent", () => {
     const hero = ECOM_TEMPLATES[0];
     expect(templateGuidance(hero, ["TAOBAO"]).platformReservations.join(" ")).toContain("70-85%");
     expect(templateGuidance(hero, ["AMAZON"]).platformReservations.join(" ")).toContain("85%");
-    expect(templatePromptContract(hero, ["TAOBAO"])).not.toContain("200x100");
-    expect(templatePromptContract(hero, ["AMAZON"])).not.toContain("price-overlay zone");
-    expect(templateGuidance(hero, ["TAOBAO"], null, "服装").categoryGuidance).toMatch(/fabric|drape|stitching/i);
+    const guidance = templateGuidance(hero, ["TAOBAO"]);
+    expect(Object.keys(guidance.categoryTips)).toContain("fashion");
+    expect(guidance.categoryTips.fashion).toMatch(/fabric|drape|stitching/i);
   });
 });

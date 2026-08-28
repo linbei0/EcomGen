@@ -103,18 +103,6 @@ export function readPlatformGuidance(context: MarketGuidanceContext) {
     product: {
       category: context.productCategory ?? null,
       family
-    },
-    copyPolicy: [
-      "Only use copy when the storyboard type needs it or the user explicitly requests it; a selected language never requires copy in every image.",
-      "When copy is needed, use the effective copy language and only verified product facts.",
-      "Do not derive visual style from the selected market. Use templates, verified product facts, brand guidance, reference assets, and user instruction for visual direction.",
-      "Do not introduce stereotypes, landmarks, holidays, cultural symbols, prices, certifications, guarantees, or unsupported claims unless explicitly supplied as verified input."
-    ],
-    planningPolicy: [
-      "MANUAL: requestedTypes is the exact list and order. Platform and product family only change each prompt. Do not add, remove, reorder, or substitute types, including extra feed packshots.",
-      "AI: choose types from product-family needs first (drape, ports, texture, ritual, scale). Then adapt hero/feed frames to the selected platform. Do not pick types because a platform is popular.",
-      "Apply platform hero rules to packshot templates such as hero-image, not blindly to whatever is first in a manual list. Infographic and poster frames may use short verified copy; Amazon/JD packshots stay textless.",
-      "Never render prices, logos, badges, or promotional stamps into pixels."
-    ]
+    }
   };
 }

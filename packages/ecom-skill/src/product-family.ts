@@ -1,3 +1,4 @@
+/** 6 个品类族取自上游模板 category_tips 使用的词汇；别名表是本地新增，用于把中文自由文本输入归一到这些族，供规划上下文做提示。 */
 export const PRODUCT_FAMILIES = ["fashion", "electronics", "beauty", "food", "home", "jewelry"] as const;
 export type ProductFamily = (typeof PRODUCT_FAMILIES)[number];
 
@@ -18,12 +19,4 @@ export function resolveProductFamily(category?: string | null): ProductFamily | 
     if (FAMILY_ALIASES[family].some((alias) => value === alias.toLowerCase() || value.includes(alias.toLowerCase()))) return family;
   }
   return null;
-}
-
-export function categoryTipFor(tips: Record<string, string>, category?: string | null): string | null {
-  if (!category?.trim()) return null;
-  const exact = Object.keys(tips).find((key) => key.toLowerCase() === category.trim().toLowerCase());
-  if (exact) return tips[exact] ?? null;
-  const family = resolveProductFamily(category);
-  return family ? tips[family] ?? null : null;
 }

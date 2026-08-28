@@ -17,8 +17,8 @@ Pi Agent 接收项目上下文、商品事实、素材摘要、目标市场、�
 
 | 工具 | 作用 | 设计限制 |
 | --- | --- | --- |
-| `read_ecom_template` | 读取一个模板的结构化视觉规范 | 只读；未知模板直接抛错；不返回“Upstream template”拼接文本 |
-| `read_platform_guidance` | 读取目标市场、商品品类和平台规则 | 只读；未知平台直接抛错；只返回当前选中平台的短规则，并带上品类偏好模板；不是内部 Prompt 片段 |
+| `read_ecom_template` | 读取一个模板的结构化视觉规范 | 只读；未知模板直接抛错；返回完整 `categoryTips` 品类提示清单，由 Agent 自行挑选最贴合商品品类的条目改写，不由代码代选；不返回“Upstream template”拼接文本 |
+| `read_platform_guidance` | 读取目标市场、商品品类和平台规则 | 只读；未知平台直接抛错；只返回当前选中平台的短规则和品类族提示；不是内部 Prompt 片段 |
 | `research_visual_direction` | 检索近期视觉趋势与版式灵感 | 默认关闭；只调用配置的搜索 API，不打开任意 URL；结果只能作为视觉灵感，不能升级为商品事实 |
 
 Pi 不启用文件、Shell、浏览器或任意 URL 抓取。联网仅通过显式配置的 `research_visual_direction` 搜索工具；搜索工具失败会作为工具错误返回给 Agent，由模型决定继续使用已有项目上下文完成规划。

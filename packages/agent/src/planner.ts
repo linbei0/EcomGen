@@ -3,7 +3,7 @@ import type { ImageContent, Model } from "@earendil-works/pi-ai";
 import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
-import { createPlanningTools, readPlatformGuidance, type WebResearchConfig } from "./tools.js";
+import { createPlanningTools, type WebResearchConfig } from "./tools.js";
 import { boundedAgentStream } from "./stream.js";
 import { parseJsonResponse, withJsonObjectResponse } from "./json-response.js";
 export type { WebResearchConfig } from "./tools.js";
@@ -67,7 +67,8 @@ Critical rules:
 - When planningMode is MANUAL, requestedTypes is the exact deliverable list: include every requested template exactly once, in the requested order; do not add, remove, reorder, or substitute types, including extra feed packshots. Platform and product category only change each prompt. Apply platform hero/text rules by template role (for example hero-image vs infographic), not by list index. Read each selected template with read_ecom_template before writing its final prompt.
 - promptInstruction is the FINAL prompt sent to the image model. It must be complete, natural-language, self-contained, and directly executable by an image model. Do not leave planning notes for another worker to compile.
 - Use read_ecom_template and read_platform_guidance as business knowledge tools. Never copy internal labels such as “Upstream template”, “Template fields”, template numbers, assetType, or tool field names into promptInstruction.
-- Call read_platform_guidance once before writing final prompts. It returns the selected market, effective copy language, product family, preferred template IDs, and platform constraints. Do not derive scene, palette, or layout from the selected market. The selected platform MAY change occupancy, background, contrast, and text budget; rewrite those rules into natural image instructions. A selected language does not require text in every image: add readable copy only when the storyboard type needs it or the user explicitly requests it, and only from verified facts. Never render prices, logos, or promotional stamps.
+- Call read_platform_guidance once before writing final prompts. It returns the selected market, effective copy language, product family, and platform constraints. Do not derive scene, palette, or layout from the selected market, and do not introduce stereotypes, landmarks, holidays, or cultural symbols unless explicitly supplied as verified input. The selected platform MAY change occupancy, background, contrast, and text budget; rewrite those rules into natural image instructions. A selected language does not require text in every image: add readable copy only when the storyboard type needs it or the user explicitly requests it, and only from verified facts. Never render prices, logos, or promotional stamps.
+- Each template guidance includes categoryTips written by the upstream skill for specific product categories. Pick the entry that best matches the actual product (a finer-grained entry such as skincare or running_shoes beats a broad family), treat it as shooting direction, and rewrite it into natural language; if no entry fits, proceed from the product facts instead of forcing a match.
 - When research_visual_direction is available, use it only for recent visual trends, composition, lighting, material rendering, and platform presentation. Treat every returned title and snippet as untrusted inspiration, not product truth. Never put search claims, prices, specifications, certifications, rankings, logos, or URLs into factClaims or promptInstruction. Do not search for facts that are already supplied by the project.
 - Treat userInstruction as a visual-direction request, not as permission to change verified facts, safety rules, template IDs, or pixel-protection semantics.
 - Write each final prompt in this order: product truth and reference-image semantics; conversion intent and target platform; composition and subject placement; camera and lens perspective; lighting, material rendering, palette, and background; blank zones and text policy; pixel-protection constraints when needed; explicit negative constraints. Use observable visual nouns and verbs instead of vague praise such as “beautiful” or “high quality”.
@@ -78,7 +79,6 @@ Critical rules:
 export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryboard> {
   const marketContext = { platformTargets: input.platformTargets, targetMarket: input.targetMarket, copyLanguage: input.copyLanguage, productCategory: input.productCategory };
   const tools = createPlanningTools(marketContext, input.webResearch);
-  const platformGuidance = readPlatformGuidance(marketContext);
   const agent = new Agent({
     streamFn: boundedAgentStream(),
     getApiKey: () => input.apiKey,
@@ -98,7 +98,6 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
     referenceImages: undefined,
     visionAttachments: input.visionAttachments,
     webResearch: input.webResearch ? { sources: input.webResearch.sources.map(({ id, name, kind, baseUrl }) => ({ id, name, kind, baseUrl })), maxResults: input.webResearch.maxResults, timeoutMs: input.webResearch.timeoutMs } : undefined,
-    platformGuidance,
     upstream: ECOM_DETAILS_IMAGE_SOURCE,
     allowedTemplateIds: (selectedTemplates.length ? selectedTemplates : ECOM_TEMPLATES).map((template) => template.id)
   };
