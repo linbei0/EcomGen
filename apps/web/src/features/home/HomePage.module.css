@@ -52,6 +52,11 @@
 }
 
 .hero {
+  /* 与顶栏保持一致：sticky 固定左侧，右侧画廊独立滚动 */
+  position: sticky;
+  top: 53px;
+  align-self: start;
+  height: calc(100vh - 53px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -166,6 +171,8 @@
   }
 
   .hero {
+    position: static;
+    height: auto;
     border-right: none;
     border-bottom: 1px solid var(--line-1);
     padding: 48px 28px;

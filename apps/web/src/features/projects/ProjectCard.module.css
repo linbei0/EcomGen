@@ -181,6 +181,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .card,
   .hero {
     transition: none;
