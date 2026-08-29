@@ -14,7 +14,7 @@ EcomGen 是面向个人卖家的电商 AI 生成套图工具。当前后端优�
 - `packages/contracts`：跨应用共享的领域类型。
 - `packages/jobs`：Redis、BullMQ 队列和 Redis Pub/Sub 事件总线。
 
-接口契约以 [`openapi.yaml`](openapi.yaml) 为准；运行时架构和长期维护规则见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+接口契约以 `packages/contracts/src` 中的 TypeBox schema 为唯一手写真相源；`openapi.yaml` 与 `apps/web/src/api/schema.d.ts` 是生成视图。运行时架构和长期维护规则见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
 
 ## 环境要求
 
@@ -36,6 +36,9 @@ pnpm dev:web
 pnpm test
 pnpm test:e2e:mock
 pnpm lint:openapi
+pnpm gen:openapi
+pnpm gen:check
+pnpm verify-contracts
 ```
 
 API 默认监听 `http://127.0.0.1:8787`，业务接口前缀为 `/api/v1`。API 与 Worker 必须使用同一个 `REDIS_URL`、`ECOMGEN_MASTER_KEY`、`ECOMGEN_DATA_DIR` 和 `ECOMGEN_QUEUE_NAME`。
@@ -73,7 +76,7 @@ docker compose up -d --build
 ## 测试要求
 
 - 修改领域逻辑或持久化：补充对应 package 的 Vitest 测试。
-- 修改 API 契约：同步根目录 `openapi.yaml`，运行 `pnpm lint:openapi`。
+- 修改 API 契约：只编辑 `packages/contracts/src` 中对应 schema，运行 `pnpm gen:openapi`、`pnpm gen:check` 和 `pnpm lint:openapi`。
 - 修改任务编排、Provider 或导出：运行 `pnpm test:e2e:mock`。
 - 提交前至少运行 `pnpm build`、`pnpm test`、`pnpm lint:openapi`；涉及完整链路时额外运行 Mock E2E。
 - 测试失败时修复根因，不通过吞错、伪造成功状态或静默降级隐藏失败。

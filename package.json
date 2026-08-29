@@ -11,13 +11,17 @@
     "test": "pnpm -r test",
     "test:e2e:mock": "node scripts/e2e-mock.mjs",
     "test:contracts": "pnpm --filter @ecomgen/contracts test",
-    "lint:openapi": "npx --yes @redocly/cli lint openapi.yaml --skip-rule operation-summary --skip-rule operation-4xx-response --skip-rule info-license --skip-rule no-server-example.com"
+    "gen:openapi": "pnpm --filter @ecomgen/contracts build && node scripts/generate-openapi.mjs",
+    "gen:check": "pnpm --filter @ecomgen/contracts build && node scripts/generate-openapi.mjs --check",
+    "verify-contracts": "pnpm gen:check && pnpm lint:openapi && pnpm --filter @ecomgen/contracts test",
+    "lint:openapi": "npx --yes @redocly/cli lint openapi.yaml --skip-rule operation-summary --skip-rule operation-4xx-response --skip-rule info-license --skip-rule no-server-example.com --skip-rule no-unused-components"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
     "concurrently": "^9.2.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
-    "vitest": "^3.1.2"
+    "vitest": "^3.1.2",
+    "yaml": "^2.9.0"
   }
 }

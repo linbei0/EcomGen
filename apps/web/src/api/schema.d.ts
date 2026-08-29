@@ -585,6 +585,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description Supersedes the original failed job as CANCELLED and queues a replacement job. Repeated retries on the same job respond with 409. */
         post: operations["retryJob"];
         delete?: never;
         options?: never;
@@ -702,100 +703,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        Health: {
-            /** @constant */
-            status: "ok";
-            /** @description Whether the server has a configured restricted visual-research search key. */
-            webResearchAvailable: boolean;
-        };
-        ErrorResponse: {
-            error: {
-                code: string;
-                message: string;
-                details?: Record<string, never>[];
-                /** Format: uuid */
-                requestId: string;
-            };
-        };
-        ProviderConfig: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            /** Format: uri */
-            baseUrl: string;
-            /** @enum {string} */
-            reasoningProtocol: "openai" | "dashscope_qwen";
-            hasApiKey: boolean;
-            models: components["schemas"]["ModelCapability"][];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        ModelCapability: {
-            id: string;
-            supportsVision: boolean;
-            supportsThinking: boolean;
-            supportsTools: boolean;
-            supportsStructuredOutput: boolean;
-            /** @enum {string|null} */
-            imageApiKind?: "openai_images" | "gemini" | "custom" | null;
-        };
-        CreateProviderInput: {
-            name: string;
-            /** Format: uri */
-            baseUrl: string;
-            /** @enum {string} */
-            reasoningProtocol: "openai" | "dashscope_qwen";
-            apiKey: string;
-            models: components["schemas"]["ModelCapability"][];
-        };
-        UpdateProviderInput: components["schemas"]["CreateProviderInput"];
-        ProviderList: {
-            items: components["schemas"]["ProviderConfig"][];
-            nextCursor: string | null;
-        };
         /** @enum {string} */
-        SearchSourceKind: "brave" | "tavily" | "searxng";
-        SearchSourceConfig: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            kind: components["schemas"]["SearchSourceKind"];
-            /** Format: uri */
-            baseUrl: string;
-            /** @description Lower values are searched first. */
-            priority: number;
-            enabled: boolean;
-            hasApiKey: boolean;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        CreateSearchSourceInput: {
-            name: string;
-            kind: components["schemas"]["SearchSourceKind"];
-            /** Format: uri */
-            baseUrl?: string;
-            apiKey?: string;
-            priority: number;
-            /** @default true */
-            enabled: boolean;
-        };
-        UpdateSearchSourceInput: {
-            name?: string;
-            kind?: components["schemas"]["SearchSourceKind"];
-            /** Format: uri */
-            baseUrl?: string;
-            apiKey?: string;
-            priority?: number;
-            enabled?: boolean;
-        };
-        SearchSourceList: {
-            items: components["schemas"]["SearchSourceConfig"][];
-            nextCursor: string | null;
-        };
+        PlatformTarget: "TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY";
+        /** @enum {string} */
+        TargetMarket: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA";
+        /** @enum {string} */
+        StoryboardMode: "CREATIVE" | "PIXEL_PROTECTED";
+        /** @enum {string} */
+        AssetRole: "PRODUCT_TRUTH" | "PACKAGING" | "STYLE_REFERENCE" | "LAYOUT_REFERENCE";
+        /** @enum {string} */
+        UserAssetKind: "PRODUCT" | "REFERENCE";
         /** @enum {string} */
         ImageResolution: "1K" | "2K" | "4K";
         /** @enum {string} */
@@ -803,121 +720,56 @@ export interface components {
         /** @enum {string} */
         PlanningMode: "AI" | "MANUAL";
         /** @enum {string} */
-        UserAssetKind: "PRODUCT" | "REFERENCE";
-        ProjectCover: {
-            /** Format: uuid */
-            productAssetId: string | null;
-            /** Format: uuid */
-            coverOutputId: string | null;
-            previewOutputIds: string[];
-            outputCount: number;
-        };
-        Project: {
+        CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION";
+        /** @enum {string} */
+        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE";
+        /** @enum {string} */
+        JobStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+        /** @enum {string} */
+        ReasoningProtocolProfile: "openai" | "dashscope_qwen";
+        /** @enum {string} */
+        SearchSourceKind: "brave" | "tavily" | "searxng";
+        /** @enum {string} */
+        EditOperation: "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "OUTPAINT" | "NATURAL_FUSION";
+        /** @enum {string} */
+        EditExecutionMode: "MODEL_DIRECTED" | "MASKED" | "OUTPAINT" | "NEED_INPUT";
+        /** @enum {string} */
+        ReferenceSource: "PROJECT" | "TEMPORARY";
+        /** @enum {string} */
+        ReferencePurpose: "PRODUCT_APPEARANCE" | "PACKAGING" | "LABEL" | "STYLE" | "LAYOUT";
+        /** @enum {string} */
+        EditTurnStatus: "DRAFT" | "PLANNING" | "PLAN_READY" | "NEED_INPUT" | "AWAITING_CONFIRMATION" | "GENERATING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+        /** @enum {string} */
+        EditSessionStatus: "ACTIVE" | "ARCHIVED";
+        /** @enum {string} */
+        ErrorCode: "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT" | "CAPABILITY_UNSUPPORTED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "PROVIDER_ERROR";
+        EventEnvelope: {
             /** Format: uuid */
             id: string;
-            name: string;
-            category?: string | null;
-            productDescription?: string | null;
-            verifiedFacts?: string[];
-            prohibitedClaims?: string[];
-            brandGuidelines?: {
-                [key: string]: string;
-            };
-            platformTargets: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
-            /** @enum {string|null} */
-            targetMarket: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
-            copyLanguage: string | null;
-            /** Format: uuid */
-            reasoningProviderId: string;
-            reasoningModelId: string;
-            /** Format: uuid */
-            imageProviderId: string;
-            imageModelId: string;
             /** @enum {string} */
-            defaultMode: "CREATIVE" | "PIXEL_PROTECTED";
-            imageResolution: components["schemas"]["ImageResolution"];
-            imageAspectRatio: components["schemas"]["ImageAspectRatio"];
-            candidatesPerType: number;
-            /** @description Enable restricted visual-direction web research during Agent planning. */
-            webResearchEnabled: boolean;
-            /** Format: date-time */
-            archivedAt?: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            cover?: components["schemas"]["ProjectCover"];
-        };
-        ProjectDetail: components["schemas"]["Project"] & {
-            assets: components["schemas"]["Asset"][];
-            storyboard: Record<string, never> | null;
-            items: components["schemas"]["StoryboardItem"][];
-            outputs: components["schemas"]["Output"][];
-            jobs: components["schemas"]["Job"][];
-        };
-        ModelRef: {
+            type: "job.updated" | "storyboard.updated" | "output.created" | "edit-session.updated" | "edit-turn.updated" | "export.updated" | "provider.updated";
             /** Format: uuid */
-            providerId: string;
-            modelId: string;
+            projectId: string;
+            /** Format: date-time */
+            occurredAt: string;
+            data: unknown;
         };
-        CreateProjectInput: {
-            name: string;
-            category?: string | null;
-            productDescription?: string | null;
-            verifiedFacts?: string[];
-            prohibitedClaims?: string[];
-            brandGuidelines?: {
-                [key: string]: string;
-            };
-            platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
-            /** @enum {string|null} */
-            targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
-            copyLanguage?: string | null;
-            /** Format: uuid */
-            reasoningProviderId: string;
-            reasoningModelId: string;
-            /** Format: uuid */
-            imageProviderId: string;
-            imageModelId: string;
-            /** @enum {string} */
-            defaultMode: "CREATIVE" | "PIXEL_PROTECTED";
-            imageResolution?: components["schemas"]["ImageResolution"];
-            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
-            candidatesPerType?: number;
-            /** @description Enable restricted visual-direction web research during Agent planning. */
-            webResearchEnabled?: boolean;
+        ModelCapabilities: {
+            supportsVision: boolean;
+            supportsThinking: boolean;
+            supportsTools: boolean;
+            supportsStructuredOutput: boolean;
+            imageApiKind: "openai_images" | "gemini" | "custom" | null;
         };
-        UpdateProjectInput: {
-            name?: string;
-            category?: string | null;
-            productDescription?: string | null;
-            verifiedFacts?: string[];
-            prohibitedClaims?: string[];
-            brandGuidelines?: {
-                [key: string]: string;
-            };
-            platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
-            /** @enum {string|null} */
-            targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
-            copyLanguage?: string | null;
-            reasoningModel?: components["schemas"]["ModelRef"];
-            imageModel?: components["schemas"]["ModelRef"];
-            /** @enum {string} */
-            defaultMode?: "CREATIVE" | "PIXEL_PROTECTED";
-            imageResolution?: components["schemas"]["ImageResolution"];
-            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
-            candidatesPerType?: number;
-            /** @description Enable restricted visual-direction web research during Agent planning. */
-            webResearchEnabled?: boolean;
-            /** @description Archive or restore the project. */
-            archived?: boolean;
+        ModelDefinition: {
+            id: string;
+        } & {
+            supportsVision: boolean;
+            supportsThinking: boolean;
+            supportsTools: boolean;
+            supportsStructuredOutput: boolean;
+            imageApiKind: "openai_images" | "gemini" | "custom" | null;
         };
-        ProjectList: {
-            items: (components["schemas"]["Project"] & Record<string, never>)[];
-            nextCursor: string | null;
-        };
-        /** @enum {string} */
-        AssetRole: "PRODUCT_TRUTH" | "PACKAGING" | "STYLE_REFERENCE" | "LAYOUT_REFERENCE";
         Asset: {
             /** Format: uuid */
             id: string;
@@ -939,6 +791,28 @@ export interface components {
             items: components["schemas"]["Asset"][];
             nextCursor: string | null;
         };
+        CopywritingResult: {
+            /** Format: uuid */
+            jobId: string;
+            /** Format: uuid */
+            projectId: string;
+            target: components["schemas"]["CopywritingTarget"];
+            content: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateCopywritingJobInput: {
+            target: components["schemas"]["CopywritingTarget"];
+            /** @description Unique key for an intentional copywriting run. */
+            regenerationKey: string;
+        };
+        CreateExportJobInput: {
+            outputIds?: string[];
+            filenamePrefix?: string;
+            platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
+            /** @default false */
+            includeDetailPageSlices: boolean;
+        };
         CreatePlanningJobInput: {
             planningMode?: components["schemas"]["PlanningMode"];
             requestedTypes?: string[];
@@ -951,156 +825,50 @@ export interface components {
             /** @description Unique key for an intentional re-planning run. */
             regenerationKey?: string;
         };
-        /** @enum {string} */
-        CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION";
-        CreateCopywritingJobInput: {
-            target: components["schemas"]["CopywritingTarget"];
-            /** @description Unique key for an intentional copywriting run. */
-            regenerationKey: string;
-        };
-        CopywritingResult: {
-            /** Format: uuid */
-            jobId: string;
-            /** Format: uuid */
-            projectId: string;
-            target: components["schemas"]["CopywritingTarget"];
-            content: string;
-            /** Format: date-time */
-            createdAt: string;
-        };
-        Storyboard: {
-            /** Format: uuid */
-            projectId: string;
-            version: number;
-            /** @enum {string} */
-            status: "DRAFT" | "CONFIRMED";
-            campaignStyleLock: string;
-            items?: components["schemas"]["StoryboardItem"][];
-        };
-        StoryboardBundle: {
-            storyboard: Record<string, never> | null;
-            items: components["schemas"]["StoryboardItem"][];
-        };
-        StoryboardItem: {
-            /** Format: uuid */
-            id: string;
-            /** @description Immutable ecom-details-image template ID; it cannot be changed after planning. */
-            assetType: string;
-            displayName: string;
-            templateVariant?: string | null;
-            candidateCount: number;
-            /** Format: uuid */
-            imageProviderId?: string;
-            imageModelId?: string;
-            imageResolution?: components["schemas"]["ImageResolution"];
-            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
-            referencedAssets?: string[];
-            /** @enum {string} */
-            mode: "CREATIVE" | "PIXEL_PROTECTED";
-            /** @enum {string} */
-            status: "DRAFT" | "CONFIRMED" | "GENERATING" | "GENERATED";
-            /** @description Final image-generation prompt produced by Pi Agent; Worker sends this text to the image model without template concatenation. */
-            promptInstruction: string;
-            factClaims?: string[];
-            riskFlags: string[];
-        };
-        UpdateStoryboardItemInput: {
-            /** @description Immutable ecom-details-image template ID; it cannot be changed after planning. */
-            assetType?: string;
-            displayName?: string;
-            templateVariant?: string | null;
-            candidateCount?: number;
-            imageModel?: components["schemas"]["ModelRef"];
-            imageResolution?: components["schemas"]["ImageResolution"];
-            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
-            referencedAssets?: string[];
-            /** @enum {string} */
-            mode?: "CREATIVE" | "PIXEL_PROTECTED";
-            /** @description Editable final image-generation prompt; the saved value is sent as-is to the image model. */
-            promptInstruction?: string;
-        };
-        Job: {
-            /** Format: uuid */
-            id: string;
-            /** @enum {string} */
-            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE";
-            /** @enum {string} */
-            status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
-            progress: number;
-            retryable: boolean;
-            requestFingerprint?: string | null;
-            /** Format: uuid */
-            providerId?: string | null;
-            modelId?: string | null;
-            estimatedCost?: Record<string, never> | null;
-            actualCost?: Record<string, never> | null;
-            cancelRequested?: boolean;
-            error?: Record<string, never> | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        Output: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            storyboardItemId: string;
-            /** Format: uuid */
-            jobId: string;
-            candidateIndex?: number;
-            generationSnapshot?: {
-                /** Format: uuid */
-                providerId?: string;
-                modelId?: string;
-                resolution?: components["schemas"]["ImageResolution"];
-                aspectRatio?: components["schemas"]["ImageAspectRatio"];
-                size?: string;
-                candidateIndex?: number;
-                revision?: string;
-            } | null;
-            url?: string;
-            storagePath?: string;
-            /** Format: uuid */
-            parentOutputId?: string | null;
-            /** Format: uuid */
-            rootOutputId?: string | null;
-            /** Format: uuid */
-            editSessionId?: string | null;
-            /** Format: uuid */
-            editTurnId?: string | null;
-            /** Format: uuid */
-            generationBatchId?: string | null;
-            /** Format: date-time */
-            createdAt: string;
-        };
-        PlanningConfigSnapshot: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            projectId: string;
-            /** Format: uuid */
-            sourceJobId: string;
-            payload: {
+        CreateProjectInput: {
+            name: string;
+            category?: string | null;
+            productDescription?: string | null;
+            verifiedFacts?: string[];
+            prohibitedClaims?: string[];
+            brandGuidelines?: {
                 [key: string]: unknown;
             };
-            /** Format: date-time */
-            createdAt: string;
-        };
-        /** @enum {string} */
-        EditTurnStatus: "DRAFT" | "PLANNING" | "PLAN_READY" | "NEED_INPUT" | "AWAITING_CONFIRMATION" | "GENERATING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
-        /** @enum {string} */
-        EditExecutionMode: "MODEL_DIRECTED" | "MASKED" | "OUTPAINT" | "NEED_INPUT";
-        /** @enum {string} */
-        ReferenceSource: "PROJECT" | "TEMPORARY";
-        /** @enum {string} */
-        ReferencePurpose: "PRODUCT_APPEARANCE" | "PACKAGING" | "LABEL" | "STYLE" | "LAYOUT";
-        ReferenceSelection: {
+            platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
+            targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
+            copyLanguage?: string | null;
             /** Format: uuid */
-            id: string;
-            source: components["schemas"]["ReferenceSource"];
-            purpose: components["schemas"]["ReferencePurpose"];
-            order: number;
+            reasoningProviderId: string;
+            reasoningModelId: string;
+            /** Format: uuid */
+            imageProviderId: string;
+            imageModelId: string;
+            /** @enum {string} */
+            defaultMode: "CREATIVE" | "PIXEL_PROTECTED";
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            candidatesPerType?: number;
+            /** @description Enable restricted visual-direction web research during Agent planning. */
+            webResearchEnabled?: boolean;
+        };
+        CreateProviderInput: {
+            name: string;
+            /** Format: uri */
+            baseUrl: string;
+            /** @enum {string} */
+            reasoningProtocol: "openai" | "dashscope_qwen";
+            apiKey: string;
+            models: components["schemas"]["ModelCapability"][];
+        };
+        CreateSearchSourceInput: {
+            name: string;
+            kind: components["schemas"]["SearchSourceKind"];
+            /** Format: uri */
+            baseUrl?: string;
+            apiKey?: string;
+            priority: number;
+            /** @default true */
+            enabled: boolean;
         };
         EditReferenceAsset: {
             /** Format: uuid */
@@ -1113,7 +881,6 @@ export interface components {
             hash: string;
             /** Format: date-time */
             createdAt: string;
-            /** Format: date-time */
             expiresAt?: string | null;
             url: string;
         };
@@ -1151,7 +918,9 @@ export interface components {
             baseOutputId: string;
             status: components["schemas"]["EditTurnStatus"];
             message: string;
-            annotations: Record<string, never>;
+            annotations: {
+                [key: string]: unknown;
+            };
             editMaskPath?: string | null;
             protectMaskPath?: string | null;
             referenceAssetIds: string[];
@@ -1169,20 +938,28 @@ export interface components {
                 requiresConfirmation?: boolean;
                 /** @enum {string} */
                 compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT";
-                memoryPatch?: Record<string, never>;
+                memoryPatch?: {
+                    [key: string]: unknown;
+                };
             } | null;
-            error?: Record<string, never> | null;
+            error?: {
+                [key: string]: unknown;
+            } | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
         };
-        CreateExportJobInput: {
-            outputIds?: string[];
-            filenamePrefix?: string;
-            platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
-            /** @default false */
-            includeDetailPageSlices: boolean;
+        ErrorResponse: {
+            error: {
+                code: string;
+                message: string;
+                details?: {
+                    [key: string]: unknown;
+                }[];
+                /** Format: uuid */
+                requestId: string;
+            };
         };
         Export: {
             /** Format: uuid */
@@ -1200,7 +977,439 @@ export interface components {
         };
         ExportJobBundle: {
             job: components["schemas"]["Job"];
-            export: Record<string, never> | null;
+            export: {
+                [key: string]: unknown;
+            } | null;
+        };
+        Health: {
+            status: string;
+            /** @description Whether the server has a configured restricted visual-research search key. */
+            webResearchAvailable: boolean;
+        };
+        Job: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE";
+            /** @enum {string} */
+            status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+            progress: number;
+            retryable: boolean;
+            requestFingerprint?: string | null;
+            providerId?: string | null;
+            modelId?: string | null;
+            estimatedCost?: {
+                [key: string]: unknown;
+            } | null;
+            actualCost?: {
+                [key: string]: unknown;
+            } | null;
+            cancelRequested?: boolean;
+            error?: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ModelCapability: {
+            id: string;
+            supportsVision: boolean;
+            supportsThinking: boolean;
+            supportsTools: boolean;
+            supportsStructuredOutput: boolean;
+            imageApiKind?: "openai_images" | "gemini" | "custom" | null;
+        };
+        ModelRef: {
+            /** Format: uuid */
+            providerId: string;
+            modelId: string;
+        };
+        Output: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            storyboardItemId: string;
+            /** Format: uuid */
+            jobId: string;
+            candidateIndex?: number;
+            generationSnapshot?: {
+                /** Format: uuid */
+                providerId?: string;
+                modelId?: string;
+                resolution?: components["schemas"]["ImageResolution"];
+                aspectRatio?: components["schemas"]["ImageAspectRatio"];
+                size?: string;
+                candidateIndex?: number;
+                revision?: string;
+            } | null;
+            url?: string;
+            storagePath?: string;
+            parentOutputId?: string | null;
+            rootOutputId?: string | null;
+            editSessionId?: string | null;
+            editTurnId?: string | null;
+            generationBatchId?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PlanningConfigSnapshot: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            sourceJobId: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        Project: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            category?: string | null;
+            productDescription?: string | null;
+            verifiedFacts?: string[];
+            prohibitedClaims?: string[];
+            brandGuidelines?: {
+                [key: string]: unknown;
+            };
+            platformTargets: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
+            targetMarket: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
+            copyLanguage: string | null;
+            /** Format: uuid */
+            reasoningProviderId: string;
+            reasoningModelId: string;
+            /** Format: uuid */
+            imageProviderId: string;
+            imageModelId: string;
+            /** @enum {string} */
+            defaultMode: "CREATIVE" | "PIXEL_PROTECTED";
+            imageResolution: components["schemas"]["ImageResolution"];
+            imageAspectRatio: components["schemas"]["ImageAspectRatio"];
+            candidatesPerType: number;
+            /** @description Enable restricted visual-direction web research during Agent planning. */
+            webResearchEnabled: boolean;
+            archivedAt?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            cover?: components["schemas"]["ProjectCover"];
+        };
+        ProjectCover: {
+            productAssetId: string | null;
+            coverOutputId: string | null;
+            previewOutputIds: string[];
+            outputCount: number;
+        };
+        ProjectDetail: components["schemas"]["Project"] & {
+            assets: components["schemas"]["Asset"][];
+            storyboard: {
+                [key: string]: unknown;
+            } | null;
+            items: components["schemas"]["StoryboardItem"][];
+            outputs: components["schemas"]["Output"][];
+            jobs: components["schemas"]["Job"][];
+        };
+        ProjectList: {
+            items: (components["schemas"]["Project"] & {
+                [key: string]: unknown;
+            })[];
+            nextCursor: string | null;
+        };
+        ProviderConfig: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uri */
+            baseUrl: string;
+            /** @enum {string} */
+            reasoningProtocol: "openai" | "dashscope_qwen";
+            hasApiKey: boolean;
+            models: components["schemas"]["ModelCapability"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ProviderList: {
+            items: components["schemas"]["ProviderConfig"][];
+            nextCursor: string | null;
+        };
+        ReferenceSelection: {
+            /** Format: uuid */
+            id: string;
+            source: components["schemas"]["ReferenceSource"];
+            purpose: components["schemas"]["ReferencePurpose"];
+            order: number;
+        };
+        SearchSourceConfig: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["SearchSourceKind"];
+            /** Format: uri */
+            baseUrl: string;
+            /** @description Lower values are searched first. */
+            priority: number;
+            enabled: boolean;
+            hasApiKey: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        SearchSourceList: {
+            items: components["schemas"]["SearchSourceConfig"][];
+            nextCursor: string | null;
+        };
+        Storyboard: {
+            /** Format: uuid */
+            projectId: string;
+            version: number;
+            /** @enum {string} */
+            status: "DRAFT" | "CONFIRMED";
+            campaignStyleLock: string;
+            items?: components["schemas"]["StoryboardItem"][];
+        };
+        StoryboardBundle: {
+            storyboard: {
+                [key: string]: unknown;
+            } | null;
+            items: components["schemas"]["StoryboardItem"][];
+        };
+        StoryboardItem: {
+            /** Format: uuid */
+            id: string;
+            /** @description Immutable ecom-details-image template ID; it cannot be changed after planning. */
+            assetType: string;
+            displayName: string;
+            templateVariant?: string | null;
+            candidateCount: number;
+            /** Format: uuid */
+            imageProviderId?: string;
+            imageModelId?: string;
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            referencedAssets?: string[];
+            /** @enum {string} */
+            mode: "CREATIVE" | "PIXEL_PROTECTED";
+            /** @enum {string} */
+            status: "DRAFT" | "CONFIRMED" | "GENERATING" | "GENERATED";
+            /** @description Final image-generation prompt produced by Pi Agent. Worker prefixes selected image roles in their actual request order before sending it to the image model. */
+            promptInstruction: string;
+            factClaims?: string[];
+            riskFlags: string[];
+        };
+        UpdateProjectInput: {
+            name?: string;
+            category?: string | null;
+            productDescription?: string | null;
+            verifiedFacts?: string[];
+            prohibitedClaims?: string[];
+            brandGuidelines?: {
+                [key: string]: unknown;
+            };
+            platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
+            targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
+            copyLanguage?: string | null;
+            reasoningModel?: components["schemas"]["ModelRef"];
+            imageModel?: components["schemas"]["ModelRef"];
+            /** @enum {string} */
+            defaultMode?: "CREATIVE" | "PIXEL_PROTECTED";
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            candidatesPerType?: number;
+            /** @description Enable restricted visual-direction web research during Agent planning. */
+            webResearchEnabled?: boolean;
+            /** @description Archive or restore the project. */
+            archived?: boolean;
+        };
+        UpdateProviderInput: components["schemas"]["CreateProviderInput"];
+        UpdateSearchSourceInput: {
+            name?: string;
+            kind?: components["schemas"]["SearchSourceKind"];
+            /** Format: uri */
+            baseUrl?: string;
+            apiKey?: string;
+            priority?: number;
+            enabled?: boolean;
+        };
+        UpdateStoryboardItemInput: {
+            /** @description Immutable ecom-details-image template ID; it cannot be changed after planning. */
+            assetType?: string;
+            displayName?: string;
+            templateVariant?: string | null;
+            candidateCount?: number;
+            imageModel?: components["schemas"]["ModelRef"];
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            referencedAssets?: string[];
+            /** @enum {string} */
+            mode?: "CREATIVE" | "PIXEL_PROTECTED";
+            /** @description Editable final image-generation prompt. Worker prefixes selected image roles in their actual request order before sending it to the image model. */
+            promptInstruction?: string;
+        };
+        AiPlanningInput: {
+            planningMode?: components["schemas"]["PlanningMode"];
+            requestedTypes?: string[];
+            imageTypes?: string[];
+            userInstruction?: string;
+            candidatesPerType?: number;
+            targetImageCount?: number;
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            regenerationKey?: string;
+        };
+        ApplyPlanningConfigSnapshotResult: {
+            project: components["schemas"]["Project"];
+            snapshot: components["schemas"]["PlanningConfigSnapshot"];
+        };
+        ApproveEditTurnResponse: {
+            job: components["schemas"]["Job"];
+            turn: components["schemas"]["EditTurn"];
+        };
+        ConfirmStoryboardInput: {
+            version?: number;
+        };
+        CreateEditTurnInput: {
+            /** Format: uuid */
+            baseOutputId?: string;
+            message: string;
+            annotations?: string;
+            /** Format: binary */
+            editMask?: string;
+            /** Format: binary */
+            protectMask?: string;
+            referenceSelections?: string;
+        };
+        CreateExportJobRequest: {
+            outputIds?: string[];
+            filenamePrefix?: string;
+            platformTargets?: components["schemas"]["PlatformTarget"][];
+            includeDetailPageSlices?: boolean;
+        };
+        CreateGenerationJobInput: {
+            storyboardItemIds: string[];
+            /** Format: uuid */
+            generationBatchId?: string;
+            revision?: string;
+            generationConfig?: {
+                imageResolution?: components["schemas"]["ImageResolution"];
+                imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+                candidateCount?: number;
+                imageModel?: components["schemas"]["ModelRef"];
+            };
+        };
+        EcomTemplateItem: {
+            id: string;
+            upstreamNumber: number;
+            name: string;
+            keywords: string[];
+            trigger_phrases: string[];
+            prompt_template: {
+                [key: string]: string;
+            };
+            defaults: {
+                [key: string]: string;
+            };
+            category_tips: {
+                [key: string]: string;
+            };
+            /** @enum {string} */
+            defaultSize: "1024x1024" | "1024x1536";
+            variants?: {
+                [key: string]: unknown;
+            };
+        };
+        EcomTemplatesResponse: {
+            source: {
+                /** Format: uri */
+                repository: string;
+                commit: string;
+                sourcePath: string;
+            };
+            items: components["schemas"]["EcomTemplateItem"][];
+        };
+        EditGenerationConfigInput: {
+            /** Format: uuid */
+            reasoningProviderId: string;
+            reasoningModelId: string;
+            /** Format: uuid */
+            imageProviderId: string;
+            imageModelId: string;
+            imageResolution?: components["schemas"]["ImageResolution"];
+            candidateCount?: number;
+        };
+        EditReferenceAssetList: {
+            items: components["schemas"]["EditReferenceAsset"][];
+            suggestedSelections: components["schemas"]["ReferenceSelection"][];
+        };
+        EditTurnQueuedResponse: {
+            /** Format: uuid */
+            turnId: string;
+            /** Format: uuid */
+            planJobId: string;
+            status: components["schemas"]["EditTurnStatus"];
+        };
+        GenerationJobsResponse: {
+            jobs: components["schemas"]["Job"][];
+        };
+        ManualPlanningInput: {
+            /** @constant */
+            planningMode: "MANUAL";
+            requestedTypes: string[];
+            userInstruction?: string;
+            candidatesPerType?: number;
+            imageResolution?: components["schemas"]["ImageResolution"];
+            imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+            regenerationKey?: string;
+        };
+        PlanningConfigSnapshotList: components["schemas"]["PlanningConfigSnapshot"][];
+        SelectEditSessionOutputInput: {
+            /** Format: uuid */
+            outputId: string;
+        };
+        TestProviderConnectionResult: {
+            ok: boolean;
+            /** Format: uuid */
+            providerId: string;
+            modelId: string;
+            kind: string;
+            latencyMs: number;
+            models: string[] | null;
+            modelAvailable: boolean | null;
+        };
+        TestProviderInput: {
+            modelId: string;
+            /** @enum {string} */
+            kind?: "reasoning" | "image";
+        };
+        UpdateAssetInput: {
+            role?: components["schemas"]["AssetRole"];
+            kind?: components["schemas"]["UserAssetKind"];
+        };
+        UpdateEditSessionMemoryInput: {
+            /** Format: uuid */
+            outputId?: string;
+            summary: string;
+            constraints: string[];
+        };
+        UploadAssetInput: {
+            /** Format: binary */
+            file: string;
+            role?: components["schemas"]["AssetRole"];
+            kind?: components["schemas"]["UserAssetKind"];
+        };
+        UploadEditReferenceAssetInput: {
+            /** Format: binary */
+            file: string;
+            purpose: components["schemas"]["ReferencePurpose"];
         };
     };
     responses: {
@@ -1301,36 +1510,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        source: {
-                            /** Format: uri */
-                            repository: string;
-                            commit: string;
-                            sourcePath: string;
-                        };
-                        items: {
-                            /** @example hero-image */
-                            id: string;
-                            upstreamNumber: number;
-                            name: string;
-                            keywords: string[];
-                            trigger_phrases: string[];
-                            prompt_template: {
-                                [key: string]: string;
-                            };
-                            defaults: {
-                                [key: string]: string;
-                            };
-                            variants: {
-                                [key: string]: Record<string, never>;
-                            };
-                            category_tips: {
-                                [key: string]: string;
-                            };
-                            /** @enum {string} */
-                            defaultSize: "1024x1024" | "1024x1536";
-                        }[];
-                    };
+                    "application/json": components["schemas"]["EcomTemplatesResponse"];
                 };
             };
         };
@@ -1439,14 +1619,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    modelId: string;
-                    /**
-                     * @default image
-                     * @enum {string}
-                     */
-                    kind?: "reasoning" | "image";
-                };
+                "application/json": components["schemas"]["TestProviderInput"];
             };
         };
         responses: {
@@ -1456,16 +1629,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        ok: boolean;
-                        /** Format: uuid */
-                        providerId: string;
-                        modelId: string;
-                        /** @enum {string} */
-                        kind: "reasoning" | "image";
-                        latencyMs: number;
-                        modelAvailable?: boolean | null;
-                    };
+                    "application/json": components["schemas"]["TestProviderConnectionResult"];
                 };
             };
             502: components["responses"]["ProviderError"];
@@ -1714,15 +1878,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": {
-                    /**
-                     * Format: binary
-                     * @description Each project accepts at most 6 product images and 6 reference images; byte-identical content is rejected as a duplicate.
-                     */
-                    file: string;
-                    role?: components["schemas"]["AssetRole"];
-                    kind?: components["schemas"]["UserAssetKind"];
-                };
+                "multipart/form-data": components["schemas"]["UploadAssetInput"];
             };
         };
         responses: {
@@ -1769,10 +1925,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    role?: components["schemas"]["AssetRole"];
-                    kind?: components["schemas"]["UserAssetKind"];
-                };
+                "application/json": components["schemas"]["UpdateAssetInput"];
             };
         };
         responses: {
@@ -1831,7 +1984,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PlanningConfigSnapshot"][];
+                    "application/json": components["schemas"]["PlanningConfigSnapshotList"];
                 };
             };
         };
@@ -1854,10 +2007,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        project: components["schemas"]["Project"];
-                        snapshot: components["schemas"]["PlanningConfigSnapshot"];
-                    };
+                    "application/json": components["schemas"]["ApplyPlanningConfigSnapshotResult"];
                 };
             };
             409: components["responses"]["Conflict"];
@@ -1957,9 +2107,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": {
-                    version?: number;
-                };
+                "application/json": components["schemas"]["ConfirmStoryboardInput"];
             };
         };
         responses: {
@@ -2034,22 +2182,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    storyboardItemIds: string[];
-                    /** Format: uuid */
-                    generationBatchId?: string;
-                    revision?: string;
-                    generationConfig?: {
-                        imageResolution?: components["schemas"]["ImageResolution"];
-                        imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
-                        candidateCount?: number;
-                        imageModel?: {
-                            /** Format: uuid */
-                            providerId: string;
-                            modelId: string;
-                        };
-                    };
-                };
+                "application/json": components["schemas"]["CreateGenerationJobInput"];
             };
         };
         responses: {
@@ -2059,9 +2192,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        jobs: components["schemas"]["Job"][];
-                    };
+                    "application/json": components["schemas"]["GenerationJobsResponse"];
                 };
             };
             409: components["responses"]["Conflict"];
@@ -2126,15 +2257,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /**
-                     * Format: uuid
-                     * @description Output node whose branch memory should be updated. Defaults to currentOutputId.
-                     */
-                    outputId?: string;
-                    summary: string;
-                    constraints: string[];
-                };
+                "application/json": components["schemas"]["UpdateEditSessionMemoryInput"];
             };
         };
         responses: {
@@ -2167,10 +2290,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        items: components["schemas"]["EditReferenceAsset"][];
-                        suggestedSelections: components["schemas"]["ReferenceSelection"][];
-                    };
+                    "application/json": components["schemas"]["EditReferenceAssetList"];
                 };
             };
         };
@@ -2186,11 +2306,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": {
-                    /** Format: binary */
-                    file: string;
-                    purpose: components["schemas"]["ReferencePurpose"];
-                };
+                "multipart/form-data": components["schemas"]["UploadEditReferenceAssetInput"];
             };
         };
         responses: {
@@ -2260,19 +2376,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": {
-                    /** Format: uuid */
-                    baseOutputId?: string;
-                    message: string;
-                    /** @description JSON encoded annotation document. */
-                    annotations?: string;
-                    /** Format: binary */
-                    editMask?: string;
-                    /** Format: binary */
-                    protectMask?: string;
-                    /** @description JSON encoded ReferenceSelection array. */
-                    referenceSelections?: string;
-                };
+                "multipart/form-data": components["schemas"]["CreateEditTurnInput"];
             };
         };
         responses: {
@@ -2282,13 +2386,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        turnId: string;
-                        /** Format: uuid */
-                        planJobId: string;
-                        status: components["schemas"]["EditTurnStatus"];
-                    };
+                    "application/json": components["schemas"]["EditTurnQueuedResponse"];
                 };
             };
         };
@@ -2304,10 +2402,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** Format: uuid */
-                    outputId: string;
-                };
+                "application/json": components["schemas"]["SelectEditSessionOutputInput"];
             };
         };
         responses: {
@@ -2361,10 +2456,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        job: components["schemas"]["Job"];
-                        turn: components["schemas"]["EditTurn"];
-                    };
+                    "application/json": components["schemas"]["ApproveEditTurnResponse"];
                 };
             };
         };
@@ -2424,7 +2516,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description New retry job queued. */
+            /** @description New retry job queued; the original job is now CANCELLED. */
             202: {
                 headers: {
                     [name: string]: unknown;

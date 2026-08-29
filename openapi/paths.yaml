@@ -1,0 +1,786 @@
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /ecom-templates:
+    get:
+      operationId: listEcomDetailsImageTemplates
+      responses:
+        "200":
+          description: Structured templates adapted from the pinned ecom-details-image upstream Skill.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomTemplatesResponse"
+  /providers:
+    get:
+      operationId: listProviders
+      responses:
+        "200":
+          description: Provider configurations.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderList"
+    post:
+      operationId: createProvider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderInput"
+      responses:
+        "201":
+          description: Provider created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderConfig"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /providers/{providerId}:
+    parameters:
+      - $ref: "#/components/parameters/ProviderId"
+    patch:
+      operationId: updateProvider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProviderInput"
+      responses:
+        "200":
+          description: Provider updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderConfig"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteProvider
+      responses:
+        "204":
+          description: Provider deleted.
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /providers/{providerId}/test:
+    parameters:
+      - $ref: "#/components/parameters/ProviderId"
+    post:
+      operationId: testProviderConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestProviderInput"
+      responses:
+        "200":
+          description: Provider connectivity result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestProviderConnectionResult"
+        "502":
+          $ref: "#/components/responses/ProviderError"
+  /search-sources:
+    get:
+      operationId: listSearchSources
+      responses:
+        "200":
+          description: Search source configurations in execution priority order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchSourceList"
+    post:
+      operationId: createSearchSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSearchSourceInput"
+      responses:
+        "201":
+          description: Search source created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchSourceConfig"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /search-sources/{sourceId}:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateSearchSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSearchSourceInput"
+      responses:
+        "200":
+          description: Search source updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchSourceConfig"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteSearchSource
+      responses:
+        "204":
+          description: Search source deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects:
+    get:
+      operationId: listProjects
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - name: archived
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Projects.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectList"
+    post:
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectInput"
+      responses:
+        "201":
+          description: Project created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{projectId}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: getProject
+      responses:
+        "200":
+          description: Project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectInput"
+      responses:
+        "200":
+          description: Project updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      responses:
+        "204":
+          description: Project deleted.
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /projects/{projectId}/assets:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listAssets
+      responses:
+        "200":
+          description: Assets.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetList"
+    post:
+      operationId: uploadAsset
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadAssetInput"
+      responses:
+        "200":
+          description: Asset uploaded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+  /assets/{assetId}:
+    parameters:
+      - $ref: "#/components/parameters/AssetId"
+    patch:
+      operationId: updateAsset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAssetInput"
+      responses:
+        "200":
+          description: Asset updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+    delete:
+      operationId: deleteAsset
+      responses:
+        "204":
+          description: Asset deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{projectId}/planning-jobs:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      operationId: createPlanningJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePlanningJobInput"
+      responses:
+        "202":
+          description: Planning job queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /projects/{projectId}/planning-config-snapshots:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listPlanningConfigSnapshots
+      responses:
+        "200":
+          description: Recent planning configuration snapshots.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanningConfigSnapshotList"
+  /projects/{projectId}/planning-config-snapshots/{snapshotId}/apply:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - name: snapshotId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: applyPlanningConfigSnapshot
+      responses:
+        "200":
+          description: Applied planning configuration snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplyPlanningConfigSnapshotResult"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /projects/{projectId}/copywriting-jobs:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      operationId: createCopywritingJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCopywritingJobInput"
+      responses:
+        "200":
+          description: Existing copywriting job reused.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "202":
+          description: Copywriting job queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /copywriting-jobs/{jobId}/result:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    get:
+      operationId: getCopywritingResult
+      responses:
+        "200":
+          description: Generated copywriting result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopywritingResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /projects/{projectId}/storyboard:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: getStoryboard
+      responses:
+        "200":
+          description: Current storyboard.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoryboardBundle"
+  /projects/{projectId}/storyboard/confirm:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      operationId: confirmStoryboard
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmStoryboardInput"
+      responses:
+        "200":
+          description: Storyboard frozen for generation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Storyboard"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /storyboard-items/{itemId}:
+    parameters:
+      - $ref: "#/components/parameters/StoryboardItemId"
+    patch:
+      operationId: updateStoryboardItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStoryboardItemInput"
+      responses:
+        "200":
+          description: Storyboard item updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoryboardItem"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteStoryboardItem
+      responses:
+        "204":
+          description: Draft storyboard item deleted.
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /projects/{projectId}/generation-jobs:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      operationId: createGenerationJobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGenerationJobInput"
+      responses:
+        "202":
+          description: Generation job queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerationJobsResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /projects/{projectId}/outputs/{outputId}/edit-sessions:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/OutputId"
+    post:
+      operationId: createEditSession
+      responses:
+        "201":
+          description: Edit session created or reused.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditSession"
+  /edit-sessions/{sessionId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getEditSession
+      responses:
+        "200":
+          description: Edit session and turns.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/EditSession"
+                  - type: object
+                    required:
+                      - turns
+                    properties:
+                      turns:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/EditTurn"
+                      versions:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Output"
+  /edit-sessions/{sessionId}/memory:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateEditSessionMemory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEditSessionMemoryInput"
+      responses:
+        "200":
+          description: Updated edit session memory.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditSession"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /edit-sessions/{sessionId}/reference-assets:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: listEditReferenceAssets
+      responses:
+        "200":
+          description: Project and temporary reference assets available to this edit session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditReferenceAssetList"
+    post:
+      operationId: uploadEditReferenceAsset
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadEditReferenceAssetInput"
+      responses:
+        "201":
+          description: Temporary reference asset uploaded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditReferenceAsset"
+  /edit-sessions/{sessionId}/reference-assets/{referenceAssetId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: referenceAssetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: deleteEditReferenceAsset
+      responses:
+        "204":
+          description: Temporary reference asset deleted.
+  /edit-sessions/{sessionId}/reference-assets/{referenceAssetId}/promote:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: referenceAssetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: promoteEditReferenceAsset
+      responses:
+        "201":
+          description: Temporary reference asset saved to the project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditReferenceAsset"
+  /edit-sessions/{sessionId}/turns:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: createEditTurn
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateEditTurnInput"
+      responses:
+        "202":
+          description: Edit plan queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditTurnQueuedResponse"
+  /edit-sessions/{sessionId}/select-output:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: selectEditSessionOutput
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SelectEditSessionOutputInput"
+      responses:
+        "200":
+          description: Current edit output changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditSession"
+  /edit-turns/{turnId}:
+    parameters:
+      - name: turnId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getEditTurn
+      responses:
+        "200":
+          description: Edit turn state and plan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditTurn"
+  /edit-turns/{turnId}/approve:
+    parameters:
+      - name: turnId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: approveEditTurn
+      responses:
+        "202":
+          description: Edit generation queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApproveEditTurnResponse"
+  /jobs/{jobId}:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    get:
+      operationId: getJob
+      responses:
+        "200":
+          description: Job state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+  /jobs/{jobId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    post:
+      operationId: cancelJob
+      responses:
+        "202":
+          description: Cancellation requested.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+  /jobs/{jobId}/retry:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    post:
+      operationId: retryJob
+      description: Supersedes the original failed job as CANCELLED and queues a replacement job. Repeated retries on the same job respond with 409.
+      responses:
+        "202":
+          description: New retry job queued; the original job is now CANCELLED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+  /projects/{projectId}/export-jobs:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      operationId: createExportJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExportJobInput"
+      responses:
+        "202":
+          description: Export job queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportJobBundle"
+  /exports/{exportId}:
+    parameters:
+      - $ref: "#/components/parameters/ExportId"
+    get:
+      operationId: getExport
+      responses:
+        "200":
+          description: Export package state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Export"
+  /files/assets/{assetId}:
+    parameters:
+      - $ref: "#/components/parameters/AssetId"
+    get:
+      operationId: downloadAsset
+      responses:
+        "200":
+          description: Original asset bytes.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /files/outputs/{outputId}:
+    parameters:
+      - $ref: "#/components/parameters/OutputId"
+    get:
+      operationId: downloadOutput
+      responses:
+        "200":
+          description: Generated image bytes.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /files/exports/{exportId}:
+    parameters:
+      - $ref: "#/components/parameters/ExportId"
+    get:
+      operationId: downloadExport
+      responses:
+        "200":
+          description: ZIP package bytes.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /events:
+    get:
+      operationId: subscribeEvents
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Server-sent event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string

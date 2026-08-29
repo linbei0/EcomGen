@@ -1,14 +1,6 @@
-export interface GenerationJobInput {
-  storyboardItemIds: string[];
-  generationBatchId?: string;
-  revision?: string;
-  generationConfig?: {
-    imageResolution?: "1K" | "2K" | "4K";
-    imageAspectRatio?: "AUTO" | "1:1" | "3:4" | "4:3" | "16:9";
-    candidateCount?: number;
-    imageModel?: { providerId: string; modelId: string };
-  };
-}
+import type { CreateGenerationJobInput } from "@ecomgen/contracts";
+
+export type GenerationJobInput = CreateGenerationJobInput;
 
 /** 显式列出分镜 ID，排序后序列化，供后端指纹去重。 */
 export function serializeGenerationBody(input: GenerationJobInput): string {

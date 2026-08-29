@@ -121,4 +121,6 @@ pnpm lint:openapi
 pnpm test:e2e:mock
 ```
 
+API schema 的手写真相源位于 `packages/contracts/src`（TypeBox）。运行 `pnpm gen:openapi` 生成 OpenAPI 组件视图，再由 `pnpm --filter @ecomgen/web gen:api` 生成 Web 类型；`pnpm gen:check` 会在不修改工作区的情况下对账这些生成物。
+
 Mock E2E 必须至少验证：规划成功、手动确认、生图请求收到最终 Prompt、Prompt 不含内部模板元数据、审核和导出成功。

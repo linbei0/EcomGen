@@ -159,7 +159,7 @@ openapi.yaml API 契约
 
 ## 开发约定
 
-- 新增跨应用字段先更新 `packages/contracts` 和根目录 `openapi.yaml`，再重新生成 Web 类型。
+- 新增跨应用字段先更新 `packages/contracts/src` 中对应 TypeBox schema，然后运行 `pnpm gen:openapi` 和 `pnpm --filter @ecomgen/web gen:api`；`openapi.yaml`、`openapi/schemas.generated.yaml` 与 Web 类型文件均为生成物。
 - 不在 Worker 中拼接模板、平台规则或 Campaign Style Lock；`promptInstruction` 是可编辑的最终 Prompt。
 - 不绕过 `ecom-skill` 模板校验；未知模板 ID、缺少 `PRODUCT_TRUTH` 或 Provider 能力不足时必须显式失败。
 - API Key、主密钥和其他凭据不得写入 Prompt、日志、`manifest.json` 或提交记录。
