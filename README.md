@@ -170,4 +170,6 @@ openapi.yaml API 契约
 
 感谢 [Pi](https://github.com/badlogic/pi-mono) 提供 Agent 能力，以及 [liangdabiao/ecom-details-image](https://github.com/liangdabiao/ecom-details-image) 提供电商图片模板与视觉规范。
 
+同时感谢 [LINUX DO](https://linux.do) 社区和各位老友在开发过程中的支持与反馈。
+
 上游模板已固定版本并内置于 `packages/ecom-skill`，来源和改造边界见 [`packages/ecom-skill/UPSTREAM.md`](./packages/ecom-skill/UPSTREAM.md)。
