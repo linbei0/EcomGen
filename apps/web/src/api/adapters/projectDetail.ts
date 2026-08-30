@@ -287,26 +287,19 @@ export function adaptStoryboardItem(raw: unknown): StoryboardItem | null {
 function adaptProjectCore(raw: Record<string, unknown>): Project | null {
   const id = asString(raw.id);
   const name = asString(raw.name);
-  const reasoningProviderId = asString(raw.reasoningProviderId);
-  const reasoningModelId = asString(raw.reasoningModelId);
-  const imageProviderId = asString(raw.imageProviderId);
-  const imageModelId = asString(raw.imageModelId);
+  const reasoningProviderId = asString(raw.reasoningProviderId) ?? null;
+  const reasoningModelId = asString(raw.reasoningModelId) ?? null;
+  const imageProviderId = asString(raw.imageProviderId) ?? null;
+  const imageModelId = asString(raw.imageModelId) ?? null;
   const defaultMode = asString(raw.defaultMode);
   const createdAt = asString(raw.createdAt);
   const updatedAt = asString(raw.updatedAt);
   const platforms = Array.isArray(raw.platformTargets)
     ? raw.platformTargets.filter((item): item is Project["platformTargets"][number] => item === "TAOBAO" || item === "JD" || item === "PDD" || item === "DOUYIN" || item === "AMAZON" || item === "SHOPIFY")
     : [];
-  if (
-    !id ||
-    !name ||
-    !reasoningProviderId ||
-    !reasoningModelId ||
-    !imageProviderId ||
-    !imageModelId ||
-    !createdAt ||
-    !updatedAt
-  ) {
+  // Provider 可被删除并置空引用：模型四元组为 null 不应导致整个项目解析失败，
+  // 页面据此展示"待重新选择模型"并在生成入口拦截
+  if (!id || !name || !createdAt || !updatedAt) {
     return null;
   }
   if (defaultMode !== "CREATIVE" && defaultMode !== "PIXEL_PROTECTED") return null;

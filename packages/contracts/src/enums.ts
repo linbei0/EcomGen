@@ -25,7 +25,7 @@ export const ReferenceSource = Type.Enum({ PROJECT: "PROJECT", TEMPORARY: "TEMPO
 export const ReferencePurpose = Type.Enum({ PRODUCT_APPEARANCE: "PRODUCT_APPEARANCE", PACKAGING: "PACKAGING", LABEL: "LABEL", STYLE: "STYLE", LAYOUT: "LAYOUT" }, { $id: "#/components/schemas/ReferencePurpose" });
 export const EditTurnStatus = Type.Enum({ DRAFT: "DRAFT", PLANNING: "PLANNING", PLAN_READY: "PLAN_READY", NEED_INPUT: "NEED_INPUT", AWAITING_CONFIRMATION: "AWAITING_CONFIRMATION", GENERATING: "GENERATING", SUCCEEDED: "SUCCEEDED", FAILED: "FAILED", CANCELLED: "CANCELLED" }, { $id: "#/components/schemas/EditTurnStatus" });
 export const EditSessionStatus = Type.Enum({ ACTIVE: "ACTIVE", ARCHIVED: "ARCHIVED" }, { $id: "#/components/schemas/EditSessionStatus" });
-export const ErrorCode = Type.Enum({ VALIDATION_ERROR: "VALIDATION_ERROR", NOT_FOUND: "NOT_FOUND", CONFLICT: "CONFLICT", CAPABILITY_UNSUPPORTED: "CAPABILITY_UNSUPPORTED", RATE_LIMITED: "RATE_LIMITED", INTERNAL_ERROR: "INTERNAL_ERROR", PROVIDER_ERROR: "PROVIDER_ERROR" }, { $id: "#/components/schemas/ErrorCode" });
+export const ErrorCode = Type.Enum({ VALIDATION_ERROR: "VALIDATION_ERROR", NOT_FOUND: "NOT_FOUND", CONFLICT: "CONFLICT", CAPABILITY_UNSUPPORTED: "CAPABILITY_UNSUPPORTED", PROVIDER_NOT_CONFIGURED: "PROVIDER_NOT_CONFIGURED", RATE_LIMITED: "RATE_LIMITED", INTERNAL_ERROR: "INTERNAL_ERROR", PROVIDER_ERROR: "PROVIDER_ERROR" }, { $id: "#/components/schemas/ErrorCode" });
 
 export type PlatformTarget = Static<typeof PlatformTarget>;
 export type TargetMarket = Static<typeof TargetMarket>;

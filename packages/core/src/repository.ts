@@ -53,10 +53,11 @@ export interface ProjectRecord {
   platformTargets: PlatformTarget[];
   targetMarket: TargetMarket | null;
   copyLanguage: string | null;
-  reasoningProviderId: string;
-  reasoningModelId: string;
-  imageProviderId: string;
-  imageModelId: string;
+  // 引用可空：Provider 可随时删除，删除时级联置空，项目进入"待重新选择模型"状态
+  reasoningProviderId: string | null;
+  reasoningModelId: string | null;
+  imageProviderId: string | null;
+  imageModelId: string | null;
   defaultMode: StoryboardMode;
   imageResolution: ImageResolution;
   imageAspectRatio: ImageAspectRatio;
@@ -97,8 +98,8 @@ export interface StoryboardItemRecord {
   displayName: string;
   templateVariant: string | null;
   candidateCount: number;
-  imageProviderId: string;
-  imageModelId: string;
+  imageProviderId: string | null;
+  imageModelId: string | null;
   imageResolution: ImageResolution;
   imageAspectRatio: ImageAspectRatio;
   referencedAssets: string[];
@@ -218,10 +219,11 @@ export interface PlanningConfigSnapshotPayload {
     platformTargets: PlatformTarget[];
     targetMarket: TargetMarket | null;
     copyLanguage: string | null;
-    reasoningProviderId: string;
-    reasoningModelId: string;
-    imageProviderId: string;
-    imageModelId: string;
+    // 与 ProjectRecord 一致可空：快照可能来自引用被置空的项目，应用快照前由 API 层校验
+    reasoningProviderId: string | null;
+    reasoningModelId: string | null;
+    imageProviderId: string | null;
+    imageModelId: string | null;
     defaultMode: StoryboardMode;
     imageResolution: ImageResolution;
     imageAspectRatio: ImageAspectRatio;
@@ -308,7 +310,7 @@ const json = (value: unknown): string => JSON.stringify(value);
 const parse = <T>(value: unknown): T => JSON.parse(String(value)) as T;
 
 export class EcomRepository {
-  public constructor(private readonly db: SqliteDatabase) {}
+  public constructor(private readonly db: SqliteDatabase) { }
 
   public listProviders(): ProviderRecord[] { return (this.db.prepare("SELECT * FROM providers ORDER BY created_at DESC").all() as Row[]).map(mapProvider); }
   public getProvider(id: string): ProviderRecord | undefined { const row = this.db.prepare("SELECT * FROM providers WHERE id = ?").get(id); return row ? mapProvider(row as Row) : undefined; }
@@ -321,11 +323,18 @@ export class EcomRepository {
       .run({ ...record, models: json(record.models) });
     return record;
   }
-  public deleteProvider(id: string): "deleted" | "in_use" | "missing" {
+  /** 删除 Provider 并把引用它的项目置空（ Provider 只在生成时使用，项目随后重新选择模型即可）。 */
+  public deleteProvider(id: string): "deleted" | "missing" {
     if (!this.getProvider(id)) return "missing";
-    const usage = this.db.prepare("SELECT COUNT(*) AS count FROM projects WHERE reasoning_provider_id=? OR image_provider_id=?").get(id, id) as { count: number };
-    if (usage.count > 0) return "in_use";
-    this.db.prepare("DELETE FROM providers WHERE id=?").run(id); return "deleted";
+    const clear = this.db.transaction(() => {
+      this.db.prepare("UPDATE projects SET reasoning_provider_id=NULL, reasoning_model_id=NULL, updated_at=? WHERE reasoning_provider_id=?").run(now(), id);
+      this.db.prepare("UPDATE projects SET image_provider_id=NULL, image_model_id=NULL, updated_at=? WHERE image_provider_id=?").run(now(), id);
+      this.db.prepare("UPDATE storyboard_items SET image_provider_id=NULL, image_model_id=NULL, updated_at=? WHERE image_provider_id=?").run(now(), id);
+      this.db.prepare("UPDATE jobs SET status='CANCELLED', retryable=0, cancel_requested=1, updated_at=? WHERE provider_id=? AND status IN ('QUEUED','RUNNING')").run(now(), id);
+      this.db.prepare("DELETE FROM providers WHERE id=?").run(id);
+    });
+    clear();
+    return "deleted";
   }
 
   public listSearchSources(): SearchSourceRecord[] {
@@ -648,10 +657,10 @@ function mapProject(row: Row): ProjectRecord {
     platformTargets: parse(row.platform_targets_json),
     targetMarket: row.target_market ? row.target_market as TargetMarket : null,
     copyLanguage: row.copy_language ? String(row.copy_language) : null,
-    reasoningProviderId: String(row.reasoning_provider_id),
-    reasoningModelId: String(row.reasoning_model_id),
-    imageProviderId: String(row.image_provider_id),
-    imageModelId: String(row.image_model_id),
+    reasoningProviderId: row.reasoning_provider_id ? String(row.reasoning_provider_id) : null,
+    reasoningModelId: row.reasoning_model_id ? String(row.reasoning_model_id) : null,
+    imageProviderId: row.image_provider_id ? String(row.image_provider_id) : null,
+    imageModelId: row.image_model_id ? String(row.image_model_id) : null,
     defaultMode: row.default_mode as StoryboardMode,
     imageResolution: (row.image_resolution as ImageResolution | undefined) ?? "1K",
     imageAspectRatio: (row.image_aspect_ratio as ImageAspectRatio | undefined) ?? "AUTO",
@@ -686,8 +695,8 @@ function mapStoryboardItem(row: Row): StoryboardItemRecord {
     displayName: String(row.display_name ?? row.asset_type),
     templateVariant: row.template_variant ? String(row.template_variant) : null,
     candidateCount: Number(row.candidate_count ?? 1),
-    imageProviderId: String(row.image_provider_id),
-    imageModelId: String(row.image_model_id),
+    imageProviderId: row.image_provider_id ? String(row.image_provider_id) : null,
+    imageModelId: row.image_model_id ? String(row.image_model_id) : null,
     imageResolution: row.image_resolution as ImageResolution,
     imageAspectRatio: row.image_aspect_ratio as ImageAspectRatio,
     referencedAssets: parse(row.referenced_assets_json ?? "[]"),

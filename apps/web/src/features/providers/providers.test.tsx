@@ -44,6 +44,7 @@ describe("设置抽屉 · Provider", () => {
     await user.click(screen.getByRole("button", { name: /^添加$/ }));
 
     expect(await screen.findByText("已添加 Provider")).toBeInTheDocument();
+    expect(await screen.findByText("编辑 Provider")).toBeInTheDocument();
     expect(captured).toMatchObject({
       name: "测试 Provider",
       baseUrl: "https://api.test.local/v1",
@@ -100,6 +101,16 @@ describe("设置抽屉 · Provider", () => {
     expect(screen.getAllByText("思考")).toHaveLength(1);
     expect(screen.getAllByText("工具")).toHaveLength(1);
     expect(screen.getAllByText("结构化")).toHaveLength(1);
+  });
+
+  it("新添加的模型必须保存后才能测试", async () => {
+    const user = userEvent.setup();
+    openDrawer();
+    await user.click(await screen.findByRole("button", { name: "编辑 OpenAI 官方" }));
+    await user.click(screen.getByRole("button", { name: "添加模型" }));
+    const testButtons = screen.getAllByRole("button", { name: "测试" });
+    expect(testButtons).toHaveLength(3);
+    expect(testButtons[2]).toBeDisabled();
   });
 
   it("删除 Provider：Popconfirm 确认后调用 DELETE", async () => {

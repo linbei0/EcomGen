@@ -7,6 +7,7 @@ import type { components, operations } from "../schema.d.ts";
 export type ProviderConfig = components["schemas"]["ProviderConfig"];
 export type ModelCapability = components["schemas"]["ModelCapability"];
 export type CreateProviderInput = components["schemas"]["CreateProviderInput"];
+export type UpdateProviderInput = components["schemas"]["UpdateProviderInput"];
 export type TestProviderResult =
   operations["testProviderConnection"]["responses"]["200"]["content"]["application/json"];
 
@@ -32,11 +33,10 @@ export function useCreateProvider() {
   });
 }
 
-/** 契约缺口 13.12：UpdateProviderInput 目前强制 apiKey，表单必须重新输入。 */
 export function useUpdateProvider() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ providerId, body }: { providerId: string; body: CreateProviderInput }) =>
+    mutationFn: ({ providerId, body }: { providerId: string; body: UpdateProviderInput }) =>
       unwrap(api.PATCH("/providers/{providerId}", { params: { path: { providerId } }, body })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.providers }),
   });

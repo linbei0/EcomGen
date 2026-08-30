@@ -43,7 +43,10 @@ export function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () =
       ) : view.kind === "search-sources" ? (
         <SearchSourceView onBack={() => setView({ kind: "list" })} />
       ) : (
-        <ProviderFormView view={view} onDone={() => setView({ kind: "list" })} />
+        <ProviderFormView
+          view={view}
+          onDone={(provider) => setView(provider ? { kind: "edit", provider } : { kind: "list" })}
+        />
       )}
     </Drawer>
   );

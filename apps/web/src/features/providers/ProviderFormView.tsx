@@ -6,9 +6,9 @@ import {
   useCreateProvider,
   useTestProvider,
   useUpdateProvider,
-  type CreateProviderInput,
   type ModelCapability,
   type ProviderConfig,
+  type UpdateProviderInput,
 } from "../../api/hooks/useProviders";
 import { errorText } from "../../lib/errorText";
 import styles from "./providers.module.css";
@@ -61,7 +61,8 @@ function toModelCapability(row: ModelFormRow): ModelCapability {
 
 interface Props {
   view: { kind: "create" } | { kind: "edit"; provider: ProviderConfig };
-  onDone: () => void;
+  /** 取消时不传值；保存成功传回最新 Provider，让父级留在编辑页。 */
+  onDone: (provider?: ProviderConfig) => void;
 }
 
 export function ProviderFormView({ view, onDone }: Props) {
@@ -77,38 +78,47 @@ export function ProviderFormView({ view, onDone }: Props) {
 
   const initialValues: ProviderFormValues = editing
     ? {
-        name: editing.name,
-        baseUrl: editing.baseUrl,
-        reasoningProtocol: editing.reasoningProtocol,
-        apiKey: "",
-        models: editing.models.map((m) => ({
-          id: m.id,
-          supportsVision: m.supportsVision,
-          supportsThinking: m.supportsThinking,
-          supportsTools: m.supportsTools,
-          supportsStructuredOutput: m.supportsStructuredOutput,
-          imageApiKind: m.imageApiKind ?? "",
-        })),
-      }
+      name: editing.name,
+      baseUrl: editing.baseUrl,
+      reasoningProtocol: editing.reasoningProtocol,
+      apiKey: "",
+      models: editing.models.map((m) => ({
+        id: m.id,
+        supportsVision: m.supportsVision,
+        supportsThinking: m.supportsThinking,
+        supportsTools: m.supportsTools,
+        supportsStructuredOutput: m.supportsStructuredOutput,
+        imageApiKind: m.imageApiKind ?? "",
+      })),
+    }
     : { name: "", baseUrl: "", reasoningProtocol: "openai", apiKey: "", models: [EMPTY_MODEL_ROW] };
 
   const handleFinish = async (values: ProviderFormValues) => {
-    const body: CreateProviderInput = {
+    // 编辑时密钥可留空：契约中 apiKey 可选，省略表示保留原密钥
+    const shared = {
       name: values.name.trim(),
       baseUrl: values.baseUrl.trim(),
       reasoningProtocol: values.reasoningProtocol,
-      apiKey: values.apiKey,
       models: values.models.map(toModelCapability),
     };
     try {
       if (editing) {
-        await updateProvider.mutateAsync({ providerId: editing.id, body });
+        const body: UpdateProviderInput = {
+          ...shared,
+          ...(values.apiKey.trim() === "" ? {} : { apiKey: values.apiKey }),
+        };
+        const saved = await updateProvider.mutateAsync({ providerId: editing.id, body });
+        form.setFieldsValue({ ...values, apiKey: "" });
+        setTestRows({});
         notification.success({ title: "已保存 Provider" });
+        onDone(saved);
       } else {
-        await createProvider.mutateAsync(body);
+        const saved = await createProvider.mutateAsync({ ...shared, apiKey: values.apiKey });
+        form.setFieldsValue({ ...values, apiKey: "" });
+        setTestRows({});
         notification.success({ title: "已添加 Provider" });
+        onDone(saved);
       }
-      onDone();
     } catch (error) {
       notification.error({
         title: editing ? "保存失败" : "创建失败",
@@ -123,6 +133,11 @@ export function ProviderFormView({ view, onDone }: Props) {
     const row = rows?.[index];
     if (!row || row.id.trim() === "") {
       notification.warning({ title: "先填写模型 ID 再测试" });
+      return;
+    }
+    const persisted = editing.models.find((model) => model.id === row.id.trim());
+    if (!persisted || (persisted.imageApiKind ?? "") !== row.imageApiKind) {
+      notification.warning({ title: "请先保存模型，再测试连通性" });
       return;
     }
     setTestRows((s) => ({ ...s, [index]: { state: "loading" } }));
@@ -185,14 +200,14 @@ export function ProviderFormView({ view, onDone }: Props) {
       <Form.Item
         name="apiKey"
         label="API Key"
-        rules={[{ required: true, message: "填写 API Key" }]}
+        rules={editing ? [] : [{ required: true, message: "填写 API Key" }]}
         extra={
           editing
-            ? "密钥不会回显。按当前契约，更新 Provider 需重新输入密钥（契约缺口 13.12）。"
+            ? "留空则保留原密钥；密钥仅通过 API 加密保存，任何响应都不会回传。"
             : "密钥仅通过 API 加密保存，任何响应都不会回传。"
         }
       >
-        <Input.Password placeholder={editing ? "重新输入密钥" : "sk-..."} autoComplete="off" />
+        <Input.Password placeholder={editing ? "留空保留原密钥" : "sk-..."} autoComplete="off" />
       </Form.Item>
 
       <div className={styles.modelsHeader}>
@@ -206,6 +221,7 @@ export function ProviderFormView({ view, onDone }: Props) {
             {fields.map((field, index) => {
               const testRow = testRows[index];
               const imageApiKind = modelKinds[field.key] ?? models?.[field.name]?.imageApiKind ?? "";
+              const persisted = Boolean(editing && editing.models.some((model) => model.id === (models?.[field.name]?.id ?? "").trim() && (model.imageApiKind ?? "") === imageApiKind));
               return (
                 <div key={field.key} className={styles.modelRow}>
                   <div className={styles.modelRowMain}>
@@ -256,11 +272,11 @@ export function ProviderFormView({ view, onDone }: Props) {
                         ]}
                       />
                     </Form.Item>
-                    <Tooltip title={editing ? "仅检测连通性，不消耗生图额度" : "保存后可测试"}>
+                    <Tooltip title={persisted ? "仅检测连通性，不消耗生图额度" : "保存后可测试"}>
                       <Button
                         size="small"
                         icon={<PlugZap size={14} strokeWidth={1.75} />}
-                        disabled={!editing}
+                        disabled={!persisted}
                         loading={testRow?.state === "loading"}
                         onClick={() => void runTest(index)}
                       >
@@ -306,7 +322,7 @@ export function ProviderFormView({ view, onDone }: Props) {
       </Form.List>
 
       <div className={styles.formFooter}>
-        <Button onClick={onDone}>取消</Button>
+        <Button onClick={() => onDone()}>取消</Button>
         <Button
           type="primary"
           htmlType="submit"

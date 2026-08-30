@@ -188,6 +188,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const project = projectFor(job); const item = repository.getStoryboardItem(job.storyboardItemId); if (!item || item.projectId !== project.id) throw new Error("Storyboard item is missing or belongs to another project");
   const providerId = job.providerId ?? item.imageProviderId;
   const modelId = job.modelId ?? item.imageModelId;
+  if (!providerId || !modelId) throw new Error("该项目尚未选择生图模型（Provider 可能已被删除），请在项目设置中重新选择");
   const provider = providerFor(providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini") throw new Error("Selected image model has no executable image API");
   const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`);
   const inputs = selectGenerationAssets(repository.listAssets(project.id), item);
@@ -403,11 +404,21 @@ async function executeExport(job: JobRecord): Promise<void> {
 }
 
 function projectFor(job: JobRecord): ProjectRecord { const project = repository.getProject(job.projectId); if (!project) throw new Error(`Project not found for job ${job.id}`); return project; }
-function providerFor(id: string) { const provider = repository.getProvider(id); if (!provider) throw new Error(`Configured provider not found: ${id}`); return provider; }
+// 引用为 null 表示 Provider 被删除后项目尚未重新选择模型；入口虽已拦截，这里兜底给出可读错误
+function providerFor(id: string | null) {
+  if (!id) throw new Error("该项目尚未选择 Provider（可能已被删除），请在项目设置中重新选择");
+  const provider = repository.getProvider(id);
+  if (!provider) throw new Error(`Configured provider not found: ${id}`);
+  return provider;
+}
 /** 一个 Job 的每个候选使用独立稳定键，重试不会再次落库或写出另一份文件。 */
 function generationKeyFor(jobId: string, candidateIndex: number): string { return `ecomgen:generation:${jobId}:candidate:${candidateIndex}`; }
 interface EditGenerationConfig { reasoningProviderId: string; reasoningModelId: string; imageProviderId: string; imageModelId: string; imageResolution: ImageResolution; candidateCount: number; }
 function editGenerationConfigFor(project: ProjectRecord, turn: EditTurnRecord): EditGenerationConfig {
+  // 编辑链路允许注解覆盖模型，但 fallback 始终依赖项目引用；引用为空时直接失败而不是产出 null 配置
+  if (!project.reasoningProviderId || !project.reasoningModelId || !project.imageProviderId || !project.imageModelId) {
+    throw new Error("该项目尚未选择推理与图片模型（Provider 可能已被删除），请在项目设置中重新选择");
+  }
   const defaults = { reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId, imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, imageResolution: project.imageResolution, candidateCount: Math.min(4, Math.max(1, Math.round(project.candidatesPerType))) };
   const raw = (turn.annotations as Record<string, unknown>).generationConfig;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;

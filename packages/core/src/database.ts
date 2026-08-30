@@ -10,7 +10,13 @@ export function openDatabase(filename: string): SqliteDatabase {
   database.pragma("journal_mode = WAL");
   database.pragma("foreign_keys = ON");
   database.pragma("busy_timeout = 5000");
-  migrate(database);
+  try {
+    migrate(database);
+  } catch (error) {
+    // 迁移失败必须释放文件句柄，否则 Windows 上后续清理临时库会 EBUSY
+    database.close();
+    throw error;
+  }
   return database;
 }
 
@@ -64,12 +70,66 @@ function removeLegacyOutputReviewColumns(database: SqliteDatabase): void {
   }
 }
 
+/** Provider 可随时删除：旧库的 projects.provider 引用列为 NOT NULL，重建表放宽为可空（删除 Provider 时级联置空）。 */
+function makeProjectProviderReferencesNullable(database: SqliteDatabase): void {
+  const columns = database.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string; notnull: number }>;
+  if (columns.length === 0 || !columns.some((column) => (column.name === "reasoning_provider_id" || column.name === "image_provider_id") && column.notnull !== 0)) return;
+  // 重建 SELECT 依赖这些后补列；更早版本的旧库可能一个都还没有
+  for (const column of ["archived_at", "target_market", "copy_language"]) {
+    if (!columns.some((existing) => existing.name === column)) database.exec(`ALTER TABLE projects ADD COLUMN ${column} TEXT`);
+  }
+  database.exec("DROP TABLE IF EXISTS projects_nullable_providers");
+  database.pragma("foreign_keys = OFF");
+  try {
+    const rebuild = database.transaction(() => database.exec(`
+      CREATE TABLE projects_nullable_providers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT,
+        product_description TEXT,
+        verified_facts_json TEXT NOT NULL DEFAULT '[]',
+        prohibited_claims_json TEXT NOT NULL DEFAULT '[]',
+        brand_guidelines_json TEXT NOT NULL DEFAULT '{}',
+        platform_targets_json TEXT NOT NULL,
+        target_market TEXT,
+        copy_language TEXT,
+        reasoning_provider_id TEXT,
+        reasoning_model_id TEXT,
+        image_provider_id TEXT,
+        image_model_id TEXT,
+        default_mode TEXT NOT NULL,
+        image_resolution TEXT NOT NULL DEFAULT '1K',
+        image_aspect_ratio TEXT NOT NULL DEFAULT 'AUTO',
+        candidates_per_type INTEGER NOT NULL DEFAULT 1,
+        web_research_enabled INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (reasoning_provider_id) REFERENCES providers(id),
+        FOREIGN KEY (image_provider_id) REFERENCES providers(id)
+      );
+      INSERT INTO projects_nullable_providers (
+        id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,created_at,updated_at
+      )
+      SELECT
+        id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,created_at,updated_at
+      FROM projects;
+      DROP TABLE projects;
+      ALTER TABLE projects_nullable_providers RENAME TO projects;
+    `));
+    rebuild();
+  } finally {
+    database.pragma("foreign_keys = ON");
+  }
+}
+
 /**
  * 开发初期以本 schema 为唯一规范，不保留历史迁移或兼容分支；
  * 结构变更时直接删除旧开发库文件重建。
  */
 function migrate(database: SqliteDatabase): void {
   removeLegacyOutputReviewColumns(database);
+  makeProjectProviderReferencesNullable(database);
   database.exec(`
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
@@ -108,10 +168,10 @@ function migrate(database: SqliteDatabase): void {
       platform_targets_json TEXT NOT NULL,
       target_market TEXT,
       copy_language TEXT,
-      reasoning_provider_id TEXT NOT NULL,
-      reasoning_model_id TEXT NOT NULL,
-      image_provider_id TEXT NOT NULL,
-      image_model_id TEXT NOT NULL,
+      reasoning_provider_id TEXT,
+      reasoning_model_id TEXT,
+      image_provider_id TEXT,
+      image_model_id TEXT,
       default_mode TEXT NOT NULL,
       image_resolution TEXT NOT NULL DEFAULT '1K',
       image_aspect_ratio TEXT NOT NULL DEFAULT 'AUTO',

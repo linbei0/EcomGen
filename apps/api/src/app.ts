@@ -76,7 +76,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     }
     catch (error) { if (error instanceof ProviderError) throw new ApiError(502, "PROVIDER_ERROR", error.message); throw error; }
   });
-  app.delete("/api/v1/providers/:providerId", async (request, reply) => { const id = parameter(request, "providerId"); const result = repository.deleteProvider(id); if (result === "missing") missing("provider", id); if (result === "in_use") throw new ApiError(409, "CONFLICT", "Provider is used by a project and cannot be deleted"); return reply.code(204).send(); });
+  app.delete("/api/v1/providers/:providerId", async (request, reply) => { const id = parameter(request, "providerId"); const result = repository.deleteProvider(id); if (result === "missing") missing("provider", id); return reply.code(204).send(); });
 
   app.get("/api/v1/search-sources", async () => ({ items: repository.listSearchSources().map(publicSearchSource), nextCursor: null }));
   app.post("/api/v1/search-sources", async (request, reply) => {
@@ -214,6 +214,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       regenerationKey: readOptionalText(body.regenerationKey)
     };
     const fingerprint = requestFingerprint({ type: "PLAN", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    verifyModel(repository, project.reasoningProviderId, project.reasoningModelId, "reasoning");
     const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "PLAN", input, requestFingerprint: fingerprint, providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueue(queue, { jobId: job.id, kind: "plan" }); return reply.code(202).send(job);
   });
@@ -333,6 +334,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const project = repository.getProject(projectId); if (!project) missing("project", projectId);
     const jobs = itemIds.flatMap((itemId) => {
       const item = repository.getStoryboardItem(itemId); if (!item || item.projectId !== projectId) throw new ApiError(400, "VALIDATION_ERROR", "Storyboard item does not belong to this project");
+      if (!overrideProviderId || !overrideModelId) verifyModel(repository, item.imageProviderId, item.imageModelId, "image");
       const candidateCount = overrideCandidates ?? clampCandidates(item.candidateCount);
       return Array.from({ length: candidateCount }, (_, index) => {
         const input = {
@@ -596,7 +598,8 @@ function clampCandidates(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.min(MAX_CANDIDATES_PER_TYPE, Math.max(1, Math.round(value)));
 }
-function verifyCopywritingModel(repository: EcomRepository, providerId: string, modelId: string): void {
+function verifyCopywritingModel(repository: EcomRepository, providerId: string | null, modelId: string | null): void {
+  if (!providerId || !modelId) throw new ApiError(422, "PROVIDER_NOT_CONFIGURED", "请先在项目设置中选择推理与图片模型");
   const provider = repository.getProvider(providerId);
   if (!provider) missing("provider", providerId);
   const model = provider.models.find((candidate) => candidate.id === modelId);
@@ -606,7 +609,13 @@ function verifyCopywritingModel(repository: EcomRepository, providerId: string, 
 interface EditGenerationConfig { reasoningProviderId: string; reasoningModelId: string; imageProviderId: string; imageModelId: string; imageResolution: ImageResolution; candidateCount: number; }
 function editGenerationConfigFor(repository: EcomRepository, project: ProjectRecord, annotations: Record<string, unknown>): EditGenerationConfig {
   const raw = annotations.generationConfig;
-  if (raw === undefined) return { reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId, imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, imageResolution: project.imageResolution, candidateCount: clampCandidates(project.candidatesPerType) };
+  if (raw === undefined) {
+    // 无注解配置时沿用项目默认；Provider 被删除后引用已置空，这里显式拦截而不是把 null 传给任务
+    if (!project.reasoningProviderId || !project.reasoningModelId || !project.imageProviderId || !project.imageModelId) {
+      throw new ApiError(422, "PROVIDER_NOT_CONFIGURED", "请先在项目设置中选择推理与图片模型");
+    }
+    return { reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId, imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, imageResolution: project.imageResolution, candidateCount: clampCandidates(project.candidatesPerType) };
+  }
   const config = parseBody(EditGenerationConfigInput, raw, { pathPrefix: "annotations.generationConfig" });
   const reasoningProviderId = readText(config.reasoningProviderId, "annotations.generationConfig.reasoningProviderId");
   const reasoningModelId = readText(config.reasoningModelId, "annotations.generationConfig.reasoningModelId");
@@ -622,7 +631,8 @@ function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "GENERATE") return "generate";
   return "export";
 }
-function verifyModel(repository: EcomRepository, providerId: string, modelId: string, kind: "reasoning" | "image"): void { const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new ApiError(400, "VALIDATION_ERROR", `${kind} model is not declared by the selected provider`); if (kind === "image" && !model.imageApiKind) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected image model has no image API configured"); }
+// ProviderId/modelId 为 null 表示项目尚未选择模型（Provider 被删除后置空），在入口拦截而不是打出一个注定失败的任务
+function verifyModel(repository: EcomRepository, providerId: string | null, modelId: string | null, kind: "reasoning" | "image"): void { if (!providerId || !modelId) throw new ApiError(422, "PROVIDER_NOT_CONFIGURED", "请先在项目设置中选择推理与图片模型"); const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new ApiError(400, "VALIDATION_ERROR", `${kind} model is not declared by the selected provider`); if (kind === "image" && !model.imageApiKind) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected image model has no image API configured"); }
 function ensureProject(repository: EcomRepository, id: string): void { if (!repository.getProject(id)) missing("project", id); }
 function missing(resource: string, id: string): never { throw new ApiError(404, "NOT_FOUND", `${resource} not found: ${id}`); }
 export function assertProjectAssetCapacity(repository: Pick<EcomRepository, "listAssets">, projectId: string, role: AssetRole): void {

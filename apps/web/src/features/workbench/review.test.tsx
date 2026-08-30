@@ -112,6 +112,22 @@ describe("工作台 · 结果", () => {
     });
   });
 
+  it("分镜引用已删除 Provider 时，重新生成自动切换到可用生图模型", async () => {
+    const user = userEvent.setup();
+    let captured: unknown;
+    const staleItems = [{ ...STORYBOARD_ITEM_FIXTURE, status: "GENERATED" as const, imageProviderId: "fb5b6a38-b3fd-4f6d-895b-6b4442517f46", imageModelId: "gpt-image-2-1k" }, { ...STORYBOARD_ITEM_B_FIXTURE, status: "GENERATED" as const }];
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload({ ...confirmed, items: staleItems, outputs: [OUTPUT_FIXTURE] }))),
+      http.get(`${BASE}/projects/:projectId/storyboard`, () => HttpResponse.json(storyboardPayload(confirmed.storyboard, staleItems))),
+      http.post(`${BASE}/projects/:projectId/generation-jobs`, async ({ request }) => { captured = await request.json(); return HttpResponse.json({ jobs: [] }, { status: 202 }); }),
+    );
+    renderResults();
+    await user.click(await screen.findByRole("button", { name: "灯箱" }));
+    await user.click(await screen.findByRole("button", { name: "用此分镜重新生成" }));
+    await user.click(await screen.findByRole("button", { name: "开始生成" }));
+    await waitFor(() => expect(captured).toMatchObject({ generationConfig: { imageModel: { providerId: PROVIDER_ID, modelId: "gpt-image-1" } } }));
+  });
+
   it("编辑版本关系画布提供单图下载按钮", async () => {
     const user = userEvent.setup();
     const edited = {

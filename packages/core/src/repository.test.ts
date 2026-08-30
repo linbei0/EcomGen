@@ -20,6 +20,25 @@ function seedProvider(repository: EcomRepository) {
 }
 
 describe("EcomRepository", () => {
+  it("删除 Provider 时级联置空项目引用，项目进入待重新选择状态", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero-image", displayName: "主图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0, imageProviderId: provider.id, imageModelId: "image" }]);
+    const item = repository.listStoryboardItems(project.id)[0]!;
+    const queuedJob = repository.createJob({ id: "provider-delete-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {}, providerId: provider.id, modelId: "image" });
+    expect(repository.deleteProvider(provider.id)).toBe("deleted");
+    const after = repository.getProject(project.id);
+    expect(after).toMatchObject({ reasoningProviderId: null, reasoningModelId: null, imageProviderId: null, imageModelId: null });
+    expect(repository.getStoryboardItem(item.id)).toMatchObject({ imageProviderId: null, imageModelId: null });
+    expect(repository.getJob(queuedJob.id)).toMatchObject({ status: "CANCELLED", retryable: false, cancelRequested: true });
+    // 置空后可以立刻重建同名 Provider，不受残留引用阻挡
+    const recreated = seedProvider(repository);
+    expect(repository.deleteProvider(recreated.id)).toBe("deleted");
+    expect(repository.deleteProvider("missing-id")).toBe("missing");
+    database.close();
+  });
   it("保留每个项目最近 20 份规划配置，并按 source job 去重", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);

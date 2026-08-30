@@ -165,8 +165,9 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
 
   useEffect(() => {
     if (!project) return;
-    setReasoningModel(`${project.reasoningProviderId}::${project.reasoningModelId}`);
-    setImageModel(`${project.imageProviderId}::${project.imageModelId}`);
+    // Provider 引用可空（删除后置空）：null 时回到空选择，提交前由模型必选校验拦截
+    setReasoningModel(project.reasoningProviderId && project.reasoningModelId ? `${project.reasoningProviderId}::${project.reasoningModelId}` : "");
+    setImageModel(project.imageProviderId && project.imageModelId ? `${project.imageProviderId}::${project.imageModelId}` : "");
     setImageResolution(project.imageResolution);
     setCandidateCount(project.candidatesPerType);
     setSettingsOpen(false);

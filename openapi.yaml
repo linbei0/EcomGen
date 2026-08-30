@@ -1027,6 +1027,7 @@ components:
         - NOT_FOUND
         - CONFLICT
         - CAPABILITY_UNSUPPORTED
+        - PROVIDER_NOT_CONFIGURED
         - RATE_LIMITED
         - INTERNAL_ERROR
         - PROVIDER_ERROR
@@ -2002,15 +2003,23 @@ components:
               type: string
             - type: "null"
         reasoningProviderId:
-          format: uuid
-          type: string
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
         reasoningModelId:
-          type: string
+          anyOf:
+            - type: string
+            - type: "null"
         imageProviderId:
-          format: uuid
-          type: string
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
         imageModelId:
-          type: string
+          anyOf:
+            - type: string
+            - type: "null"
         defaultMode:
           type: string
           enum:
@@ -2439,7 +2448,27 @@ components:
           description: Archive or restore the project.
           type: boolean
     UpdateProviderInput:
-      $ref: "#/components/schemas/CreateProviderInput"
+      type: object
+      properties:
+        name:
+          minLength: 1
+          type: string
+        baseUrl:
+          format: uri
+          type: string
+        reasoningProtocol:
+          type: string
+          enum:
+            - openai
+            - dashscope_qwen
+        apiKey:
+          minLength: 1
+          type: string
+        models:
+          minItems: 1
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelCapability"
     UpdateSearchSourceInput:
       type: object
       properties:

@@ -1,6 +1,6 @@
 import { App, Button, Image, InputNumber, Modal, Select } from "antd";
 import { Download, Maximize2, Minus, Plus } from "lucide-react";
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 
 import type { Output, ProjectDetail, StoryboardItem } from "../../api/adapters/projectDetail";
 import { useProviders } from "../../api/hooks/useProviders";
@@ -264,11 +264,20 @@ function LightboxModal({
   const [candidateCount, setCandidateCount] = useState(item?.candidateCount ?? 1);
   const [modelKey, setModelKey] = useState(item?.imageProviderId && item.imageModelId ? `${item.imageProviderId}::${item.imageModelId}` : undefined);
   const imageOptions = modelOptions(providers.data?.items ?? [], "image");
+  const defaultModelKey = item?.imageProviderId && item.imageModelId ? `${item.imageProviderId}::${item.imageModelId}` : undefined;
+
+  // 历史分镜可能仍引用已删除的 Provider；Select 找不到对应 option 时会直接显示原始 UUID。
+  // Provider 列表加载完成后自动切换到第一个可用生图模型，避免提交失效引用。
+  useEffect(() => {
+    if (!retryOpen || imageOptions.length === 0) return;
+    setModelKey((current) => current && imageOptions.some((option) => option.value === current) ? current : imageOptions[0]!.value);
+  }, [retryOpen, imageOptions]);
+
   const openRetry = () => {
     setResolution(item?.imageResolution ?? "1K");
     setAspectRatio(item?.imageAspectRatio ?? "AUTO");
     setCandidateCount(item?.candidateCount ?? 1);
-    setModelKey(item?.imageProviderId && item.imageModelId ? `${item.imageProviderId}::${item.imageModelId}` : imageOptions[0]?.value);
+    setModelKey(defaultModelKey && imageOptions.some((option) => option.value === defaultModelKey) ? defaultModelKey : imageOptions[0]?.value);
     setRetryOpen(true);
   };
   const submitRetry = () => {

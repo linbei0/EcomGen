@@ -742,7 +742,7 @@ export interface components {
         /** @enum {string} */
         EditSessionStatus: "ACTIVE" | "ARCHIVED";
         /** @enum {string} */
-        ErrorCode: "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT" | "CAPABILITY_UNSUPPORTED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "PROVIDER_ERROR";
+        ErrorCode: "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT" | "CAPABILITY_UNSUPPORTED" | "PROVIDER_NOT_CONFIGURED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "PROVIDER_ERROR";
         EventEnvelope: {
             /** Format: uuid */
             id: string;
@@ -1081,12 +1081,10 @@ export interface components {
             platformTargets: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
             targetMarket: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
             copyLanguage: string | null;
-            /** Format: uuid */
-            reasoningProviderId: string;
-            reasoningModelId: string;
-            /** Format: uuid */
-            imageProviderId: string;
-            imageModelId: string;
+            reasoningProviderId: string | null;
+            reasoningModelId: string | null;
+            imageProviderId: string | null;
+            imageModelId: string | null;
             /** @enum {string} */
             defaultMode: "CREATIVE" | "PIXEL_PROTECTED";
             imageResolution: components["schemas"]["ImageResolution"];
@@ -1230,7 +1228,15 @@ export interface components {
             /** @description Archive or restore the project. */
             archived?: boolean;
         };
-        UpdateProviderInput: components["schemas"]["CreateProviderInput"];
+        UpdateProviderInput: {
+            name?: string;
+            /** Format: uri */
+            baseUrl?: string;
+            /** @enum {string} */
+            reasoningProtocol?: "openai" | "dashscope_qwen";
+            apiKey?: string;
+            models?: components["schemas"]["ModelCapability"][];
+        };
         UpdateSearchSourceInput: {
             name?: string;
             kind?: components["schemas"]["SearchSourceKind"];

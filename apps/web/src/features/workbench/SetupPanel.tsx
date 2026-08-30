@@ -27,6 +27,11 @@ function toLines(value: string[] | null | undefined): string {
   return (value ?? []).join("\n");
 }
 
+/** Provider 引用可空（删除后置空）：null 时返回空串让下拉回到占位状态，而不是显示 "null::null"。 */
+function modelKey(providerId: string | null, modelId: string | null): string {
+  return providerId && modelId ? `${providerId}::${modelId}` : "";
+}
+
 function splitLines(value: string): string[] {
   return value
     .split("\n")
@@ -77,8 +82,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const [platformTarget, setPlatformTarget] = useState(detail.platformTargets[0]);
   const [targetMarket, setTargetMarket] = useState(detail.targetMarket ?? undefined);
   const [defaultMode, setDefaultMode] = useState(detail.defaultMode);
-  const [reasoningKeyDraft, setReasoningKeyDraft] = useState(`${detail.reasoningProviderId}::${detail.reasoningModelId}`);
-  const [imageKeyDraft, setImageKeyDraft] = useState(`${detail.imageProviderId}::${detail.imageModelId}`);
+  const [reasoningKeyDraft, setReasoningKeyDraft] = useState(modelKey(detail.reasoningProviderId, detail.reasoningModelId));
+  const [imageKeyDraft, setImageKeyDraft] = useState(modelKey(detail.imageProviderId, detail.imageModelId));
   const [imageResolution, setImageResolution] = useState(detail.imageResolution);
   const [imageAspectRatio, setImageAspectRatio] = useState(detail.imageAspectRatio);
   const [candidatesPerType, setCandidatesPerType] = useState(detail.candidatesPerType);
@@ -102,8 +107,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   useEffect(() => setPlatformTarget(detail.platformTargets[0]), [detail.platformTargets]);
   useEffect(() => setTargetMarket(detail.targetMarket ?? undefined), [detail.targetMarket]);
   useEffect(() => setDefaultMode(detail.defaultMode), [detail.defaultMode]);
-  useEffect(() => setReasoningKeyDraft(`${detail.reasoningProviderId}::${detail.reasoningModelId}`), [detail.reasoningProviderId, detail.reasoningModelId]);
-  useEffect(() => setImageKeyDraft(`${detail.imageProviderId}::${detail.imageModelId}`), [detail.imageProviderId, detail.imageModelId]);
+  useEffect(() => setReasoningKeyDraft(modelKey(detail.reasoningProviderId, detail.reasoningModelId)), [detail.reasoningProviderId, detail.reasoningModelId]);
+  useEffect(() => setImageKeyDraft(modelKey(detail.imageProviderId, detail.imageModelId)), [detail.imageProviderId, detail.imageModelId]);
   useEffect(() => setImageResolution(detail.imageResolution), [detail.imageResolution]);
   useEffect(() => setImageAspectRatio(detail.imageAspectRatio), [detail.imageAspectRatio]);
   useEffect(() => {
@@ -207,10 +212,10 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const copywritingUnavailableReason = productCount === 0
     ? "请先上传至少一张产品图"
     : providers.data && !configuredReasoningModel
-      ? "当前推理模型不可用"
-    : configuredReasoningModel && !configuredReasoningModel.supportsVision
-      ? "当前推理模型不支持图片识别"
-      : undefined;
+      ? "推理模型未配置或已失效，请在下方重新选择"
+      : configuredReasoningModel && !configuredReasoningModel.supportsVision
+        ? "当前推理模型不支持图片识别"
+        : undefined;
   const copywritingActive = createCopywriting.isPending || (Boolean(activeCopywritingJob) && !copywritingJob) || copywritingJob?.status === "QUEUED" || copywritingJob?.status === "RUNNING";
   const splitKey = (value: string) => {
     const [providerId, modelId] = value.split("::");
@@ -297,8 +302,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       setFacts(toLines(project.verifiedFacts)); setClaims(toLines(project.prohibitedClaims));
       setCopyLanguage(copyLanguageLabel(project.copyLanguage)); setSavedCopyLanguage(project.copyLanguage ?? "");
       setPlatformTarget(project.platformTargets[0]); setTargetMarket(project.targetMarket ?? undefined);
-      setDefaultMode(project.defaultMode); setReasoningKeyDraft(`${project.reasoningProviderId}::${project.reasoningModelId}`);
-      setImageKeyDraft(`${project.imageProviderId}::${project.imageModelId}`); setImageResolution(project.imageResolution);
+      setDefaultMode(project.defaultMode); setReasoningKeyDraft(modelKey(project.reasoningProviderId, project.reasoningModelId));
+      setImageKeyDraft(modelKey(project.imageProviderId, project.imageModelId)); setImageResolution(project.imageResolution);
       setImageAspectRatio(project.imageAspectRatio); candidateRef.current = project.candidatesPerType; setCandidatesPerType(project.candidatesPerType);
       setPlanningMode(planning.planningMode); setSelected(planning.requestedTypes);
       setTargetImageCount(planning.targetImageCount ?? DEFAULT_TARGET_IMAGE_COUNT); setInstruction(planning.userInstruction ?? "");
@@ -483,7 +488,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
               aria-label="生图模型"
               value={imageOptions.some((item) => item.value === imageKey) ? imageKey : undefined}
               options={imageOptions}
-              placeholder="仅列出含 imageApiKind 的模型"
+              placeholder="选择生图模型"
               onChange={(value) => void saveOptimistic(value, setImageKeyDraft, imageKeyDraft, { imageModel: splitKey(value) }, "保存生图模型失败")}
             />
           </label>
