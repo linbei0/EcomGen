@@ -5,5 +5,10 @@
   "type": "module",
   "exports": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "scripts": { "build": "tsc -p tsconfig.json && node scripts/copy-templates.mjs", "test": "vitest run --passWithNoTests" }
+  "scripts": {
+    "build": "node scripts/generate-manifest.mjs && tsc -p tsconfig.json",
+    "gen:templates": "node scripts/generate-manifest.mjs",
+    "gen:templates:check": "node scripts/generate-manifest.mjs --check",
+    "test": "vitest run --passWithNoTests"
+  }
 }

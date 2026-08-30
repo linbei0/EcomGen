@@ -93,7 +93,7 @@ Worker 必须拒绝包含 `Upstream template`、`Template fields` 等内部模�
 
 ### 新增图片类型
 
-1. 在 `packages/ecom-skill/src/templates/` 增加模板 JSON。
+1. 在 `packages/ecom-skill/src/templates/` 增加模板 JSON，并运行 `pnpm --filter @ecomgen/ecom-skill gen:templates` 重新生成静态 manifest。
 2. 在 `packages/ecom-skill/src/catalog.ts` 增加执行画像和默认尺寸。
 3. 确保 `read_ecom_template` 能返回该模板的结构化规范。
 4. 增加模板解析/校验测试和 Mock E2E 覆盖。

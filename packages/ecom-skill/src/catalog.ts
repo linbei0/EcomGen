@@ -1,6 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import templatesManifest from "./templates-manifest.js";
 
 export interface UpstreamVariant { description: string; overrides: Record<string, string>; }
 export interface UpstreamTemplate {
@@ -29,6 +27,20 @@ export const ECOM_DETAILS_IMAGE_SOURCE = {
   commit: "1ec867b743179af3598db55388f65287c4e04de1",
   sourcePath: "packages/ecom-skill/src/templates"
 } as const;
+
+interface ManifestTemplateEntry {
+  file: string;
+  hash: string;
+  upstreamNumber: number;
+  data: UpstreamTemplate;
+}
+
+/** 构建期由 generate-manifest.mjs 固化的静态模板清单；运行时不再扫描模板目录。 */
+// 生成的字面量类型是各模板字段的联合（可选属性会推断为 undefined），需经 unknown 收敛到统一接口。
+const manifest = templatesManifest as unknown as { totalHash: string; templates: ManifestTemplateEntry[] };
+
+/** 全部上游模板内容合并后的 SHA-256 指纹；用于部署诊断和构建期漂移校验。 */
+export const ECOM_TEMPLATES_HASH: string = manifest.totalHash;
 
 const executionProfiles: Record<string, Omit<EcomTemplate, keyof UpstreamTemplate | "upstreamNumber">> = {
   "hero-image": p("1024x1024", "35-40%", "at least 45%", "slight 3/4 full-product angle"),
@@ -114,11 +126,10 @@ function platformReservationsFor(templateId: string, platformTargets: readonly s
 }
 
 function loadTemplates(): EcomTemplate[] {
-  const directory = fileURLToPath(new URL("./templates/", import.meta.url));
-  return readdirSync(directory).filter((name) => /^\d{2}-.+\.json$/.test(name)).sort().map((filename) => {
-    const upstream = JSON.parse(readFileSync(resolve(directory, filename), "utf8")) as UpstreamTemplate;
-    const profile = executionProfiles[upstream.id]; if (!profile) throw new Error(`No execution profile has been defined for upstream template ${upstream.id}`);
-    return { ...upstream, ...profile, upstreamNumber: Number.parseInt(filename.slice(0, 2), 10) };
+  return manifest.templates.map((entry) => {
+    const profile = executionProfiles[entry.data.id];
+    if (!profile) throw new Error(`No execution profile has been defined for upstream template ${entry.data.id}`);
+    return { ...entry.data, ...profile, upstreamNumber: entry.upstreamNumber };
   });
 }
 function p(defaultSize: EcomTemplate["defaultSize"], productOccupancy: string, whitespace: string, camera: string): Omit<EcomTemplate, keyof UpstreamTemplate | "upstreamNumber"> { return { defaultSize, productOccupancy, whitespace, camera }; }
