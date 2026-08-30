@@ -109,18 +109,20 @@ pnpm dev
 
 ## Docker Compose
 
-Docker Compose 会启动 Redis、API 和 Worker，并将业务数据保存到命名卷。先在根目录创建 `.env`，至少设置 `ECOMGEN_MASTER_KEY`，再运行：
+Docker Compose 会启动 Redis、API 和 Worker，并将业务数据保存到命名卷。API 会同时托管 Web 页面（`apps/web/dist`），因此**只需暴露一个端口**。先在根目录创建 `.env`，至少设置 `ECOMGEN_MASTER_KEY`，再运行：
 
 ```bash
 docker compose up -d --build
 ```
 
-API 将暴露在 `http://127.0.0.1:8787`。查看日志或停止服务：
+启动后访问 `http://127.0.0.1:8787` 即是完整工作台。部署在 VPS 或远程服务器时，用 `http://<服务器IP>:8787` 直接访问（建议前置 Nginx/Caddy 反代并配置 HTTPS）。查看日志或停止服务：
 
 ```bash
 docker compose logs -f api worker
 docker compose down
 ```
+
+前后端分开部署（Web 托管在别处）时，`VITE_API_BASE_URL` 是**构建期**变量：在 `pnpm --filter @ecomgen/web build` 前设置为可从浏览器访问的 API 地址（如 `http://<服务器IP>:8787/api/v1`），构建后无法修改。不设置时默认走同源相对路径 `/api/v1`（本地开发由 Vite 代理转发）。
 
 ## 常用命令
 
