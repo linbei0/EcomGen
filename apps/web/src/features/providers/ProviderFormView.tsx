@@ -50,10 +50,11 @@ const EMPTY_MODEL_ROW: ModelFormRow = {
 function toModelCapability(row: ModelFormRow): ModelCapability {
   return {
     id: row.id.trim(),
-    supportsVision: row.supportsVision,
-    supportsThinking: row.supportsThinking,
-    supportsTools: row.supportsTools,
-    supportsStructuredOutput: row.supportsStructuredOutput,
+    // 生图模型的能力开关未渲染，antd onFinish 不返回未挂载字段，这里必须兜底
+    supportsVision: Boolean(row.supportsVision),
+    supportsThinking: Boolean(row.supportsThinking),
+    supportsTools: Boolean(row.supportsTools),
+    supportsStructuredOutput: Boolean(row.supportsStructuredOutput),
     imageApiKind: row.imageApiKind === "" ? null : row.imageApiKind,
   };
 }
