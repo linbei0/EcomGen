@@ -28,7 +28,7 @@ interface ModelFormRow {
 interface ProviderFormValues {
   name: string;
   baseUrl: string;
-  reasoningProtocol: "openai" | "dashscope_qwen";
+  reasoningProtocol: "openai" | "dashscope_qwen" | "openai_responses";
   apiKey: string;
   models: ModelFormRow[];
 }
@@ -193,6 +193,7 @@ export function ProviderFormView({ view, onDone }: Props) {
           options={[
             { value: "openai", label: "OpenAI Completions" },
             { value: "dashscope_qwen", label: "DashScope Qwen" },
+            { value: "openai_responses", label: "OpenAI Responses" },
           ]}
         />
       </Form.Item>

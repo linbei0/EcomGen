@@ -969,6 +969,7 @@ components:
       enum:
         - openai
         - dashscope_qwen
+        - openai_responses
     SearchSourceKind:
       type: string
       enum:
@@ -1389,6 +1390,7 @@ components:
           enum:
             - openai
             - dashscope_qwen
+            - openai_responses
         apiKey:
           minLength: 1
           type: string
@@ -2151,6 +2153,7 @@ components:
           enum:
             - openai
             - dashscope_qwen
+            - openai_responses
         hasApiKey:
           type: boolean
         models:
@@ -2461,6 +2464,7 @@ components:
           enum:
             - openai
             - dashscope_qwen
+            - openai_responses
         apiKey:
           minLength: 1
           type: string

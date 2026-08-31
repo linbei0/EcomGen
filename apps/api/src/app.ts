@@ -47,14 +47,14 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const body = parseBody(CreateProviderInput, request.body);
     const models = normalizeModels(body.models);
     const apiKey = readText(body.apiKey, "apiKey");
-    const reasoningProtocol = enumValue<ReasoningProtocolProfile>(body.reasoningProtocol ?? "openai", ["openai", "dashscope_qwen"], "reasoningProtocol");
+    const reasoningProtocol = enumValue<ReasoningProtocolProfile>(body.reasoningProtocol ?? "openai", ["openai", "dashscope_qwen", "openai_responses"], "reasoningProtocol");
     const record = repository.saveProvider({ name: readText(body.name, "name"), baseUrl: readText(body.baseUrl, "baseUrl"), reasoningProtocol, encryptedApiKey: secrets.encrypt(apiKey), models });
     await events.publish("system", "provider.updated", publicProvider(record)); return reply.code(201).send(publicProvider(record));
   });
   app.patch("/api/v1/providers/:providerId", async (request) => {
     const id = parameter(request, "providerId"); const current = repository.getProvider(id); if (!current) missing("provider", id);
     const body = parseBody(UpdateProviderInput, request.body);
-    const reasoningProtocol = body.reasoningProtocol === undefined ? current.reasoningProtocol : enumValue<ReasoningProtocolProfile>(body.reasoningProtocol, ["openai", "dashscope_qwen"], "reasoningProtocol");
+    const reasoningProtocol = body.reasoningProtocol === undefined ? current.reasoningProtocol : enumValue<ReasoningProtocolProfile>(body.reasoningProtocol, ["openai", "dashscope_qwen", "openai_responses"], "reasoningProtocol");
     const record = repository.saveProvider({ id, name: readOptionalText(body.name) ?? current.name, baseUrl: readOptionalText(body.baseUrl) ?? current.baseUrl, reasoningProtocol, encryptedApiKey: body.apiKey ? secrets.encrypt(readText(body.apiKey, "apiKey")) : current.encryptedApiKey, models: body.models ? normalizeModels(body.models) : current.models });
     await events.publish("system", "provider.updated", publicProvider(record)); return publicProvider(record);
   });
@@ -66,7 +66,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     try {
       if (kind === "reasoning") {
         const probeModel = model;
-        const probe = await probeReasoning({ providerId, modelId, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: probeModel.supportsVision, supportsThinking: probeModel.supportsThinking, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+        const probe = await probeReasoning({ providerId, modelId, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: probeModel.supportsVision, supportsThinking: probeModel.supportsThinking, supportsStructuredOutput: probeModel.supportsStructuredOutput, apiKey: secrets.decrypt(provider.encryptedApiKey) });
         return { ok: true, providerId, modelId, kind, latencyMs: probe.latencyMs, models: null, modelAvailable: true };
       }
       const probe = model.imageApiKind === "gemini"

@@ -1,6 +1,6 @@
 import { PassThrough } from "node:stream";
 import { resolve } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Worker } from "bullmq";
 import archiver from "archiver";
 import sharp from "sharp";
@@ -11,6 +11,7 @@ import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type Ed
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { assertPixelProtectedInputs, selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata, withGenerationAssetRoles } from "./visual-assets.js";
+import { VisionDerivativeCache } from "./vision-cache.js";
 
 const masterKey = process.env.ECOMGEN_MASTER_KEY;
 if (!masterKey) throw new Error("ECOMGEN_MASTER_KEY must be a base64-encoded 32-byte key");
@@ -18,6 +19,7 @@ const projectRoot = resolve(import.meta.dirname, "../../..");
 const dataDir = resolveDataDir(process.env.ECOMGEN_DATA_DIR, projectRoot);
 const repository = new EcomRepository(openDatabase(resolve(dataDir, "ecomgen.sqlite")));
 const storage = new LocalAssetStore(dataDir); await storage.initialize();
+const visionCache = new VisionDerivativeCache(dataDir); await visionCache.initialize();
 const secrets = new SecretBox(masterKey);
 const redis = createRedisConnection(process.env.REDIS_URL ?? "redis://127.0.0.1:6379");
 const events = new RedisProjectEventBus(redis.duplicate(), redis.duplicate());
@@ -88,7 +90,7 @@ async function executePlan(job: JobRecord): Promise<void> {
   const webResearch = project.webResearchEnabled ? configuredWebResearch() : undefined;
   repository.createWebResearchAudit(job.id, webResearch ? "AVAILABLE" : project.webResearchEnabled ? "UNAVAILABLE" : "DISABLED");
   const plan = await planStoryboard({
-    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
+    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking, supportsStructuredOutput: model.supportsStructuredOutput }),
     apiKey: secrets.decrypt(provider.encryptedApiKey),
     projectName: project.name,
     productCategory: project.category,
@@ -155,7 +157,7 @@ async function executeCopywriting(job: JobRecord): Promise<void> {
   const visualAttachments = await visionImageContents(assets);
   const result = await writeCopywriting({
     target: target as CopywritingTarget,
-    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
+    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking, supportsStructuredOutput: model.supportsStructuredOutput }),
     apiKey: secrets.decrypt(provider.encryptedApiKey),
     projectName: project.name,
     productCategory: project.category,
@@ -269,7 +271,7 @@ async function executeEditPlan(job: JobRecord): Promise<void> {
   let plan;
   try {
     plan = await planImageEdit({
-      model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
+      model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking, supportsStructuredOutput: model.supportsStructuredOutput }),
       apiKey: secrets.decrypt(provider.encryptedApiKey),
       message: turn.message,
       annotations: turn.annotations,
@@ -457,21 +459,32 @@ async function compressForVision(buffer: Buffer): Promise<{ data: Buffer; mimeTy
 
 async function visionImageContents(assets: AssetRecord[]): Promise<Array<{ type: "image"; mimeType: string; data: string }>> {
   return Promise.all(assets.map(async (asset) => {
-    const compressed = await compressForVision(await storage.read(asset.storagePath));
+    const original = await storage.read(asset.storagePath);
+    const compressed = await cachedCompressForVision(original, asset.hash);
     return { type: "image" as const, mimeType: compressed.mimeType, data: compressed.data.toString("base64") };
   }));
 }
 
 async function visionSourceImage(storagePath: string): Promise<{ type: "image"; mimeType: string; data: string }> {
-  const compressed = await compressForVision(await storage.read(storagePath));
+  const original = await storage.read(storagePath);
+  const compressed = await cachedCompressForVision(original);
   return { type: "image", mimeType: compressed.mimeType, data: compressed.data.toString("base64") };
+}
+
+async function cachedCompressForVision(buffer: Buffer, sourceHash?: string): Promise<{ data: Buffer; mimeType: string }> {
+  const hash = sourceHash ?? createHash("sha256").update(buffer).digest("hex");
+  const metadata = await sharp(buffer).metadata();
+  const passthroughMime = metadata.format === "png" ? "image/png" : metadata.format === "webp" ? "image/webp" : "image/jpeg";
+  const withinBounds = (metadata.width ?? 0) <= VISION_MAX_EDGE && (metadata.height ?? 0) <= VISION_MAX_EDGE;
+  const outputMimeType = withinBounds && buffer.byteLength <= VISION_PASSTHROUGH_BYTES ? passthroughMime : "image/jpeg";
+  return visionCache.getOrCreate({ sourceHash: hash, maxEdge: VISION_MAX_EDGE, jpegQuality: VISION_JPEG_QUALITY, mimeType: outputMimeType }, async () => compressForVision(buffer));
 }
 async function reviseGenerationPrompt(project: ProjectRecord, prompt: string, revision: string): Promise<string> {
   const provider = providerFor(project.reasoningProviderId);
   const model = provider.models.find((candidate) => candidate.id === project.reasoningModelId);
   if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
   return reviseImagePrompt({
-    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking }),
+    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking, supportsStructuredOutput: model.supportsStructuredOutput }),
     apiKey: secrets.decrypt(provider.encryptedApiKey),
     prompt,
     revision

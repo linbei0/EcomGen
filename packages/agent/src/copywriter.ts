@@ -1,12 +1,12 @@
-import { Agent } from "@earendil-works/pi-agent-core";
-import type { ImageContent, Model } from "@earendil-works/pi-ai";
+import type { ImageContent } from "@earendil-works/pi-ai";
 import type { CopywritingTarget, PlatformTarget, TargetMarket } from "@ecomgen/contracts";
-import { boundedAgentStream } from "./stream.js";
-import { parseJsonResponse, withJsonObjectResponse } from "./json-response.js";
+import { createAgent, type ReasoningModel } from "./runtime.js";
+import { parseJsonResponse } from "./json-response.js";
+import { COPYWRITING_DESCRIPTION_SCHEMA, COPYWRITING_INSTRUCTION_SCHEMA } from "./structured-output.js";
 
 export interface CopywritingInput {
   target: CopywritingTarget;
-  model: Model<"openai-completions">;
+  model: ReasoningModel;
   apiKey: string;
   projectName: string;
   productCategory: string | null;
@@ -41,17 +41,8 @@ Critical rules:
 // 重试由 boundedAgentStream 注入。
 /** 使用 Pi Agent 将项目事实和带角色的视觉输入转换为可编辑文案。 */
 export async function writeCopywriting(input: CopywritingInput): Promise<CopywritingResult> {
-  const agent = new Agent({
-    streamFn: boundedAgentStream(),
-    getApiKey: () => input.apiKey,
-    onPayload: (payload, model) => withJsonObjectResponse(payload, model),
-    initialState: {
-      model: input.model,
-      systemPrompt: SYSTEM_PROMPT,
-      thinkingLevel: "off",
-      tools: [],
-    },
-  });
+  const outputSchema = input.target === "PRODUCT_DESCRIPTION" ? COPYWRITING_DESCRIPTION_SCHEMA : COPYWRITING_INSTRUCTION_SCHEMA;
+  const agent = createAgent({ workflow: "COPYWRITE", model: input.model, apiKey: input.apiKey, systemPrompt: SYSTEM_PROMPT, tools: [], outputSchema });
   const schema = input.target === "PRODUCT_DESCRIPTION"
     ? '{"productName":string,"coreSellingPoints":string[],"suitableAudience":string,"expectedScenarios":string}'
     : '{"content":string}';

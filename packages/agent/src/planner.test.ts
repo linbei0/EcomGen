@@ -81,11 +81,11 @@ describe("planStoryboard", () => {
     expect(captured.streamMock).toHaveBeenCalledWith({ id: "model" }, { messages: [] }, { temperature: 0.2, timeoutMs: 240_000, maxRetries: 2 });
   });
 
-  it("enables DeepSeek JSON Output without changing generic OpenAI-compatible payloads", async () => {
+  it("adds strict JSON Schema only when the model advertises structured output", async () => {
     captured.errorMessage = undefined;
     await planStoryboard(input);
     const payload = { messages: [] };
-    expect(captured.options?.onPayload?.(payload, { id: "deepseek-v4-flash", baseUrl: "https://api.deepseek.com" })).toMatchObject({ response_format: { type: "json_object" } });
+    expect(captured.options?.onPayload?.(payload, { id: "model", baseUrl: "https://custom-gateway.example/v1", api: "openai-completions", provider: "provider", ecomgenSupportsStructuredOutput: true } as never)).toMatchObject({ response_format: { type: "json_schema", json_schema: { strict: true } } });
     expect(captured.options?.onPayload?.(payload, { id: "qwen-plus", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" })).toBe(payload);
   });
 
@@ -222,12 +222,12 @@ describe("planStoryboard", () => {
 });
 
 describe("reviseImagePrompt", () => {
-  it("不为要求纯文本的提示词修订启用 JSON Output", async () => {
+  it("uses a structured object for prompt revision", async () => {
     captured.errorMessage = undefined;
-    captured.responseText = "revised image prompt";
+    captured.responseText = JSON.stringify({ prompt: "revised image prompt" });
     try {
       await expect(reviseImagePrompt({ model: input.model, apiKey: "secret", prompt: "original image prompt", revision: "make it brighter" })).resolves.toBe("revised image prompt");
-      expect(captured.options?.onPayload).toBeUndefined();
+      expect(captured.options?.onPayload).toBeTypeOf("function");
     } finally {
       captured.responseText = undefined;
     }

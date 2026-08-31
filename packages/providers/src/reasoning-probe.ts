@@ -1,4 +1,5 @@
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
+import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 
 import { ProviderError } from "./openai-compatible.js";
 import { buildReasoningModel, type ReasoningModelInput } from "./reasoning-profile.js";
@@ -16,7 +17,14 @@ export async function probeReasoning(input: ReasoningProbeInput): Promise<Reason
   const started = Date.now();
   const model = buildReasoningModel(input);
   const options = { apiKey: input.apiKey, maxTokens: 512, ...(input.supportsThinking ? { reasoning: "low" as const } : {}) };
-  const stream = openAICompletionsApi().streamSimple(
+  const stream = input.protocol === "openai_responses" ? openAIResponsesApi().streamSimple(
+    model,
+    {
+      systemPrompt: "Reply with exactly OK.",
+      messages: [{ role: "user", content: "Reply with exactly OK.", timestamp: Date.now() }],
+    },
+    options,
+  ) : openAICompletionsApi().streamSimple(
     model,
     {
       systemPrompt: "Reply with exactly OK.",

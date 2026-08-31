@@ -15,6 +15,20 @@ describe("reasoning protocol profiles", () => {
     expect(resolveReasoningProfile("openai")).toBeUndefined();
   });
 
+  it("builds an OpenAI Responses model when explicitly selected", () => {
+    const model = buildReasoningModel({
+      providerId: "provider",
+      modelId: "gpt-5",
+      baseUrl: "https://api.openai.com/v1",
+      protocol: "openai_responses",
+      supportsVision: true,
+      supportsThinking: true,
+      supportsStructuredOutput: true,
+    });
+    expect(model.api).toBe("openai-responses");
+    expect(model.ecomgenSupportsStructuredOutput).toBe(true);
+  });
+
   it("builds a Pi model from provider and model capabilities", () => {
     const model = buildReasoningModel({
       providerId: "provider",

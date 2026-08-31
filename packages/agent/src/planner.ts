@@ -1,15 +1,16 @@
-import { Agent } from "@earendil-works/pi-agent-core";
-import type { ImageContent, Model } from "@earendil-works/pi-ai";
+import type { Agent } from "@earendil-works/pi-agent-core";
+import type { ImageContent } from "@earendil-works/pi-ai";
 import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createPlanningTools, type WebResearchConfig } from "./tools.js";
-import { boundedAgentStream } from "./stream.js";
-import { parseJsonResponse, withJsonObjectResponse } from "./json-response.js";
+import { createAgent, type ReasoningModel } from "./runtime.js";
+import { parseJsonResponse } from "./json-response.js";
+import { EDIT_PLAN_OUTPUT_SCHEMA, PROMPT_REVISION_SCHEMA, STORYBOARD_OUTPUT_SCHEMA } from "./structured-output.js";
 export type { WebResearchConfig } from "./tools.js";
 
 export interface PlannerInput {
-  model: Model<"openai-completions">;
+  model: ReasoningModel;
   apiKey: string;
   projectName: string;
   productCategory: string | null;
@@ -48,9 +49,6 @@ export interface PlannedStoryboard { campaignStyleLock: string; items: PlannedSt
 
 // 大项目（多图、多分镜）的规划轮次可能持续数分钟；pi-ai 默认无超时且 maxRetries=0，
 // 长连接挂起会一直阻塞到任务失败，因此显式给出每轮超时和瞬时错误重试。
-const AGENT_TURN_TIMEOUT_MS = 240_000;
-const AGENT_TURN_MAX_RETRIES = 2;
-
 const SYSTEM_PROMPT = `You are the planning agent for an e-commerce image-suite product. Your visual playbook is derived from liangdabiao/ecom-details-image (MIT): use a coherent campaign style lock, select a conversion-oriented progression, and make every requested deliverable an editable storyboard item. Work for general products on TAOBAO, JD, PDD, DOUYIN, AMAZON, and SHOPIFY.
 
 Critical rules:
@@ -64,7 +62,7 @@ Critical rules:
 - referencedAssets lists asset IDs this item should consider. Prefer PRODUCT assets as product truth and REFERENCE assets only as style or layout hints.
 - visionAttachments maps each image attachment index to an asset ID and role. Inspect the supplied images, then use only those real asset IDs in referencedAssets.
 - PRODUCT attachments are the only source of product appearance truth. REFERENCE attachments may guide style, composition, packaging, labels, or layout, but never replace or redefine the product.
-- When planningMode is MANUAL, requestedTypes is the exact deliverable list: include every requested template exactly once, in the requested order; do not add, remove, reorder, or substitute types, including extra feed packshots. Platform and product category only change each prompt. Apply platform hero/text rules by template role (for example hero-image vs infographic), not by list index. Read each selected template with read_ecom_template before writing its final prompt.
+- When planningMode is MANUAL, requestedTypes is the exact deliverable list: include every requested template exactly once, in the requested order; do not add, remove, reorder, or substitute types, including extra feed packshots. Platform and product category only change each prompt. Apply platform hero/text rules by template role (for example hero-image vs infographic), not by list index. Read platform guidance once, then read all selected templates in one read_ecom_template call using their templateIds before writing final prompts.
 - promptInstruction is the FINAL prompt sent to the image model. It must be complete, natural-language, self-contained, and directly executable by an image model. Do not leave planning notes for another worker to compile.
 - Use read_ecom_template and read_platform_guidance as business knowledge tools. Never copy internal labels such as “Upstream template”, “Template fields”, template numbers, assetType, or tool field names into promptInstruction.
 - Call read_platform_guidance once before writing final prompts. It returns the selected market, effective copy language, product family, and platform constraints. Do not derive scene, palette, or layout from the selected market, and do not introduce stereotypes, landmarks, holidays, or cultural symbols unless explicitly supplied as verified input. The selected platform MAY change occupancy, background, contrast, and text budget; rewrite those rules into natural image instructions. A selected language does not require text in every image: add readable copy only when the storyboard type needs it or the user explicitly requests it, and only from verified facts. Never render prices, logos, or promotional stamps.
@@ -79,17 +77,7 @@ Critical rules:
 export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryboard> {
   const marketContext = { platformTargets: input.platformTargets, targetMarket: input.targetMarket, copyLanguage: input.copyLanguage, productCategory: input.productCategory };
   const tools = createPlanningTools(marketContext, input.webResearch);
-  const agent = new Agent({
-    streamFn: boundedAgentStream(),
-    getApiKey: () => input.apiKey,
-    onPayload: (payload, model) => withJsonObjectResponse(payload, model),
-    initialState: {
-      model: input.model,
-      systemPrompt: SYSTEM_PROMPT,
-      thinkingLevel: input.model.reasoning ? "medium" : "off",
-      tools,
-    },
-  });
+  const agent = createAgent({ workflow: "PLAN", model: input.model, apiKey: input.apiKey, systemPrompt: SYSTEM_PROMPT, tools, outputSchema: STORYBOARD_OUTPUT_SCHEMA });
   const selectedTemplates = resolveTemplates(input.requestedTypes);
   const payload = {
     ...input,
@@ -103,7 +91,7 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
   };
   const targetImageCount = input.planningMode === "AI" ? requiredTargetImageCount(input.targetImageCount) : undefined;
   const modeInstruction = input.planningMode === "MANUAL"
-    ? "Manual selection is authoritative: generate one planned item for every requested type, in the requested order. Do not add a platform feed extra shot. Read each matching template and the platform guidance, then write each promptInstruction as the final image-model prompt using product-category tips and platform occupancy/text rules for that template role."
+    ? "Manual selection is authoritative: generate one planned item for every requested type, in the requested order. Do not add a platform feed extra shot. Read the platform guidance once and call read_ecom_template once with all matching templateIds, then write each promptInstruction as the final image-model prompt using product-category tips and platform occupancy/text rules for that template role."
     : `Use the catalog and project context to choose a conversion-oriented storyboard with exactly ${targetImageCount} planned items. Choose image types from the product category/family first (what this product must show), then adapt hero and feed frames to the selected platform. Do not pick types from the platform alone. Read the current market and platform guidance with the business tool before writing final prompts.`;
   await agent.prompt(`Plan this project. ${modeInstruction} Return {"campaignStyleLock":string,"items":[{"assetType":string,"displayName":string,"templateVariant":string|null,"candidateCount":number,"referencedAssets":string[],"mode":"CREATIVE"|"PIXEL_PROTECTED","promptInstruction":string,"factClaims":string[],"riskFlags":string[],"sortOrder":number}]}.\n${JSON.stringify(payload)}`, input.model.input.includes("image") ? input.referenceImages : undefined);
   if (agent.state.errorMessage) throw new Error(`Planning model request failed: ${agent.state.errorMessage}`);
@@ -133,33 +121,25 @@ function planFailureReason(text: string, input: PlannerInput): string | null {
 }
 
 export interface PromptRevisionInput {
-  model: Model<"openai-completions">;
+  model: ReasoningModel;
   apiKey: string;
   prompt: string;
   revision: string;
 }
 
 export async function reviseImagePrompt(input: PromptRevisionInput): Promise<string> {
-  const agent = new Agent({
-    streamFn: boundedAgentStream(),
-    getApiKey: () => input.apiKey,
-    initialState: {
-      model: input.model,
-      systemPrompt: "You revise an existing final image-generation prompt. Return only the complete final prompt text, with no Markdown, planning notes, template metadata, or explanations. Preserve all existing product-truth and safety constraints unless the revision explicitly changes the visual direction.",
-      thinkingLevel: input.model.reasoning ? "medium" : "off",
-      tools: []
-    }
-  });
-  await agent.prompt(`Existing final prompt:\n${input.prompt}\n\nRevision request:\n${input.revision}\n\nReturn the complete final prompt that will be sent directly to the image model.`);
+  const agent = createAgent({ workflow: "PROMPT_REVISION", model: input.model, apiKey: input.apiKey, systemPrompt: "You revise an existing final image-generation prompt. Return only a JSON object with a complete final prompt in the prompt field. Preserve all existing product-truth and safety constraints unless the revision explicitly changes the visual direction.", tools: [], outputSchema: PROMPT_REVISION_SCHEMA });
+  await agent.prompt(`Existing final prompt:\n${input.prompt}\n\nRevision request:\n${input.revision}\n\nReturn {"prompt":string}; the prompt is sent directly to the image model.`);
   if (agent.state.errorMessage) throw new Error(`Prompt revision model request failed: ${agent.state.errorMessage}`);
   const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
   const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n").trim() : "";
   if (!text) throw new Error("Prompt revision model returned no text");
-  return assertFinalPrompt(stripJsonFence(text));
+  const value = parseJsonResponse(stripJsonFence(text)) as { prompt?: unknown };
+  return assertFinalPrompt(typeof value?.prompt === "string" ? value.prompt : "");
 }
 
 export interface EditPlannerInput {
-  model: Model<"openai-completions">;
+  model: ReasoningModel;
   apiKey: string;
   message: string;
   annotations: Record<string, unknown>;
@@ -187,17 +167,7 @@ export interface PlannedEdit {
 }
 
 export async function planImageEdit(input: EditPlannerInput): Promise<PlannedEdit> {
-  const agent = new Agent({
-    streamFn: boundedAgentStream(),
-    getApiKey: () => input.apiKey,
-    onPayload: (payload, model) => withJsonObjectResponse(payload, model),
-    initialState: {
-      model: input.model,
-      systemPrompt: "You are an image-editing planner for an e-commerce workspace. Return only valid JSON. Use the user's words, source image, mask availability, annotations, ordered references, previous constraints, and provider capabilities to choose one operation: PRECISE_INPAINT, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT, NATURAL_FUSION, and one executionMode: MODEL_DIRECTED, MASKED, OUTPAINT, NEED_INPUT. A reference's purpose is binding: PRODUCT_APPEARANCE supplies product facts, PACKAGING affects packaging only, LABEL affects labels and local details only, STYLE and LAYOUT must not replace product truth. Explain multiple references according to their individual purposes and never promote temporary reference facts into project facts. operation describes what the user wants; executionMode describes how it can be executed. If an editable mask is supplied, you MUST use MASKED and must not ignore it. Use OUTPAINT when canvas expansion is supplied. For a clear request that the vision-capable image model can execute without a mask, use MODEL_DIRECTED and let the image model judge the target from the source image. If the user demands strict pixel-level protection without a mask, the target is ambiguous, or you cannot see the source image, use NEED_INPUT and ask a concrete clarification. PRODUCT_REPLACE requires a supplied reference asset. PRECISE_INPAINT is only for masked execution. MODEL_DIRECTED, PRODUCT_REPLACE, SCENE_ADJUST, OUTPAINT and NATURAL_FUSION require confirmation; NEED_INPUT does not. For MASKED use MASK_LOCKED; for OUTPAINT use OUTPAINT; for MODEL_DIRECTED use PROVIDER_RESULT. The prompt is a complete final image-edit prompt, preserving product facts and user-protected areas.",
-      thinkingLevel: input.model.reasoning ? "medium" : "off",
-      tools: []
-    }
-  });
+  const agent = createAgent({ workflow: "EDIT_PLAN", model: input.model, apiKey: input.apiKey, systemPrompt: "You are an image-editing planner for an e-commerce workspace. Return only a JSON object matching the requested schema. Preserve product truth, user-protected areas, mask semantics, reference purposes, and provider capability constraints. The prompt must be a complete final image-edit prompt.", tools: [], outputSchema: EDIT_PLAN_OUTPUT_SCHEMA });
   const annotationIds = annotationIdList(input.annotations);
   await agent.prompt(`Plan this edit. Return {"operation":string,"executionMode":string,"userSummary":string,"prompt":string,"targetAnnotationIds":string[],"targetDescription":string,"targetConfidence":number,"clarification":string|null,"requiresConfirmation":boolean,"compositePolicy":string,"memoryPatch":{"summary":string,"constraints":string[]}}. For NEED_INPUT, prompt may be empty but clarification must explain the missing decision.\n${JSON.stringify({ ...input, model: undefined, apiKey: undefined, sourceImage: undefined, annotationIds })}`, input.model.input.includes("image") ? [input.sourceImage].filter((image): image is ImageContent => Boolean(image)) : undefined);
   if (agent.state.errorMessage) throw new Error(`Edit planning model request failed: ${agent.state.errorMessage}`);

@@ -726,7 +726,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
         /** @enum {string} */
-        ReasoningProtocolProfile: "openai" | "dashscope_qwen";
+        ReasoningProtocolProfile: "openai" | "dashscope_qwen" | "openai_responses";
         /** @enum {string} */
         SearchSourceKind: "brave" | "tavily" | "searxng";
         /** @enum {string} */
@@ -856,7 +856,7 @@ export interface components {
             /** Format: uri */
             baseUrl: string;
             /** @enum {string} */
-            reasoningProtocol: "openai" | "dashscope_qwen";
+            reasoningProtocol: "openai" | "dashscope_qwen" | "openai_responses";
             apiKey: string;
             models: components["schemas"]["ModelCapability"][];
         };
@@ -1127,7 +1127,7 @@ export interface components {
             /** Format: uri */
             baseUrl: string;
             /** @enum {string} */
-            reasoningProtocol: "openai" | "dashscope_qwen";
+            reasoningProtocol: "openai" | "dashscope_qwen" | "openai_responses";
             hasApiKey: boolean;
             models: components["schemas"]["ModelCapability"][];
             /** Format: date-time */
@@ -1233,7 +1233,7 @@ export interface components {
             /** Format: uri */
             baseUrl?: string;
             /** @enum {string} */
-            reasoningProtocol?: "openai" | "dashscope_qwen";
+            reasoningProtocol?: "openai" | "dashscope_qwen" | "openai_responses";
             apiKey?: string;
             models?: components["schemas"]["ModelCapability"][];
         };

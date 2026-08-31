@@ -40,8 +40,8 @@ export interface WebResearchAuditReporter {
 }
 
 const readTemplateParameters = Type.Object({
-  templateId: Type.String({ minLength: 1 }),
-  variant: Type.Optional(Type.String())
+  templateIds: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 12 }),
+  variants: Type.Optional(Type.Record(Type.String({ minLength: 1 }), Type.String({ minLength: 1 })))
 });
 type ReadTemplateParameters = Static<typeof readTemplateParameters>;
 
@@ -63,20 +63,24 @@ export function createPlanningTools(context: MarketGuidanceContext, webResearch?
   const readTemplate: AgentTool<typeof readTemplateParameters> = {
     name: "read_ecom_template",
     label: "读取电商图片规范",
-    description: "按模板 ID 读取一份电商图片规范。返回供 Agent 组织最终生图 Prompt 的结构化视觉约束，包括完整的 categoryTips 品类拍摄提示清单：从中自行挑选与商品品类最贴合的条目改写进 Prompt（更具体的品类条目优先于宽泛的大类），不要原样照抄，也不要把字段名、模板编号或内部元数据写入最终 Prompt。",
+    description: "按模板 ID 批量读取电商图片规范。返回顺序与 templateIds 一致，包含完整的 categoryTips 品类拍摄提示清单：从中自行挑选与商品品类最贴合的条目改写进 Prompt，不要原样照抄，也不要把字段名、模板编号或内部元数据写入最终 Prompt。",
     parameters: readTemplateParameters,
     execute: async (_toolCallId: string, params: ReadTemplateParameters): Promise<AgentToolResult<unknown>> => {
-      const template = getTemplate(params.templateId);
-      if (!template) throw new Error(`Unknown ecom-details-image template: ${params.templateId}`);
-      if (params.variant && !template.variants[params.variant]) throw new Error(`Unknown template variant: ${params.variant}`);
-      return textResult({
-        id: template.id,
-        name: template.name,
-        variant: params.variant ?? null,
-        guidance: templateGuidance(template, context.platformTargets, params.variant),
-        variants: Object.fromEntries(Object.entries(template.variants).map(([key, value]) => [key, value.description])),
-        supportsImageReference: template.supports_image_reference
+      const templates = params.templateIds.map((templateId) => {
+        const template = getTemplate(templateId);
+        if (!template) throw new Error(`Unknown ecom-details-image template: ${templateId}`);
+        const variant = params.variants?.[templateId];
+        if (variant && !template.variants[variant]) throw new Error(`Unknown template variant: ${variant}`);
+        return {
+          id: template.id,
+          name: template.name,
+          variant: variant ?? null,
+          guidance: templateGuidance(template, context.platformTargets, variant),
+          variants: Object.fromEntries(Object.entries(template.variants).map(([key, value]) => [key, value.description])),
+          supportsImageReference: template.supports_image_reference
+        };
       });
+      return textResult({ templates });
     }
   };
 

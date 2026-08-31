@@ -23,7 +23,7 @@ try {
       const requestText = body.toString("utf8");
       if (requestText.includes("Existing final prompt:")) {
         response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-        response.write(`data: ${JSON.stringify({ id: "mock-revision", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: plan.items[0].promptInstruction + " Revision applied: initial." }, finish_reason: null }] })}\n\n`);
+        response.write(`data: ${JSON.stringify({ id: "mock-revision", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify({ prompt: plan.items[0].promptInstruction + " Revision applied: initial." }) }, finish_reason: null }] })}\n\n`);
         response.write(`data: ${JSON.stringify({ id: "mock-revision", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
         response.write("data: [DONE]\n\n");
         response.end();

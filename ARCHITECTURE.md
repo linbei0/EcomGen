@@ -4,7 +4,7 @@
 
 ## 一句话模型
 
-Pi Agent 把项目事实和电商规范转换成一份可以直接交给生图模型的最终 Prompt，Worker 只检查执行条件并原样发送这份 Prompt。
+Pi Agent 把项目事实和电商规范转换成一份可以直接交给生图模型的最终 Prompt，Worker 只检查执行条件、按实际图片顺序前置角色说明后发送这份 Prompt。
 
 ```mermaid
 flowchart LR
@@ -15,7 +15,7 @@ flowchart LR
   E --> F[分镜 promptInstruction]
   F --> G[用户编辑并确认]
   G --> H[Worker 资源/状态/参数检查]
-  H --> I[Provider 原样接收 Prompt]
+  H --> I[Provider 接收含角色前缀的 Prompt]
   I --> J[compiledPrompt 与实际请求一致]
 ```
 
@@ -58,9 +58,9 @@ Worker 执行以下顺序：
 2. 检查 Provider、模型、模型能力和模板 ID。
 3. 检查 `PIXEL_PROTECTED` 是否有当前项目的 `PRODUCT_TRUTH` 图片。
 4. 根据项目参数和模板默认尺寸计算输出尺寸。
-5. 无 revision 时，将 `item.promptInstruction.trim()` 原样传给 Provider。
-6. 有 revision 时，调用 Pi Agent 的 Prompt 改写函数，再将改写后的完整文本传给 Provider。
-7. 把实际发送的文本保存到 `compiledPrompt`，用于结果追溯和导出 manifest。
+5. 无 revision 时，将 `item.promptInstruction.trim()` 作为最终 Prompt；有 revision 时，调用 Pi Agent 的 Prompt 改写函数得到最终 Prompt。
+6. 选中图片素材时，Worker 按实际请求顺序在 Prompt 前固定追加图片角色说明（`withGenerationAssetRoles`）；未选素材时保持原样。
+7. 把实际发送的完整文本保存到 `compiledPrompt`，用于结果追溯和导出 manifest。
 
 Worker 必须拒绝包含 `Upstream template`、`Template fields` 等内部模板标记的旧 Prompt，并要求重新规划；不能静默替用户清洗旧数据。
 
@@ -72,8 +72,8 @@ Worker 必须拒绝包含 `Upstream template`、`Template fields` 等内部模�
 | --- | --- | --- |
 | `assetType` | 模板稳定 ID | 规划后不可修改；未知 ID 必须失败 |
 | `templateVariant` | 模板已声明的变体 | 只能使用模板目录中存在的 key |
-| `promptInstruction` | 用户可编辑的最终 Prompt | 直接发送给生图模型；不能包含内部模板元数据 |
-| `compiledPrompt` | 本次实际发送的 Prompt 快照 | 普通生成时等于 `promptInstruction`；revision 生成时等于 Agent 改写后的完整 Prompt |
+| `promptInstruction` | 用户可编辑的最终 Prompt | 直接发送给生图模型（Worker 会按实际图片顺序前置角色说明）；不能包含内部模板元数据 |
+| `compiledPrompt` | 本次实际发送的 Prompt 快照 | 等于最终 Prompt 前置图片角色说明后的完整文本；未选图片素材时，普通生成等于 `promptInstruction`，revision 生成等于 Agent 改写后的完整 Prompt |
 | `referencedAssets` | 分镜建议使用的素材 ID | 必须属于当前项目；商品事实图优先于风格参考图 |
 | `factClaims` | Agent 认为可依据的事实 | 只能来自项目 `verifiedFacts`，不能凭空补充 |
 | `riskFlags` | 需要人工复核的产品不确定性 | 不用于重复模板通用提示 |

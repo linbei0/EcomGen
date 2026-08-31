@@ -8,6 +8,7 @@ export interface ReasoningModelInput {
   protocol: ReasoningProtocolProfile;
   supportsVision: boolean;
   supportsThinking: boolean;
+  supportsStructuredOutput?: boolean;
 }
 
 /** 将业务层的协议 Profile 映射为 Pi 的 OpenAI-compatible 兼容参数。 */
@@ -17,16 +18,19 @@ export function resolveReasoningProfile(profile: ReasoningProtocolProfile): Open
       return undefined;
     case "dashscope_qwen":
       return { maxTokensField: "max_tokens", thinkingFormat: "qwen", supportsDeveloperRole: false };
+    case "openai_responses":
+      return undefined;
     default:
       return assertNever(profile);
   }
 }
 
-export function buildReasoningModel(input: ReasoningModelInput): Model<"openai-completions"> {
+export function buildReasoningModel(input: ReasoningModelInput): Model<"openai-completions" | "openai-responses"> & { ecomgenSupportsStructuredOutput: boolean } {
+  const api = input.protocol === "openai_responses" ? "openai-responses" : "openai-completions";
   return {
     id: input.modelId,
     name: input.modelId,
-    api: "openai-completions",
+    api,
     provider: input.providerId as never,
     baseUrl: input.baseUrl,
     reasoning: input.supportsThinking,
@@ -37,6 +41,7 @@ export function buildReasoningModel(input: ReasoningModelInput): Model<"openai-c
     // 多个分镜的完整最终 Prompt，8K 容易被截断成非法 JSON，因此提高上限并留出余量。
     maxTokens: 16_384,
     compat: resolveReasoningProfile(input.protocol),
+    ecomgenSupportsStructuredOutput: input.supportsStructuredOutput === true && input.protocol !== "dashscope_qwen",
   };
 }
 

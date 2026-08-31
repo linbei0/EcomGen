@@ -7,8 +7,8 @@ const amazonContext = { platformTargets: ["AMAZON"] as const, targetMarket: null
 describe("Pi planning business tools", () => {
   it("returns structured template guidance without exposing a prompt contract string", async () => {
     const tool = createPlanningTools(taobaoContext)[0];
-    const result = await tool.execute("call-1", { templateId: "hero-image" });
-    const guidance = result.details as { guidance: { visualFields: Record<string, string>; platformReservations: string[]; categoryTips: Record<string, string> } };
+    const result = await tool.execute("call-1", { templateIds: ["hero-image"] });
+    const guidance = (result.details as { templates: Array<{ guidance: { visualFields: Record<string, string>; platformReservations: string[]; categoryTips: Record<string, string> } }> }).templates[0];
     expect(guidance.guidance.visualFields).toHaveProperty("type");
     expect(guidance.guidance.platformReservations.join(" ")).toContain("70-85%");
     expect(guidance.guidance.categoryTips.fashion).toMatch(/fabric|drape|stitching/i);
@@ -17,7 +17,9 @@ describe("Pi planning business tools", () => {
 
   it("fails explicitly for unknown templates and scopes platform guidance to project context", async () => {
     const tools = createPlanningTools(amazonContext);
-    await expect(tools[0].execute("call-1", { templateId: "missing-template" })).rejects.toThrow("Unknown ecom-details-image template");
+    await expect(tools[0].execute("call-1", { templateIds: ["missing-template"] })).rejects.toThrow("Unknown ecom-details-image template");
+    const batch = await tools[0].execute("call-batch", { templateIds: ["hero-image", "lifestyle-scene"] });
+    expect((batch.details as { templates: Array<{ id: string }> }).templates.map((item) => item.id)).toEqual(["hero-image", "lifestyle-scene"]);
     const result = await tools[1].execute("call-2", {});
     const details = result.details as { targets: Array<{ target: string; hero: { textBudget: string; occupancy: string } }>; copyPolicy?: unknown; planningPolicy?: unknown };
     expect(details).toMatchObject({ targets: [{ target: "AMAZON" }], effectiveCopyLanguage: null });
