@@ -32,11 +32,11 @@
     }
   },
   "category_tips": {
-    "beauty": "show cream formula texture, shimmer particles, light reflection",
-    "electronics": "show port precision, material finish, button detail",
-    "food": "show ingredient texture, cross-section, freshness",
-    "fashion": "show fabric weave, stitching quality, hardware detail",
-    "jewelry": "show gemstone cut, metal finish, clasp detail"
+    "beauty": "show cream formula texture, shimmer particles, light reflection; raking light across surface, shallow depth of field",
+    "electronics": "show port precision, material finish, button detail; raking light for texture, narrow contact shadow",
+    "food": "show ingredient texture, cross-section, freshness; directional side light, natural cast shadow",
+    "fashion": "show fabric weave, stitching quality, hardware detail; raking light to reveal weave, shallow depth of field",
+    "jewelry": "show gemstone cut, metal finish, clasp detail; diffused lightbox with focused sparkle light, dark-field reflection"
   },
   "examples": [
     "Extreme close-up beauty macro, Canon EOS R5 100mm f/2.8 macro. {product} filling 80% of frame, focusing on {focus_area}. Visible pores, fine lines, natural imperfections, NOT retouched. Formula visible with realistic light reflection. Natural side lighting. 8K",

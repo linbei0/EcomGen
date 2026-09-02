@@ -32,10 +32,10 @@
     }
   },
   "category_tips": {
-    "beauty": "skincare ritual flat lay, open product showing formula, botanical elements",
-    "food": "ingredients spread, fresh produce, kitchen tools",
-    "fashion": "clothing + accessories + shoes arranged aesthetically, fabric textures",
-    "home": "decor items, textures, materials spread showing lifestyle"
+    "beauty": "skincare ritual flat lay, open product showing formula, botanical elements; soft window light top-left, soft contact shadow",
+    "food": "ingredients spread, fresh produce, kitchen tools; 90-degree overhead, soft window light, soft overlapping shadows",
+    "fashion": "clothing + accessories + shoes arranged aesthetically, fabric textures; 90-degree overhead, triangular arrangement, soft contact shadow",
+    "home": "decor items, textures, materials spread showing lifestyle; 90-degree overhead, soft window light, negative space between items"
   },
   "examples": [
     "Luxurious {category} ritual flat lay, top-down photography. {product} with lid open showing texture as hero at bottom center. Surrounding: gold-tone palette, crystal bottle, dried lavender with silk ribbon, gold foil flakes, pearl beads. Background: ivory linen. Color: ivory, blush, champagne gold. Soft window light top-left at 45 degrees. 8K, no text, no watermark",

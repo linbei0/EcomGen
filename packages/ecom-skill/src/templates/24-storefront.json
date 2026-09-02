@@ -23,12 +23,12 @@
     "aerial-plan": { "description": "俯视平面", "overrides": { "camera": "top-down bird's eye view showing full floor plan layout" } }
   },
   "category_tips": {
-    "coffee_shop": "espresso machine visible, warm wood tones, latte art, pastry display",
-    "beauty_store": "illuminated niches, marble counter, product wall, consultation area",
-    "fashion_boutique": "minimalist racks, curated display, premium flooring, mirror accents",
-    "restaurant": "table setting, kitchen pass visible, ambient lighting, menu display",
-    "gym_studio": "modern equipment, branded wall, natural light, motivational signage",
-    "pop_up": "temporary creative installation, bold graphics, unique display fixtures"
+    "coffee_shop": "espresso machine visible, warm wood tones, latte art, pastry display; warm practical lighting, natural cast shadows",
+    "beauty_store": "illuminated niches, marble counter, product wall, consultation area; backlit niches, reflection on marble",
+    "fashion_boutique": "minimalist racks, curated display, premium flooring, mirror accents; soft track lighting, gentle contact shadows",
+    "restaurant": "table setting, kitchen pass visible, ambient lighting, menu display; warm pendant practicals, natural shadows",
+    "gym_studio": "modern equipment, branded wall, natural light, motivational signage; daylight plus practical fill, long cast shadows",
+    "pop_up": "temporary creative installation, bold graphics, unique display fixtures; even high-key fill, clean shadows"
   },
   "examples": [
     "Storefront photography. Modern {business} with glass windows showing warm interior. Entrance with potted plants. Golden hour light. Architectural photography, 8K",

@@ -24,12 +24,12 @@
     "gym-power": { "description": "健身力量感", "overrides": { "athlete": "muscular athlete seated on oversized dumbbell or equipment", "props": "exaggerated fitness equipment placed diagonally" } }
   },
   "category_tips": {
-    "running_shoes": "dynamic forward motion, speed lines, track or road surface context",
-    "basketball": "mid-dunk or crossover pose, stadium lighting, court texture",
-    "fitness_equipment": "athlete using product, sweat detail, gym environment",
-    "sportswear": "compression fit visible, fabric technology highlighted, movement pose",
-    "protein_supplements": "product with athlete post-workout, muscular definition, energy mood",
-    "sports_drink": "splash effects, condensation, vibrant energy colors, hydration theme"
+    "running_shoes": "dynamic forward motion, speed lines, track or road surface context; hard side light, long directional cast shadow",
+    "basketball": "mid-dunk or crossover pose, stadium lighting, court texture; dramatic stadium key plus rim, strong cast shadow",
+    "fitness_equipment": "athlete using product, sweat detail, gym environment; high-contrast side light, sweat highlights",
+    "sportswear": "compression fit visible, fabric technology highlighted, movement pose; rim light for silhouette, directional cast shadow",
+    "protein_supplements": "product with athlete post-workout, muscular definition, energy mood; dramatic side light, container contact shadow",
+    "sports_drink": "splash effects, condensation, vibrant energy colors, hydration theme; backlighting through liquid, condensation highlights, cast shadow"
   },
   "examples": [
     "Sports advertising photo. {product} placed diagonally on reflective dark surface. Dramatic side lighting, speed lines around product. Bold headline text. Dynamic and energetic, 8K, 1080x1350px",

@@ -33,10 +33,10 @@
     }
   },
   "category_tips": {
-    "beauty": "dimension callout badge, usage ritual steps, ingredient percentages",
-    "electronics": "precise dimensions with comparison objects, port specs",
-    "food": "serving size, preparation steps, nutritional highlights",
-    "fashion": "size chart with body measurements, care instructions"
+    "beauty": "dimension callout badge, usage ritual steps, ingredient percentages; shadowless front view, even illumination",
+    "electronics": "precise dimensions with comparison objects, port specs; shadowless, true-to-scale side view",
+    "food": "serving size, preparation steps, nutritional highlights; shadowless product front, clean white base",
+    "fashion": "size chart with body measurements, care instructions; flat garment, shadowless overhead view"
   },
   "examples": [
     "Premium {category} specification and ritual guide, luxury editorial. White background, subtle border. Top: {product} centered with dimension badge. Left: 4-step usage guide with decorative icons. Right: highlights with colored pills. Bottom: {data}. Decorative corner accents. Magazine-quality, 2000x2800px",

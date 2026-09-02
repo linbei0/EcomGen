@@ -25,12 +25,12 @@
     "office-lifestyle": { "description": "办公场景", "overrides": { "desk_accessories": "Aesop hand cream, Muji pen holder, latte with art, hardcover notebook, trailing plant on shelf", "background": "Scandinavian home office with white bookshelf" } }
   },
   "category_tips": {
-    "saas": "show dashboard with charts, KPI cards, data visualizations",
-    "mobile_app": "show app interface on phone, notification visible, clean UI",
-    "ecommerce_platform": "show store admin dashboard with product listings and analytics",
-    "fintech": "show financial dashboard with graphs, portfolio summary",
-    "health_app": "show workout tracker, health metrics, progress charts",
-    "ai_product": "show chat interface, AI responses, modern dark or light theme"
+    "saas": "show dashboard with charts, KPI cards, data visualizations; screen glow as key light, minimal contact shadow",
+    "mobile_app": "show app interface on phone, notification visible, clean UI; screen glow, soft reflection on screen glass",
+    "ecommerce_platform": "show store admin dashboard with product listings and analytics; screen glow key, subtle device contact shadow",
+    "fintech": "show financial dashboard with graphs, portfolio summary; screen glow, dark-theme rim highlight",
+    "health_app": "show workout tracker, health metrics, progress charts; screen glow, soft ambient fill",
+    "ai_product": "show chat interface, AI responses, modern dark or light theme; screen glow with glow accents, low-key surround"
   },
   "examples": [
     "Product mockup on laptop. Silver laptop on white desk, screen showing modern dashboard with charts. Coffee cup and small plant nearby. Natural window light. Clean product photography, 8K",

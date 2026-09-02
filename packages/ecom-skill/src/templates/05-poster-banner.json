@@ -41,10 +41,10 @@
     }
   },
   "category_tips": {
-    "beauty": "rose gold accents, elegant serif fonts, luxury gift aesthetic",
-    "electronics": "dark backgrounds, neon accents, futuristic typography",
-    "food": "warm colors, dynamic food elements, freshness cues",
-    "fashion": "editorial style, model inclusion, aspirational lifestyle"
+    "beauty": "rose gold accents, elegant serif fonts, luxury gift aesthetic; shadowless cutout product on gradient, high-key lighting",
+    "electronics": "dark backgrounds, neon accents, futuristic typography; low-key lighting, rim light separation, shadowless composite",
+    "food": "warm colors, dynamic food elements, freshness cues; high-key key light, soft cast shadow toward viewer",
+    "fashion": "editorial style, model inclusion, aspirational lifestyle; Rembrandt or split lighting, shadowless composite layout"
   },
   "examples": [
     "Luxury {category} campaign poster. Full-bleed gradient ivory to rose. Top: {headline} elegant serif. Center: {product} with decorative elements. {subtitle}. Bottom left: price {price} original crossed out. Bottom right: brand logo and {cta}. Gold foil accents, premium aesthetic, 2000x3000px",

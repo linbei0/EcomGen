@@ -35,12 +35,12 @@
     }
   },
   "category_tips": {
-    "beauty": "emphasize texture and glow, show formula details",
-    "electronics": "highlight metallic finish, screen details, port precision",
-    "food": "vibrant colors, fresh appearance, show texture",
-    "fashion": "show fabric texture, drape quality, stitching details",
-    "home": "show material quality, craftsmanship, lifestyle appeal",
-    "jewelry": "macro detail, sparkle and cut quality, luxurious lighting"
+    "beauty": "emphasize texture and glow, show formula details; butterfly or clamshell lighting, shadowless background",
+    "electronics": "highlight metallic finish, screen details, port precision; soft diffused studio lighting with subtle rim light, shadowless background",
+    "food": "vibrant colors, fresh appearance, show texture; soft diffused top light, soft contact shadow",
+    "fashion": "show fabric texture, drape quality, stitching details; soft diffused studio lighting, subtle contact shadow, centered symmetrical composition",
+    "home": "show material quality, craftsmanship, lifestyle appeal; soft diffused 3/4 lighting, soft contact shadow",
+    "jewelry": "macro detail, sparkle and cut quality; diffused lightbox tent lighting, controlled reflection shadow on white surface"
   },
   "examples": [
     "{product}, professional product photography on clean white background, soft diffused studio lighting, centered, 8K, commercial e-commerce photography, no shadows, no props",

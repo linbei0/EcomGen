@@ -31,10 +31,10 @@
     }
   },
   "category_tips": {
-    "beauty": "complete routine (cleanser → toner → serum → cream), gift-ready",
-    "food": "product range, variety pack, flavor assortment",
-    "fashion": "outfit coordination pieces, colorway options",
-    "home": "collection of coordinating items"
+    "beauty": "complete routine (cleanser → toner → serum → cream), gift-ready; single softbox key light, uniform contact shadows",
+    "food": "product range, variety pack, flavor assortment; uniform diffused light, identical contact shadow per item",
+    "fashion": "outfit coordination pieces, colorway options; even high-key light, aligned shadows",
+    "home": "collection of coordinating items; soft diffused key light, triangular arrangement, consistent contact shadows"
   },
   "examples": [
     "Luxury {category} gift set on premium surface: {product_list}. Organized composition with product cards. Scattered: gold foil, pearls, dried flowers, velvet ribbon. Bottom left: set description. Bottom right: price with original crossed out. Soft directional lighting, premium photography, 8K",

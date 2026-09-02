@@ -33,10 +33,10 @@
     }
   },
   "category_tips": {
-    "beauty": "show product in use on skin, texture close-up, real results",
-    "food": "overhead dish/drink shot, appetizing colors, 45-degree angle",
-    "fashion": "mirror selfie or outfit grid, casual styling, real-person aesthetic",
-    "home": "corner shot in styled room, cozy atmosphere, warm tones"
+    "beauty": "show product in use on skin, texture close-up, real results; natural window light, realistic contact shadows",
+    "food": "overhead dish/drink shot, appetizing colors, 45-degree angle; natural daylight, natural cast shadow",
+    "fashion": "mirror selfie or outfit grid, casual styling, real-person aesthetic; ambient indoor light, realistic shadows",
+    "home": "corner shot in styled room, cozy atmosphere, warm tones; warm natural window light, natural contact shadow"
   },
   "examples": [
     "Ultra-realistic Xiaohongshu RED product lifestyle photo, iPhone 15 Pro, NOT professional photographer. Slightly tilted angle, {product} on {surface}, lid off showing texture. Environmental details: slight water stain, natural shadows, lived-in feel. iPhone warm auto-white-balance, natural noise, NOT sharpened, Kodak Portra 400 feel, NOT AI-generated look, 8K, 1080x1350px",

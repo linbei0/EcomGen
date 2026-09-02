@@ -33,10 +33,10 @@
     }
   },
   "category_tips": {
-    "beauty": "extreme close-up on application moment, formula texture on skin, real skin mandatory",
-    "fashion": "full outfit showcase, pose highlighting garment, editorial lighting",
-    "accessories": "product being worn/used, hand or body detail, lifestyle context",
-    "sports": "active pose in appropriate setting, show performance"
+    "beauty": "extreme close-up on application moment, formula texture on skin, real skin mandatory; clamshell lighting, minimal shadows",
+    "fashion": "full outfit showcase, pose highlighting garment, editorial lighting; editorial loop or Rembrandt lighting, natural ground shadow",
+    "accessories": "product being worn/used, hand or body detail, lifestyle context; soft diffused key light, natural contact shadow",
+    "sports": "active pose in appropriate setting, show performance; dramatic side light, directional cast shadow"
   },
   "examples": [
     "Extreme close-up beauty macro, Canon EOS R5 100mm f/2.8 macro. Face filling 80% of frame, {product} being applied on {focus_area}. Skin incredibly detailed: pores, fine lines, natural imperfections, NOT retouched. Formula visible with realistic reflection. Natural side lighting. NOT AI-generated look, 8K, 1080x1350px",

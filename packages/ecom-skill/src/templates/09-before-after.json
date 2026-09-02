@@ -33,10 +33,10 @@
     }
   },
   "category_tips": {
-    "beauty": "show skin texture change, include moisture/radiance percentage data",
-    "fitness": "body transformation, consistent pose and lighting",
-    "home": "room before/after renovation or cleaning",
-    "automotive": "vehicle before/after detailing"
+    "beauty": "show skin texture change, include moisture/radiance percentage data; identical lighting both sides, shadowless clinical setup",
+    "fitness": "body transformation, consistent pose and lighting; same key light direction and contact shadow both halves",
+    "home": "room before/after renovation or cleaning; identical camera angle, consistent window light direction",
+    "automotive": "vehicle before/after detailing; consistent diffused overcast-style light both halves"
   },
   "examples": [
     "Cinematic before/after {category} transformation. Left: moody lighting showing {before}, cool tone. Right: bright golden hour showing {after}, warm tone. Center: decorative frame with product. Bottom: comparison data grid. Premium campaign layout, 8K, 1080x1620px",

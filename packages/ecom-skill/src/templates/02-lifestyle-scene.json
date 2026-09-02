@@ -37,11 +37,11 @@
     }
   },
   "category_tips": {
-    "beauty": "bathroom vanity with botanical elements, skincare ritual feel",
-    "electronics": "modern desk setup, minimal aesthetic, tech-forward",
-    "food": "kitchen counter or dining table, fresh ingredients, warm tones",
-    "fashion": "urban street or boutique fitting room, model wearing the item",
-    "home": "styled room interior, product naturally placed"
+    "beauty": "bathroom vanity with botanical elements, skincare ritual feel; soft window light, natural contact shadow",
+    "electronics": "modern desk setup, minimal aesthetic, tech-forward; loop lighting from window side, soft contact shadow",
+    "food": "kitchen counter or dining table, fresh ingredients, warm tones; window side light at 45 degrees, natural cast shadow",
+    "fashion": "urban street or boutique fitting room, model wearing the item; golden hour backlight or loop light, natural contact shadow",
+    "home": "styled room interior, product naturally placed; soft one-side window light, natural contact shadow, rule-of-thirds placement"
   },
   "examples": [
     "{product} naturally placed in {scene}, morning sunlight through window, botanical touches, warm atmosphere, professional lifestyle photography, 8K",

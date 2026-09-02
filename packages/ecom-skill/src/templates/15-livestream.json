@@ -34,10 +34,10 @@
     }
   },
   "category_tips": {
-    "beauty": "host demonstrating application, showing texture, real-time swatching",
-    "fashion": "host wearing/showing clothing, fit demo, fabric close-up",
-    "food": "host tasting/preparing, showing freshness, unboxing",
-    "electronics": "host demonstrating features, hands-on product demo"
+    "beauty": "host demonstrating application, showing texture, real-time swatching; ring light catchlight, warm indoor fill",
+    "fashion": "host wearing/showing clothing, fit demo, fabric close-up; ring light plus ambient room light",
+    "food": "host tasting/preparing, showing freshness, unboxing; warm practical lighting, natural shadows",
+    "electronics": "host demonstrating features, hands-on product demo; ring light catchlight, screen glow fill"
   },
   "examples": [
     "Ultra-realistic Douyin livestream screenshot, phone screen capture. Host in casual {outfit}, minimal makeup, visible pores and skin texture, NOT retouched. Demonstrating {product}, showing details, other hand gesturing. Ring light natural shine, NOT plastic AI look. Background: real home setup - product shelf, whiteboard with prices, string lights, coffee mug. Phone UI: LIVE badge, viewer count, scrolling comments, product card with price, yellow buy button. Warm cast, slight noise, Kodak Portra 400 tone, NOT AI-generated look, 1080x1920px",

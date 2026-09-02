@@ -31,10 +31,10 @@
     }
   },
   "category_tips": {
-    "beauty": "spa bathroom, vanity mirror, botanical elements, skincare ritual",
-    "fashion": "model wearing item in appropriate setting, natural styling",
-    "furniture": "product in complete room setting, complementary decor",
-    "electronics": "modern desk setup, in-use context, tech-forward"
+    "beauty": "spa bathroom, vanity mirror, botanical elements, skincare ritual; soft vanity light, natural contact shadow",
+    "fashion": "model wearing item in appropriate setting, natural styling; natural window light, ground contact shadow",
+    "furniture": "product in complete room setting, complementary decor; room-matched window light, realistic contact shadow",
+    "electronics": "modern desk setup, in-use context, tech-forward; ambient desk light, natural contact shadow"
   },
   "examples": [
     "Cinematic luxury {category} integration. High-end {interior} with {materials}. {product} prominently displayed. Morning sunlight through frosted glass, ethereal light rays. Fresh flowers, botanical elements. Product label visible, ingredient card beside it. Decorative: tray, pearls, gold foil. Color: {colors}. Cinematic depth, warm grading, premium, 8K, 1080x1620px",

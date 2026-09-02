@@ -37,11 +37,11 @@
     }
   },
   "category_tips": {
-    "beauty": "product in use on real skin, visible pores, bathroom setting",
-    "food": "phone snap on table, casual restaurant or home",
-    "fashion": "mirror selfie wearing item, bedroom or fitting room",
-    "electronics": "desk setup with product in use, realistic cables",
-    "home": "product in actual living space, not perfectly styled"
+    "beauty": "product in use on real skin, visible pores, bathroom setting; warm bathroom light, realistic uneven shadows",
+    "food": "phone snap on table, casual restaurant or home; ambient restaurant light, natural cast shadow",
+    "fashion": "mirror selfie wearing item, bedroom or fitting room; harsh direct flash or ambient light, raw shadows",
+    "electronics": "desk setup with product in use, realistic cables; monitor glow plus room light, realistic cable shadows",
+    "home": "product in actual living space, not perfectly styled; mixed household lighting, natural imperfect shadows"
   },
   "examples": [
     "Bathroom mirror selfie, iPhone front camera. Person with {product}. Mirror has slight condensation. Warm yellowish indoor lighting. {product} label recognizable but not centered. Skin: visible pores, slight redness, NOT flawless. Warm yellow cast, phone noise, natural unposed, NOT AI-generated look, authentic UGC, 1080x1350px",

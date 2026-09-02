@@ -24,12 +24,12 @@
     "editorial": { "description": "杂志编辑风格", "overrides": { "background": "warm off-white with subtle texture", "labels": "serif font callouts, hand-drawn arrow style" } }
   },
   "category_tips": {
-    "electronics": "highlight circuit boards, chips, battery modules with spec labels",
-    "audio": "show speaker drivers, diaphragms, ANC modules, battery size",
-    "wearables": "include sensors, display panel, waterproof seals, strap mechanism",
-    "home_appliance": "show motor, filter system, internal wiring, control board",
-    "phone_accessories": "highlight charging coils, magnet arrays, protective layers",
-    "camera": "show lens elements, sensor, image processor, stabilization unit"
+    "electronics": "highlight circuit boards, chips, battery modules with spec labels; parts float vertically, soft shadow beneath each part",
+    "audio": "show speaker drivers, diaphragms, ANC modules, battery size; floating alignment with equal spacing, soft per-part shadow",
+    "wearables": "include sensors, display panel, waterproof seals, strap mechanism; vertical exploded axis, soft contact shadows below",
+    "home_appliance": "show motor, filter system, internal wiring, control board; aligned floating components, soft ground shadow",
+    "phone_accessories": "highlight charging coils, magnet arrays, protective layers; vertical float, soft per-part shadow",
+    "camera": "show lens elements, sensor, image processor, stabilization unit; aligned lens stack float, soft shadow beneath"
   },
   "examples": [
     "Product exploded view. {product} disassembled into 5 components floating in mid-air with spacing, arranged vertically. Clean light gray background. Soft shadows beneath each part. Technical illustration style, 8K, no text",

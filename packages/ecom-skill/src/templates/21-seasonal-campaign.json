@@ -24,12 +24,12 @@
     "travel-series": { "description": "旅行主题", "overrides": { "layout": "2x2 grid, product in 4 travel destinations with local elements" } }
   },
   "category_tips": {
-    "skincare": "spring=blossoms+dew, summer=sun+kisses, autumn=cozy+cream, winter=frost+glow",
-    "fragrance": "each season with matching botanical elements and color palette",
-    "fashion": "season-appropriate styling visible in each quadrant",
-    "food": "seasonal ingredients and color palette matching product",
-    "home": "seasonal decor elements and lighting mood",
-    "candles": "seasonal scents visualized through corresponding natural elements"
+    "skincare": "spring=blossoms+dew, summer=sun+kisses, autumn=cozy+cream, winter=frost+glow; season-matched light temperature, consistent shadow style per quadrant",
+    "fragrance": "each season with matching botanical elements and color palette; consistent rim light across quadrants",
+    "fashion": "season-appropriate styling visible in each quadrant; consistent key light direction, natural contact shadow",
+    "food": "seasonal ingredients and color palette matching product; matched light warmth per season, soft contact shadow",
+    "home": "seasonal decor elements and lighting mood; consistent window light direction across quadrants",
+    "candles": "seasonal scents visualized through corresponding natural elements; warm flame practical light, low-key ambience"
   },
   "examples": [
     "2x2 seasonal grid. Same {product} in four settings: Spring with cherry blossoms, Summer with citrus and sunshine, Autumn with maple leaves, Winter with pine and snow. Consistent product angle, 8K, 2000x2000px",

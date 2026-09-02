@@ -25,12 +25,12 @@
     "minimal-editorial": { "description": "极简杂志内页", "overrides": { "background": "clean white studio, no backdrop color", "layout": "no masthead, clean full-bleed editorial image" } }
   },
   "category_tips": {
-    "skincare": "dewy skin, product held at chin level, beauty lighting",
-    "fragrance": "atmospheric smoke, contemplative mood, bottle prominent",
-    "fashion": "confident pose, outfit fully visible, dramatic lighting",
-    "jewelry": "close-up on hands/neck, editorial styling, luxury backdrop",
-    "haircare": "hair as hero element, movement and texture, beauty lighting",
-    "makeup": "bold lip or eye focus, product in hand, editorial beauty"
+    "skincare": "dewy skin, product held at chin level, beauty lighting; butterfly or clamshell beauty lighting",
+    "fragrance": "atmospheric smoke, contemplative mood, bottle prominent; backlighting through smoke, rim light",
+    "fashion": "confident pose, outfit fully visible, dramatic lighting; Rembrandt or split editorial lighting, long cast shadow",
+    "jewelry": "close-up on hands/neck, editorial styling, luxury backdrop; diffused tent key light plus sparkle accent, dark-field reflection",
+    "haircare": "hair as hero element, movement and texture, beauty lighting; rim light for hair separation, soft fill",
+    "makeup": "bold lip or eye focus, product in hand, editorial beauty; clamshell beauty lighting, soft falloff"
   },
   "examples": [
     "Beauty magazine cover. Woman with glowing skin holding {product} near face. Beauty dish lighting, soft background. Top area for masthead. Vogue-quality editorial, 8K, 1080x1350px",

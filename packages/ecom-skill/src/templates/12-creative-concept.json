@@ -33,10 +33,10 @@
     }
   },
   "category_tips": {
-    "beauty": "floating product with splash, ethereal lighting, formula particles",
-    "electronics": "holographic interfaces, data visualization, futuristic",
-    "food": "ingredient explosion, dynamic pour/splash, steam and fire",
-    "fashion": "editorial art direction, dramatic poses, fabric in motion"
+    "beauty": "floating product with splash, ethereal lighting, formula particles; backlighting through liquid, rim light separation",
+    "electronics": "holographic interfaces, data visualization, futuristic; low-key setup, rim and backlight, glow accents",
+    "food": "ingredient explosion, dynamic pour/splash, steam and fire; frozen high-speed motion, dramatic side light, cast shadow",
+    "fashion": "editorial art direction, dramatic poses, fabric in motion; split or cross lighting, long cast shadow"
   },
   "examples": [
     "{product} floating in {dramatic_environment}, {effects: splash/particles/smoke}, {bold colors}, art direction: {style}, ultra-detailed, cinematic lighting, award-winning advertising, 8K",

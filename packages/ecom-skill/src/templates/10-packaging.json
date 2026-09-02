@@ -31,10 +31,10 @@
     }
   },
   "category_tips": {
-    "beauty": "label design, ingredient preview, formula through transparent elements",
-    "food": "nutritional info area, ingredient imagery, freshness seals",
-    "fashion": "branded tissue, garment tag, care instructions, shopping bag",
-    "electronics": "box design, inner foam, cable organization, quick-start guide"
+    "beauty": "label design, ingredient preview, formula through transparent elements; backlighting for transparent parts, soft contact shadow",
+    "food": "nutritional info area, ingredient imagery, freshness seals; soft diffused studio light, soft contact shadow",
+    "fashion": "branded tissue, garment tag, care instructions, shopping bag; soft directional light, gentle cast shadow",
+    "electronics": "box design, inner foam, cable organization, quick-start guide; soft diffused top light, precise contact shadow"
   },
   "examples": [
     "Luxury {category} packaging concept. Full spread: (1) product with lid, label visible, (2) outer gift box: embossed pattern, gold logo, magnetic closure, (3) tissue with subtle watermark, (4) satin ribbon with monogram, (5) brand card gold foil, (6) sustainable fill. On marble with gold foil, pearls, dried petals. Soft directional lighting, metallic reflections. Premium presentation, 8K, 1080x1620px",

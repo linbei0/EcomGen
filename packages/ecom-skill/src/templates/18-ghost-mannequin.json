@@ -24,12 +24,12 @@
     "lifestyle": { "description": "带环境道具", "overrides": { "background": "minimal studio with subtle editorial prop - single branch or flower in corner" } }
   },
   "category_tips": {
-    "shirts": "collar standing naturally, top buttons detail, cuff visibility",
-    "dresses": "natural waist cinch, skirt drape showing fabric weight, back zipper detail",
-    "coats": "architectural shoulder structure, fabric texture visible, button and pocket details",
-    "knitwear": "visible knit pattern and texture, natural stretch around body contours",
-    "tshirts": "casual relaxed drape, crew or v-neck sitting naturally, sleeve length proportion",
-    "activewear": "compression fit showing body contour, moisture-wicking fabric texture, logo placement"
+    "shirts": "collar standing naturally, top buttons detail, cuff visibility; soft studio light, soft contact shadow",
+    "dresses": "natural waist cinch, skirt drape showing fabric weight, back zipper detail; soft wraparound light, contact shadow",
+    "coats": "architectural shoulder structure, fabric texture visible, button and pocket details; raking light for texture, soft contact shadow",
+    "knitwear": "visible knit pattern and texture, natural stretch around body contours; soft diffused light, gentle contact shadow",
+    "tshirts": "casual relaxed drape, crew or v-neck sitting naturally, sleeve length proportion; even softbox light, minimal contact shadow",
+    "activewear": "compression fit showing body contour, moisture-wicking fabric texture, logo placement; soft directional light, contact shadow"
   },
   "examples": [
     "Ghost mannequin photography. {product} on invisible mannequin, natural body contours visible. Fabric drapes naturally showing material weight. Pure white background. Soft studio lighting, 8K, fashion e-commerce standard",

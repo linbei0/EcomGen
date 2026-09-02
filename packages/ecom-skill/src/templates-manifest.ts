@@ -1,11 +1,11 @@
 // 自动生成文件：由 scripts/generate-manifest.mjs 从 src/templates/ 生成，请勿手改。
 // 重新生成：pnpm --filter @ecomgen/ecom-skill gen:templates
 export default {
-  "totalHash": "dcb41727f7eba2dacf4ab4daced69699f34e5d92e84a52679ad8d199b000917d",
+  "totalHash": "57e0280010cc0f13d49b7f081b08cfed7729d91937af9c16892f47986a1c0e8c",
   "templates": [
     {
       "file": "01-hero-image.json",
-      "hash": "d7850f61fefd57cd254e57a6a91c405d3146d86e3336bbd2aa47e49dd1c8e6a7",
+      "hash": "92142cb00f2288e3956430546f0590d9c0942815d318d2a178247de877815a4c",
       "upstreamNumber": 1,
       "data": {
         "id": "hero-image",
@@ -71,12 +71,12 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "emphasize texture and glow, show formula details",
-          "electronics": "highlight metallic finish, screen details, port precision",
-          "food": "vibrant colors, fresh appearance, show texture",
-          "fashion": "show fabric texture, drape quality, stitching details",
-          "home": "show material quality, craftsmanship, lifestyle appeal",
-          "jewelry": "macro detail, sparkle and cut quality, luxurious lighting"
+          "beauty": "emphasize texture and glow, show formula details; butterfly or clamshell lighting, shadowless background",
+          "electronics": "highlight metallic finish, screen details, port precision; soft diffused studio lighting with subtle rim light, shadowless background",
+          "food": "vibrant colors, fresh appearance, show texture; soft diffused top light, soft contact shadow",
+          "fashion": "show fabric texture, drape quality, stitching details; soft diffused studio lighting, subtle contact shadow, centered symmetrical composition",
+          "home": "show material quality, craftsmanship, lifestyle appeal; soft diffused 3/4 lighting, soft contact shadow",
+          "jewelry": "macro detail, sparkle and cut quality; diffused lightbox tent lighting, controlled reflection shadow on white surface"
         },
         "examples": [
           "{product}, professional product photography on clean white background, soft diffused studio lighting, centered, 8K, commercial e-commerce photography, no shadows, no props",
@@ -89,7 +89,7 @@ export default {
     },
     {
       "file": "02-lifestyle-scene.json",
-      "hash": "3884056b36b4bd8dd11eb32ee33e634f3f6258ad8bf9f6bf1e6d8f63a00d417e",
+      "hash": "ad102566533b0fcb130aa6aca86a41bb91807eab13a890964a0628943110b3ba",
       "upstreamNumber": 2,
       "data": {
         "id": "lifestyle-scene",
@@ -161,11 +161,11 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "bathroom vanity with botanical elements, skincare ritual feel",
-          "electronics": "modern desk setup, minimal aesthetic, tech-forward",
-          "food": "kitchen counter or dining table, fresh ingredients, warm tones",
-          "fashion": "urban street or boutique fitting room, model wearing the item",
-          "home": "styled room interior, product naturally placed"
+          "beauty": "bathroom vanity with botanical elements, skincare ritual feel; soft window light, natural contact shadow",
+          "electronics": "modern desk setup, minimal aesthetic, tech-forward; loop lighting from window side, soft contact shadow",
+          "food": "kitchen counter or dining table, fresh ingredients, warm tones; window side light at 45 degrees, natural cast shadow",
+          "fashion": "urban street or boutique fitting room, model wearing the item; golden hour backlight or loop light, natural contact shadow",
+          "home": "styled room interior, product naturally placed; soft one-side window light, natural contact shadow, rule-of-thirds placement"
         },
         "examples": [
           "{product} naturally placed in {scene}, morning sunlight through window, botanical touches, warm atmosphere, professional lifestyle photography, 8K",
@@ -178,7 +178,7 @@ export default {
     },
     {
       "file": "03-flat-lay.json",
-      "hash": "7576403ef9a82bc323afd10aea9ddb3a1c7dacf4f93077950082eec115a99457",
+      "hash": "a5b9d5bb60556bbef40d9484fbb44ef8fe5c9bdcc210154818d9f3962fac5189",
       "upstreamNumber": 3,
       "data": {
         "id": "flat-lay",
@@ -238,10 +238,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "skincare ritual flat lay, open product showing formula, botanical elements",
-          "food": "ingredients spread, fresh produce, kitchen tools",
-          "fashion": "clothing + accessories + shoes arranged aesthetically, fabric textures",
-          "home": "decor items, textures, materials spread showing lifestyle"
+          "beauty": "skincare ritual flat lay, open product showing formula, botanical elements; soft window light top-left, soft contact shadow",
+          "food": "ingredients spread, fresh produce, kitchen tools; 90-degree overhead, soft window light, soft overlapping shadows",
+          "fashion": "clothing + accessories + shoes arranged aesthetically, fabric textures; 90-degree overhead, triangular arrangement, soft contact shadow",
+          "home": "decor items, textures, materials spread showing lifestyle; 90-degree overhead, soft window light, negative space between items"
         },
         "examples": [
           "Luxurious {category} ritual flat lay, top-down photography. {product} with lid open showing texture as hero at bottom center. Surrounding: gold-tone palette, crystal bottle, dried lavender with silk ribbon, gold foil flakes, pearl beads. Background: ivory linen. Color: ivory, blush, champagne gold. Soft window light top-left at 45 degrees. 8K, no text, no watermark",
@@ -254,7 +254,7 @@ export default {
     },
     {
       "file": "04-detail-macro.json",
-      "hash": "a3121a0430262a1c4b5bf9ea03179c588255212948f498c15124b371204140b9",
+      "hash": "b3373407c3f1c7ea85660d599c17590df082a1e3f807594d934173ec5dba7632",
       "upstreamNumber": 4,
       "data": {
         "id": "detail-macro",
@@ -312,11 +312,11 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "show cream formula texture, shimmer particles, light reflection",
-          "electronics": "show port precision, material finish, button detail",
-          "food": "show ingredient texture, cross-section, freshness",
-          "fashion": "show fabric weave, stitching quality, hardware detail",
-          "jewelry": "show gemstone cut, metal finish, clasp detail"
+          "beauty": "show cream formula texture, shimmer particles, light reflection; raking light across surface, shallow depth of field",
+          "electronics": "show port precision, material finish, button detail; raking light for texture, narrow contact shadow",
+          "food": "show ingredient texture, cross-section, freshness; directional side light, natural cast shadow",
+          "fashion": "show fabric weave, stitching quality, hardware detail; raking light to reveal weave, shallow depth of field",
+          "jewelry": "show gemstone cut, metal finish, clasp detail; diffused lightbox with focused sparkle light, dark-field reflection"
         },
         "examples": [
           "Extreme close-up beauty macro, Canon EOS R5 100mm f/2.8 macro. {product} filling 80% of frame, focusing on {focus_area}. Visible pores, fine lines, natural imperfections, NOT retouched. Formula visible with realistic light reflection. Natural side lighting. 8K",
@@ -329,7 +329,7 @@ export default {
     },
     {
       "file": "05-poster-banner.json",
-      "hash": "ea3012598cd55670710d4ea2b72ba678b92c6aa7842bad77ff4835656ec6e78a",
+      "hash": "d9f1a65d9195e834cce8e1b6a5574aec33e294a53f1cd2f4d11ed6d1c90b2235",
       "upstreamNumber": 5,
       "data": {
         "id": "poster-banner",
@@ -402,10 +402,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "rose gold accents, elegant serif fonts, luxury gift aesthetic",
-          "electronics": "dark backgrounds, neon accents, futuristic typography",
-          "food": "warm colors, dynamic food elements, freshness cues",
-          "fashion": "editorial style, model inclusion, aspirational lifestyle"
+          "beauty": "rose gold accents, elegant serif fonts, luxury gift aesthetic; shadowless cutout product on gradient, high-key lighting",
+          "electronics": "dark backgrounds, neon accents, futuristic typography; low-key lighting, rim light separation, shadowless composite",
+          "food": "warm colors, dynamic food elements, freshness cues; high-key key light, soft cast shadow toward viewer",
+          "fashion": "editorial style, model inclusion, aspirational lifestyle; Rembrandt or split lighting, shadowless composite layout"
         },
         "examples": [
           "Luxury {category} campaign poster. Full-bleed gradient ivory to rose. Top: {headline} elegant serif. Center: {product} with decorative elements. {subtitle}. Bottom left: price {price} original crossed out. Bottom right: brand logo and {cta}. Gold foil accents, premium aesthetic, 2000x3000px",
@@ -418,7 +418,7 @@ export default {
     },
     {
       "file": "06-social-media.json",
-      "hash": "e2a3aad6036ada0f251730ff1e5a87212c7e041693dad5ba2d5d4be9f53a2209",
+      "hash": "bb4c1896f3be655b40ef9401feacecb674cb686d0c50d8aa3cb3c8678deb77d6",
       "upstreamNumber": 6,
       "data": {
         "id": "social-media",
@@ -483,10 +483,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "show product in use on skin, texture close-up, real results",
-          "food": "overhead dish/drink shot, appetizing colors, 45-degree angle",
-          "fashion": "mirror selfie or outfit grid, casual styling, real-person aesthetic",
-          "home": "corner shot in styled room, cozy atmosphere, warm tones"
+          "beauty": "show product in use on skin, texture close-up, real results; natural window light, realistic contact shadows",
+          "food": "overhead dish/drink shot, appetizing colors, 45-degree angle; natural daylight, natural cast shadow",
+          "fashion": "mirror selfie or outfit grid, casual styling, real-person aesthetic; ambient indoor light, realistic shadows",
+          "home": "corner shot in styled room, cozy atmosphere, warm tones; warm natural window light, natural contact shadow"
         },
         "examples": [
           "Ultra-realistic Xiaohongshu RED product lifestyle photo, iPhone 15 Pro, NOT professional photographer. Slightly tilted angle, {product} on {surface}, lid off showing texture. Environmental details: slight water stain, natural shadows, lived-in feel. iPhone warm auto-white-balance, natural noise, NOT sharpened, Kodak Portra 400 feel, NOT AI-generated look, 8K, 1080x1350px",
@@ -499,7 +499,7 @@ export default {
     },
     {
       "file": "07-ugc-style.json",
-      "hash": "ae46fa51c70bc95cbb66a01da3f3154c4109f69f96a025b574846642cb9e901f",
+      "hash": "6ca3aa94a5e3056b0f67779ff17803548dfddbb87e9afa44cabe479a1a308132",
       "upstreamNumber": 7,
       "data": {
         "id": "ugc-style",
@@ -570,11 +570,11 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "product in use on real skin, visible pores, bathroom setting",
-          "food": "phone snap on table, casual restaurant or home",
-          "fashion": "mirror selfie wearing item, bedroom or fitting room",
-          "electronics": "desk setup with product in use, realistic cables",
-          "home": "product in actual living space, not perfectly styled"
+          "beauty": "product in use on real skin, visible pores, bathroom setting; warm bathroom light, realistic uneven shadows",
+          "food": "phone snap on table, casual restaurant or home; ambient restaurant light, natural cast shadow",
+          "fashion": "mirror selfie wearing item, bedroom or fitting room; harsh direct flash or ambient light, raw shadows",
+          "electronics": "desk setup with product in use, realistic cables; monitor glow plus room light, realistic cable shadows",
+          "home": "product in actual living space, not perfectly styled; mixed household lighting, natural imperfect shadows"
         },
         "examples": [
           "Bathroom mirror selfie, iPhone front camera. Person with {product}. Mirror has slight condensation. Warm yellowish indoor lighting. {product} label recognizable but not centered. Skin: visible pores, slight redness, NOT flawless. Warm yellow cast, phone noise, natural unposed, NOT AI-generated look, authentic UGC, 1080x1350px",
@@ -587,7 +587,7 @@ export default {
     },
     {
       "file": "08-model-showcase.json",
-      "hash": "a1697c690151bf9095437e618c8077d727eecc1eecddcf29ae6aa8c9c62ff677",
+      "hash": "a6f97774c6086ded950fe6e006c910b682a55a36aa1d37a1f1de440cb4299674",
       "upstreamNumber": 8,
       "data": {
         "id": "model-showcase",
@@ -649,10 +649,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "extreme close-up on application moment, formula texture on skin, real skin mandatory",
-          "fashion": "full outfit showcase, pose highlighting garment, editorial lighting",
-          "accessories": "product being worn/used, hand or body detail, lifestyle context",
-          "sports": "active pose in appropriate setting, show performance"
+          "beauty": "extreme close-up on application moment, formula texture on skin, real skin mandatory; clamshell lighting, minimal shadows",
+          "fashion": "full outfit showcase, pose highlighting garment, editorial lighting; editorial loop or Rembrandt lighting, natural ground shadow",
+          "accessories": "product being worn/used, hand or body detail, lifestyle context; soft diffused key light, natural contact shadow",
+          "sports": "active pose in appropriate setting, show performance; dramatic side light, directional cast shadow"
         },
         "examples": [
           "Extreme close-up beauty macro, Canon EOS R5 100mm f/2.8 macro. Face filling 80% of frame, {product} being applied on {focus_area}. Skin incredibly detailed: pores, fine lines, natural imperfections, NOT retouched. Formula visible with realistic reflection. Natural side lighting. NOT AI-generated look, 8K, 1080x1350px",
@@ -665,7 +665,7 @@ export default {
     },
     {
       "file": "09-before-after.json",
-      "hash": "37f7ea3695d57ea30d6fbcb396e732973336d97417675dc62ee2bd4c5a883ead",
+      "hash": "fd590dd469b50220529f86648d7716701dc6e24045f61460b23e35f8b1c0549e",
       "upstreamNumber": 9,
       "data": {
         "id": "before-after",
@@ -724,10 +724,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "show skin texture change, include moisture/radiance percentage data",
-          "fitness": "body transformation, consistent pose and lighting",
-          "home": "room before/after renovation or cleaning",
-          "automotive": "vehicle before/after detailing"
+          "beauty": "show skin texture change, include moisture/radiance percentage data; identical lighting both sides, shadowless clinical setup",
+          "fitness": "body transformation, consistent pose and lighting; same key light direction and contact shadow both halves",
+          "home": "room before/after renovation or cleaning; identical camera angle, consistent window light direction",
+          "automotive": "vehicle before/after detailing; consistent diffused overcast-style light both halves"
         },
         "examples": [
           "Cinematic before/after {category} transformation. Left: moody lighting showing {before}, cool tone. Right: bright golden hour showing {after}, warm tone. Center: decorative frame with product. Bottom: comparison data grid. Premium campaign layout, 8K, 1080x1620px",
@@ -740,7 +740,7 @@ export default {
     },
     {
       "file": "10-packaging.json",
-      "hash": "17a11fadc25921e2806943a94b083955b0a6ffa767fcf66cc1577724b24867dc",
+      "hash": "f3e5ae186daed3b6e4d6c8d2351f75975516b4816809372f26ac76c5c96dd4d0",
       "upstreamNumber": 10,
       "data": {
         "id": "packaging",
@@ -798,10 +798,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "label design, ingredient preview, formula through transparent elements",
-          "food": "nutritional info area, ingredient imagery, freshness seals",
-          "fashion": "branded tissue, garment tag, care instructions, shopping bag",
-          "electronics": "box design, inner foam, cable organization, quick-start guide"
+          "beauty": "label design, ingredient preview, formula through transparent elements; backlighting for transparent parts, soft contact shadow",
+          "food": "nutritional info area, ingredient imagery, freshness seals; soft diffused studio light, soft contact shadow",
+          "fashion": "branded tissue, garment tag, care instructions, shopping bag; soft directional light, gentle cast shadow",
+          "electronics": "box design, inner foam, cable organization, quick-start guide; soft diffused top light, precise contact shadow"
         },
         "examples": [
           "Luxury {category} packaging concept. Full spread: (1) product with lid, label visible, (2) outer gift box: embossed pattern, gold logo, magnetic closure, (3) tissue with subtle watermark, (4) satin ribbon with monogram, (5) brand card gold foil, (6) sustainable fill. On marble with gold foil, pearls, dried petals. Soft directional lighting, metallic reflections. Premium presentation, 8K, 1080x1620px",
@@ -814,7 +814,7 @@ export default {
     },
     {
       "file": "11-infographic.json",
-      "hash": "94ff540b8e03303f55ee0fc332b670e2bd210e97dc06da8e782585948b2d70be",
+      "hash": "6465fea7175228af9bae6fb38e45ac6888dcbc3586f4da07b23f6579a5169e13",
       "upstreamNumber": 11,
       "data": {
         "id": "infographic",
@@ -873,10 +873,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "ingredient breakdown with %, before/after data, dermatologist badges",
-          "electronics": "spec comparison, performance metrics, compatibility icons",
-          "food": "nutritional visualization, ingredient sourcing, recipe flow",
-          "fashion": "size guide, material composition, care instructions"
+          "beauty": "ingredient breakdown with %, before/after data, dermatologist badges; shadowless cutout product, high-key lighting",
+          "electronics": "spec comparison, performance metrics, compatibility icons; shadowless cutout, subtle contact shadow only",
+          "food": "nutritional visualization, ingredient sourcing, recipe flow; shadowless cutout, clean high-key light",
+          "fashion": "size guide, material composition, care instructions; shadowless garment cutout, even illumination"
         },
         "examples": [
           "Complex Amazon A+ Content module. Top banner with brand and tagline. Main: 4 quadrants each showing product detail with labeled feature: (1) {f1}, (2) {f2}, (3) {f3}, (4) {f4}. Below: comparison table. Bottom: spec chart and certification badges. {color} palette. Mobile-first, professional e-commerce, 2000x2500px",
@@ -889,7 +889,7 @@ export default {
     },
     {
       "file": "12-creative-concept.json",
-      "hash": "712d91e645d858220b48988322aa0aecb158e1cce6724ea72bdc67c01bcbdc26",
+      "hash": "958197cce07d100120008397ded63ca359d5a641659e20a829eab6741d52cdbd",
       "upstreamNumber": 12,
       "data": {
         "id": "creative-concept",
@@ -950,10 +950,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "floating product with splash, ethereal lighting, formula particles",
-          "electronics": "holographic interfaces, data visualization, futuristic",
-          "food": "ingredient explosion, dynamic pour/splash, steam and fire",
-          "fashion": "editorial art direction, dramatic poses, fabric in motion"
+          "beauty": "floating product with splash, ethereal lighting, formula particles; backlighting through liquid, rim light separation",
+          "electronics": "holographic interfaces, data visualization, futuristic; low-key setup, rim and backlight, glow accents",
+          "food": "ingredient explosion, dynamic pour/splash, steam and fire; frozen high-speed motion, dramatic side light, cast shadow",
+          "fashion": "editorial art direction, dramatic poses, fabric in motion; split or cross lighting, long cast shadow"
         },
         "examples": [
           "{product} floating in {dramatic_environment}, {effects: splash/particles/smoke}, {bold colors}, art direction: {style}, ultra-detailed, cinematic lighting, award-winning advertising, 8K",
@@ -966,7 +966,7 @@ export default {
     },
     {
       "file": "13-size-spec.json",
-      "hash": "14a21b95f69f4ecd46ad19e0acd9df16cfe59b65ce32c2ab129e572b0c91aa8a",
+      "hash": "52e04120c9eda326ef801a15a02c46b4e75b959ea851a14134f1f88c64d02c9d",
       "upstreamNumber": 13,
       "data": {
         "id": "size-spec",
@@ -1027,10 +1027,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "dimension callout badge, usage ritual steps, ingredient percentages",
-          "electronics": "precise dimensions with comparison objects, port specs",
-          "food": "serving size, preparation steps, nutritional highlights",
-          "fashion": "size chart with body measurements, care instructions"
+          "beauty": "dimension callout badge, usage ritual steps, ingredient percentages; shadowless front view, even illumination",
+          "electronics": "precise dimensions with comparison objects, port specs; shadowless, true-to-scale side view",
+          "food": "serving size, preparation steps, nutritional highlights; shadowless product front, clean white base",
+          "fashion": "size chart with body measurements, care instructions; flat garment, shadowless overhead view"
         },
         "examples": [
           "Premium {category} specification and ritual guide, luxury editorial. White background, subtle border. Top: {product} centered with dimension badge. Left: 4-step usage guide with decorative icons. Right: highlights with colored pills. Bottom: {data}. Decorative corner accents. Magazine-quality, 2000x2800px",
@@ -1043,7 +1043,7 @@ export default {
     },
     {
       "file": "14-multi-product.json",
-      "hash": "11b329a915656d7153685b7a535c0e99d482cbc5c12514f7750cb169e577358e",
+      "hash": "e48b760fcfada7b1be470da06ad80c6f0cb25653a73ede70938fb5d3736d6ec0",
       "upstreamNumber": 14,
       "data": {
         "id": "multi-product",
@@ -1103,10 +1103,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "complete routine (cleanser → toner → serum → cream), gift-ready",
-          "food": "product range, variety pack, flavor assortment",
-          "fashion": "outfit coordination pieces, colorway options",
-          "home": "collection of coordinating items"
+          "beauty": "complete routine (cleanser → toner → serum → cream), gift-ready; single softbox key light, uniform contact shadows",
+          "food": "product range, variety pack, flavor assortment; uniform diffused light, identical contact shadow per item",
+          "fashion": "outfit coordination pieces, colorway options; even high-key light, aligned shadows",
+          "home": "collection of coordinating items; soft diffused key light, triangular arrangement, consistent contact shadows"
         },
         "examples": [
           "Luxury {category} gift set on premium surface: {product_list}. Organized composition with product cards. Scattered: gold foil, pearls, dried flowers, velvet ribbon. Bottom left: set description. Bottom right: price with original crossed out. Soft directional lighting, premium photography, 8K",
@@ -1119,7 +1119,7 @@ export default {
     },
     {
       "file": "15-livestream.json",
-      "hash": "4b4d30db560857ad991888012888d56bc6a18365a6b4c2d80c4478e309dcf2b0",
+      "hash": "4d90babfb78a953211b4426de0e4e7682f027035c6f4ca9cbf90eada4a7cfbdb",
       "upstreamNumber": 15,
       "data": {
         "id": "livestream",
@@ -1180,10 +1180,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "host demonstrating application, showing texture, real-time swatching",
-          "fashion": "host wearing/showing clothing, fit demo, fabric close-up",
-          "food": "host tasting/preparing, showing freshness, unboxing",
-          "electronics": "host demonstrating features, hands-on product demo"
+          "beauty": "host demonstrating application, showing texture, real-time swatching; ring light catchlight, warm indoor fill",
+          "fashion": "host wearing/showing clothing, fit demo, fabric close-up; ring light plus ambient room light",
+          "food": "host tasting/preparing, showing freshness, unboxing; warm practical lighting, natural shadows",
+          "electronics": "host demonstrating features, hands-on product demo; ring light catchlight, screen glow fill"
         },
         "examples": [
           "Ultra-realistic Douyin livestream screenshot, phone screen capture. Host in casual {outfit}, minimal makeup, visible pores and skin texture, NOT retouched. Demonstrating {product}, showing details, other hand gesturing. Ring light natural shine, NOT plastic AI look. Background: real home setup - product shelf, whiteboard with prices, string lights, coffee mug. Phone UI: LIVE badge, viewer count, scrolling comments, product card with price, yellow buy button. Warm cast, slight noise, Kodak Portra 400 tone, NOT AI-generated look, 1080x1920px",
@@ -1196,7 +1196,7 @@ export default {
     },
     {
       "file": "16-try-on-virtual.json",
-      "hash": "fc48de1ca577bd78087ee03cde23316df664390254cac9694f29bc769f25c444",
+      "hash": "c93c9e930c5d632097ebec704cc1d16886f787339a1c2fa9c6f7fa0c92138b30",
       "upstreamNumber": 16,
       "data": {
         "id": "try-on-virtual",
@@ -1255,10 +1255,10 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "spa bathroom, vanity mirror, botanical elements, skincare ritual",
-          "fashion": "model wearing item in appropriate setting, natural styling",
-          "furniture": "product in complete room setting, complementary decor",
-          "electronics": "modern desk setup, in-use context, tech-forward"
+          "beauty": "spa bathroom, vanity mirror, botanical elements, skincare ritual; soft vanity light, natural contact shadow",
+          "fashion": "model wearing item in appropriate setting, natural styling; natural window light, ground contact shadow",
+          "furniture": "product in complete room setting, complementary decor; room-matched window light, realistic contact shadow",
+          "electronics": "modern desk setup, in-use context, tech-forward; ambient desk light, natural contact shadow"
         },
         "examples": [
           "Cinematic luxury {category} integration. High-end {interior} with {materials}. {product} prominently displayed. Morning sunlight through frosted glass, ethereal light rays. Fresh flowers, botanical elements. Product label visible, ingredient card beside it. Decorative: tray, pearls, gold foil. Color: {colors}. Cinematic depth, warm grading, premium, 8K, 1080x1620px",
@@ -1271,7 +1271,7 @@ export default {
     },
     {
       "file": "17-exploded-view.json",
-      "hash": "f2d68480d17eca6ccf31f87e68e1739e242ab0cd2499899aa195d808772e31b7",
+      "hash": "68b6c6183d69e51c48d1f00f917a6d9a7a31d77fde6440c8c8ff2238f0d506c3",
       "upstreamNumber": 17,
       "data": {
         "id": "exploded-view",
@@ -1342,12 +1342,12 @@ export default {
           }
         },
         "category_tips": {
-          "electronics": "highlight circuit boards, chips, battery modules with spec labels",
-          "audio": "show speaker drivers, diaphragms, ANC modules, battery size",
-          "wearables": "include sensors, display panel, waterproof seals, strap mechanism",
-          "home_appliance": "show motor, filter system, internal wiring, control board",
-          "phone_accessories": "highlight charging coils, magnet arrays, protective layers",
-          "camera": "show lens elements, sensor, image processor, stabilization unit"
+          "electronics": "highlight circuit boards, chips, battery modules with spec labels; parts float vertically, soft shadow beneath each part",
+          "audio": "show speaker drivers, diaphragms, ANC modules, battery size; floating alignment with equal spacing, soft per-part shadow",
+          "wearables": "include sensors, display panel, waterproof seals, strap mechanism; vertical exploded axis, soft contact shadows below",
+          "home_appliance": "show motor, filter system, internal wiring, control board; aligned floating components, soft ground shadow",
+          "phone_accessories": "highlight charging coils, magnet arrays, protective layers; vertical float, soft per-part shadow",
+          "camera": "show lens elements, sensor, image processor, stabilization unit; aligned lens stack float, soft shadow beneath"
         },
         "examples": [
           "Product exploded view. {product} disassembled into 5 components floating in mid-air with spacing, arranged vertically. Clean light gray background. Soft shadows beneath each part. Technical illustration style, 8K, no text",
@@ -1359,7 +1359,7 @@ export default {
     },
     {
       "file": "18-ghost-mannequin.json",
-      "hash": "8a1bdb79e27a784b2d7f6dab2f01898a25017688953378c57c3e450ae1b17590",
+      "hash": "fc594c93c11ca79d91a853f8b13209105086e9bb1d834c39db8394c896c6ed7f",
       "upstreamNumber": 18,
       "data": {
         "id": "ghost-mannequin",
@@ -1425,12 +1425,12 @@ export default {
           }
         },
         "category_tips": {
-          "shirts": "collar standing naturally, top buttons detail, cuff visibility",
-          "dresses": "natural waist cinch, skirt drape showing fabric weight, back zipper detail",
-          "coats": "architectural shoulder structure, fabric texture visible, button and pocket details",
-          "knitwear": "visible knit pattern and texture, natural stretch around body contours",
-          "tshirts": "casual relaxed drape, crew or v-neck sitting naturally, sleeve length proportion",
-          "activewear": "compression fit showing body contour, moisture-wicking fabric texture, logo placement"
+          "shirts": "collar standing naturally, top buttons detail, cuff visibility; soft studio light, soft contact shadow",
+          "dresses": "natural waist cinch, skirt drape showing fabric weight, back zipper detail; soft wraparound light, contact shadow",
+          "coats": "architectural shoulder structure, fabric texture visible, button and pocket details; raking light for texture, soft contact shadow",
+          "knitwear": "visible knit pattern and texture, natural stretch around body contours; soft diffused light, gentle contact shadow",
+          "tshirts": "casual relaxed drape, crew or v-neck sitting naturally, sleeve length proportion; even softbox light, minimal contact shadow",
+          "activewear": "compression fit showing body contour, moisture-wicking fabric texture, logo placement; soft directional light, contact shadow"
         },
         "examples": [
           "Ghost mannequin photography. {product} on invisible mannequin, natural body contours visible. Fabric drapes naturally showing material weight. Pure white background. Soft studio lighting, 8K, fashion e-commerce standard",
@@ -1442,7 +1442,7 @@ export default {
     },
     {
       "file": "19-multi-angle-grid.json",
-      "hash": "3d0a3491181b18e88d277e10b77e124c559d0ccec294a5cf69416b30bbf4e4c9",
+      "hash": "2988da3dd868a9b62bd90d54c2b1a3b6c5db15dda8d1104a98ea53f6f4ae8f15",
       "upstreamNumber": 19,
       "data": {
         "id": "multi-angle-grid",
@@ -1513,12 +1513,12 @@ export default {
           }
         },
         "category_tips": {
-          "beauty": "show bottle angle, cap detail, texture close-up, and open product",
-          "electronics": "show front face, side ports, back panel, and included accessories",
-          "fashion": "show front view, back view, detail close-up, and fabric texture",
-          "food": "show packaging front, back nutrition, open product, and serving suggestion",
-          "home": "show full product, detail angle, material texture, and in-context shot",
-          "sports": "show product front, side profile, sole/bottom, and action usage shot"
+          "beauty": "show bottle angle, cap detail, texture close-up, and open product; identical lighting and shadow in all four cells",
+          "electronics": "show front face, side ports, back panel, and included accessories; uniform studio light per cell, consistent contact shadow",
+          "fashion": "show front view, back view, detail close-up, and fabric texture; identical key light direction across grid",
+          "food": "show packaging front, back nutrition, open product, and serving suggestion; uniform light, consistent shadows",
+          "home": "show full product, detail angle, material texture, and in-context shot; consistent lighting across cells",
+          "sports": "show product front, side profile, sole/bottom, and action usage shot; uniform studio cells, consistent shadow direction"
         },
         "examples": [
           "2x2 product grid. {product} shown from 4 angles: front, side, back, top-down. Clean white background per cell. Thin borders. Uniform studio lighting, 8K, 2000x2000px",
@@ -1530,7 +1530,7 @@ export default {
     },
     {
       "file": "20-magazine-editorial.json",
-      "hash": "ac2d545a6beb60b9f8a2e308bb82ff3fd34e1e4cbd737cc3a6bc9f24154d85bd",
+      "hash": "7a1769a510df17b8779c6c6571d87df9e19e23af7f696cd499811a67c5f50601",
       "upstreamNumber": 20,
       "data": {
         "id": "magazine-editorial",
@@ -1602,12 +1602,12 @@ export default {
           }
         },
         "category_tips": {
-          "skincare": "dewy skin, product held at chin level, beauty lighting",
-          "fragrance": "atmospheric smoke, contemplative mood, bottle prominent",
-          "fashion": "confident pose, outfit fully visible, dramatic lighting",
-          "jewelry": "close-up on hands/neck, editorial styling, luxury backdrop",
-          "haircare": "hair as hero element, movement and texture, beauty lighting",
-          "makeup": "bold lip or eye focus, product in hand, editorial beauty"
+          "skincare": "dewy skin, product held at chin level, beauty lighting; butterfly or clamshell beauty lighting",
+          "fragrance": "atmospheric smoke, contemplative mood, bottle prominent; backlighting through smoke, rim light",
+          "fashion": "confident pose, outfit fully visible, dramatic lighting; Rembrandt or split editorial lighting, long cast shadow",
+          "jewelry": "close-up on hands/neck, editorial styling, luxury backdrop; diffused tent key light plus sparkle accent, dark-field reflection",
+          "haircare": "hair as hero element, movement and texture, beauty lighting; rim light for hair separation, soft fill",
+          "makeup": "bold lip or eye focus, product in hand, editorial beauty; clamshell beauty lighting, soft falloff"
         },
         "examples": [
           "Beauty magazine cover. Woman with glowing skin holding {product} near face. Beauty dish lighting, soft background. Top area for masthead. Vogue-quality editorial, 8K, 1080x1350px",
@@ -1619,7 +1619,7 @@ export default {
     },
     {
       "file": "21-seasonal-campaign.json",
-      "hash": "7a17dc8cc64913f2566e1f23dfb896ffe6f5f8fb566dd0645dd38a034d35e856",
+      "hash": "8279b58260965cf3b8ab2752d1e7ed462c47ec5ad920a81a61f444832a9992ee",
       "upstreamNumber": 21,
       "data": {
         "id": "seasonal-campaign",
@@ -1686,12 +1686,12 @@ export default {
           }
         },
         "category_tips": {
-          "skincare": "spring=blossoms+dew, summer=sun+kisses, autumn=cozy+cream, winter=frost+glow",
-          "fragrance": "each season with matching botanical elements and color palette",
-          "fashion": "season-appropriate styling visible in each quadrant",
-          "food": "seasonal ingredients and color palette matching product",
-          "home": "seasonal decor elements and lighting mood",
-          "candles": "seasonal scents visualized through corresponding natural elements"
+          "skincare": "spring=blossoms+dew, summer=sun+kisses, autumn=cozy+cream, winter=frost+glow; season-matched light temperature, consistent shadow style per quadrant",
+          "fragrance": "each season with matching botanical elements and color palette; consistent rim light across quadrants",
+          "fashion": "season-appropriate styling visible in each quadrant; consistent key light direction, natural contact shadow",
+          "food": "seasonal ingredients and color palette matching product; matched light warmth per season, soft contact shadow",
+          "home": "seasonal decor elements and lighting mood; consistent window light direction across quadrants",
+          "candles": "seasonal scents visualized through corresponding natural elements; warm flame practical light, low-key ambience"
         },
         "examples": [
           "2x2 seasonal grid. Same {product} in four settings: Spring with cherry blossoms, Summer with citrus and sunshine, Autumn with maple leaves, Winter with pine and snow. Consistent product angle, 8K, 2000x2000px",
@@ -1703,7 +1703,7 @@ export default {
     },
     {
       "file": "22-luxury-atmospherics.json",
-      "hash": "e36ca1a4c7eff4b9f530dc33dc1ea457362b02fd98789848e1a619083868576d",
+      "hash": "dc17516772ce184aae09a269f8118a0d44bebb5a2b5a4d6c8dafb6054f108ca2",
       "upstreamNumber": 22,
       "data": {
         "id": "luxury-atmospherics",
@@ -1773,12 +1773,12 @@ export default {
           }
         },
         "category_tips": {
-          "fragrance": "multi-layer smoke + matching botanical elements, amber liquid visible inside",
-          "skincare": "ethereal glow around product, subtle condensation, dreamy quality",
-          "jewelry": "diamond-like light bokeh, dark background, sparkle and reflection focus",
-          "wine": "rich amber or ruby liquid, smoke wisps matching color, candlelight warmth",
-          "chocolate": "warm golden particles, cocoa powder dust, rich dark tones",
-          "watch": "sharp metallic reflections, precise time visible, ice-blue or golden accent"
+          "fragrance": "multi-layer smoke + matching botanical elements, amber liquid visible inside; backlighting through liquid, rim light, reflection on polished surface",
+          "skincare": "ethereal glow around product, subtle condensation, dreamy quality; backlight glow, narrow contact shadow on dark surface",
+          "jewelry": "diamond-like light bokeh, dark background, sparkle and reflection focus; diffused tent plus focused sparkle light, reflection shadow",
+          "wine": "rich amber or ruby liquid, smoke wisps matching color, candlelight warmth; backlighting through glass, candlelight practical, surface reflection",
+          "chocolate": "warm golden particles, cocoa powder dust, rich dark tones; low-key side light, raking light for texture",
+          "watch": "sharp metallic reflections, precise time visible, ice-blue or golden accent; diffused tent with accent rim, reflection on dark polished surface"
         },
         "examples": [
           "Luxury product photography with atmospheric effects. {product} on polished dark surface, surrounded by wisps of purple-blue smoke. Dramatic rim light. Deep black background. 8K, cinematic quality",
@@ -1790,7 +1790,7 @@ export default {
     },
     {
       "file": "23-device-mockup.json",
-      "hash": "cc0b3f1ee0d80ec7ce00a0ded0ed44cf90657e2ea12c1cd0a23a965a39660a6d",
+      "hash": "484668b1f86a8d74ddd4e5db191d3ee2d659570e208771d2337c6b19721f27e5",
       "upstreamNumber": 23,
       "data": {
         "id": "device-mockup",
@@ -1860,12 +1860,12 @@ export default {
           }
         },
         "category_tips": {
-          "saas": "show dashboard with charts, KPI cards, data visualizations",
-          "mobile_app": "show app interface on phone, notification visible, clean UI",
-          "ecommerce_platform": "show store admin dashboard with product listings and analytics",
-          "fintech": "show financial dashboard with graphs, portfolio summary",
-          "health_app": "show workout tracker, health metrics, progress charts",
-          "ai_product": "show chat interface, AI responses, modern dark or light theme"
+          "saas": "show dashboard with charts, KPI cards, data visualizations; screen glow as key light, minimal contact shadow",
+          "mobile_app": "show app interface on phone, notification visible, clean UI; screen glow, soft reflection on screen glass",
+          "ecommerce_platform": "show store admin dashboard with product listings and analytics; screen glow key, subtle device contact shadow",
+          "fintech": "show financial dashboard with graphs, portfolio summary; screen glow, dark-theme rim highlight",
+          "health_app": "show workout tracker, health metrics, progress charts; screen glow, soft ambient fill",
+          "ai_product": "show chat interface, AI responses, modern dark or light theme; screen glow with glow accents, low-key surround"
         },
         "examples": [
           "Product mockup on laptop. Silver laptop on white desk, screen showing modern dashboard with charts. Coffee cup and small plant nearby. Natural window light. Clean product photography, 8K",
@@ -1877,7 +1877,7 @@ export default {
     },
     {
       "file": "24-storefront.json",
-      "hash": "9c747c7ee6b7fd04f216946b0f57b7ffe975fa37dd997b7d1581290431c20f46",
+      "hash": "a8a8040e7154d96d0e1ab559bf87eafa3d9a4b034e21e0c4f38e7578652b1d5e",
       "upstreamNumber": 24,
       "data": {
         "id": "storefront",
@@ -1946,12 +1946,12 @@ export default {
           }
         },
         "category_tips": {
-          "coffee_shop": "espresso machine visible, warm wood tones, latte art, pastry display",
-          "beauty_store": "illuminated niches, marble counter, product wall, consultation area",
-          "fashion_boutique": "minimalist racks, curated display, premium flooring, mirror accents",
-          "restaurant": "table setting, kitchen pass visible, ambient lighting, menu display",
-          "gym_studio": "modern equipment, branded wall, natural light, motivational signage",
-          "pop_up": "temporary creative installation, bold graphics, unique display fixtures"
+          "coffee_shop": "espresso machine visible, warm wood tones, latte art, pastry display; warm practical lighting, natural cast shadows",
+          "beauty_store": "illuminated niches, marble counter, product wall, consultation area; backlit niches, reflection on marble",
+          "fashion_boutique": "minimalist racks, curated display, premium flooring, mirror accents; soft track lighting, gentle contact shadows",
+          "restaurant": "table setting, kitchen pass visible, ambient lighting, menu display; warm pendant practicals, natural shadows",
+          "gym_studio": "modern equipment, branded wall, natural light, motivational signage; daylight plus practical fill, long cast shadows",
+          "pop_up": "temporary creative installation, bold graphics, unique display fixtures; even high-key fill, clean shadows"
         },
         "examples": [
           "Storefront photography. Modern {business} with glass windows showing warm interior. Entrance with potted plants. Golden hour light. Architectural photography, 8K",
@@ -1963,7 +1963,7 @@ export default {
     },
     {
       "file": "25-sports-campaign.json",
-      "hash": "5b35105c6d142a614fbcf781d5648c2e308ac71d4c758452483916bd302dad68",
+      "hash": "44019d486c34b4d3d9ada5e6f404752baca1e8a60ea79fbdda16905e16f9aee9",
       "upstreamNumber": 25,
       "data": {
         "id": "sports-campaign",
@@ -2034,12 +2034,12 @@ export default {
           }
         },
         "category_tips": {
-          "running_shoes": "dynamic forward motion, speed lines, track or road surface context",
-          "basketball": "mid-dunk or crossover pose, stadium lighting, court texture",
-          "fitness_equipment": "athlete using product, sweat detail, gym environment",
-          "sportswear": "compression fit visible, fabric technology highlighted, movement pose",
-          "protein_supplements": "product with athlete post-workout, muscular definition, energy mood",
-          "sports_drink": "splash effects, condensation, vibrant energy colors, hydration theme"
+          "running_shoes": "dynamic forward motion, speed lines, track or road surface context; hard side light, long directional cast shadow",
+          "basketball": "mid-dunk or crossover pose, stadium lighting, court texture; dramatic stadium key plus rim, strong cast shadow",
+          "fitness_equipment": "athlete using product, sweat detail, gym environment; high-contrast side light, sweat highlights",
+          "sportswear": "compression fit visible, fabric technology highlighted, movement pose; rim light for silhouette, directional cast shadow",
+          "protein_supplements": "product with athlete post-workout, muscular definition, energy mood; dramatic side light, container contact shadow",
+          "sports_drink": "splash effects, condensation, vibrant energy colors, hydration theme; backlighting through liquid, condensation highlights, cast shadow"
         },
         "examples": [
           "Sports advertising photo. {product} placed diagonally on reflective dark surface. Dramatic side lighting, speed lines around product. Bold headline text. Dynamic and energetic, 8K, 1080x1350px",

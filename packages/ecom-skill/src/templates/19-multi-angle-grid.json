@@ -25,12 +25,12 @@
     "comparison": { "description": "对比网格", "overrides": { "variation": "before/after or product vs competitor in side-by-side grid" } }
   },
   "category_tips": {
-    "beauty": "show bottle angle, cap detail, texture close-up, and open product",
-    "electronics": "show front face, side ports, back panel, and included accessories",
-    "fashion": "show front view, back view, detail close-up, and fabric texture",
-    "food": "show packaging front, back nutrition, open product, and serving suggestion",
-    "home": "show full product, detail angle, material texture, and in-context shot",
-    "sports": "show product front, side profile, sole/bottom, and action usage shot"
+    "beauty": "show bottle angle, cap detail, texture close-up, and open product; identical lighting and shadow in all four cells",
+    "electronics": "show front face, side ports, back panel, and included accessories; uniform studio light per cell, consistent contact shadow",
+    "fashion": "show front view, back view, detail close-up, and fabric texture; identical key light direction across grid",
+    "food": "show packaging front, back nutrition, open product, and serving suggestion; uniform light, consistent shadows",
+    "home": "show full product, detail angle, material texture, and in-context shot; consistent lighting across cells",
+    "sports": "show product front, side profile, sole/bottom, and action usage shot; uniform studio cells, consistent shadow direction"
   },
   "examples": [
     "2x2 product grid. {product} shown from 4 angles: front, side, back, top-down. Clean white background per cell. Thin borders. Uniform studio lighting, 8K, 2000x2000px",

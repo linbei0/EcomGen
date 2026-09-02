@@ -33,10 +33,10 @@
     }
   },
   "category_tips": {
-    "beauty": "ingredient breakdown with %, before/after data, dermatologist badges",
-    "electronics": "spec comparison, performance metrics, compatibility icons",
-    "food": "nutritional visualization, ingredient sourcing, recipe flow",
-    "fashion": "size guide, material composition, care instructions"
+    "beauty": "ingredient breakdown with %, before/after data, dermatologist badges; shadowless cutout product, high-key lighting",
+    "electronics": "spec comparison, performance metrics, compatibility icons; shadowless cutout, subtle contact shadow only",
+    "food": "nutritional visualization, ingredient sourcing, recipe flow; shadowless cutout, clean high-key light",
+    "fashion": "size guide, material composition, care instructions; shadowless garment cutout, even illumination"
   },
   "examples": [
     "Complex Amazon A+ Content module. Top banner with brand and tagline. Main: 4 quadrants each showing product detail with labeled feature: (1) {f1}, (2) {f2}, (3) {f3}, (4) {f4}. Below: comparison table. Bottom: spec chart and certification badges. {color} palette. Mobile-first, professional e-commerce, 2000x2500px",

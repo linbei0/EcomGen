@@ -24,12 +24,12 @@
     "ice-crystal": { "description": "冰晶冷冽", "overrides": { "atmosphere": "floating ice crystals, frost patterns, diamond-like light refractions", "lighting": "cool platinum spotlight, ice-blue ambient" } }
   },
   "category_tips": {
-    "fragrance": "multi-layer smoke + matching botanical elements, amber liquid visible inside",
-    "skincare": "ethereal glow around product, subtle condensation, dreamy quality",
-    "jewelry": "diamond-like light bokeh, dark background, sparkle and reflection focus",
-    "wine": "rich amber or ruby liquid, smoke wisps matching color, candlelight warmth",
-    "chocolate": "warm golden particles, cocoa powder dust, rich dark tones",
-    "watch": "sharp metallic reflections, precise time visible, ice-blue or golden accent"
+    "fragrance": "multi-layer smoke + matching botanical elements, amber liquid visible inside; backlighting through liquid, rim light, reflection on polished surface",
+    "skincare": "ethereal glow around product, subtle condensation, dreamy quality; backlight glow, narrow contact shadow on dark surface",
+    "jewelry": "diamond-like light bokeh, dark background, sparkle and reflection focus; diffused tent plus focused sparkle light, reflection shadow",
+    "wine": "rich amber or ruby liquid, smoke wisps matching color, candlelight warmth; backlighting through glass, candlelight practical, surface reflection",
+    "chocolate": "warm golden particles, cocoa powder dust, rich dark tones; low-key side light, raking light for texture",
+    "watch": "sharp metallic reflections, precise time visible, ice-blue or golden accent; diffused tent with accent rim, reflection on dark polished surface"
   },
   "examples": [
     "Luxury product photography with atmospheric effects. {product} on polished dark surface, surrounded by wisps of purple-blue smoke. Dramatic rim light. Deep black background. 8K, cinematic quality",
