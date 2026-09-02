@@ -39,19 +39,27 @@ Pi 不启用文件、Shell、浏览器或任意 URL 抓取。联网仅通过显�
 {
   "assetType": "hero-image",
   "displayName": "通勤杯质感首图",
+  "shotRole": "HERO",
   "templateVariant": "luxury",
   "mode": "PIXEL_PROTECTED",
-  "promptInstruction": "Create a complete e-commerce hero image ...",
+  "promptInstruction": "Preserve the exact product identity: ... Create a complete e-commerce hero image ...",
   "factClaims": ["304 stainless steel body"],
   "riskFlags": []
 }
 ```
+
+## ShotRole 语义与去重
+
+每个分镜必须声明恰好一个 `shotRole`，描述它的转化任务：`HERO`（首图截流）、`PAIN_POINT`（痛点可视化）、`COMPARISON`（对比）、`SCENE`（使用场景）、`DETAIL`（细节特写）、`TRUST`（信任背书）、`VARIANT`（规格变体）、`CTA`（行动引导）。角色沿转化叙事分配，禁止堆叠重复任务。
+
+去重规则：两个分镜共享同一 `shotRole` 时必须使用不同模板；同一 `assetType` 的分镜不得共享同一 `shotRole`，即 `shotRole × assetType` 组合必须唯一。违反时校验失败并回传模型修复一轮。
 
 校验器会拒绝：
 
 - 空 Prompt；
 - 未知模板或未声明的模板变体；
 - 手动模式下漏项、增项或替换图片类型；
+- 非法 `shotRole` 或重复的 `shotRole × assetType` 组合；
 - 重复或泛化的显示名称；
 - `Upstream template`、`Template fields`、`promptContract` 等内部模板元数据。
 

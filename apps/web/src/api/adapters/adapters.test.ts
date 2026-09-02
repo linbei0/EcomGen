@@ -112,6 +112,7 @@ describe("adapters", () => {
           id: "item-1",
           assetType: "hero-image",
           displayName: "白底/纯色底产品主图",
+          shotRole: "HERO",
           candidateCount: 2,
           mode: "CREATIVE",
           status: "DRAFT",
@@ -119,14 +120,27 @@ describe("adapters", () => {
           factClaims: ["续航 8 小时"],
           riskFlags: ["angle"],
         },
+        {
+          id: "item-2",
+          assetType: "scene-image",
+          displayName: "使用场景",
+          shotRole: "NOT_A_ROLE",
+          candidateCount: 1,
+          mode: "CREATIVE",
+          status: "DRAFT",
+          promptInstruction: "使用场景",
+        },
       ],
     });
     expect(bundle.storyboard?.version).toBe(2);
-    expect(bundle.items).toHaveLength(1);
+    expect(bundle.items).toHaveLength(2);
     expect(bundle.storyboard?.items?.[0]?.displayName).toBe("白底/纯色底产品主图");
     expect(bundle.items[0]?.candidateCount).toBe(2);
     expect(bundle.items[0]?.factClaims).toEqual(["续航 8 小时"]);
     expect(bundle.items[0]?.riskFlags).toEqual(["angle"]);
+    expect(bundle.items[0]?.shotRole).toBe("HERO");
+    // 非法角色值不透传给 UI，归一为 null
+    expect(bundle.items[1]?.shotRole).toBeNull();
   });
 
   it("导出记录优先 downloadUrl，否则回退 files 路径", () => {

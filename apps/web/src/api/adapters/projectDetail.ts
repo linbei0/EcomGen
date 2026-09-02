@@ -13,6 +13,7 @@ export type ImageAspectRatio = components["schemas"]["ImageAspectRatio"];
 export type PlanningMode = components["schemas"]["PlanningMode"];
 export type Storyboard = components["schemas"]["Storyboard"];
 export type StoryboardItem = components["schemas"]["StoryboardItem"];
+export type StoryboardShotRole = NonNullable<StoryboardItem["shotRole"]>;
 export type Output = components["schemas"]["Output"];
 export type Job = components["schemas"]["Job"];
 export type CreateProjectInput = components["schemas"]["CreateProjectInput"];
@@ -49,6 +50,7 @@ const TARGET_MARKETS = new Set<Exclude<TargetMarket, null>>([
   "GERMANY", "FRANCE", "ITALY", "SPAIN", "JAPAN", "SOUTH_KOREA",
 ]);
 const ASPECTS = new Set<ImageAspectRatio>(["AUTO", "1:1", "3:4", "4:3", "16:9"]);
+const SHOT_ROLES = new Set<StoryboardShotRole>(["HERO", "PAIN_POINT", "COMPARISON", "SCENE", "DETAIL", "TRUST", "VARIANT", "CTA"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -125,16 +127,16 @@ function adaptOutput(raw: unknown): Output | null {
   if (!id || !storyboardItemId || !jobId || !createdAt) return null;
   const snapshot = isRecord(raw.generationSnapshot)
     ? {
-        resolution: RESOLUTIONS.has(raw.generationSnapshot.resolution as ImageResolution)
-          ? (raw.generationSnapshot.resolution as ImageResolution)
-          : undefined,
-        aspectRatio: ASPECTS.has(raw.generationSnapshot.aspectRatio as ImageAspectRatio)
-          ? (raw.generationSnapshot.aspectRatio as ImageAspectRatio)
-          : undefined,
-        size: asString(raw.generationSnapshot.size),
-        candidateIndex: asNumber(raw.generationSnapshot.candidateIndex),
-        revision: asString(raw.generationSnapshot.revision),
-      }
+      resolution: RESOLUTIONS.has(raw.generationSnapshot.resolution as ImageResolution)
+        ? (raw.generationSnapshot.resolution as ImageResolution)
+        : undefined,
+      aspectRatio: ASPECTS.has(raw.generationSnapshot.aspectRatio as ImageAspectRatio)
+        ? (raw.generationSnapshot.aspectRatio as ImageAspectRatio)
+        : undefined,
+      size: asString(raw.generationSnapshot.size),
+      candidateIndex: asNumber(raw.generationSnapshot.candidateIndex),
+      revision: asString(raw.generationSnapshot.revision),
+    }
     : null;
   return {
     id,
@@ -265,6 +267,7 @@ export function adaptStoryboardItem(raw: unknown): StoryboardItem | null {
     id,
     assetType,
     displayName: asString(raw.displayName) ?? assetType,
+    shotRole: SHOT_ROLES.has(raw.shotRole as StoryboardShotRole) ? raw.shotRole as StoryboardShotRole : null,
     templateVariant: asString(raw.templateVariant) ?? null,
     candidateCount: Math.min(4, Math.max(1, candidateCount)),
     imageProviderId: asString(raw.imageProviderId),
@@ -305,8 +308,8 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
   if (defaultMode !== "CREATIVE" && defaultMode !== "PIXEL_PROTECTED") return null;
   const brand = isRecord(raw.brandGuidelines)
     ? Object.fromEntries(
-        Object.entries(raw.brandGuidelines).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
-      )
+      Object.entries(raw.brandGuidelines).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+    )
     : undefined;
   const resolution = asString(raw.imageResolution);
   const aspect = asString(raw.imageAspectRatio);

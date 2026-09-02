@@ -50,6 +50,10 @@ flowchart LR
 
 `assetType` 是不可变的内部模板 ID，用于查找模板和默认尺寸；它不应被写入 Prompt。`displayName` 是给用户看的中文场景名称，也不应替代 Prompt。
 
+`shotRole` 是规划时分配的视觉任务语义（HERO / PAIN_POINT / COMPARISON / SCENE / DETAIL / TRUST / VARIANT / CTA），规划后不可变。每个分镜的 `shotRole × assetType` 组合必须唯一，防止套图退化为多张同质图。历史数据该字段为 null，由 UI 按“未标注”处理。
+
+`promptInstruction` 由规划 Agent 生成，必须包含保持商品身份（形状/轮廓/颜色/材质/logo 位置/比例）的明确指令；这是 Agent 提示词层面的要求，不做逐字校验或运行时注入。
+
 ### 生图阶段
 
 Worker 执行以下顺序：
@@ -71,8 +75,9 @@ Worker 必须拒绝包含 `Upstream template`、`Template fields` 等内部模�
 | 字段 | 含义 | 约束 |
 | --- | --- | --- |
 | `assetType` | 模板稳定 ID | 规划后不可修改；未知 ID 必须失败 |
+| `shotRole` | 规划时分配的视觉任务语义 | 规划后不可变；`shotRole × assetType` 组合必须唯一；历史数据为 null |
 | `templateVariant` | 模板已声明的变体 | 只能使用模板目录中存在的 key |
-| `promptInstruction` | 用户可编辑的最终 Prompt | 直接发送给生图模型（Worker 会按实际图片顺序前置角色说明）；不能包含内部模板元数据 |
+| `promptInstruction` | 用户可编辑的最终 Prompt | 必须包含商品身份保真指令（Agent 提示词层要求）；直接发送给生图模型（Worker 会按实际图片顺序前置角色说明）；不能包含内部模板元数据 |
 | `compiledPrompt` | 本次实际发送的 Prompt 快照 | 等于最终 Prompt 前置图片角色说明后的完整文本；未选图片素材时，普通生成等于 `promptInstruction`，revision 生成等于 Agent 改写后的完整 Prompt |
 | `referencedAssets` | 分镜建议使用的素材 ID | 必须属于当前项目；商品事实图优先于风格参考图 |
 | `factClaims` | Agent 认为可依据的事实 | 只能来自项目 `verifiedFacts`，不能凭空补充 |

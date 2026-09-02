@@ -23,6 +23,7 @@ export const STORYBOARD_OUTPUT_SCHEMA: StructuredOutputSchema = {
           properties: {
             assetType: { type: "string" },
             displayName: { type: "string" },
+            shotRole: { type: "string", enum: ["HERO", "PAIN_POINT", "COMPARISON", "SCENE", "DETAIL", "TRUST", "VARIANT", "CTA"] },
             templateVariant: { anyOf: [{ type: "string" }, { type: "null" }] },
             candidateCount: { type: "integer", minimum: 1 },
             referencedAssets: { type: "array", items: { type: "string" } },
@@ -32,7 +33,7 @@ export const STORYBOARD_OUTPUT_SCHEMA: StructuredOutputSchema = {
             riskFlags: { type: "array", items: { type: "string" } },
             sortOrder: { type: "integer", minimum: 0 },
           },
-          required: ["assetType", "displayName", "templateVariant", "candidateCount", "referencedAssets", "mode", "promptInstruction", "factClaims", "riskFlags", "sortOrder"],
+          required: ["assetType", "displayName", "shotRole", "templateVariant", "candidateCount", "referencedAssets", "mode", "promptInstruction", "factClaims", "riskFlags", "sortOrder"],
         },
       },
     },

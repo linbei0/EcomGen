@@ -30,6 +30,17 @@ components:
       enum:
         - CREATIVE
         - PIXEL_PROTECTED
+    StoryboardShotRole:
+      type: string
+      enum:
+        - HERO
+        - PAIN_POINT
+        - COMPARISON
+        - SCENE
+        - DETAIL
+        - TRUST
+        - VARIANT
+        - CTA
     AssetRole:
       type: string
       enum:
@@ -1430,6 +1441,11 @@ components:
           type: string
         displayName:
           type: string
+        shotRole:
+          description: Visual-task semantics assigned during planning; immutable. Null on items planned before this field existed.
+          anyOf:
+            - $ref: "#/components/schemas/StoryboardShotRole"
+            - type: "null"
         templateVariant:
           anyOf:
             - type: string
@@ -1465,7 +1481,7 @@ components:
             - GENERATING
             - GENERATED
         promptInstruction:
-          description: Final image-generation prompt produced by Pi Agent. Worker prefixes selected image roles in their actual request order before sending it to the image model.
+          description: Final image-generation prompt produced by Pi Agent. Must instruct the image model to preserve exact product identity. Worker prefixes selected image roles in their actual request order before sending it to the image model.
           type: string
         factClaims:
           type: array
@@ -1645,7 +1661,7 @@ components:
             - CREATIVE
             - PIXEL_PROTECTED
         promptInstruction:
-          description: Editable final image-generation prompt. Worker prefixes selected image roles in their actual request order before sending it to the image model.
+          description: Editable final image-generation prompt. Must keep instructing the image model to preserve exact product identity. Worker prefixes selected image roles in their actual request order before sending it to the image model.
           maxLength: 4000
           type: string
     AiPlanningInput:

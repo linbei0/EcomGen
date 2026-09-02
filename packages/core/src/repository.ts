@@ -11,6 +11,7 @@ import type {
   ReasoningProtocolProfile,
   SearchSourceKind,
   StoryboardMode,
+  StoryboardShotRole,
   TargetMarket
 } from "@ecomgen/contracts";
 import type { EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
@@ -96,6 +97,8 @@ export interface StoryboardItemRecord {
   storyboardVersion: number;
   assetType: string;
   displayName: string;
+  // 规划语义、不可变；历史行无值时为 null，由 UI 按"未标注"处理
+  shotRole: StoryboardShotRole | null;
   templateVariant: string | null;
   candidateCount: number;
   imageProviderId: string | null;
@@ -446,10 +449,11 @@ export class EcomRepository {
       this.db.prepare(`INSERT INTO storyboards (project_id,version,status,campaign_style_lock,created_at,updated_at) VALUES (@projectId,@version,@status,@campaignStyleLock,@createdAt,@updatedAt)
         ON CONFLICT(project_id) DO UPDATE SET version=excluded.version,status=excluded.status,campaign_style_lock=excluded.campaign_style_lock,updated_at=excluded.updated_at`).run(storyboard);
       const sortOffset = Number((this.db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS value FROM storyboard_items WHERE project_id=?").get(projectId) as { value: number }).value) + 1;
-      const insert = this.db.prepare(`INSERT INTO storyboard_items (id,project_id,storyboard_version,asset_type,display_name,template_variant,candidate_count,image_provider_id,image_model_id,image_resolution,image_aspect_ratio,referenced_assets_json,mode,status,prompt_instruction,compiled_prompt,fact_claims_json,risk_flags_json,sort_order,created_at,updated_at)
-        VALUES (@id,@projectId,@storyboardVersion,@assetType,@displayName,@templateVariant,@candidateCount,@imageProviderId,@imageModelId,@imageResolution,@imageAspectRatio,@referencedAssets,@mode,@status,@promptInstruction,@compiledPrompt,@factClaims,@riskFlags,@sortOrder,@createdAt,@updatedAt)`);
+      const insert = this.db.prepare(`INSERT INTO storyboard_items (id,project_id,storyboard_version,asset_type,display_name,shot_role,template_variant,candidate_count,image_provider_id,image_model_id,image_resolution,image_aspect_ratio,referenced_assets_json,mode,status,prompt_instruction,compiled_prompt,fact_claims_json,risk_flags_json,sort_order,created_at,updated_at)
+        VALUES (@id,@projectId,@storyboardVersion,@assetType,@displayName,@shotRole,@templateVariant,@candidateCount,@imageProviderId,@imageModelId,@imageResolution,@imageAspectRatio,@referencedAssets,@mode,@status,@promptInstruction,@compiledPrompt,@factClaims,@riskFlags,@sortOrder,@createdAt,@updatedAt)`);
       items.forEach((item, index) => insert.run({
         ...item,
+        shotRole: item.shotRole ?? null,
         imageProviderId: item.imageProviderId ?? project.imageProviderId,
         imageModelId: item.imageModelId ?? project.imageModelId,
         imageResolution: item.imageResolution ?? project.imageResolution,
@@ -693,6 +697,7 @@ function mapStoryboardItem(row: Row): StoryboardItemRecord {
     storyboardVersion: Number(row.storyboard_version),
     assetType: String(row.asset_type),
     displayName: String(row.display_name ?? row.asset_type),
+    shotRole: row.shot_role ? (String(row.shot_role) as StoryboardShotRole) : null,
     templateVariant: row.template_variant ? String(row.template_variant) : null,
     candidateCount: Number(row.candidate_count ?? 1),
     imageProviderId: row.image_provider_id ? String(row.image_provider_id) : null,

@@ -5,6 +5,8 @@ export const PLATFORM_TARGETS = ["TAOBAO", "JD", "PDD", "DOUYIN", "AMAZON", "SHO
 export const PlatformTarget = Type.Enum({ TAOBAO: "TAOBAO", JD: "JD", PDD: "PDD", DOUYIN: "DOUYIN", AMAZON: "AMAZON", SHOPIFY: "SHOPIFY" }, { $id: "#/components/schemas/PlatformTarget" });
 export const TargetMarket = Type.Enum({ CHINA_MAINLAND: "CHINA_MAINLAND", HONG_KONG: "HONG_KONG", MACAU: "MACAU", TAIWAN: "TAIWAN", UNITED_STATES: "UNITED_STATES", UNITED_KINGDOM: "UNITED_KINGDOM", GERMANY: "GERMANY", FRANCE: "FRANCE", ITALY: "ITALY", SPAIN: "SPAIN", JAPAN: "JAPAN", SOUTH_KOREA: "SOUTH_KOREA" }, { $id: "#/components/schemas/TargetMarket" });
 export const StoryboardMode = Type.Enum({ CREATIVE: "CREATIVE", PIXEL_PROTECTED: "PIXEL_PROTECTED" }, { $id: "#/components/schemas/StoryboardMode" });
+/** 分镜的视觉任务语义；同一角色在套图中重复时必须使用不同模板，防止信息重复。 */
+export const StoryboardShotRole = Type.Enum({ HERO: "HERO", PAIN_POINT: "PAIN_POINT", COMPARISON: "COMPARISON", SCENE: "SCENE", DETAIL: "DETAIL", TRUST: "TRUST", VARIANT: "VARIANT", CTA: "CTA" }, { $id: "#/components/schemas/StoryboardShotRole" });
 export const AssetRole = Type.Enum({ PRODUCT_TRUTH: "PRODUCT_TRUTH", PACKAGING: "PACKAGING", STYLE_REFERENCE: "STYLE_REFERENCE", LAYOUT_REFERENCE: "LAYOUT_REFERENCE" }, { $id: "#/components/schemas/AssetRole" });
 /** 用户可见入口：产品图。内部仍写入 PRODUCT_TRUTH。 */
 export const USER_ASSET_KIND_PRODUCT = "PRODUCT" as const;
@@ -30,6 +32,7 @@ export const ErrorCode = Type.Enum({ VALIDATION_ERROR: "VALIDATION_ERROR", NOT_F
 export type PlatformTarget = Static<typeof PlatformTarget>;
 export type TargetMarket = Static<typeof TargetMarket>;
 export type StoryboardMode = Static<typeof StoryboardMode>;
+export type StoryboardShotRole = Static<typeof StoryboardShotRole>;
 export type AssetRole = Static<typeof AssetRole>;
 export type UserAssetKind = Static<typeof UserAssetKind>;
 export type ImageResolution = Static<typeof ImageResolution>;

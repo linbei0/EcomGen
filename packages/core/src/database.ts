@@ -70,6 +70,13 @@ function removeLegacyOutputReviewColumns(database: SqliteDatabase): void {
   }
 }
 
+/** 旧库补齐 shot_role 列；历史行保持 NULL，由上层按"未标注"处理。 */
+function addStoryboardItemShotRole(database: SqliteDatabase): void {
+  const tables = tableNames(database);
+  if (!tables.has("storyboard_items") || columnNames(database, "storyboard_items").has("shot_role")) return;
+  database.exec("ALTER TABLE storyboard_items ADD COLUMN shot_role TEXT");
+}
+
 /** Provider 可随时删除：旧库的 projects.provider 引用列为 NOT NULL，重建表放宽为可空（删除 Provider 时级联置空）。 */
 function makeProjectProviderReferencesNullable(database: SqliteDatabase): void {
   const columns = database.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string; notnull: number }>;
@@ -124,12 +131,13 @@ function makeProjectProviderReferencesNullable(database: SqliteDatabase): void {
 }
 
 /**
- * 开发初期以本 schema 为唯一规范，不保留历史迁移或兼容分支；
- * 结构变更时直接删除旧开发库文件重建。
+ * 开发初期以本 schema 为唯一规范，不保留历史状态；
+ * 新增可空列走一次性 ALTER，旧行保持 NULL 由上层按"未标注"处理。
  */
 function migrate(database: SqliteDatabase): void {
   removeLegacyOutputReviewColumns(database);
   makeProjectProviderReferencesNullable(database);
+  addStoryboardItemShotRole(database);
   database.exec(`
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
@@ -211,6 +219,7 @@ function migrate(database: SqliteDatabase): void {
       storyboard_version INTEGER NOT NULL,
       asset_type TEXT NOT NULL,
       display_name TEXT NOT NULL,
+      shot_role TEXT,
       template_variant TEXT,
       candidate_count INTEGER NOT NULL DEFAULT 1,
       image_provider_id TEXT,

@@ -710,6 +710,8 @@ export interface components {
         /** @enum {string} */
         StoryboardMode: "CREATIVE" | "PIXEL_PROTECTED";
         /** @enum {string} */
+        StoryboardShotRole: "HERO" | "PAIN_POINT" | "COMPARISON" | "SCENE" | "DETAIL" | "TRUST" | "VARIANT" | "CTA";
+        /** @enum {string} */
         AssetRole: "PRODUCT_TRUTH" | "PACKAGING" | "STYLE_REFERENCE" | "LAYOUT_REFERENCE";
         /** @enum {string} */
         UserAssetKind: "PRODUCT" | "REFERENCE";
@@ -1187,6 +1189,8 @@ export interface components {
             /** @description Immutable ecom-details-image template ID; it cannot be changed after planning. */
             assetType: string;
             displayName: string;
+            /** @description Visual-task semantics assigned during planning; immutable. Null on items planned before this field existed. */
+            shotRole?: components["schemas"]["StoryboardShotRole"] | null;
             templateVariant?: string | null;
             candidateCount: number;
             /** Format: uuid */
@@ -1199,7 +1203,7 @@ export interface components {
             mode: "CREATIVE" | "PIXEL_PROTECTED";
             /** @enum {string} */
             status: "DRAFT" | "CONFIRMED" | "GENERATING" | "GENERATED";
-            /** @description Final image-generation prompt produced by Pi Agent. Worker prefixes selected image roles in their actual request order before sending it to the image model. */
+            /** @description Final image-generation prompt produced by Pi Agent. Must instruct the image model to preserve exact product identity. Worker prefixes selected image roles in their actual request order before sending it to the image model. */
             promptInstruction: string;
             factClaims?: string[];
             riskFlags: string[];
@@ -1258,7 +1262,7 @@ export interface components {
             referencedAssets?: string[];
             /** @enum {string} */
             mode?: "CREATIVE" | "PIXEL_PROTECTED";
-            /** @description Editable final image-generation prompt. Worker prefixes selected image roles in their actual request order before sending it to the image model. */
+            /** @description Editable final image-generation prompt. Must keep instructing the image model to preserve exact product identity. Worker prefixes selected image roles in their actual request order before sending it to the image model. */
             promptInstruction?: string;
         };
         AiPlanningInput: {

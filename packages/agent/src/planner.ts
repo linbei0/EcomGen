@@ -1,6 +1,6 @@
 import type { Agent } from "@earendil-works/pi-agent-core";
 import type { ImageContent } from "@earendil-works/pi-ai";
-import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, TargetMarket } from "@ecomgen/contracts";
+import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, StoryboardShotRole, TargetMarket } from "@ecomgen/contracts";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createPlanningTools, type WebResearchConfig } from "./tools.js";
@@ -36,6 +36,7 @@ export interface PlannerInput {
 export interface PlannedStoryboardItem {
   assetType: string;
   displayName: string;
+  shotRole: StoryboardShotRole;
   templateVariant: string | null;
   candidateCount: number;
   referencedAssets: string[];
@@ -72,6 +73,11 @@ Output only valid JSON matching the requested schema. No Markdown.
 - PRODUCT attachments are the only source of product appearance truth. REFERENCE attachments may guide style, composition, packaging, labels, or layout, but never replace or redefine the product.
 - When planningMode is MANUAL, requestedTypes is the exact deliverable list: include every requested template exactly once, in the requested order; do not add, remove, reorder, or substitute types, including extra feed packshots. Platform and product category only change each prompt. Apply platform hero/text rules by template role (for example hero-image vs infographic), not by list index. Read platform guidance once, then read all selected templates in one read_ecom_template call using their templateIds before writing final prompts.
 
+# Shot roles
+- Every item must declare exactly one shotRole describing its conversion task: HERO (instant product recognition for the first frame), PAIN_POINT (visualize the buyer problem in the buyer's language), COMPARISON (before/after, old/new, or parameter contrast made self-evident), SCENE (realistic use context), DETAIL (material, craftsmanship, texture close-up), TRUST (visual quality evidence such as construction, finish, or packaging care), VARIANT (color/spec/bundle matrix), CTA (spec, size reference, or decision-support framing).
+- Assign roles along the conversion narrative: HERO first, then a mix of PAIN_POINT, COMPARISON, SCENE, DETAIL, TRUST, VARIANT, and CTA that fits this product. Do not stack repeated tasks.
+- Dedup rule: when two items share the same shotRole, they must use different assetType templates. Two items with the same assetType must not share the same shotRole. Adjacent items must not read as the same visual task.
+
 # Visual style
 - campaignStyleLock is one reusable sentence that anchors the whole suite: name 2-3 concrete colors using exact shade names or hex codes (for example "sage green", "#FF6B35"), one surface or material treatment, and lighting direction with color temperature (for example "soft 5600K daylight from upper left").
 - Derive the palette from, in priority order: explicit brandGuidelines entries, colors actually visible on the product in PRODUCT images, then the product category's natural material tones. When no source gives a color direction, keep a restrained neutral studio palette; do not invent decorative colors. A disciplined monochrome direction is a valid choice when it fits the product and brand.
@@ -89,6 +95,7 @@ Output only valid JSON matching the requested schema. No Markdown.
 
 # Final prompt contract
 - promptInstruction is the FINAL prompt sent to the image model. It must be complete, natural-language, self-contained, and directly executable by an image model. Do not leave planning notes for another worker to compile.
+- Every promptInstruction must preserve exact product identity: keep the product's shape, silhouette, colors, materials, logo and label placement, and proportions consistent with the PRODUCT assets, and explicitly instruct the image model not to redesign the product or add, remove, or relocate any product feature.
 - Write each final prompt in this order: product truth and reference-image semantics; conversion intent and target platform; composition and subject placement; camera and lens perspective; lighting, material rendering, palette, and background; blank zones and text policy; pixel-protection constraints when needed; explicit negative constraints.
 - The final prompt must be complete enough to execute without hidden context. Never include citations, URLs, tool names, template metadata, or research prose in it.`;
 
@@ -113,7 +120,7 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
   const modeInstruction = input.planningMode === "MANUAL"
     ? "Manual selection is authoritative: generate one planned item for every requested type, in the requested order. Do not add a platform feed extra shot. Read the platform guidance once and call read_ecom_template once with all matching templateIds, then write each promptInstruction as the final image-model prompt using product-category tips and platform occupancy/text rules for that template role."
     : `Use the catalog and project context to choose a conversion-oriented storyboard with exactly ${targetImageCount} planned items. Choose image types from the product category/family first (what this product must show), then adapt hero and feed frames to the selected platform. Do not pick types from the platform alone. Read the current market and platform guidance with the business tool before writing final prompts.`;
-  await agent.prompt(`Plan this project. ${modeInstruction} Return {"campaignStyleLock":string,"items":[{"assetType":string,"displayName":string,"templateVariant":string|null,"candidateCount":number,"referencedAssets":string[],"mode":"CREATIVE"|"PIXEL_PROTECTED","promptInstruction":string,"factClaims":string[],"riskFlags":string[],"sortOrder":number}]}.\n${JSON.stringify(payload)}`, input.model.input.includes("image") ? input.referenceImages : undefined);
+  await agent.prompt(`Plan this project. ${modeInstruction} Return {"campaignStyleLock":string,"items":[{"assetType":string,"displayName":string,"shotRole":"HERO"|"PAIN_POINT"|"COMPARISON"|"SCENE"|"DETAIL"|"TRUST"|"VARIANT"|"CTA","templateVariant":string|null,"candidateCount":number,"referencedAssets":string[],"mode":"CREATIVE"|"PIXEL_PROTECTED","promptInstruction":string,"factClaims":string[],"riskFlags":string[],"sortOrder":number}]}. Every promptInstruction must explicitly instruct the image model to preserve exact product identity and not redesign the product.\n${JSON.stringify(payload)}`, input.model.input.includes("image") ? input.referenceImages : undefined);
   if (agent.state.errorMessage) throw new Error(`Planning model request failed: ${agent.state.errorMessage}`);
   // 一次规划动辄数分钟，JSON 解析或校验失败时先带着错误回传给模型修复一轮，避免整体作废。
   const firstFailure = planFailureReason(assistantText(agent), input);
@@ -148,14 +155,15 @@ export interface PromptRevisionInput {
 }
 
 export async function reviseImagePrompt(input: PromptRevisionInput): Promise<string> {
-  const agent = createAgent({ workflow: "PROMPT_REVISION", model: input.model, apiKey: input.apiKey, systemPrompt: "You revise an existing final image-generation prompt. Return only a JSON object with a complete final prompt in the prompt field. Preserve all existing product-truth and safety constraints unless the revision explicitly changes the visual direction.", tools: [], outputSchema: PROMPT_REVISION_SCHEMA });
+  const agent = createAgent({ workflow: "PROMPT_REVISION", model: input.model, apiKey: input.apiKey, systemPrompt: "You revise an existing final image-generation prompt. Return only a JSON object with a complete final prompt in the prompt field. Preserve all existing product-truth, product-identity, and safety constraints unless the revision explicitly changes the visual direction.", tools: [], outputSchema: PROMPT_REVISION_SCHEMA });
   await agent.prompt(`Existing final prompt:\n${input.prompt}\n\nRevision request:\n${input.revision}\n\nReturn {"prompt":string}; the prompt is sent directly to the image model.`);
   if (agent.state.errorMessage) throw new Error(`Prompt revision model request failed: ${agent.state.errorMessage}`);
   const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
   const text = response && response.role === "assistant" ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n").trim() : "";
   if (!text) throw new Error("Prompt revision model returned no text");
   const value = parseJsonResponse(stripJsonFence(text)) as { prompt?: unknown };
-  return assertFinalPrompt(typeof value?.prompt === "string" ? value.prompt : "");
+  const prompt = assertFinalPrompt(typeof value?.prompt === "string" ? value.prompt : "");
+  return prompt;
 }
 
 export interface EditPlannerInput {
@@ -222,6 +230,9 @@ function validateEditPlan(plan: PlannedEdit, input: EditPlannerInput, annotation
 }
 
 function stripJsonFence(value: string): string { return value.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, ""); }
+
+const SHOT_ROLES: readonly StoryboardShotRole[] = ["HERO", "PAIN_POINT", "COMPARISON", "SCENE", "DETAIL", "TRUST", "VARIANT", "CTA"];
+
 function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStoryboard {
   if (!plan || typeof plan.campaignStyleLock !== "string" || !Array.isArray(plan.items) || plan.items.length === 0) throw new Error("Planning model returned an invalid storyboard");
   const requestedTemplates = resolveTemplates(input.requestedTypes);
@@ -241,6 +252,7 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
     const template = getTemplate(item.assetType); if (!template || !allowedTemplateIds.has(item.assetType)) throw new Error(`Planning model returned an unavailable ecom-details-image template: ${item.assetType}`);
     if (item.templateVariant !== null && item.templateVariant !== undefined && !template.variants[item.templateVariant]) throw new Error(`Planning model returned an invalid variant for ${item.assetType}: ${item.templateVariant}`);
     if (item.mode !== "CREATIVE" && item.mode !== "PIXEL_PROTECTED") throw new Error("Planning model returned an invalid storyboard mode");
+    if (!SHOT_ROLES.includes(item.shotRole)) throw new Error(`Planning model returned an invalid shotRole for ${item.assetType}: ${String(item.shotRole)}. Use one of ${SHOT_ROLES.join(", ")}`);
     if (!item.assetType || !item.promptInstruction || typeof item.displayName !== "string" || !item.displayName.trim()) throw new Error("Planning model returned an incomplete storyboard item");
     assertFinalPrompt(item.promptInstruction);
     const displayName = item.displayName.trim();
@@ -253,6 +265,7 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
     return {
       assetType: item.assetType,
       displayName,
+      shotRole: item.shotRole,
       templateVariant: item.templateVariant ?? null,
       candidateCount: clampCandidates(item.candidateCount ?? defaultCandidates),
       referencedAssets,
@@ -264,6 +277,13 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
     };
   });
   if (new Set(items.map((item) => item.displayName)).size !== items.length) throw new Error("Planning model returned duplicate storyboard display names");
+  // 视觉任务去重：同角色重复时必须换模板，否则套图会回到"多张同质图"的失败模式。
+  const roleKeys = new Set<string>();
+  for (const item of items) {
+    const key = `${item.shotRole}|${item.assetType}`;
+    if (roleKeys.has(key)) throw new Error(`Planning model returned duplicate visual-task assignment: shotRole ${item.shotRole} with template ${item.assetType} appears more than once`);
+    roleKeys.add(key);
+  }
   return { campaignStyleLock: plan.campaignStyleLock, items };
 }
 

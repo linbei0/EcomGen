@@ -25,7 +25,7 @@ describe("EcomRepository", () => {
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
     const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
-    repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero-image", displayName: "主图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0, imageProviderId: provider.id, imageModelId: "image" }]);
+    repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero-image", displayName: "主图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0, imageProviderId: provider.id, imageModelId: "image" }]);
     const item = repository.listStoryboardItems(project.id)[0]!;
     const queuedJob = repository.createJob({ id: "provider-delete-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {}, providerId: provider.id, modelId: "image" });
     expect(repository.deleteProvider(provider.id)).toBe("deleted");
@@ -262,7 +262,7 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database); const provider = seedProvider(repository);
     const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
-    const storyboard = repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero-image", displayName: "杯子首图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    const storyboard = repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero-image", displayName: "杯子首图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
     const item = repository.listStoryboardItems(project.id)[0]!;
     const job = repository.createJob({ id: "edit-lineage-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
     const root = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/root.png", hash: "root" });
@@ -308,6 +308,7 @@ describe("EcomRepository", () => {
     const storyboard = repository.saveStoryboard(project.id, "quiet clean commercial photography", "DRAFT", [{
       assetType: "hero-image",
       displayName: "白底/纯色底产品主图",
+      shotRole: "HERO",
       templateVariant: "luxury",
       candidateCount: 2,
       referencedAssets: [],
@@ -322,6 +323,7 @@ describe("EcomRepository", () => {
     const item = repository.listStoryboardItems(project.id)[0];
     expect(storyboard.version).toBe(1);
     expect(item.displayName).toBe("白底/纯色底产品主图");
+    expect(item.shotRole).toBe("HERO");
     expect(item.candidateCount).toBe(2);
     expect(item.imageProviderId).toBe(provider.id);
     expect(item.imageModelId).toBe("image");
@@ -333,6 +335,7 @@ describe("EcomRepository", () => {
     const appended = repository.saveStoryboard(project.id, "second campaign", "DRAFT", [{
       assetType: "lifestyle-scene",
       displayName: "场景化生活图",
+      shotRole: "SCENE",
       templateVariant: null,
       candidateCount: 1,
       referencedAssets: [],
@@ -425,7 +428,7 @@ describe("EcomRepository", () => {
   it("persists ordered project and temporary references on an edit turn", () => {
     const database = openDatabase(":memory:"); const repository = new EcomRepository(database); const provider = seedProvider(repository);
     const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
-    repository.saveStoryboard(project.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "主图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    repository.saveStoryboard(project.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "主图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
     const item = repository.listStoryboardItems(project.id)[0]!; const job = repository.createJob({ id: "reference-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
     const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/base.png", hash: "base" });
     const session = repository.createEditSession({ id: "reference-session", projectId: project.id, currentOutputId: output.id, status: "ACTIVE", memorySummary: {} });
@@ -472,6 +475,7 @@ describe("EcomRepository", () => {
     const storyboard = repository.saveStoryboard(withOutputs.id, "lock", "DRAFT", [{
       assetType: "hero-image",
       displayName: "主图",
+      shotRole: null,
       templateVariant: null,
       candidateCount: 1,
       referencedAssets: [],

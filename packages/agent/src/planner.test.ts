@@ -23,7 +23,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
         const researchTool = captured.options?.initialState?.tools?.find((tool) => tool.name === "research_visual_direction");
         try { await researchTool?.execute("research-call", { query: "product photography lighting" }); } catch { /* Pi 将工具错误返回给模型并继续规划。 */ }
       }
-      const plan = { campaignStyleLock: "clean", items: Array.from({ length: captured.itemCount }, (_, index) => ({ assetType: "hero-image", displayName: index === 0 ? "整机斜侧展示首图" : `展示场景${index + 1}`, templateVariant: null, candidateCount: 1, referencedAssets: captured.referencedAssets, mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: index })) };
+      const plan = { campaignStyleLock: "clean", items: Array.from({ length: captured.itemCount }, (_, index) => ({ assetType: "hero-image", displayName: index === 0 ? "整机斜侧展示首图" : `展示场景${index + 1}`, shotRole: index === 0 ? "HERO" : "SCENE", templateVariant: null, candidateCount: 1, referencedAssets: captured.referencedAssets, mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: index })) };
       const text = captured.promptCount === 1 && captured.firstResponseText !== undefined ? captured.firstResponseText : captured.responseText ?? JSON.stringify(plan);
       this.state.messages = [{ role: "assistant", content: [{ type: "text", text }] }];
     }
@@ -168,7 +168,7 @@ describe("planStoryboard", () => {
 
   it("extracts JSON when the planning model adds a natural-language preamble", async () => {
     captured.errorMessage = undefined;
-    const plan = { campaignStyleLock: "clean", items: [{ assetType: "hero-image", displayName: "整机斜侧展示首图", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: 0 }] };
+    const plan = { campaignStyleLock: "clean", items: [{ assetType: "hero-image", displayName: "整机斜侧展示首图", shotRole: "HERO", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: 0 }] };
     captured.responseText = "I have all the details.\\n```json\\n" + JSON.stringify(plan) + "\\n```";
     try {
       await expect(planStoryboard(input)).resolves.toMatchObject({ campaignStyleLock: "clean" });
@@ -217,6 +217,30 @@ describe("planStoryboard", () => {
     } finally {
       fetchMock.mockRestore();
       captured.simulateResearchFailure = false;
+    }
+  });
+
+  it("拒绝非法 shotRole 与重复 角色×模板 组合", async () => {
+    captured.errorMessage = undefined;
+    const base = { templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", factClaims: [], riskFlags: [], sortOrder: 0 };
+    const cases: Array<[unknown[], RegExp]> = [
+      [[{ assetType: "hero-image", displayName: "整机斜侧展示首图", shotRole: "WOW", promptInstruction: "hero", ...base }], /invalid shotRole/],
+      [[
+        { assetType: "hero-image", displayName: "整机斜侧展示首图", shotRole: "HERO", promptInstruction: "hero", ...base },
+        { assetType: "hero-image", displayName: "整机斜侧场景图", shotRole: "HERO", promptInstruction: "scene", ...base, sortOrder: 1 },
+      ], /duplicate visual-task/],
+    ];
+    for (const [items, expected] of cases) {
+      captured.promptCount = 0;
+      // 两轮都返回同样的违规结果，让最终的校验错误原样抛出
+      captured.firstResponseText = captured.responseText = JSON.stringify({ campaignStyleLock: "clean", items });
+      try {
+        await expect(planStoryboard({ ...input, targetImageCount: items.length })).rejects.toThrow(expected);
+      } finally {
+        captured.promptCount = 0;
+        captured.firstResponseText = undefined;
+        captured.responseText = undefined;
+      }
     }
   });
 });
