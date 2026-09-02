@@ -123,37 +123,43 @@ describe("planStoryboard", () => {
     expect(captured.prompt).toContain("product category/family first");
   });
 
-  it("passes visual attachments and their asset mapping to the vision model", async () => {
+  it("passes handle-based visual attachments and resolves referenced handles to asset ids", async () => {
     captured.errorMessage = undefined;
     captured.prompt = "";
     captured.images = [];
-    await planStoryboard({
-      ...input,
-      model: { ...input.model, input: ["text", "image"] },
-      referenceImages: [
-        { type: "image", mimeType: "image/png", data: "product-bytes" },
-        { type: "image", mimeType: "image/jpeg", data: "style-bytes" },
-      ],
-      visionAttachments: [
-        { attachmentIndex: 1, assetId: "product-1", role: "PRODUCT_TRUTH", name: "product.png", mimeType: "image/png" },
-        { attachmentIndex: 2, assetId: "style-1", role: "STYLE_REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
-      ],
-      assets: [
-        { id: "product-1", role: "PRODUCT_TRUTH", kind: "PRODUCT", name: "product.png", mimeType: "image/png" },
-        { id: "style-1", role: "STYLE_REFERENCE", kind: "REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
-      ],
-    });
-    expect(captured.images).toHaveLength(2);
-    expect(captured.prompt).toContain("visionAttachments");
-    expect(captured.prompt).toContain("product-1");
-    expect(captured.prompt).toContain("style-1");
+    captured.referencedAssets = ["P1", "R1"];
+    try {
+      const result = await planStoryboard({
+        ...input,
+        model: { ...input.model, input: ["text", "image"] },
+        referenceImages: [
+          { type: "image", mimeType: "image/png", data: "product-bytes" },
+          { type: "image", mimeType: "image/jpeg", data: "style-bytes" },
+        ],
+        visionAttachments: [
+          { attachmentIndex: 1, handle: "P1", role: "PRODUCT_TRUTH", name: "product.png", mimeType: "image/png" },
+          { attachmentIndex: 2, handle: "R1", role: "STYLE_REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
+        ],
+        assets: [
+          { id: "product-1", handle: "P1", role: "PRODUCT_TRUTH", kind: "PRODUCT", name: "product.png", mimeType: "image/png" },
+          { id: "style-1", handle: "R1", role: "STYLE_REFERENCE", kind: "REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
+        ],
+      });
+      expect(captured.images).toHaveLength(2);
+      expect(captured.prompt).toContain("visionAttachments");
+      expect(captured.prompt).toContain("P1");
+      expect(captured.prompt).not.toContain("product-1");
+      expect(result.items[0]?.referencedAssets).toEqual(["product-1", "style-1"]);
+    } finally {
+      captured.referencedAssets = [];
+    }
   });
 
   it("rejects a storyboard item that references more than four non-product images", async () => {
-    captured.referencedAssets = ["reference-1", "reference-2", "reference-3", "reference-4", "reference-5"];
+    captured.referencedAssets = ["R1", "R2", "R3", "R4", "R5"];
     await expect(planStoryboard({
       ...input,
-      assets: captured.referencedAssets.map((id) => ({ id, role: "STYLE_REFERENCE", kind: "REFERENCE" as const, name: `${id}.png`, mimeType: "image/png" })),
+      assets: captured.referencedAssets.map((handle, index) => ({ id: `reference-${index + 1}`, handle, role: "STYLE_REFERENCE", kind: "REFERENCE" as const, name: `${handle}.png`, mimeType: "image/png" })),
     })).rejects.toThrow("at most 4 non-product images");
     captured.referencedAssets = [];
   });

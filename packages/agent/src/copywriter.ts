@@ -16,9 +16,9 @@ export interface CopywritingInput {
   platformTargets: PlatformTarget[];
   targetMarket: TargetMarket | null;
   copyLanguage: string | null;
-  assets: Array<{ id: string; role: string; name: string; mimeType: string }>;
+  // 素材只以 handle（P1/R1）进入模型上下文，避免数据库 ID 泄漏进提示词。
+  assets: Array<{ handle: string; role: string; name: string; mimeType: string }>;
   referenceImages: ImageContent[];
-  visionAttachments?: Array<{ attachmentIndex: number; assetId: string; role: string; name: string; mimeType: string }>;
 }
 
 export interface CopywritingResult {
@@ -57,7 +57,6 @@ export async function writeCopywriting(input: CopywritingInput): Promise<Copywri
     targetMarket: input.targetMarket,
     copyLanguage: input.copyLanguage,
     visualAttachments: input.assets.map((asset, index) => ({ attachmentIndex: index + 1, ...asset })),
-    visionAttachments: input.visionAttachments,
   };
   await agent.prompt(
     `Write copy for this project. Return ${schema}.\n${JSON.stringify(payload)}`,

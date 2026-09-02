@@ -10,7 +10,7 @@ import { getTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
-import { assertPixelProtectedInputs, selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata, withGenerationAssetRoles } from "./visual-assets.js";
+import { assertPixelProtectedInputs, assignImageHandles, imageHandle, selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata, withGenerationAssetRoles } from "./visual-assets.js";
 import { VisionDerivativeCache } from "./vision-cache.js";
 
 const masterKey = process.env.ECOMGEN_MASTER_KEY;
@@ -86,7 +86,9 @@ async function executePlan(job: JobRecord): Promise<void> {
       candidatesPerType: input.candidatesPerType ?? project.candidatesPerType
     });
   }
-  const plannerAssets = visualAssets.map((asset) => ({ id: asset.id, role: asset.role, kind: userAssetKindForRole(asset.role), name: asset.originalName, mimeType: asset.mimeType }));
+  // 模型上下文只出现 P1/R1 短指代；真实素材 ID 不进入任何提示词，映射在代码内完成。
+  const imageHandles = assignImageHandles(assets);
+  const plannerAssets = visualAssets.map((asset) => ({ id: asset.id, handle: imageHandle(imageHandles, asset.id), role: asset.role, kind: userAssetKindForRole(asset.role), name: asset.originalName, mimeType: asset.mimeType }));
   const webResearch = project.webResearchEnabled ? configuredWebResearch() : undefined;
   repository.createWebResearchAudit(job.id, webResearch ? "AVAILABLE" : project.webResearchEnabled ? "UNAVAILABLE" : "DISABLED");
   const plan = await planStoryboard({
@@ -104,7 +106,7 @@ async function executePlan(job: JobRecord): Promise<void> {
     defaultMode: project.defaultMode,
     assets: plannerAssets,
     referenceImages,
-    visionAttachments: visionAttachmentMetadata(visualAssets.map((asset) => ({ ...asset, name: asset.originalName }))),
+    visionAttachments: visionAttachmentMetadata(visualAssets.map((asset) => ({ ...asset, name: asset.originalName })), imageHandles),
     planningMode: input.planningMode ?? "AI",
     requestedTypes: input.requestedTypes,
     userInstruction: input.userInstruction,
@@ -155,6 +157,7 @@ async function executeCopywriting(job: JobRecord): Promise<void> {
   if (target !== "PRODUCT_DESCRIPTION" && target !== "PLANNING_INSTRUCTION") throw new Error("Copywriting job has an invalid target");
   await updateJob(job, { progress: 25 });
   const visualAttachments = await visionImageContents(assets);
+  const imageHandles = assignImageHandles(assets);
   const result = await writeCopywriting({
     target: target as CopywritingTarget,
     model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking, supportsStructuredOutput: model.supportsStructuredOutput }),
@@ -167,9 +170,8 @@ async function executeCopywriting(job: JobRecord): Promise<void> {
     platformTargets: project.platformTargets,
     targetMarket: project.targetMarket,
     copyLanguage: project.copyLanguage,
-    assets: assets.map((asset) => ({ id: asset.id, role: asset.role, name: asset.originalName, mimeType: asset.mimeType })),
+    assets: assets.map((asset) => ({ handle: imageHandle(imageHandles, asset.id), role: asset.role, name: asset.originalName, mimeType: asset.mimeType })),
     referenceImages: visualAttachments,
-    visionAttachments: visionAttachmentMetadata(assets.map((asset) => ({ ...asset, name: asset.originalName }))),
   });
   throwIfCancelled(job);
   repository.saveCopywritingResult({ jobId: job.id, projectId: project.id, target: result.target, content: result.content });
@@ -193,7 +195,8 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   if (!providerId || !modelId) throw new Error("该项目尚未选择生图模型（Provider 可能已被删除），请在项目设置中重新选择");
   const provider = providerFor(providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini") throw new Error("Selected image model has no executable image API");
   const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`);
-  const inputs = selectGenerationAssets(repository.listAssets(project.id), item);
+  const projectAssets = repository.listAssets(project.id);
+  const inputs = selectGenerationAssets(projectAssets, item);
   const generationInputs = template.supports_image_reference ? inputs : [];
   if (item.mode === "PIXEL_PROTECTED") assertPixelProtectedInputs(generationInputs);
   const revision = typeof job.input.revision === "string" ? job.input.revision.trim() : "";
@@ -211,7 +214,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const prompt = revision && !isRetry
     ? await reviseGenerationPrompt(project, basePrompt, revision)
     : basePrompt;
-  const compiledPrompt = withGenerationAssetRoles(prompt, generationInputs);
+  const compiledPrompt = withGenerationAssetRoles(prompt, generationInputs, assignImageHandles(projectAssets));
   const generationKey = generationKeyFor(job.id, candidateIndex);
   const existingOutput = repository.getOutputByGenerationKey(generationKey);
   if (existingOutput) {

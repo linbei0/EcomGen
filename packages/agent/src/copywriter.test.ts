@@ -41,8 +41,8 @@ const input: CopywritingInput = {
   targetMarket: "CHINA_MAINLAND",
   copyLanguage: "zh-Hans",
   assets: [
-    { id: "product-1", role: "PRODUCT_TRUTH", name: "earbuds.png", mimeType: "image/png" },
-    { id: "reference-1", role: "STYLE_REFERENCE", name: "style.png", mimeType: "image/png" },
+    { handle: "P1", role: "PRODUCT_TRUTH", name: "earbuds.png", mimeType: "image/png" },
+    { handle: "R1", role: "STYLE_REFERENCE", name: "style.png", mimeType: "image/png" },
   ],
   referenceImages: [],
 };
@@ -76,17 +76,17 @@ describe("writeCopywriting", () => {
     expect(captured.streamMock).toHaveBeenCalledWith({ id: "model" }, { messages: [] }, { timeoutMs: 240_000, maxRetries: 2 });
   });
 
-  it("sends the supplied visual attachment mapping with its images", async () => {
+  it("sends handle-based visual attachments without exposing asset ids", async () => {
     captured.response = JSON.stringify({ content: "产品居中展示，保留右侧留白。" });
     await writeCopywriting({
       ...input,
       target: "PLANNING_INSTRUCTION",
       referenceImages: [{ type: "image", mimeType: "image/png", data: "encoded" }],
-      visionAttachments: [{ attachmentIndex: 1, assetId: "product-1", role: "PRODUCT_TRUTH", name: "earbuds.png", mimeType: "image/png" }],
     });
     expect(captured.images).toHaveLength(1);
-    expect(captured.prompt).toContain("visionAttachments");
-    expect(captured.prompt).toContain("product-1");
+    expect(captured.prompt).toContain("visualAttachments");
+    expect(captured.prompt).toContain("P1");
+    expect(captured.prompt).not.toContain("product-1");
   });
 
   it("接受画面规划说明，并拒绝不完整的商品描述", () => {

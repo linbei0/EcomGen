@@ -63,7 +63,7 @@ Worker 执行以下顺序：
 3. 检查 `PIXEL_PROTECTED` 是否有当前项目的 `PRODUCT_TRUTH` 图片。
 4. 根据项目参数和模板默认尺寸计算输出尺寸。
 5. 无 revision 时，将 `item.promptInstruction.trim()` 作为最终 Prompt；有 revision 时，调用 Pi Agent 的 Prompt 改写函数得到最终 Prompt。
-6. 选中图片素材时，Worker 按实际请求顺序在 Prompt 前固定追加图片角色说明（`withGenerationAssetRoles`）；未选素材时保持原样。
+6. 选中图片素材时，Worker 按实际请求顺序在 Prompt 前固定追加图片角色说明（`withGenerationAssetRoles`），并标注由角色加确定性排序派生的短指代（`P1`、`R1`）；未选素材时保持原样。真实素材 ID 不进入规划或生图模型上下文，规划输出中的 handle 引用由 Worker 代码解析回素材 ID。
 7. 把实际发送的完整文本保存到 `compiledPrompt`，用于结果追溯和导出 manifest。
 
 Worker 必须拒绝包含 `Upstream template`、`Template fields` 等内部模板标记的旧 Prompt，并要求重新规划；不能静默替用户清洗旧数据。

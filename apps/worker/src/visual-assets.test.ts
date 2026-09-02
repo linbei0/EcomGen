@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertPixelProtectedInputs, selectGenerationAssets, selectVisionAssets, withGenerationAssetRoles } from "./visual-assets.js";
+import { assertPixelProtectedInputs, assignImageHandles, selectGenerationAssets, selectVisionAssets, withGenerationAssetRoles } from "./visual-assets.js";
 
 function asset(id: string, role: string, createdAt: string) {
   return { id, role, mimeType: "image/png", createdAt };
@@ -33,15 +33,31 @@ describe("visual asset selection", () => {
     expect(() => assertPixelProtectedInputs([asset("style", "STYLE_REFERENCE", "2026-01-01")])).toThrow("PRODUCT_TRUTH");
   });
 
+  it("derives stable P/R handles from role and deterministic order", () => {
+    const assets = [
+      asset("style-late", "STYLE_REFERENCE", "2026-01-03"),
+      asset("product-b", "PRODUCT_TRUTH", "2026-01-02"),
+      asset("product-a", "PRODUCT_TRUTH", "2026-01-01"),
+      asset("file.txt", "PRODUCT_TRUTH", "2026-01-04"),
+    ];
+    (assets[3] as ReturnType<typeof asset>).mimeType = "text/plain";
+    expect(Object.fromEntries(assignImageHandles(assets))).toEqual({
+      "product-a": "P1",
+      "product-b": "P2",
+      "style-late": "R1",
+    });
+  });
+
   it("adds the actual input order and role semantics to the generation prompt", () => {
-    const prompt = withGenerationAssetRoles("Create a hero image.", [
+    const assets = [
       asset("product", "PRODUCT_TRUTH", "2026-01-01"),
       asset("layout", "LAYOUT_REFERENCE", "2026-01-02"),
       asset("style", "STYLE_REFERENCE", "2026-01-03"),
-    ]);
-    expect(prompt).toContain("Image 1: PRODUCT TRUTH");
-    expect(prompt).toContain("Image 2: LAYOUT REFERENCE ONLY");
-    expect(prompt).toContain("Image 3: STYLE REFERENCE ONLY");
+    ];
+    const prompt = withGenerationAssetRoles("Create a hero image.", assets, assignImageHandles(assets));
+    expect(prompt).toContain("Image 1 (P1): PRODUCT TRUTH");
+    expect(prompt).toContain("Image 2 (R1): LAYOUT REFERENCE ONLY");
+    expect(prompt).toContain("Image 3 (R2): STYLE REFERENCE ONLY");
     expect(prompt).toContain("Never use a non-product reference as the product");
     expect(prompt.endsWith("Create a hero image.")).toBe(true);
   });

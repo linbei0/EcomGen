@@ -22,9 +22,11 @@ export interface PlannerInput {
   targetMarket: TargetMarket | null;
   copyLanguage: string | null;
   defaultMode: StoryboardMode;
-  assets: Array<{ id: string; role: string; kind: "PRODUCT" | "REFERENCE"; name: string; mimeType: string }>;
+  // handle（P1/R1）是素材在模型上下文中的唯一指代；id 仅供 validatePlan 解析，
+  // planStoryboard 构造 payload 时必须剥离，保证真实素材 ID 不进入模型上下文。
+  assets: Array<{ id: string; handle: string; role: string; kind: "PRODUCT" | "REFERENCE"; name: string; mimeType: string }>;
   referenceImages?: ImageContent[];
-  visionAttachments?: Array<{ attachmentIndex: number; assetId: string; role: string; name: string; mimeType: string }>;
+  visionAttachments?: Array<{ attachmentIndex: number; handle: string; role: string; name: string; mimeType: string }>;
   planningMode?: PlanningMode;
   requestedTypes?: string[];
   userInstruction?: string;
@@ -50,8 +52,10 @@ export interface PlannedStoryboard { campaignStyleLock: string; items: PlannedSt
 
 // 大项目（多图、多分镜）的规划轮次可能持续数分钟；pi-ai 默认无超时且 maxRetries=0，
 // 长连接挂起会一直阻塞到任务失败，因此显式给出每轮超时和瞬时错误重试。
-// 提示按节组织（Role/Output/Facts/Structure/Visual style/Tools/Final prompt contract），
-// 通用规则在前、特定覆盖在后；Visual style 给出配色来源链与色板内变化规则，避免模型退回无据可依的白底默认。
+// 提示只承载判断性知识（角色、事实边界、镜头角色语义、视觉风格取向、工具用法、最终 Prompt 契约）；
+// 结构性约束由 outputSchema 与 validatePlan 修复回环硬性保证，提示内不重复展开。
+// 提示不携带任何字面示例值（色名、色号、标题样例）：模型会把 in-context 示例原样复述进 promptInstruction，
+// 因此 campaignStyleLock 的配色来源必须锚定输入数据（brandGuidelines、PRODUCT 图、模板 guidance），而非示例。
 const SYSTEM_PROMPT = `# Role
 You are the planning agent for an e-commerce image-suite product. Your visual playbook is derived from liangdabiao/ecom-details-image (MIT): use a coherent campaign style lock, select a conversion-oriented progression, and make every requested deliverable an editable storyboard item. Work for general products on TAOBAO, JD, PDD, DOUYIN, AMAZON, and SHOPIFY.
 
@@ -65,23 +69,21 @@ Output only valid JSON matching the requested schema. No Markdown.
 - riskFlags are only for material product-specific uncertainties that require human review; do not repeat generic template guidance or anti-AI style tips, and return an empty array when no material uncertainty exists.
 
 # Storyboard structure
-- assetType must be one of the supplied upstream template IDs. templateVariant must be null or a declared variant key for that template. Use requested template IDs exactly when present; otherwise select a conversion-oriented mix from the supplied catalog using the product category first and the platform only to shape hero/feed frames.
-- displayName is a human-facing Chinese scene title generated from the actual product, viewpoint, setting, and conversion purpose. Keep it concise (usually 4-12 Chinese characters), specific, and distinct for each item. Do not copy the catalog template name, internal template ID, generic labels such as “分镜/场景图/产品主图”, numbered labels, platform names, or unsupported product facts. The title may describe the visual treatment, such as “整机斜侧展示首图”, while assetType remains the exact template ID.
+- assetType must be one of the supplied upstream template IDs; templateVariant must be null or a declared variant key for that template. Use requested template IDs exactly when present; otherwise select a conversion-oriented mix from the supplied catalog using the product category first and the platform only to shape hero/feed frames.
+- displayName is a human-facing Chinese scene title generated from the actual product, viewpoint, setting, and conversion purpose. Keep it concise (usually 4-12 Chinese characters), specific, and distinct for each item; it may describe the visual treatment while assetType remains the exact template ID. Do not copy the catalog template name, internal template ID, generic scene labels, numbered labels, platform names, or unsupported product facts.
 - candidateCount is how many image candidates to generate for that type; keep it between 1 and the supplied candidatesPerType.
-- referencedAssets lists asset IDs this item should consider. Prefer PRODUCT assets as product truth and REFERENCE assets only as style or layout hints.
-- visionAttachments maps each image attachment index to an asset ID and role. Inspect the supplied images, then use only those real asset IDs in referencedAssets.
-- PRODUCT attachments are the only source of product appearance truth. REFERENCE attachments may guide style, composition, packaging, labels, or layout, but never replace or redefine the product.
-- When planningMode is MANUAL, requestedTypes is the exact deliverable list: include every requested template exactly once, in the requested order; do not add, remove, reorder, or substitute types, including extra feed packshots. Platform and product category only change each prompt. Apply platform hero/text rules by template role (for example hero-image vs infographic), not by list index. Read platform guidance once, then read all selected templates in one read_ecom_template call using their templateIds before writing final prompts.
+- referencedAssets lists image handles this item should consider. Inspect the supplied visionAttachments and use only those real handles; prefer PRODUCT handles as product truth and REFERENCE handles only as style or layout hints.
+- Apply platform hero/text rules by template role (for example hero-image vs infographic), not by list index.
 
 # Shot roles
 - Every item must declare exactly one shotRole describing its conversion task: HERO (instant product recognition for the first frame), PAIN_POINT (visualize the buyer problem in the buyer's language), COMPARISON (before/after, old/new, or parameter contrast made self-evident), SCENE (realistic use context), DETAIL (material, craftsmanship, texture close-up), TRUST (visual quality evidence such as construction, finish, or packaging care), VARIANT (color/spec/bundle matrix), CTA (spec, size reference, or decision-support framing).
-- Assign roles along the conversion narrative: HERO first, then a mix of PAIN_POINT, COMPARISON, SCENE, DETAIL, TRUST, VARIANT, and CTA that fits this product. Do not stack repeated tasks.
-- Dedup rule: when two items share the same shotRole, they must use different assetType templates. Two items with the same assetType must not share the same shotRole. Adjacent items must not read as the same visual task.
+- Assign roles along the conversion narrative: HERO first, then a mix of PAIN_POINT, COMPARISON, SCENE, DETAIL, TRUST, VARIANT, and CTA that fits this product.
+- Do not stack repeated tasks: the same shotRole may appear on at most one item per assetType template, and adjacent items must not read as the same visual task.
 
 # Visual style
-- campaignStyleLock is one reusable sentence that anchors the whole suite: name 2-3 concrete colors using exact shade names or hex codes (for example "sage green", "#FF6B35"), one surface or material treatment, and lighting direction with color temperature (for example "soft 5600K daylight from upper left").
-- Derive the palette from, in priority order: explicit brandGuidelines entries, colors actually visible on the product in PRODUCT images, then the product category's natural material tones. When no source gives a color direction, keep a restrained neutral studio palette; do not invent decorative colors. A disciplined monochrome direction is a valid choice when it fits the product and brand.
-- Reuse the exact shade wording from campaignStyleLock in every promptInstruction; never paraphrase a shade between items ("sage green" in one item must not become "soft green" in another).
+- campaignStyleLock is one reusable sentence that anchors the whole suite: name 2-3 concrete colors by exact shade name or hex code, one surface or material treatment, and lighting direction with color temperature.
+- Derive the palette from the supplied inputs only, in priority order: explicit brandGuidelines entries, colors actually visible on the product in PRODUCT images, then the palette and lighting hints returned by the template guidance. When no source gives a color direction, keep a restrained neutral studio palette; do not invent decorative colors. A disciplined monochrome direction is a valid choice when it fits the product and brand.
+- Reuse the exact shade wording from campaignStyleLock in every promptInstruction; never paraphrase a shade between items.
 - Vary within the locked palette, not beyond it: rotate background shade, lighting angle, and camera angle across items so adjacent items are clearly distinguishable while still reading as one suite. Keep marketplace packshots on their reserved white background; place richer background or color treatment only on scene and creative types (lifestyle, poster, social, editorial, seasonal, detail-macro) and only when the product category and platform rules allow it.
 - Never use unquantified color or quality words (colorful, vibrant, eye-catching, beautiful, high quality) without a named shade or observable detail; replace them with concrete visual nouns.
 - Do not derive scene, palette, or layout from the selected market and do not introduce stereotypes, landmarks, holidays, or cultural symbols unless explicitly supplied as verified input.
@@ -97,6 +99,7 @@ Output only valid JSON matching the requested schema. No Markdown.
 - promptInstruction is the FINAL prompt sent to the image model. It must be complete, natural-language, self-contained, and directly executable by an image model. Do not leave planning notes for another worker to compile.
 - Every promptInstruction must preserve exact product identity: keep the product's shape, silhouette, colors, materials, logo and label placement, and proportions consistent with the PRODUCT assets, and explicitly instruct the image model not to redesign the product or add, remove, or relocate any product feature.
 - Write each final prompt in this order: product truth and reference-image semantics; conversion intent and target platform; composition and subject placement; camera and lens perspective; lighting, material rendering, palette, and background; blank zones and text policy; pixel-protection constraints when needed; explicit negative constraints.
+- Refer to supplied images only by their handles (P1, R1), and only handles that the same item lists in referencedAssets; unselected images are not attached at generation time, so referencing them leaves the instruction unresolvable. The runtime resolves each handle to the actual input image. Never mention internal asset IDs, file names, or attachment indexes.
 - The final prompt must be complete enough to execute without hidden context. Never include citations, URLs, tool names, template metadata, or research prose in it.`;
 
 export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryboard> {
@@ -109,6 +112,8 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
     apiKey: undefined,
     model: undefined,
     referenceImages: undefined,
+    // 剥离素材真实 ID：模型上下文只保留 handle 指代，id 仅用于输出解析。
+    assets: input.assets.map(({ id: _assetId, ...asset }) => asset),
     // 空的品牌指南不进 payload：省 token 且避免模型虚构品牌色；有值时规划层才按配色来源链消费。
     brandGuidelines: Object.keys(input.brandGuidelines ?? {}).length > 0 ? input.brandGuidelines : undefined,
     visionAttachments: input.visionAttachments,
@@ -246,7 +251,8 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
   } else if (plan.items.length !== requiredTargetImageCount(input.targetImageCount)) {
     throw new Error(`AI planning must return exactly ${requiredTargetImageCount(input.targetImageCount)} storyboard items`);
   }
-  const knownAssetIds = new Set(input.assets.map((asset) => asset.id));
+  // 模型只见过 handle；无法解析的引用与旧行为一致地静默丢弃，不进入修复回环。
+  const assetsByHandle = new Map(input.assets.map((asset) => [asset.handle, asset]));
   const defaultCandidates = clampCandidates(input.candidatesPerType ?? 1);
   const items = plan.items.map((item, index) => {
     const template = getTemplate(item.assetType); if (!template || !allowedTemplateIds.has(item.assetType)) throw new Error(`Planning model returned an unavailable ecom-details-image template: ${item.assetType}`);
@@ -257,8 +263,9 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
     assertFinalPrompt(item.promptInstruction);
     const displayName = item.displayName.trim();
     if (displayName === template.name || displayName === item.assetType) throw new Error(`Planning model returned a generic storyboard display name for ${item.assetType}`);
-    const referencedAssets = Array.isArray(item.referencedAssets) ? [...new Set(item.referencedAssets.filter((id) => knownAssetIds.has(id)))] : [];
-    const nonProductReferences = referencedAssets.filter((id) => input.assets.find((asset) => asset.id === id)?.kind === "REFERENCE");
+    const referenced = Array.isArray(item.referencedAssets) ? [...new Set(item.referencedAssets)].map((handle) => assetsByHandle.get(handle)).filter((asset): asset is NonNullable<ReturnType<typeof assetsByHandle.get>> => Boolean(asset)) : [];
+    const referencedAssets = referenced.map((asset) => asset.id);
+    const nonProductReferences = referenced.filter((asset) => asset.kind === "REFERENCE");
     if (nonProductReferences.length > MAX_GENERATION_REFERENCE_IMAGES) {
       throw new Error(`Storyboard item may reference at most ${MAX_GENERATION_REFERENCE_IMAGES} non-product images`);
     }

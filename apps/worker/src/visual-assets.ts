@@ -54,11 +54,45 @@ export function assertPixelProtectedInputs<T extends VisualAssetRecord>(assets: 
   }
 }
 
-/** 按 Provider 实际收到的顺序声明每张图的角色，避免参考素材被误认作商品。 */
-export function withGenerationAssetRoles<T extends VisualAssetRecord>(prompt: string, assets: T[]): string {
+/**
+ * 为图片素材生成进入模型上下文的稳定短指代（P1/P2、R1/R2）。
+ * 真实素材 ID 是数据库主键，对模型无语义且会被照抄进提示词；
+ * 指代由角色 + 确定性排序（createdAt、id）派生，规划和生成两侧各自推导即天然一致。
+ */
+export function assignImageHandles<T extends VisualAssetRecord>(assets: T[]): Map<string, string> {
+  const images = assets
+    .filter((asset) => asset.mimeType.startsWith("image/"))
+    .slice()
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
+  const handles = new Map<string, string>();
+  let productIndex = 0;
+  let referenceIndex = 0;
+  for (const asset of images) {
+    if (asset.role === "PRODUCT_TRUTH") {
+      productIndex += 1;
+      handles.set(asset.id, `P${productIndex}`);
+    } else {
+      referenceIndex += 1;
+      handles.set(asset.id, `R${referenceIndex}`);
+    }
+  }
+  return handles;
+}
+
+export function imageHandle(handles: Map<string, string>, assetId: string): string {
+  const handle = handles.get(assetId);
+  if (!handle) throw new Error(`Image handle is missing for asset: ${assetId}`);
+  return handle;
+}
+
+/** 按 Provider 实际收到的顺序声明每张图的角色和指代，让提示词里的 P1/R1 引用可解析，避免参考素材被误认作商品。 */
+export function withGenerationAssetRoles<T extends VisualAssetRecord>(prompt: string, assets: T[], handles?: Map<string, string>): string {
   const finalPrompt = prompt.trim();
   if (assets.length === 0) return finalPrompt;
-  const roles = assets.map((asset, index) => `- Image ${index + 1}: ${generationRoleInstruction(asset.role)}`);
+  const roles = assets.map((asset, index) => {
+    const handle = handles?.get(asset.id);
+    return `- Image ${index + 1}${handle ? ` (${handle})` : ""}: ${generationRoleInstruction(asset.role)}`;
+  });
   return [
     "Input image roles (follow strictly):",
     ...roles,
@@ -68,8 +102,8 @@ export function withGenerationAssetRoles<T extends VisualAssetRecord>(prompt: st
   ].join("\n");
 }
 
-export function visionAttachmentMetadata<T extends VisualAssetRecord>(assets: T[]): Array<{ attachmentIndex: number; assetId: string; role: string; name: string; mimeType: string }> {
-  return assets.map((asset, index) => ({ attachmentIndex: index + 1, assetId: asset.id, role: asset.role, name: asset.name ?? asset.id, mimeType: asset.mimeType }));
+export function visionAttachmentMetadata<T extends VisualAssetRecord>(assets: T[], handles: Map<string, string>): Array<{ attachmentIndex: number; handle: string; role: string; name: string; mimeType: string }> {
+  return assets.map((asset, index) => ({ attachmentIndex: index + 1, handle: imageHandle(handles, asset.id), role: asset.role, name: asset.name ?? asset.id, mimeType: asset.mimeType }));
 }
 
 function generationRoleInstruction(role: string): string {
