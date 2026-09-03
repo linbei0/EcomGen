@@ -15,7 +15,9 @@ export type Storyboard = components["schemas"]["Storyboard"];
 export type StoryboardItem = components["schemas"]["StoryboardItem"];
 export type StoryboardShotRole = NonNullable<StoryboardItem["shotRole"]>;
 export type Output = components["schemas"]["Output"];
-export type Job = components["schemas"]["Job"];
+// GENERATE 任务由 API 按 storyboard item 逐个创建，仓储记录直接序列化出 storyboardItemId
+// （契约 Job schema 未声明该字段）；前端用它把失败任务关联回分镜展示
+export type Job = components["schemas"]["Job"] & { storyboardItemId?: string | null };
 export type CreateProjectInput = components["schemas"]["CreateProjectInput"];
 export type UpdateProjectInput = components["schemas"]["UpdateProjectInput"];
 export interface PlanningConfigSnapshot {
@@ -227,6 +229,7 @@ export function adaptJob(raw: unknown): Job | null {
     status,
     progress,
     retryable: raw.retryable === true,
+    storyboardItemId: asString(raw.storyboardItemId) ?? null,
     createdAt,
     updatedAt: asString(raw.updatedAt),
     requestFingerprint: asString(raw.requestFingerprint) ?? null,

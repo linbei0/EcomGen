@@ -10,6 +10,8 @@ import { errorText } from "../../lib/errorText";
 import { JOB_STATUS_LABEL } from "../../lib/factClaims";
 import { activeGenerateJobs } from "../../lib/generateSelection";
 import { jobErrorText } from "../../lib/jobError";
+import { itemDisplayName } from "../../lib/itemName";
+import { useTemplates } from "../../api/hooks/useTemplates";
 import { ReviewStage } from "./ReviewStage";
 import styles from "./workbench.module.css";
 
@@ -26,6 +28,7 @@ export function ResultsWorkspace({
   const [activeExportId, setActiveExportId] = useState<string | undefined>(undefined);
   const [selectedOutputIds, setSelectedOutputIds] = useState<string[]>([]);
   const liveExport = useExport(activeExportId);
+  const templates = useTemplates();
   const active = activeGenerateJobs(detail.jobs);
   const failed = detail.jobs.filter((job) => job.type === "GENERATE" && job.status === "FAILED");
   const record = liveExport.data;
@@ -73,30 +76,36 @@ export function ResultsWorkspace({
         </aside>
       ) : null}
 
-      {failed.map((job) => (
-        <aside key={job.id} className={styles.jobCard} data-status="FAILED">
-          <p className={styles.jobStatus}>{JOB_STATUS_LABEL.FAILED}</p>
-          {jobErrorText(job) ? <p className={styles.jobError}>{jobErrorText(job)}</p> : null}
-          <div className={styles.jobActions}>
-            {job.retryable ? (
-              <Button loading={retryJob.isPending} onClick={() => void retryJob.mutateAsync(job.id)}>
-                重试生成
-              </Button>
-            ) : null}
-          </div>
-          <Tooltip title="关闭失败提示">
-            <Button
-              className={styles.jobDismiss}
-              type="text"
-              size="small"
-              icon={<X size={16} strokeWidth={1.75} />}
-              loading={cancelJob.isPending}
-              aria-label="关闭失败提示"
-              onClick={() => void cancelJob.mutateAsync(job.id)}
-            />
-          </Tooltip>
-        </aside>
-      ))}
+      {failed.map((job) => {
+        // GENERATE 任务与分镜一一对应，展示分镜名以区分是哪张图失败
+        const item = detail.items.find((candidate) => candidate.id === job.storyboardItemId);
+        const label = item ? itemDisplayName(item, templates.data ?? []) : null;
+        return (
+          <aside key={job.id} className={styles.jobCard} data-status="FAILED">
+            <p className={styles.jobStatus}>{JOB_STATUS_LABEL.FAILED}</p>
+            {label ? <h2>{label}</h2> : null}
+            {jobErrorText(job) ? <p className={styles.jobError}>{jobErrorText(job)}</p> : null}
+            <div className={styles.jobActions}>
+              {job.retryable ? (
+                <Button loading={retryJob.isPending} onClick={() => void retryJob.mutateAsync(job.id)}>
+                  重试生成
+                </Button>
+              ) : null}
+            </div>
+            <Tooltip title="关闭失败提示">
+              <Button
+                className={styles.jobDismiss}
+                type="text"
+                size="small"
+                icon={<X size={16} strokeWidth={1.75} />}
+                loading={cancelJob.isPending}
+                aria-label="关闭失败提示"
+                onClick={() => void cancelJob.mutateAsync(job.id)}
+              />
+            </Tooltip>
+          </aside>
+        );
+      })}
 
       <div className={styles.resultsToolbar}>
         <Button size="small" onClick={() => setSelectedOutputIds(detail.outputs.map((output) => output.id))} disabled={detail.outputs.length === 0}>全选图片</Button>
