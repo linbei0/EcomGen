@@ -15,7 +15,10 @@ export interface ReasoningModelInput {
 export function resolveReasoningProfile(profile: ReasoningProtocolProfile): OpenAICompletionsCompat | undefined {
   switch (profile) {
     case "openai":
-      return undefined;
+      // "openai" 表示经 OpenAI-compatible 中转站访问各类上游（GLM/DeepSeek/Qwen 等），
+      // 它们普遍不识别 developer 角色，真实 OpenAI 也仍接受 system；
+      // //显式禁用，避免 Pi 对未知模型族自动启用 developer role。其余字段留给Pi 按 baseUrl/模型族判定。
+      return { supportsDeveloperRole: false };
     case "dashscope_qwen":
       return { maxTokensField: "max_tokens", thinkingFormat: "qwen", supportsDeveloperRole: false };
     case "openai_responses":
@@ -25,6 +28,9 @@ export function resolveReasoningProfile(profile: ReasoningProtocolProfile): Open
   }
 }
 
+// 部分中转站（如 NewAPI 前置 WAF）会按 User-Agent 拦截 openai SDK 的默认UA
+const PROVIDER_USER_AGENT = "EcomGen/1.0";
+
 export function buildReasoningModel(input: ReasoningModelInput): Model<"openai-completions" | "openai-responses"> & { ecomgenSupportsStructuredOutput: boolean } {
   const api = input.protocol === "openai_responses" ? "openai-responses" : "openai-completions";
   return {
@@ -33,6 +39,7 @@ export function buildReasoningModel(input: ReasoningModelInput): Model<"openai-c
     api,
     provider: input.providerId as never,
     baseUrl: input.baseUrl,
+    headers: { "User-Agent": PROVIDER_USER_AGENT },
     reasoning: input.supportsThinking,
     input: input.supportsVision ? ["text", "image"] : ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

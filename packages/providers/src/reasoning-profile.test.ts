@@ -11,8 +11,8 @@ describe("reasoning protocol profiles", () => {
     });
   });
 
-  it("leaves the standard OpenAI profile on Pi defaults", () => {
-    expect(resolveReasoningProfile("openai")).toBeUndefined();
+  it("disables the developer role for the standard OpenAI profile", () => {
+    expect(resolveReasoningProfile("openai")).toEqual({ supportsDeveloperRole: false });
   });
 
   it("builds an OpenAI Responses model when explicitly selected", () => {

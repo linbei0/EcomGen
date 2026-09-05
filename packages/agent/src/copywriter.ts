@@ -1,4 +1,5 @@
 import type { ImageContent } from "@earendil-works/pi-ai";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { CopywritingTarget, PlatformTarget, TargetMarket } from "@ecomgen/contracts";
 import { createAgent, type ReasoningModel } from "./runtime.js";
 import { parseJsonResponse } from "./json-response.js";
@@ -63,13 +64,36 @@ export async function writeCopywriting(input: CopywritingInput): Promise<Copywri
     input.model.input.includes("image") ? input.referenceImages : undefined,
   );
   if (agent.state.errorMessage) throw new Error(`Copywriting model request failed: ${agent.state.errorMessage}`);
-  const response = [...agent.state.messages].reverse().find((message) => message.role === "assistant");
-  const text = response && response.role === "assistant"
-    ? response.content.filter((part) => part.type === "text").map((part) => part.text).join("\n")
+  let result: CopywritingResult;
+  try {
+    result = validateCopywriting(input.target, parseJsonResponse(latestAssistantText(agent.state.messages)));
+  } catch (error) {
+    // LLM 对字符数软约束不可靠，超限是可恢复偏差：在同一会话里追加一次有界压缩
+    // 重试并留出安全余量；仍超限则按失败处理，不静默截断文案。
+    if (!(error instanceof Error) || !error.message.startsWith("Copywriting model returned content longer than")) throw error;
+    // 压缩目标比硬护栏再留一档余量（500/3800），避免重试结果贴着上限再次超限。
+    const limit = input.target === "PRODUCT_DESCRIPTION" ? 500 : 3800;
+    await agent.prompt(
+      `Your previous result is too long. Rewrite it with the same JSON schema and the same facts, shortening every field so the final formatted content stays within ${limit} characters. Return only the JSON.`,
+    );
+    if (agent.state.errorMessage) throw new Error(`Copywriting model request failed: ${agent.state.errorMessage}`);
+    result = validateCopywriting(input.target, parseJsonResponse(latestAssistantText(agent.state.messages)));
+  }
+  return result;
+}
+
+function latestAssistantText(messages: readonly AgentMessage[]): string {
+  const response = [...messages].reverse().find((message) => message.role === "assistant");
+  const text = response
+    ? response.content.filter((part) => part.type === "text").map((part) => ("text" in part ? part.text : "")).join("\n")
     : "";
   if (!text) throw new Error("Copywriting model returned no text");
-  return validateCopywriting(input.target, parseJsonResponse(text));
+  return text;
 }
+
+// 产品描述的 Prompt 目标是 400 字符（产品期望的简洁度），但 LLM 对字符计数不可靠，
+// 硬护栏放宽到 600 作为容差带：轻微超限直接放行，只有严重超限才触发压缩重试。
+const PRODUCT_DESCRIPTION_LIMIT = 600;
 
 export function validateCopywriting(target: CopywritingTarget, value: unknown): CopywritingResult {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Copywriting model returned an invalid result");
@@ -87,7 +111,7 @@ export function validateCopywriting(target: CopywritingTarget, value: unknown): 
       `适用人群：${requiredText(record.suitableAudience, "suitableAudience")}`,
       `期望场景：${requiredText(record.expectedScenarios, "expectedScenarios")}`,
     ].join("\n");
-    return { target, content: checkedLength(content, 400) };
+    return { target, content: checkedLength(content, PRODUCT_DESCRIPTION_LIMIT) };
   }
   return { target, content: checkedLength(requiredText(record.content, "content"), 4000) };
 }

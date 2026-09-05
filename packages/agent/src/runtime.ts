@@ -33,7 +33,12 @@ export function createAgent(options: AgentRuntimeOptions): Agent {
     initialState: {
       model: options.model,
       systemPrompt: options.systemPrompt,
-      thinkingLevel: options.workflow === "COPYWRITE" ? "off" : options.model.reasoning ? "medium" : "off",
+      // 始终思考的模型（如 glm-5.3-flash）会拒绝关闭思考（智谱 1210），因此思考能力
+      // 开启时帮写降级为 low 而不是 off；思考关闭时保持 off，由 Pi 决定是否携带参数。
+      thinkingLevel:
+        options.workflow === "COPYWRITE"
+          ? options.model.reasoning ? "low" : "off"
+          : options.model.reasoning ? "medium" : "off",
       tools: options.tools,
     },
   });

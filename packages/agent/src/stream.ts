@@ -12,9 +12,18 @@ export function boundedAgentStream(): StreamFn {
   const completions = openAICompletionsApi().stream;
   const responses = openAIResponsesApi().stream;
   return (model, context, options) => {
-    const boundedOptions = { ...options, timeoutMs: AGENT_TURN_TIMEOUT_MS, maxRetries: AGENT_TURN_MAX_RETRIES };
+    // pi-ai 的 stream 只读 reasoningEffort，而 Agent 传入的是 reasoning（thinkingLevel）；
+    // 直接透传会被静默丢弃，zai 家族（如直连智谱）会退化为显式关闭思考，始终思考的
+    // 模型（glm-5.3-flash）因此报 1210。此处按 streamSimple 的语义转换档位。
+    const { reasoning, ...boundedOptions } = options ?? {};
+    const finalOptions = {
+      ...boundedOptions,
+      ...(reasoning !== undefined ? { reasoningEffort: reasoning } : {}),
+      timeoutMs: AGENT_TURN_TIMEOUT_MS,
+      maxRetries: AGENT_TURN_MAX_RETRIES,
+    };
     return model.api === "openai-responses"
-      ? responses(model, context, boundedOptions)
-      : completions(model, context, boundedOptions);
+      ? responses(model, context, finalOptions)
+      : completions(model, context, finalOptions);
   };
 }
