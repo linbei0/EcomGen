@@ -19,6 +19,10 @@ describe("contracts", () => {
     expect(resolveImageSize("1K", "AUTO", "1024x1536")).toBe("1024x1536");
     expect(resolveImageSize("2K", "1:1", "1024x1536")).toBe("1024x1024");
     expect(resolveImageSize("4K", "3:4", "1024x1024")).toBe("1024x1536");
+    expect(resolveImageSize("1K", "9:16", "1024x1024")).toBe("1024x1536");
+    expect(resolveImageSize("1K", "21:9", "1024x1024")).toBe("1536x1024");
+    expect(resolveImageSize("1K", "4:5", "1024x1024")).toBe("1024x1536");
+    expect(resolveImageSize("1K", "5:4", "1024x1024")).toBe("1536x1024");
   });
 
   it("keeps every registered API schema serializable with a unique component id", () => {

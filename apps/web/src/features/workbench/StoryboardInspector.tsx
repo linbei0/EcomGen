@@ -9,7 +9,8 @@ import { useProviders } from "../../api/hooks/useProviders";
 import { errorText } from "../../lib/errorText";
 import { factClaimRows } from "../../lib/factClaims";
 import { modelOptions } from "../../lib/modelOptions";
-import { ASPECT_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
+import { RESOLUTION_LABEL } from "../../lib/roles";
+import { ASPECT_SELECT_OPTIONS, renderAspectOption } from "./aspectOptions";
 import styles from "./workbench.module.css";
 
 const DEBOUNCE_MS = 600;
@@ -132,7 +133,8 @@ export function StoryboardInspector({
               aria-label="分镜图片比例"
               value={draft.imageAspectRatio}
               disabled={generationSettingsReadOnly}
-              options={Object.entries(ASPECT_LABEL).map(([value, label]) => ({ value, label }))}
+              options={ASPECT_SELECT_OPTIONS}
+              optionRender={renderAspectOption}
               onChange={(imageAspectRatio) => setDraft((current) => ({ ...current, imageAspectRatio }))}
             />
           </label>

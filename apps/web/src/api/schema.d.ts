@@ -718,7 +718,7 @@ export interface components {
         /** @enum {string} */
         ImageResolution: "1K" | "2K" | "4K";
         /** @enum {string} */
-        ImageAspectRatio: "AUTO" | "1:1" | "3:4" | "4:3" | "16:9";
+        ImageAspectRatio: "AUTO" | "1:1" | "2:3" | "3:2" | "3:4" | "4:3" | "4:5" | "5:4" | "9:16" | "16:9" | "21:9";
         /** @enum {string} */
         PlanningMode: "AI" | "MANUAL";
         /** @enum {string} */

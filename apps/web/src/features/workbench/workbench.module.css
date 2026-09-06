@@ -2889,3 +2889,44 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* 比例下拉选项：示意框直接给出形状，减少逐个试选的成本 */
+.aspectOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 固定宽度槽位居中示意框，比例值在所有选项间纵向对齐 */
+.aspectGlyphBox {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+}
+
+.aspectGlyph {
+  flex: none;
+  display: inline-block;
+  border: 1.5px solid var(--text-2);
+  border-radius: 3px;
+}
+
+.aspectGlyphAuto {
+  flex: none;
+  display: inline-block;
+  border: 1.5px dashed var(--text-3);
+  border-radius: 3px;
+}
+
+.aspectRatioText {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.aspectDesc {
+  font-size: 12px;
+  color: var(--text-3);
+}

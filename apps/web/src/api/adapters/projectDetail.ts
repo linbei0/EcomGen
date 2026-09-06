@@ -51,7 +51,7 @@ const TARGET_MARKETS = new Set<Exclude<TargetMarket, null>>([
   "CHINA_MAINLAND", "HONG_KONG", "MACAU", "TAIWAN", "UNITED_STATES", "UNITED_KINGDOM",
   "GERMANY", "FRANCE", "ITALY", "SPAIN", "JAPAN", "SOUTH_KOREA",
 ]);
-const ASPECTS = new Set<ImageAspectRatio>(["AUTO", "1:1", "3:4", "4:3", "16:9"]);
+const ASPECTS = new Set<ImageAspectRatio>(["AUTO", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]);
 const SHOT_ROLES = new Set<StoryboardShotRole>(["HERO", "PAIN_POINT", "COMPARISON", "SCENE", "DETAIL", "TRUST", "VARIANT", "CTA"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {

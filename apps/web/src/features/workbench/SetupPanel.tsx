@@ -19,7 +19,8 @@ import { jobErrorText } from "../../lib/jobError";
 import { modelOptions } from "../../lib/modelOptions";
 import { randomUuid } from "../../lib/randomUuid";
 import { canResubmitPlan, isActiveJob, latestPlanJob } from "../../lib/planJob";
-import { ASPECT_LABEL, PLATFORM_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
+import { PLATFORM_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
+import { ASPECT_SELECT_OPTIONS, renderAspectOption } from "./aspectOptions";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import styles from "./workbench.module.css";
 
@@ -506,7 +507,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
             <Select
               aria-label="图片比例"
               value={imageAspectRatio}
-              options={Object.entries(ASPECT_LABEL).map(([value, label]) => ({ value, label }))}
+              options={ASPECT_SELECT_OPTIONS}
+              optionRender={renderAspectOption}
               onChange={(value) => void saveOptimistic(value, setImageAspectRatio, imageAspectRatio, { imageAspectRatio: value }, "保存比例失败")}
             />
           </label>

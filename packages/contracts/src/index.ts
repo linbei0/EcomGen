@@ -5,7 +5,7 @@ export * from "./ref.js";
 import type { AssetRole, ImageAspectRatio, ImageResolution, UserAssetKind } from "./enums.js";
 
 export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
-export const IMAGE_ASPECT_RATIOS = ["AUTO", "1:1", "3:4", "4:3", "16:9"] as const;
+export const IMAGE_ASPECT_RATIOS = ["AUTO", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"] as const;
 export const MAX_CANDIDATES_PER_TYPE = 4;
 export const MAX_PRODUCT_IMAGE_ASSETS = 6;
 export const MAX_REFERENCE_IMAGE_ASSETS = 6;
@@ -19,7 +19,8 @@ export const DEFAULT_CANDIDATES_PER_TYPE = 1;
 
 /**
  * 项目级允许值映射到当前 OpenAI-compatible Images 尺寸。
- * 2K/4K 仍走 1024 家族，避免按模型名猜测更大尺寸。
+ * 2K/4K 仍走 1024 家族，避免按模型名猜测更大尺寸；
+ * 细分比例按方向折叠到 OpenAI 支持的三档尺寸，Gemini 则原生透传比例。
  */
 export function resolveImageSize(
   resolution: Static<typeof ImageResolution>,
@@ -27,10 +28,10 @@ export function resolveImageSize(
   templateDefault: string
 ): string {
   void resolution;
+  if (aspectRatio === "AUTO") return templateDefault;
   if (aspectRatio === "1:1") return "1024x1024";
-  if (aspectRatio === "3:4") return "1024x1536";
-  if (aspectRatio === "4:3" || aspectRatio === "16:9") return "1536x1024";
-  return templateDefault;
+  const [width, height] = aspectRatio.split(":").map(Number);
+  return width > height ? "1536x1024" : "1024x1536";
 }
 
 export function userAssetKindForRole(role: Static<typeof AssetRole>): Static<typeof UserAssetKind> {

@@ -15,7 +15,8 @@ import { groupOutputsByGenerationBatch } from "../../lib/review";
 import { formatDateTime } from "../../lib/format";
 import styles from "./workbench.module.css";
 import type { GenerationJobInput } from "../../api/serializeGenerationBody";
-import { ASPECT_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
+import { RESOLUTION_LABEL } from "../../lib/roles";
+import { ASPECT_SELECT_OPTIONS, renderAspectOption } from "./aspectOptions";
 import { modelOptions } from "../../lib/modelOptions";
 import { EditImageWorkspace } from "./EditImageWorkspace";
 
@@ -312,7 +313,7 @@ function LightboxModal({
       </Modal>
       <Modal open={retryOpen} title="重新生成配置" okText="开始生成" cancelText="取消" onOk={submitRetry} onCancel={() => setRetryOpen(false)} okButtonProps={{ disabled: !modelKey }}>
         <div className={styles.inspectorSettingGrid}>
-          <label className={styles.fieldLabel}>图片比例<Select value={aspectRatio} options={Object.entries(ASPECT_LABEL).map(([value, label]) => ({ value, label }))} onChange={setAspectRatio} /></label>
+          <label className={styles.fieldLabel}>图片比例<Select value={aspectRatio} options={ASPECT_SELECT_OPTIONS} optionRender={renderAspectOption} onChange={setAspectRatio} /></label>
           <label className={styles.fieldLabel}>分辨率<Select value={resolution} options={Object.entries(RESOLUTION_LABEL).map(([value, label]) => ({ value, label }))} onChange={setResolution} /></label>
           <label className={styles.fieldLabel}>候选数<InputNumber min={1} max={4} value={candidateCount} onChange={(value) => setCandidateCount(value ?? 1)} /></label>
           <label className={styles.fieldLabel}>生图模型<Select value={modelKey} options={imageOptions} placeholder="选择生图模型" onChange={setModelKey} /></label>
