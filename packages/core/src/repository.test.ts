@@ -57,6 +57,29 @@ describe("EcomRepository", () => {
     expect(repository.listPlanningConfigSnapshots(project.id)).toHaveLength(20);
     database.close();
   });
+  it("listAssetHistory 跨项目按 hash 去重、排除指定项目并按时间倒序", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const projectBase = { category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO" as const], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE" as const, imageResolution: "1K" as const, imageAspectRatio: "AUTO" as const, candidatesPerType: 1 };
+    const projectA = repository.createProject({ name: "a", ...projectBase });
+    const projectB = repository.createProject({ name: "b", ...projectBase });
+    const projectC = repository.createProject({ name: "c", ...projectBase });
+    const storagePath = "assets/source.png";
+    const oldDuplicate = repository.createAsset({ projectId: projectA.id, role: "PRODUCT_TRUTH", storagePath, hash: "dup", originalName: "old.png", mimeType: "image/png", width: null, height: null });
+    const newDuplicate = repository.createAsset({ projectId: projectB.id, role: "PRODUCT_TRUTH", storagePath, hash: "dup", originalName: "new.png", mimeType: "image/png", width: null, height: null });
+    const unique = repository.createAsset({ projectId: projectB.id, role: "STYLE_REFERENCE", storagePath, hash: "unique", originalName: "unique.png", mimeType: "image/png", width: null, height: null });
+    const owned = repository.createAsset({ projectId: projectC.id, role: "STYLE_REFERENCE", storagePath, hash: "owned", originalName: "owned.png", mimeType: "image/png", width: null, height: null });
+    database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-01-01T00:00:00.000Z", oldDuplicate.id);
+    database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-02-01T00:00:00.000Z", newDuplicate.id);
+    database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-03-01T00:00:00.000Z", unique.id);
+    database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-04-01T00:00:00.000Z", owned.id);
+    const history = repository.listAssetHistory(projectC.id);
+    expect(history.map((asset) => asset.hash)).toEqual(["unique", "dup"]);
+    expect(history.find((asset) => asset.hash === "dup")?.id).toBe(newDuplicate.id);
+    expect(repository.listAssetHistory(null)).toHaveLength(3);
+    database.close();
+  });
   it("恢复任务时不自动重试结果未知的外部图像请求", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);

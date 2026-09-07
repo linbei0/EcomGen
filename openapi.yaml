@@ -282,6 +282,43 @@ paths:
           description: Asset deleted.
         "404":
           $ref: "#/components/responses/NotFound"
+  /asset-history:
+    get:
+      operationId: listAssetHistory
+      parameters:
+        - name: excludeProjectId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Recently uploaded assets across projects, deduplicated by content hash.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetList"
+  /projects/{projectId}/assets/from-history:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      operationId: copyAssetFromHistory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CopyAssetFromHistoryInput"
+      responses:
+        "201":
+          description: Asset copied into the project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{projectId}/planning-jobs:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
@@ -2608,6 +2645,18 @@ components:
         version:
           minimum: 1
           type: integer
+    CopyAssetFromHistoryInput:
+      type: object
+      required:
+        - assetId
+      properties:
+        assetId:
+          format: uuid
+          type: string
+        role:
+          $ref: "#/components/schemas/AssetRole"
+        kind:
+          $ref: "#/components/schemas/UserAssetKind"
     CreateEditTurnInput:
       type: object
       required:

@@ -9,7 +9,7 @@ import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFinger
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, roleForUserAssetKind } from "@ecomgen/contracts";
+import { CopyAssetFromHistoryInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, roleForUserAssetKind } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -191,6 +191,24 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   // 先删文件再删行：行删了就找不到 storagePath；不级联分镜/输出/任务（契约 deleteAsset）
   app.delete("/api/v1/assets/:assetId", async (request, reply) => { const id = parameter(request, "assetId"); const asset = repository.getAsset(id); if (!asset) missing("asset", id); await storage.delete(asset.storagePath); repository.deleteAsset(id); return reply.code(204).send(); });
+  app.get("/api/v1/asset-history", async (request) => {
+    const query = (request.query ?? {}) as Record<string, unknown>;
+    const excludeProjectId = typeof query.excludeProjectId === "string" && query.excludeProjectId ? query.excludeProjectId : null;
+    return { items: repository.listAssetHistory(excludeProjectId), nextCursor: null };
+  });
+  // 复制而非共享 storage_path：DELETE 资产会删物理文件、deleteProject 按项目目录清理，共享路径会互相破坏
+  app.post("/api/v1/projects/:projectId/assets/from-history", async (request, reply) => {
+    const projectId = parameter(request, "projectId"); ensureProject(repository, projectId);
+    const body = parseBody(CopyAssetFromHistoryInput, request.body ?? {});
+    const source = repository.getAsset(body.assetId); if (!source) missing("asset", body.assetId);
+    const role = parseAssetRole(body.kind ?? body.role ?? source.role);
+    assertProjectAssetCapacity(repository, projectId, role);
+    assertProjectAssetHashUnique(repository, projectId, source.hash);
+    if (!(await storage.exists(source.storagePath))) throw new ApiError(404, "NOT_FOUND", "Source asset file is missing");
+    const content = await storage.read(source.storagePath);
+    const stored = await storage.putAsset(projectId, source.originalName, content);
+    return reply.code(201).send(repository.createAsset({ projectId, role, storagePath: stored.path, hash: stored.hash, originalName: source.originalName, mimeType: source.mimeType, width: source.width, height: source.height }));
+  });
   app.post("/api/v1/projects/:projectId/planning-jobs", async (request, reply) => {
     const projectId = parameter(request, "projectId"); const project = repository.getProject(projectId); if (!project) missing("project", projectId); const body = parseBody(CreatePlanningJobInput, request.body ?? {});
     if (project.defaultMode === "PIXEL_PROTECTED" && !repository.listAssets(projectId).some((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/"))) {

@@ -423,6 +423,24 @@ export class EcomRepository {
   }
 
   public listAssets(projectId: string): AssetRecord[] { return (this.db.prepare("SELECT * FROM assets WHERE project_id=? ORDER BY created_at").all(projectId) as Row[]).map(mapAsset); }
+  /** 历史上传：跨项目按内容 hash 去重（同图多项目只保留最新一条），按上传时间倒序；
+   * excludeProjectId 项目内已有 hash 一并排除，避免前端选到必然被项目内 hash 唯一性拒绝的图片。 */
+  public listAssetHistory(excludeProjectId: string | null): AssetRecord[] {
+    const excludedHashes = new Set(
+      excludeProjectId
+        ? (this.db.prepare("SELECT hash FROM assets WHERE project_id=?").all(excludeProjectId) as Row[]).map((row) => String(row.hash))
+        : [],
+    );
+    const seen = new Set<string>();
+    const result: AssetRecord[] = [];
+    for (const row of this.db.prepare("SELECT * FROM assets ORDER BY created_at DESC, rowid DESC").all() as Row[]) {
+      const asset = mapAsset(row);
+      if (excludedHashes.has(asset.hash) || seen.has(asset.hash)) continue;
+      seen.add(asset.hash);
+      result.push(asset);
+    }
+    return result;
+  }
   public getAsset(id: string): AssetRecord | undefined { const row = this.db.prepare("SELECT * FROM assets WHERE id=?").get(id); return row ? mapAsset(row as Row) : undefined; }
   public createAsset(input: Omit<AssetRecord, "id" | "createdAt">): AssetRecord {
     const record: AssetRecord = { ...input, id: randomUUID(), createdAt: now() };

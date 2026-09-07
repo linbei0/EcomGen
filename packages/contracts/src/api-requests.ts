@@ -38,6 +38,8 @@ export const EditGenerationConfigInput = Type.Object({ reasoningProviderId: Type
 export type EditGenerationConfigInput = Static<typeof EditGenerationConfigInput>;
 
 export const UploadAssetInput = Type.Object({ file: Type.String({ format: "binary" }), role: Type.Optional(schemaRef(AssetRole)), kind: Type.Optional(schemaRef(UserAssetKind)) }, { $id: "#/components/schemas/UploadAssetInput" });
+export const CopyAssetFromHistoryInput = Type.Object({ assetId: Type.String({ format: "uuid" }), role: Type.Optional(schemaRef(AssetRole)), kind: Type.Optional(schemaRef(UserAssetKind)) }, { $id: "#/components/schemas/CopyAssetFromHistoryInput" });
+export type CopyAssetFromHistoryInput = Static<typeof CopyAssetFromHistoryInput>;
 export const UpdateAssetInput = Type.Object({ role: Type.Optional(schemaRef(AssetRole)), kind: Type.Optional(schemaRef(UserAssetKind)) }, { $id: "#/components/schemas/UpdateAssetInput" });
 export const ConfirmStoryboardInput = Type.Object({ version: Type.Optional(Type.Integer({ minimum: 1 })) }, { $id: "#/components/schemas/ConfirmStoryboardInput" });
 export const GenerationJobsResponse = Type.Object({ jobs: Type.Array(schemaRef(Job)) }, { $id: "#/components/schemas/GenerationJobsResponse" });

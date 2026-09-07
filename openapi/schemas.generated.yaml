@@ -1727,6 +1727,18 @@ components:
         version:
           minimum: 1
           type: integer
+    CopyAssetFromHistoryInput:
+      type: object
+      required:
+        - assetId
+      properties:
+        assetId:
+          format: uuid
+          type: string
+        role:
+          $ref: "#/components/schemas/AssetRole"
+        kind:
+          $ref: "#/components/schemas/UserAssetKind"
     CreateEditTurnInput:
       type: object
       required:

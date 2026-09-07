@@ -6,6 +6,7 @@ export const qk = {
   searchSources: ["search-sources"] as const,
   projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,
   project: (id: string) => ["projects", id] as const,
+  assetHistory: (excludeProjectId: string) => ["asset-history", { excludeProjectId }] as const,
   storyboard: (id: string) => ["projects", id, "storyboard"] as const,
   planningSnapshots: (id: string) => ["projects", id, "planning-config-snapshots"] as const,
   job: (id: string) => ["jobs", id] as const,

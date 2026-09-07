@@ -741,6 +741,126 @@
   font-size: 12px;
 }
 
+/* 行内「上传记录」入口：需浮在透明 file input 之上才可点击 */
+.historyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 2px;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.historyLink:hover {
+  text-decoration: underline;
+}
+
+.historyHint {
+  margin: 0 0 12px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.historyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  margin: 0;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.historyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  max-height: 56vh;
+  overflow-y: auto;
+  /* 预留滚动条空间，避免与最后一列图片重叠 */
+  scrollbar-gutter: stable;
+  padding-right: 8px;
+}
+
+.historyItem {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-2);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.historyItem:hover {
+  border-color: var(--line-2);
+}
+
+.historyItem[data-selected="true"] {
+  border-color: var(--accent);
+}
+
+.historyThumbWrap {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  background: var(--bg-3);
+}
+
+.historyThumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.historyCheck {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-s);
+  background: var(--accent);
+  color: var(--bg-0);
+}
+
+.historyItem[data-selected="true"] .historyCheck {
+  display: inline-flex;
+}
+
+.historyMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+}
+
+.historyName {
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyDate {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
 .missing {
   display: flex;
   flex-direction: column;

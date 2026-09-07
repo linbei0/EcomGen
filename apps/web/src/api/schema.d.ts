@@ -192,6 +192,40 @@ export interface paths {
         patch: operations["updateAsset"];
         trace?: never;
     };
+    "/asset-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAssetHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/assets/from-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["copyAssetFromHistory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{projectId}/planning-jobs": {
         parameters: {
             query?: never;
@@ -1287,6 +1321,12 @@ export interface components {
         ConfirmStoryboardInput: {
             version?: number;
         };
+        CopyAssetFromHistoryInput: {
+            /** Format: uuid */
+            assetId: string;
+            role?: components["schemas"]["AssetRole"];
+            kind?: components["schemas"]["UserAssetKind"];
+        };
         CreateEditTurnInput: {
             /** Format: uuid */
             baseOutputId?: string;
@@ -1948,6 +1988,55 @@ export interface operations {
                     "application/json": components["schemas"]["Asset"];
                 };
             };
+        };
+    };
+    listAssetHistory: {
+        parameters: {
+            query?: {
+                excludeProjectId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recently uploaded assets across projects, deduplicated by content hash. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetList"];
+                };
+            };
+        };
+    };
+    copyAssetFromHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyAssetFromHistoryInput"];
+            };
+        };
+        responses: {
+            /** @description Asset copied into the project. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Asset"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     createPlanningJob: {
