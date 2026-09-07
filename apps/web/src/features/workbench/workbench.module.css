@@ -3050,3 +3050,114 @@
   font-size: 12px;
   color: var(--text-3);
 }
+
+/* 自定义模板 chip：虚线边框与内置模板区分 */
+.chip[data-custom="true"] {
+  border-style: dashed;
+}
+
+.manageTemplates {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.manageTemplates:hover {
+  text-decoration: underline;
+}
+
+.userTemplateList {
+  display: grid;
+  gap: 10px;
+}
+
+.userTemplateEmpty {
+  margin: 0;
+  padding: 18px 0;
+  color: var(--text-3);
+  font-size: 13px;
+  text-align: center;
+}
+
+.userTemplateItem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-1);
+  border-radius: 8px;
+  background: var(--bg-1);
+}
+
+.userTemplateMain {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.userTemplateName {
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.userTemplateMeta {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.userTemplatePrompt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.userTemplateActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.userTemplateForm {
+  display: grid;
+  gap: 4px;
+}
+
+.userTemplateBack {
+  justify-self: start;
+  margin-bottom: 4px;
+}
+
+.userTemplatePromptLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.userTemplateParams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.userTemplateParamItem {
+  margin-bottom: 0;
+}
+
+.userTemplateFormActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}

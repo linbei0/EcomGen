@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import type { Output, ProjectDetail, StoryboardItem } from "../../api/adapters/projectDetail";
 import { useProviders } from "../../api/hooks/useProviders";
 import { useStoryboard } from "../../api/hooks/useStoryboard";
-import { useTemplates } from "../../api/hooks/useTemplates";
+import { useTemplateNames } from "../../api/hooks/useTemplates";
 import { ModeBadge } from "../../components/ModeBadge";
 import { downloadOriginal, outputFileName } from "../../lib/downloadImage";
 import { errorText } from "../../lib/errorText";
@@ -33,7 +33,7 @@ export function ReviewStage({
 }) {
   const { notification } = App.useApp();
   const board = useStoryboard(detail.id);
-  const templates = useTemplates();
+  const templateNames = useTemplateNames();
   const items = board.data?.items ?? detail.items;
   const originalOutputs = useMemo(() => detail.outputs.filter((output) => !output.editSessionId), [detail.outputs]);
   const editedOutputs = useMemo(() => detail.outputs.filter((output) => Boolean(output.editSessionId)), [detail.outputs]);
@@ -108,7 +108,7 @@ export function ReviewStage({
           </aside>
           <div className={styles.generationBatchBody}>
             {batch.groups.map((group) => {
-              const label = itemDisplayName(group.item, templates.data ?? []);
+              const label = itemDisplayName(group.item, templateNames);
               const groupKey = `${batch.id}:${group.item.id}`;
               const expanded = expandedGroups.has(groupKey);
               // 折叠时优先展示最新 4 张（重试图生成时间靠后、最值得关注），按时间正序排列
@@ -163,11 +163,11 @@ export function ReviewStage({
       <LightboxModal
         output={lightbox}
         item={lightboxItem}
-        label={lightboxItem ? itemDisplayName(lightboxItem, templates.data ?? []) : ""}
+        label={lightboxItem ? itemDisplayName(lightboxItem, templateNames) : ""}
         onClose={() => setLightboxId(null)}
         downloading={lightbox ? downloadingId === lightbox.id : false}
         onDownload={() => {
-          if (lightbox) void download(lightbox, lightboxItem ? itemDisplayName(lightboxItem, templates.data ?? []) : "");
+          if (lightbox) void download(lightbox, lightboxItem ? itemDisplayName(lightboxItem, templateNames) : "");
         }}
         onRetry={(generationConfig) => {
           if (lightboxItem) onRetryItem(lightboxItem.id, generationConfig, lightbox?.generationBatchId ?? undefined);

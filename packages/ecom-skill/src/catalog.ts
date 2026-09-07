@@ -82,6 +82,52 @@ export function resolveTemplates(requestedTypes?: string[]): EcomTemplate[] {
   }
   return [...resolved.values()];
 }
+
+/** 用户自定义模板的最小输入形状；字段上限校验在 contracts 层，编译函数信任输入形状。 */
+export interface UserTemplateSource {
+  id: string;
+  name: string;
+  prompt: string;
+  defaultSize: "1024x1024" | "1024x1536";
+  supportsImageReference: boolean;
+}
+
+/** 自定义模板 ID 统一使用 custom- 前缀，与内置模板 ID 空间隔离。 */
+export function isUserTemplateId(templateId: string): boolean { return templateId.startsWith("custom-"); }
+
+/** 编译用户自定义模板为与内置模板同构的对象；执行参数用中性透传文案，不虚构与用户提示词冲突的构图约束。 */
+export function compileUserTemplate(source: UserTemplateSource): EcomTemplate {
+  return {
+    id: source.id,
+    name: source.name,
+    keywords: [],
+    trigger_phrases: [],
+    prompt_template: { custom_prompt: source.prompt },
+    defaults: {},
+    variants: {},
+    category_tips: {},
+    examples: [],
+    anti_ai_tips: "",
+    supports_image_reference: source.supportsImageReference,
+    upstreamNumber: 0,
+    defaultSize: source.defaultSize,
+    productOccupancy: "as specified in the custom template prompt",
+    whitespace: "as specified in the custom template prompt",
+    camera: "as specified in the custom template prompt"
+  };
+}
+
+/** 内置模板沿用别名匹配；自定义模板只按 id 或 name 精确匹配，保持"逐项解析"语义供上层做数量一致性校验。 */
+export function resolveTemplatesWithUser(requestedTypes: string[] | undefined, userTemplates: readonly EcomTemplate[]): EcomTemplate[] {
+  if (!requestedTypes?.length) return [];
+  const resolved = new Map<string, EcomTemplate>();
+  for (const requested of requestedTypes.map((value) => value.trim()).filter(Boolean)) {
+    const template = ECOM_TEMPLATES.find((candidate) => [candidate.id, candidate.name, ...candidate.keywords, ...candidate.trigger_phrases].some((value) => normalize(value) === normalize(requested)))
+      ?? userTemplates.find((candidate) => candidate.id === requested || candidate.name === requested);
+    if (template) resolved.set(template.id, template);
+  }
+  return [...resolved.values()];
+}
 export interface TemplateGuidance {
   visualFields: Record<string, string>;
   productOccupancy: string;

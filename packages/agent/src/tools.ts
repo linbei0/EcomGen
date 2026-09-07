@@ -1,6 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
-import { getTemplate, templateGuidance } from "@ecomgen/ecom-skill";
+import { ECOM_TEMPLATES, templateGuidance, type EcomTemplate } from "@ecomgen/ecom-skill";
 import { readPlatformGuidance, type MarketGuidanceContext } from "./platform-guidance.js";
 
 export { readPlatformGuidance, type MarketGuidanceContext } from "./platform-guidance.js";
@@ -58,8 +58,9 @@ function textResult<T>(details: T): AgentToolResult<T> {
   return { content: [{ type: "text", text: JSON.stringify(details) }], details };
 }
 
-/** Pi 只能通过只读业务工具读取电商规范；联网研究必须使用受控搜索工具。 */
-export function createPlanningTools(context: MarketGuidanceContext, webResearch?: WebResearchConfig): AgentTool[] {
+/** Pi 只能通过只读业务工具读取电商规范；联网研究必须使用受控搜索工具。extraTemplates 为 MANUAL 规划注入的用户自定义模板。 */
+export function createPlanningTools(context: MarketGuidanceContext, webResearch?: WebResearchConfig, extraTemplates: readonly EcomTemplate[] = []): AgentTool[] {
+  const catalog: readonly EcomTemplate[] = extraTemplates.length ? [...ECOM_TEMPLATES, ...extraTemplates] : ECOM_TEMPLATES;
   const readTemplate: AgentTool<typeof readTemplateParameters> = {
     name: "read_ecom_template",
     label: "读取电商图片规范",
@@ -67,7 +68,7 @@ export function createPlanningTools(context: MarketGuidanceContext, webResearch?
     parameters: readTemplateParameters,
     execute: async (_toolCallId: string, params: ReadTemplateParameters): Promise<AgentToolResult<unknown>> => {
       const templates = params.templateIds.map((templateId) => {
-        const template = getTemplate(templateId);
+        const template = catalog.find((candidate) => candidate.id === templateId);
         if (!template) throw new Error(`Unknown ecom-details-image template: ${templateId}`);
         const variant = params.variants?.[templateId];
         if (variant && !template.variants[variant]) throw new Error(`Unknown template variant: ${variant}`);

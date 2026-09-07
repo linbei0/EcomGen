@@ -43,6 +43,17 @@ export interface SearchSourceRecord {
   updatedAt: string;
 }
 
+/** 用户自定义提示词模板（简化格式）；ID 形如 custom-xxxxxxxx，由 API 层生成。 */
+export interface UserTemplateRecord {
+  id: string;
+  name: string;
+  prompt: string;
+  defaultSize: "1024x1024" | "1024x1536";
+  supportsImageReference: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProjectRecord {
   id: string;
   name: string;
@@ -360,6 +371,26 @@ export class EcomRepository {
     return this.db.prepare("DELETE FROM search_sources WHERE id=?").run(id).changes > 0;
   }
 
+  public listUserTemplates(): UserTemplateRecord[] {
+    return (this.db.prepare("SELECT * FROM user_templates ORDER BY created_at ASC").all() as Row[]).map(mapUserTemplate);
+  }
+  public getUserTemplate(id: string): UserTemplateRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM user_templates WHERE id = ?").get(id);
+    return row ? mapUserTemplate(row as Row) : undefined;
+  }
+  public saveUserTemplate(input: Omit<UserTemplateRecord, "createdAt" | "updatedAt"> & { id?: string }): UserTemplateRecord {
+    const existing = input.id ? this.getUserTemplate(input.id) : undefined;
+    const record: UserTemplateRecord = { ...input, id: input.id ?? randomUUID(), createdAt: existing?.createdAt ?? now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO user_templates (id,name,prompt,default_size,supports_image_reference,created_at,updated_at)
+      VALUES (@id,@name,@prompt,@defaultSize,@supportsImageReference,@createdAt,@updatedAt)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,prompt=excluded.prompt,default_size=excluded.default_size,supports_image_reference=excluded.supports_image_reference,updated_at=excluded.updated_at`)
+      .run({ ...record, supportsImageReference: record.supportsImageReference ? 1 : 0 });
+    return record;
+  }
+  public deleteUserTemplate(id: string): boolean {
+    return this.db.prepare("DELETE FROM user_templates WHERE id=?").run(id).changes > 0;
+  }
+
   public listProjects(archived = false): ProjectRecord[] {
     const order = archived ? "archived_at DESC, updated_at DESC" : "updated_at DESC";
     return (this.db.prepare(`SELECT * FROM projects WHERE archived_at IS ${archived ? "NOT " : ""}NULL ORDER BY ${order}`).all() as Row[]).map(mapProject);
@@ -667,6 +698,8 @@ export class EcomRepository {
 
 function mapProvider(row: Row): ProviderRecord { return { id: String(row.id), name: String(row.name), baseUrl: String(row.base_url), reasoningProtocol: row.reasoning_protocol as ReasoningProtocolProfile, encryptedApiKey: String(row.encrypted_api_key), models: parse(row.models_json), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapSearchSource(row: Row): SearchSourceRecord { return { id: String(row.id), name: String(row.name), kind: row.kind as SearchSourceKind, baseUrl: String(row.base_url), encryptedApiKey: row.encrypted_api_key ? String(row.encrypted_api_key) : null, priority: Number(row.priority), enabled: Boolean(row.enabled), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+
+function mapUserTemplate(row: Row): UserTemplateRecord { return { id: String(row.id), name: String(row.name), prompt: String(row.prompt), defaultSize: row.default_size === "1024x1536" ? "1024x1536" : "1024x1024", supportsImageReference: Boolean(row.supports_image_reference), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapProject(row: Row): ProjectRecord {
   return {
     id: String(row.id),

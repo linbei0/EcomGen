@@ -6,7 +6,7 @@ import archiver from "archiver";
 import sharp from "sharp";
 import { planImageEdit, planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
 import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
-import { getTemplate } from "@ecomgen/ecom-skill";
+import { compileUserTemplate, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
@@ -109,6 +109,7 @@ async function executePlan(job: JobRecord): Promise<void> {
     visionAttachments: visionAttachmentMetadata(visualAssets.map((asset) => ({ ...asset, name: asset.originalName })), imageHandles),
     planningMode: input.planningMode ?? "AI",
     requestedTypes: input.requestedTypes,
+    userTemplates: compiledUserTemplates(),
     userInstruction: input.userInstruction,
     candidatesPerType: input.candidatesPerType ?? project.candidatesPerType,
     targetImageCount: input.targetImageCount,
@@ -178,6 +179,11 @@ async function executeCopywriting(job: JobRecord): Promise<void> {
   await updateJob(job, { progress: 90 });
 }
 
+/** 自定义模板按 job 执行时从 DB 实时编译：表极小，无缓存必要，且保证与 API 同一编译口径。 */
+function compiledUserTemplates(): EcomTemplate[] {
+  return repository.listUserTemplates().map((record) => compileUserTemplate({ id: record.id, name: record.name, prompt: record.prompt, defaultSize: record.defaultSize, supportsImageReference: record.supportsImageReference }));
+}
+
 /** 搜索源严格按后台 priority 执行；所有源失败仍由 Pi 使用已有项目上下文完成规划。 */
 function configuredWebResearch() {
   const sources = repository.listSearchSources()
@@ -194,7 +200,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const modelId = job.modelId ?? item.imageModelId;
   if (!providerId || !modelId) throw new Error("该项目尚未选择生图模型（Provider 可能已被删除），请在项目设置中重新选择");
   const provider = providerFor(providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini") throw new Error("Selected image model has no executable image API");
-  const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType); if (!template) throw new Error(`Storyboard item uses an unknown ecom-details-image template: ${item.assetType}`);
+  const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType) ?? compiledUserTemplates().find((userTemplate) => userTemplate.id === item.assetType); if (!template) throw new Error(`分镜引用的模板不存在或已被删除（${item.assetType}），无法生成；请删除该分镜或重新规划`);
   const projectAssets = repository.listAssets(project.id);
   const inputs = selectGenerationAssets(projectAssets, item);
   const generationInputs = template.supports_image_reference ? inputs : [];

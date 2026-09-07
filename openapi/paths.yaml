@@ -19,6 +19,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EcomTemplatesResponse"
+  /user-templates:
+    get:
+      operationId: listUserTemplates
+      responses:
+        "200":
+          description: User-defined custom prompt templates.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserTemplateList"
+    post:
+      operationId: createUserTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserTemplateInput"
+      responses:
+        "201":
+          description: Custom template created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserTemplateItem"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /user-templates/{templateId}:
+    parameters:
+      - $ref: "#/components/parameters/UserTemplateId"
+    patch:
+      operationId: updateUserTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserTemplateInput"
+      responses:
+        "200":
+          description: Custom template updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserTemplateItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteUserTemplate
+      responses:
+        "204":
+          description: Custom template deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /providers:
     get:
       operationId: listProviders

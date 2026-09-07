@@ -4,8 +4,8 @@ import { http, HttpResponse } from "msw";
 import { Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { PLAN_JOB_FIXTURE, PROJECT_ID, projectDetailPayload } from "../../test/msw/fixtures";
-import { BASE } from "../../test/msw/handlers";
+import { PLAN_JOB_FIXTURE, PROJECT_ID, USER_TEMPLATE_FIXTURE, projectDetailPayload } from "../../test/msw/fixtures";
+import { BASE, userTemplateStore } from "../../test/msw/handlers";
 import { server } from "../../test/msw/server";
 import { renderWithProviders } from "../../test/render";
 import { WorkbenchPage } from "./WorkbenchPage";
@@ -176,5 +176,68 @@ describe("工作台 · 规划", () => {
     renderSetup();
     expect(await screen.findByText("像素保护需要至少一张产品图，否则生成会失败。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "生成分镜" })).toBeDisabled();
+  });
+
+  it("手动选择可勾选自定义模板并随 requestedTypes 提交", async () => {
+    const user = userEvent.setup();
+    let captured: { planningMode?: string; requestedTypes?: string[] } | undefined;
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
+      http.post(`${BASE}/projects/:projectId/planning-jobs`, async ({ request }) => {
+        captured = (await request.json()) as typeof captured;
+        return HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 8 });
+      }),
+    );
+
+    renderSetup();
+    expect(await screen.findByDisplayValue("无线耳机 SPU")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "手动选择" }));
+    await user.click(await screen.findByRole("button", { name: "自定义节日礼盒图" }));
+    await user.click(screen.getByRole("button", { name: "生成分镜" }));
+
+    await waitFor(() => {
+      expect(captured?.planningMode).toBe("MANUAL");
+      expect(captured?.requestedTypes).toContain("custom-a1b2c3d4");
+    });
+    expect(await screen.findByText("排队中")).toBeInTheDocument();
+  });
+
+  it("自定义模板管理器：新建模板按契约提交并在列表展示", async () => {
+    const user = userEvent.setup();
+    let created: Record<string, unknown> | undefined;
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
+      http.post(`${BASE}/user-templates`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        created = body;
+        const item = { ...USER_TEMPLATE_FIXTURE, id: "custom-new01", ...body };
+        userTemplateStore.push(item);
+        return HttpResponse.json(item, { status: 201 });
+      }),
+    );
+
+    renderSetup();
+    expect(await screen.findByDisplayValue("无线耳机 SPU")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "手动选择" }));
+    await user.click(screen.getByRole("button", { name: "管理自定义模板" }));
+
+    // 模态列表与背景 chip 同名，用 findAllByText 确认管理器已打开
+    expect((await screen.findAllByText("自定义节日礼盒图")).length).toBeGreaterThan(1);
+    await user.click(screen.getByRole("button", { name: /新建模板/ }));
+
+    await user.type(screen.getByPlaceholderText("如：节日礼盒氛围主图"), "极简白底自定义图");
+    await user.type(screen.getByPlaceholderText(/可直接粘贴提示词/), "极简白底产品图，柔和顶光。");
+    await user.click(screen.getByRole("button", { name: "创建" }));
+
+    await waitFor(() => {
+      expect(created).toMatchObject({
+        name: "极简白底自定义图",
+        prompt: "极简白底产品图，柔和顶光。",
+        defaultSize: "1024x1024",
+        supportsImageReference: true,
+      });
+    });
+    // 创建成功后列表与背景 chip 都会显示新模板名
+    expect((await screen.findAllByText("极简白底自定义图")).length).toBeGreaterThan(1);
   });
 });

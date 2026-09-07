@@ -54,6 +54,9 @@ function writeOrCheck(path, content) {
 
 const operationSchemaRefs = {
   listEcomDetailsImageTemplates: { response: { "200": "EcomTemplatesResponse" } },
+  createUserTemplate: { request: "CreateUserTemplateInput", response: { "201": "UserTemplateItem" } },
+  updateUserTemplate: { request: "UpdateUserTemplateInput", response: { "200": "UserTemplateItem" } },
+  listUserTemplates: { response: { "200": "UserTemplateList" } },
   testProviderConnection: { request: "TestProviderInput", response: { "200": "TestProviderConnectionResult" } },
   uploadAsset: { request: "UploadAssetInput" },
   updateAsset: { request: "UpdateAssetInput" },

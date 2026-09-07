@@ -2,7 +2,7 @@ import type { Agent } from "@earendil-works/pi-agent-core";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, StoryboardShotRole, TargetMarket } from "@ecomgen/contracts";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
-import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
+import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplatesWithUser, type EcomTemplate } from "@ecomgen/ecom-skill";
 import { createPlanningTools, type WebResearchConfig } from "./tools.js";
 import { createAgent, type ReasoningModel } from "./runtime.js";
 import { parseJsonResponse } from "./json-response.js";
@@ -29,6 +29,8 @@ export interface PlannerInput {
   visionAttachments?: Array<{ attachmentIndex: number; handle: string; role: string; name: string; mimeType: string }>;
   planningMode?: PlanningMode;
   requestedTypes?: string[];
+  /** 用户自定义模板（Worker 编译后注入）；仅在 MANUAL 规划或 requestedTypes 显式约束时生效，AI 自动选片仍只用内置目录。 */
+  userTemplates?: EcomTemplate[];
   userInstruction?: string;
   candidatesPerType?: number;
   targetImageCount?: number;
@@ -69,7 +71,7 @@ Output only valid JSON matching the requested schema. No Markdown.
 - riskFlags are only for material product-specific uncertainties that require human review; do not repeat generic template guidance or anti-AI style tips, and return an empty array when no material uncertainty exists.
 
 # Storyboard structure
-- assetType must be one of the supplied upstream template IDs; templateVariant must be null or a declared variant key for that template. Use requested template IDs exactly when present; otherwise select a conversion-oriented mix from the supplied catalog using the product category first and the platform only to shape hero/feed frames.
+- assetType must be one of the supplied template IDs (built-in catalog, or user-defined templates when supplied); templateVariant must be null or a declared variant key for that template. Use requested template IDs exactly when present; otherwise select a conversion-oriented mix from the supplied catalog using the product category first and the platform only to shape hero/feed frames.
 - displayName is a human-facing Chinese scene title generated from the actual product, viewpoint, setting, and conversion purpose. Keep it concise (usually 4-12 Chinese characters), specific, and distinct for each item; it may describe the visual treatment while assetType remains the exact template ID. Do not copy the catalog template name, internal template ID, generic scene labels, numbered labels, platform names, or unsupported product facts.
 - candidateCount is how many image candidates to generate for that type; keep it between 1 and the supplied candidatesPerType.
 - referencedAssets lists image handles this item should consider. Inspect the supplied visionAttachments and use only those real handles; prefer PRODUCT handles as product truth and REFERENCE handles only as style or layout hints.
@@ -104,9 +106,11 @@ Output only valid JSON matching the requested schema. No Markdown.
 
 export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryboard> {
   const marketContext = { platformTargets: input.platformTargets, targetMarket: input.targetMarket, copyLanguage: input.copyLanguage, productCategory: input.productCategory };
-  const tools = createPlanningTools(marketContext, input.webResearch);
+  const selectedTemplates = resolveTemplatesWithUser(input.requestedTypes, input.userTemplates ?? []);
+  // AI 自动选片不暴露自定义模板：工具目录只在 MANUAL 模式合并 userTemplates，避免诱导未授权的 assetType
+  const manualMode = input.planningMode === "MANUAL";
+  const tools = createPlanningTools(marketContext, input.webResearch, manualMode ? input.userTemplates ?? [] : []);
   const agent = createAgent({ workflow: "PLAN", model: input.model, apiKey: input.apiKey, systemPrompt: SYSTEM_PROMPT, tools, outputSchema: STORYBOARD_OUTPUT_SCHEMA });
-  const selectedTemplates = resolveTemplates(input.requestedTypes);
   const payload = {
     ...input,
     apiKey: undefined,
@@ -117,6 +121,8 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
     // 空的品牌指南不进 payload：省 token 且避免模型虚构品牌色；有值时规划层才按配色来源链消费。
     brandGuidelines: Object.keys(input.brandGuidelines ?? {}).length > 0 ? input.brandGuidelines : undefined,
     visionAttachments: input.visionAttachments,
+    // 自定义模板仅在 MANUAL 规划可见（custom_prompt 是 Agent 撰写最终 Prompt 的直接指导）
+    userTemplates: manualMode ? input.userTemplates : undefined,
     webResearch: input.webResearch ? { sources: input.webResearch.sources.map(({ id, name, kind, baseUrl }) => ({ id, name, kind, baseUrl })), maxResults: input.webResearch.maxResults, timeoutMs: input.webResearch.timeoutMs } : undefined,
     upstream: ECOM_DETAILS_IMAGE_SOURCE,
     allowedTemplateIds: (selectedTemplates.length ? selectedTemplates : ECOM_TEMPLATES).map((template) => template.id)
@@ -240,8 +246,9 @@ const SHOT_ROLES: readonly StoryboardShotRole[] = ["HERO", "PAIN_POINT", "COMPAR
 
 function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStoryboard {
   if (!plan || typeof plan.campaignStyleLock !== "string" || !Array.isArray(plan.items) || plan.items.length === 0) throw new Error("Planning model returned an invalid storyboard");
-  const requestedTemplates = resolveTemplates(input.requestedTypes);
+  const requestedTemplates = resolveTemplatesWithUser(input.requestedTypes, input.userTemplates ?? []);
   const allowedTemplateIds = new Set((requestedTemplates.length ? requestedTemplates : ECOM_TEMPLATES).map((template) => template.id));
+  const templateById = (id: string): EcomTemplate | undefined => getTemplate(id) ?? input.userTemplates?.find((template) => template.id === id);
   if (input.planningMode === "MANUAL") {
     const expected = requestedTemplates.map((template) => template.id);
     const actual = plan.items.map((item) => item.assetType);
@@ -255,7 +262,7 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
   const assetsByHandle = new Map(input.assets.map((asset) => [asset.handle, asset]));
   const defaultCandidates = clampCandidates(input.candidatesPerType ?? 1);
   const items = plan.items.map((item, index) => {
-    const template = getTemplate(item.assetType); if (!template || !allowedTemplateIds.has(item.assetType)) throw new Error(`Planning model returned an unavailable ecom-details-image template: ${item.assetType}`);
+    const template = templateById(item.assetType); if (!template || !allowedTemplateIds.has(item.assetType)) throw new Error(`Planning model returned an unavailable ecom-details-image template: ${item.assetType}`);
     if (item.templateVariant !== null && item.templateVariant !== undefined && !template.variants[item.templateVariant]) throw new Error(`Planning model returned an invalid variant for ${item.assetType}: ${item.templateVariant}`);
     if (item.mode !== "CREATIVE" && item.mode !== "PIXEL_PROTECTED") throw new Error("Planning model returned an invalid storyboard mode");
     if (!SHOT_ROLES.includes(item.shotRole)) throw new Error(`Planning model returned an invalid shotRole for ${item.assetType}: ${String(item.shotRole)}. Use one of ${SHOT_ROLES.join(", ")}`);

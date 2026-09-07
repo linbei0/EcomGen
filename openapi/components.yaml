@@ -49,6 +49,13 @@ components:
       schema:
         type: string
         format: uuid
+    UserTemplateId:
+      name: templateId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^custom-[0-9a-f]{8}$"
     Cursor:
       name: cursor
       in: query

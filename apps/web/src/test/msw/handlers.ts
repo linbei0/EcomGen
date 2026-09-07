@@ -12,12 +12,16 @@ import {
   STORYBOARD_ITEM_B_FIXTURE,
   STORYBOARD_ITEM_FIXTURE,
   TEMPLATE_FIXTURES,
+  USER_TEMPLATE_FIXTURE,
   projectDetailPayload,
   storyboardPayload,
 } from "./fixtures";
 
 /** 与 config/env.ts 的默认 API_BASE_URL 保持一致；测试只拦截该源。 */
 export const BASE = "http://127.0.0.1:8787/api/v1";
+
+/** 自定义模板内存态：同文件内多次增删改测试共享，模拟真实 CRUD。 */
+export const userTemplateStore: typeof USER_TEMPLATE_FIXTURE[] = [{ ...USER_TEMPLATE_FIXTURE }];
 
 export const PROVIDER_FIXTURE = {
   id: "7d0b0d1e-4b1c-4c2d-9a3e-2f5b6c7d8e9f",
@@ -118,6 +122,51 @@ export const handlers = [
   }),
 
   http.get(`${BASE}/ecom-templates`, () => HttpResponse.json(TEMPLATE_FIXTURES)),
+
+  http.get(`${BASE}/user-templates`, () =>
+    HttpResponse.json({ items: userTemplateStore, nextCursor: null }),
+  ),
+
+  http.post(`${BASE}/user-templates`, async ({ request }) => {
+    const body = (await request.json()) as {
+      name: string;
+      prompt: string;
+      defaultSize?: "1024x1024" | "1024x1536";
+      supportsImageReference?: boolean;
+    };
+    const created = {
+      ...USER_TEMPLATE_FIXTURE,
+      id: `custom-${Math.random().toString(16).slice(2, 10)}`,
+      name: body.name,
+      prompt: body.prompt,
+      defaultSize: body.defaultSize ?? "1024x1024",
+      supportsImageReference: body.supportsImageReference ?? true,
+    };
+    userTemplateStore.push(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.patch(`${BASE}/user-templates/:templateId`, async ({ request, params }) => {
+    const id = params.templateId as string;
+    const index = userTemplateStore.findIndex((template) => template.id === id);
+    if (index < 0) return new HttpResponse(null, { status: 404 });
+    const body = (await request.json()) as Record<string, unknown>;
+    const updated = {
+      ...userTemplateStore[index]!,
+      ...body,
+      id,
+    };
+    userTemplateStore[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete(`${BASE}/user-templates/:templateId`, ({ params }) => {
+    const id = params.templateId as string;
+    const index = userTemplateStore.findIndex((template) => template.id === id);
+    if (index < 0) return new HttpResponse(null, { status: 404 });
+    userTemplateStore.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
 
   http.get(`${BASE}/projects`, ({ request }) => {
     const archived = new URL(request.url).searchParams.get("archived") === "true";

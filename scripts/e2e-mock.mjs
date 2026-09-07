@@ -10,6 +10,9 @@ const dataDir = join(root, "data-e2e-mock");
 const onePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL7WQAAAABJRU5ErkJggg==";
 const onePixelReferencePng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const plan = { campaignStyleLock: "fixed deep green #1A3A2E and clean off-white #FFFFFF ecommerce system", items: [{ assetType: "hero-image", displayName: "通勤杯质感首图", shotRole: "HERO", templateVariant: "luxury", candidateCount: 1, referencedAssets: [], mode: "PIXEL_PROTECTED", promptInstruction: "Create a premium e-commerce hero image of the verified green insulated travel cup. Preserve the exact product identity: shape, silhouette, colors, materials, logo and label placement, and proportions; do not redesign the product. Keep the exact supplied product geometry and visible details. Use a clean off-white background, centered three-quarter product composition, Rembrandt lighting, and restrained deep green accents. Preserve generous whitespace and reserve a blank price-overlay zone without generating readable price, logo, or promotional text. Use the verified fact 304 stainless steel body only as visual material guidance; do not claim keeps hot for 24 hours. No extra props, hands, watermarks, fake logos, or invented product details.", factClaims: ["304 stainless steel body"], riskFlags: [], sortOrder: 0 }] };
+// 自定义模板场景：模型按 payload.userTemplates 中注入的 custom_prompt 撰写最终 Prompt；customTemplateId 在运行时由 API 生成后回填
+let customTemplateId = "";
+const customPlan = () => ({ campaignStyleLock: "warm festive gift box ecommerce system", items: [{ assetType: customTemplateId, displayName: "礼盒丝绒氛围图", shotRole: "SCENE", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "Create a warm festive e-commerce gift box scene with soft window light, triangular composition, rich red velvet accents and a festive ribbon close-up. Preserve exact product identity: shape, silhouette, colors, materials, logo and label placement, and proportions; do not redesign the product. No readable text, watermarks, or invented product details.", factClaims: [], riskFlags: [], sortOrder: 0 }] });
 const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "" };
 const children = [];
 let mock;
@@ -35,6 +38,16 @@ try {
         response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
         response.write(`data: ${JSON.stringify({ id: "mock-copywriting", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(copy) }, finish_reason: null }] })}\n\n`);
         response.write(`data: ${JSON.stringify({ id: "mock-copywriting", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+        response.write("data: [DONE]\n\n");
+        response.end();
+        return;
+      }
+      // 自定义模板 MANUAL 规划：payload.userTemplates 注入的 custom_prompt 以 marker 识别
+      if (requestText.includes("e2e-custom-marker")) {
+        observed.planningPrompt = body.toString("utf8");
+        response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        response.write(`data: ${JSON.stringify({ id: "mock-custom-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(customPlan()) }, finish_reason: null }] })}\n\n`);
+        response.write(`data: ${JSON.stringify({ id: "mock-custom-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
         response.write("data: [DONE]\n\n");
         response.end();
         return;
@@ -175,7 +188,43 @@ try {
   const archive = Buffer.from(await zip.arrayBuffer());
   assert.equal(archive.subarray(0, 2).toString("utf8"), "PK");
   assert.match(archive.toString("binary"), /manifest\.json/);
-  console.log("Mock E2E passed: plan -> confirm -> generate -> export");
+  // 自定义模板场景：创建模板 → MANUAL 规划（custom_prompt 注入规划上下文）→ 生图（Worker 回退解析自定义模板）
+  const customTemplate = await requestJson(`${base}/user-templates`, "POST", { name: "Festive gift box scene", prompt: "Festive gift box hero scene with e2e-custom-marker ribbon detail, soft window light, triangular composition.", defaultSize: "1024x1024", supportsImageReference: false });
+  assert.match(customTemplate.id, /^custom-/);
+  customTemplateId = customTemplate.id;
+  const customProject = await requestJson(`${base}/projects`, "POST", {
+    name: "Gift box",
+    category: "home",
+    productDescription: "A red velvet gift box for festive seasons.",
+    verifiedFacts: [],
+    prohibitedClaims: [],
+    brandGuidelines: {},
+    platformTargets: ["AMAZON"],
+    targetMarket: "UNITED_STATES",
+    copyLanguage: "en-US",
+    reasoningProviderId: provider.id,
+    reasoningModelId: "mock-reasoner",
+    imageProviderId: provider.id,
+    imageModelId: "mock-image",
+    defaultMode: "CREATIVE",
+    imageResolution: "1K",
+    imageAspectRatio: "AUTO",
+    candidatesPerType: 1
+  });
+  await requestJson(`${base}/projects/${customProject.id}/planning-jobs`, "POST", { planningMode: "MANUAL", requestedTypes: [customTemplate.id], candidatesPerType: 1 });
+  const customPlanningJob = await waitForJob(base, customProject.id, "PLAN");
+  assert.equal(customPlanningJob.status, "SUCCEEDED");
+  assert.match(observed.planningPrompt, /e2e-custom-marker/);
+  const customStoryboard = await requestJson(`${base}/projects/${customProject.id}/storyboard`, "GET");
+  assert.equal(customStoryboard.items.length, 1);
+  assert.equal(customStoryboard.items[0].assetType, customTemplate.id);
+  assert.equal(customStoryboard.items[0].displayName, "礼盒丝绒氛围图");
+  await requestJson(`${base}/projects/${customProject.id}/storyboard/confirm`, "POST", {});
+  const customGeneration = await requestJson(`${base}/projects/${customProject.id}/generation-jobs`, "POST", { storyboardItemIds: [customStoryboard.items[0].id] });
+  const customGenerationJob = await waitJob(base, customGeneration.jobs[0].id);
+  assert.equal(customGenerationJob.status, "SUCCEEDED");
+  assert.match(observed.imagePrompt, /festive ribbon close-up/);
+  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate");
 } finally {
   await Promise.all(children.map(stop));
   if (mock) await new Promise((resolveClose) => mock.close(resolveClose));

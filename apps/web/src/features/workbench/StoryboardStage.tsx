@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import type { ProjectDetail, StoryboardItem } from "../../api/adapters/projectDetail";
 import { useCreateGenerationJobs } from "../../api/hooks/useGeneration";
 import { useConfirmStoryboard, useDeleteStoryboardItem, useStoryboard, useUpdateStoryboardItem } from "../../api/hooks/useStoryboard";
-import { useTemplates } from "../../api/hooks/useTemplates";
+import { useTemplateNames } from "../../api/hooks/useTemplates";
 import { ModeBadge } from "../../components/ModeBadge";
 import { isApiError } from "../../api/errors";
 import { transition } from "../../design/motion";
@@ -30,7 +30,7 @@ export function StoryboardStage({
   const remove = useDeleteStoryboardItem(detail.id);
   const update = useUpdateStoryboardItem(detail.id);
   const generate = useCreateGenerationJobs(detail.id);
-  const templates = useTemplates();
+  const templateNames = useTemplateNames();
   const items = board.data?.items ?? detail.items;
   const storyboard = board.data?.storyboard ?? detail.storyboard;
   const locked = storyboard?.status === "CONFIRMED";
@@ -107,7 +107,7 @@ export function StoryboardStage({
         transition={transition.fast}
       >
         {items.map((item) => {
-          const label = itemDisplayName(item, templates.data ?? []);
+          const label = itemDisplayName(item, templateNames);
           return (
             <StoryboardCard
               key={item.id}
@@ -158,7 +158,7 @@ export function StoryboardStage({
           <StoryboardInspector
             projectId={detail.id}
             item={editing}
-            templates={templates.data ?? []}
+            templates={templateNames}
           />
         ) : null}
       </Modal>

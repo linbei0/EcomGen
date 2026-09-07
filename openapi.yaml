@@ -28,6 +28,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EcomTemplatesResponse"
+  /user-templates:
+    get:
+      operationId: listUserTemplates
+      responses:
+        "200":
+          description: User-defined custom prompt templates.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserTemplateList"
+    post:
+      operationId: createUserTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserTemplateInput"
+      responses:
+        "201":
+          description: Custom template created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserTemplateItem"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /user-templates/{templateId}:
+    parameters:
+      - $ref: "#/components/parameters/UserTemplateId"
+    patch:
+      operationId: updateUserTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserTemplateInput"
+      responses:
+        "200":
+          description: Custom template updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserTemplateItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteUserTemplate
+      responses:
+        "204":
+          description: Custom template deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /providers:
     get:
       operationId: listProviders
@@ -881,6 +937,13 @@ components:
       schema:
         type: string
         format: uuid
+    UserTemplateId:
+      name: templateId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^custom-[0-9a-f]{8}$
     Cursor:
       name: cursor
       in: query
@@ -1476,6 +1539,30 @@ components:
           maximum: 100000
           type: integer
         enabled:
+          default: true
+          type: boolean
+    CreateUserTemplateInput:
+      type: object
+      required:
+        - name
+        - prompt
+      properties:
+        name:
+          minLength: 1
+          maxLength: 40
+          type: string
+        prompt:
+          minLength: 1
+          maxLength: 20000
+          description: Complete prompt template text. It is planning input with the same shape as built-in prompt_template entries and is injected into the planner payload; the planning Agent rewrites it into promptInstruction, which keeps its own 4000 budget. The 20000 bound is a generous planner-context sanity limit, not the final-prompt budget.
+          type: string
+        defaultSize:
+          default: 1024x1024
+          type: string
+          enum:
+            - 1024x1024
+            - 1024x1536
+        supportsImageReference:
           default: true
           type: boolean
     EditReferenceAsset:
@@ -2588,6 +2675,70 @@ components:
           description: Editable final image-generation prompt. Must keep instructing the image model to preserve exact product identity. Worker prefixes selected image roles in their actual request order before sending it to the image model.
           maxLength: 4000
           type: string
+    UpdateUserTemplateInput:
+      type: object
+      properties:
+        name:
+          minLength: 1
+          maxLength: 40
+          type: string
+        prompt:
+          minLength: 1
+          maxLength: 20000
+          type: string
+        defaultSize:
+          type: string
+          enum:
+            - 1024x1024
+            - 1024x1536
+        supportsImageReference:
+          type: boolean
+    UserTemplateItem:
+      type: object
+      required:
+        - id
+        - name
+        - prompt
+        - defaultSize
+        - supportsImageReference
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          description: Server-generated custom template ID with the custom- prefix.
+          type: string
+        name:
+          type: string
+        prompt:
+          description: Full prompt template text; may contain {placeholders} the planning agent rewrites from project context.
+          type: string
+        defaultSize:
+          type: string
+          enum:
+            - 1024x1024
+            - 1024x1536
+        supportsImageReference:
+          type: boolean
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    UserTemplateList:
+      type: object
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserTemplateItem"
+        nextCursor:
+          anyOf:
+            - type: string
+            - type: "null"
     AiPlanningInput:
       type: object
       properties:

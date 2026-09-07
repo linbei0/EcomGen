@@ -99,6 +99,16 @@ export const TEMPLATE_FIXTURES = {
   ],
 };
 
+export const USER_TEMPLATE_FIXTURE = {
+  id: "custom-a1b2c3d4",
+  name: "自定义节日礼盒图",
+  prompt: "极简白底产品图，柔和顶光，居中构图，85% 画面占比，突出产品卖点。",
+  defaultSize: "1024x1024" as "1024x1024" | "1024x1536",
+  supportsImageReference: true,
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+};
+
 export const PLAN_JOB_FIXTURE = {
   id: PLAN_JOB_ID,
   projectId: PROJECT_ID,

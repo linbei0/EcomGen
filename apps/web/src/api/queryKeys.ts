@@ -2,6 +2,7 @@
 export const qk = {
   health: ["health"] as const,
   templates: ["ecom-templates"] as const,
+  userTemplates: ["user-templates"] as const,
   providers: ["providers"] as const,
   searchSources: ["search-sources"] as const,
   projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,

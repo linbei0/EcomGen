@@ -20,6 +20,22 @@ function seedProvider(repository: EcomRepository) {
 }
 
 describe("EcomRepository", () => {
+  it("用户自定义模板 CRUD 往返，upsert 保留 createdAt，删除不阻断", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const created = repository.saveUserTemplate({ id: "custom-ab12cd34", name: "我的模板", prompt: "packshot of {product_description}", defaultSize: "1024x1024", supportsImageReference: true });
+    expect(repository.getUserTemplate("custom-ab12cd34")).toEqual(created);
+    const updated = repository.saveUserTemplate({ id: "custom-ab12cd34", name: "改名", prompt: "updated prompt", defaultSize: "1024x1536", supportsImageReference: false });
+    expect(updated.createdAt).toBe(created.createdAt);
+    expect(repository.getUserTemplate("custom-ab12cd34")).toMatchObject({ name: "改名", prompt: "updated prompt", defaultSize: "1024x1536", supportsImageReference: false });
+    const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    repository.saveStoryboard(project.id, "", "DRAFT", [{ assetType: "custom-ab12cd34", displayName: "自定义项", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0, imageProviderId: provider.id, imageModelId: "image" }]);
+    // 模板被分镜引用时仍可删除；旧分镜的生成失败由 worker 模板解析显式报错
+    expect(repository.deleteUserTemplate("custom-ab12cd34")).toBe(true);
+    expect(repository.deleteUserTemplate("custom-ab12cd34")).toBe(false);
+    database.close();
+  });
   it("删除 Provider 时级联置空项目引用，项目进入待重新选择状态", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);

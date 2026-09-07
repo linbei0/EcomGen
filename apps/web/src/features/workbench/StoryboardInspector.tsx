@@ -34,7 +34,8 @@ export function StoryboardInspector({
 }: {
   projectId: string;
   item: StoryboardItem;
-  templates: EcomTemplate[];
+  /** 内置 + 自定义模板的名称解析列表；inspector 只读 id/name。 */
+  templates: readonly Pick<EcomTemplate, "id" | "name">[];
 }) {
   const { notification } = App.useApp();
   const update = useUpdateStoryboardItem(projectId);

@@ -1,15 +1,15 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import sharp from "sharp";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord } from "@ecomgen/core";
-import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplates } from "@ecomgen/ecom-skill";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type UserTemplateRecord } from "@ecomgen/core";
+import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyAssetFromHistoryInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, roleForUserAssetKind } from "@ecomgen/contracts";
+import { CopyAssetFromHistoryInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, roleForUserAssetKind } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -42,6 +42,39 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
 
   app.get("/health", async () => ({ status: "ok", webResearchAvailable: repository.listSearchSources().some((source) => source.enabled && (source.kind === "searxng" || source.encryptedApiKey)) }));
   app.get("/api/v1/ecom-templates", async () => ({ source: ECOM_DETAILS_IMAGE_SOURCE, items: ECOM_TEMPLATES }));
+  app.get("/api/v1/user-templates", async () => ({ items: repository.listUserTemplates().map(publicUserTemplate), nextCursor: null }));
+  app.post("/api/v1/user-templates", async (request, reply) => {
+    const body = parseBody(CreateUserTemplateInput, request.body);
+    // custom- 前缀与内置 ID 空间隔离；8 位 hex 撞库概率可忽略，仍做一次冲突重试保证唯一
+    let id = `custom-${randomBytes(4).toString("hex")}`;
+    if (repository.getUserTemplate(id)) id = `custom-${randomBytes(4).toString("hex")}`;
+    const record = repository.saveUserTemplate({
+      id,
+      name: readText(body.name, "name"),
+      prompt: readText(body.prompt, "prompt"),
+      defaultSize: body.defaultSize === undefined ? "1024x1024" : enumValue(body.defaultSize, ["1024x1024", "1024x1536"], "defaultSize"),
+      supportsImageReference: body.supportsImageReference === undefined ? true : readBoolean(body.supportsImageReference, "supportsImageReference")
+    });
+    return reply.code(201).send(publicUserTemplate(record));
+  });
+  app.patch("/api/v1/user-templates/:templateId", async (request) => {
+    const id = parameter(request, "templateId"); const current = repository.getUserTemplate(id); if (!current) missing("user template", id);
+    const body = parseBody(UpdateUserTemplateInput, request.body);
+    const record = repository.saveUserTemplate({
+      id,
+      name: body.name === undefined ? current.name : readText(body.name, "name"),
+      prompt: body.prompt === undefined ? current.prompt : readText(body.prompt, "prompt"),
+      defaultSize: body.defaultSize === undefined ? current.defaultSize : enumValue(body.defaultSize, ["1024x1024", "1024x1536"], "defaultSize"),
+      supportsImageReference: body.supportsImageReference === undefined ? current.supportsImageReference : readBoolean(body.supportsImageReference, "supportsImageReference")
+    });
+    return publicUserTemplate(record);
+  });
+  app.delete("/api/v1/user-templates/:templateId", async (request, reply) => {
+    const id = parameter(request, "templateId"); if (!repository.getUserTemplate(id)) missing("user template", id);
+    // 模板是规划期资产：允许删除，引用它的旧分镜在生成期显式报错（见 worker 模板解析），不做静默降级
+    repository.deleteUserTemplate(id);
+    return reply.code(204).send();
+  });
   app.get("/api/v1/providers", async () => ({ items: repository.listProviders().map(publicProvider), nextCursor: null }));
   app.post("/api/v1/providers", async (request, reply) => {
     const body = parseBody(CreateProviderInput, request.body);
@@ -214,7 +247,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (project.defaultMode === "PIXEL_PROTECTED" && !repository.listAssets(projectId).some((asset) => asset.role === "PRODUCT_TRUTH" && asset.mimeType.startsWith("image/"))) {
       throw new ApiError(400, "VALIDATION_ERROR", "PIXEL_PROTECTED planning requires at least one PRODUCT_TRUTH image");
     }
-    const requestedTypes = readOptionalTextArray(body.requestedTypes ?? body.imageTypes); if (requestedTypes?.length && resolveTemplates(requestedTypes).length !== requestedTypes.length) throw new ApiError(400, "VALIDATION_ERROR", "requestedTypes contains an unknown ecom-details-image template ID or alias");
+    const requestedTypes = readOptionalTextArray(body.requestedTypes ?? body.imageTypes); if (requestedTypes?.length && resolveTemplatesWithUser(requestedTypes, compiledUserTemplates(repository)).length !== requestedTypes.length) throw new ApiError(400, "VALIDATION_ERROR", "requestedTypes contains an unknown ecom-details-image template ID or alias");
     const planningMode = body.planningMode === undefined ? "AI" : enumValue<PlanningMode>(body.planningMode, ["AI", "MANUAL"], "planningMode");
     if (planningMode === "MANUAL" && !requestedTypes?.length) throw new ApiError(400, "VALIDATION_ERROR", "MANUAL planning requires requestedTypes");
     if (planningMode === "MANUAL" && body.targetImageCount !== undefined) throw new ApiError(400, "VALIDATION_ERROR", "targetImageCount is only supported for AI planning");
@@ -297,7 +330,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (body.assetType !== undefined) {
       const templateId = readText(body.assetType, "assetType");
       if (templateId !== current.assetType) throw new ApiError(409, "CONFLICT", "Storyboard item image type is immutable");
-      if (!getTemplate(templateId)) throw new ApiError(400, "VALIDATION_ERROR", "assetType must be an ecom-details-image template ID");
+      // assetType 不可变：这里只放行"仍可解析"的既有值（内置模板或未删除的自定义模板）
+      if (!getTemplate(templateId) && !(isUserTemplateId(templateId) && repository.getUserTemplate(templateId))) throw new ApiError(400, "VALIDATION_ERROR", "assetType must be an ecom-details-image template ID");
     }
     if (body.displayName !== undefined) patch.displayName = readText(body.displayName, "displayName");
     if (body.templateVariant !== undefined) { const template = getTemplate(String(patch.assetType ?? current.assetType)); const variant = readOptionalText(body.templateVariant) ?? null; if (variant && !template?.variants[variant]) throw new ApiError(400, "VALIDATION_ERROR", "templateVariant is not declared by the selected ecom-details-image template"); patch.templateVariant = variant; }
@@ -553,6 +587,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
 
 function publicProvider(value: ProviderRecord): object { const { encryptedApiKey, ...provider } = value; return { ...provider, hasApiKey: Boolean(encryptedApiKey) }; }
 function publicSearchSource(value: SearchSourceRecord): object { const { encryptedApiKey, ...source } = value; return { ...source, hasApiKey: Boolean(encryptedApiKey) }; }
+function publicUserTemplate(value: UserTemplateRecord): object { return { ...value }; }
+/** 规划校验与 Worker 共用同一编译口径；表极小，按请求读取即可保证最新。 */
+function compiledUserTemplates(repository: EcomRepository): ReturnType<typeof compileUserTemplate>[] { return repository.listUserTemplates().map((record) => compileUserTemplate({ id: record.id, name: record.name, prompt: record.prompt, defaultSize: record.defaultSize, supportsImageReference: record.supportsImageReference })); }
 function publicReferenceAsset(value: AssetRecord | EditReferenceAssetRecord): object {
   const temporary = "sessionId" in value;
   return { id: value.id, source: temporary ? "TEMPORARY" : "PROJECT", purpose: temporary ? value.purpose : defaultPurposeForRole(value.role), role: temporary ? null : value.role, originalName: value.originalName, mimeType: value.mimeType, hash: value.hash, createdAt: value.createdAt, expiresAt: temporary ? value.expiresAt : null, url: temporary ? `/files/edit-reference-assets/${value.id}` : `/files/assets/${value.id}` };

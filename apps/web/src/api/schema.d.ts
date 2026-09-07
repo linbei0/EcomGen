@@ -36,6 +36,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/user-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listUserTemplates"];
+        put?: never;
+        post: operations["createUserTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user-templates/{templateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: components["parameters"]["UserTemplateId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteUserTemplate"];
+        options?: never;
+        head?: never;
+        patch: operations["updateUserTemplate"];
+        trace?: never;
+    };
     "/providers": {
         parameters: {
             query?: never;
@@ -906,6 +940,18 @@ export interface components {
             /** @default true */
             enabled: boolean;
         };
+        CreateUserTemplateInput: {
+            name: string;
+            /** @description Complete prompt template text. It is planning input with the same shape as built-in prompt_template entries and is injected into the planner payload; the planning Agent rewrites it into promptInstruction, which keeps its own 4000 budget. The 20000 bound is a generous planner-context sanity limit, not the final-prompt budget. */
+            prompt: string;
+            /**
+             * @default 1024x1024
+             * @enum {string}
+             */
+            defaultSize: "1024x1024" | "1024x1536";
+            /** @default true */
+            supportsImageReference: boolean;
+        };
         EditReferenceAsset: {
             /** Format: uuid */
             id: string;
@@ -1299,6 +1345,31 @@ export interface components {
             /** @description Editable final image-generation prompt. Must keep instructing the image model to preserve exact product identity. Worker prefixes selected image roles in their actual request order before sending it to the image model. */
             promptInstruction?: string;
         };
+        UpdateUserTemplateInput: {
+            name?: string;
+            prompt?: string;
+            /** @enum {string} */
+            defaultSize?: "1024x1024" | "1024x1536";
+            supportsImageReference?: boolean;
+        };
+        UserTemplateItem: {
+            /** @description Server-generated custom template ID with the custom- prefix. */
+            id: string;
+            name: string;
+            /** @description Full prompt template text; may contain {placeholders} the planning agent rewrites from project context. */
+            prompt: string;
+            /** @enum {string} */
+            defaultSize: "1024x1024" | "1024x1536";
+            supportsImageReference: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        UserTemplateList: {
+            items: components["schemas"]["UserTemplateItem"][];
+            nextCursor: string | null;
+        };
         AiPlanningInput: {
             planningMode?: components["schemas"]["PlanningMode"];
             requestedTypes?: string[];
@@ -1517,6 +1588,7 @@ export interface components {
         JobId: string;
         OutputId: string;
         ExportId: string;
+        UserTemplateId: string;
         Cursor: string;
     };
     requestBodies: never;
@@ -1563,6 +1635,100 @@ export interface operations {
                     "application/json": components["schemas"]["EcomTemplatesResponse"];
                 };
             };
+        };
+    };
+    listUserTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User-defined custom prompt templates. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTemplateList"];
+                };
+            };
+        };
+    };
+    createUserTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserTemplateInput"];
+            };
+        };
+        responses: {
+            /** @description Custom template created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTemplateItem"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+        };
+    };
+    deleteUserTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: components["parameters"]["UserTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Custom template deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateUserTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: components["parameters"]["UserTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserTemplateInput"];
+            };
+        };
+        responses: {
+            /** @description Custom template updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTemplateItem"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     listProviders: {

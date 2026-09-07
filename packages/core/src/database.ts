@@ -387,6 +387,15 @@ function migrate(database: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_outputs_root_created ON outputs(root_output_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_exports_project_updated ON exports(project_id, updated_at);
     CREATE INDEX IF NOT EXISTS idx_edit_turns_project_updated ON edit_turns(project_id, updated_at);
+    CREATE TABLE IF NOT EXISTS user_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      default_size TEXT NOT NULL DEFAULT '1024x1024',
+      supports_image_reference INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
   if (!columnNames(database, "projects").has("archived_at")) {
     database.exec("ALTER TABLE projects ADD COLUMN archived_at TEXT");

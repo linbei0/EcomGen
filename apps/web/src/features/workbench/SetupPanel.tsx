@@ -11,6 +11,7 @@ import { useHealth } from "../../api/hooks/useHealth";
 import { useProviders } from "../../api/hooks/useProviders";
 import { useUpdateProject } from "../../api/hooks/useProjects";
 import { useTemplates } from "../../api/hooks/useTemplates";
+import { useUserTemplates } from "../../api/hooks/useUserTemplates";
 import { errorText } from "../../lib/errorText";
 import { formatDateTime } from "../../lib/format";
 import { COPY_LANGUAGE_AUTOCOMPLETE_OPTIONS, copyLanguageLabel, copyLanguageOptionMatches, resolveCopyLanguage } from "../../lib/copyLanguage";
@@ -21,6 +22,7 @@ import { randomUuid } from "../../lib/randomUuid";
 import { canResubmitPlan, isActiveJob, latestPlanJob } from "../../lib/planJob";
 import { PLATFORM_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
 import { ASPECT_SELECT_OPTIONS, renderAspectOption } from "./aspectOptions";
+import { UserTemplateManager } from "./UserTemplateManager";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import styles from "./workbench.module.css";
 
@@ -61,6 +63,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const providers = useProviders();
   const health = useHealth();
   const templates = useTemplates();
+  const userTemplatesQuery = useUserTemplates();
+  const userTemplates = userTemplatesQuery.data ?? [];
   const createPlan = useCreatePlanningJob(detail.id);
   const planningSnapshots = usePlanningConfigSnapshots(detail.id);
   const applyPlanningSnapshot = useApplyPlanningConfigSnapshot(detail.id);
@@ -76,6 +80,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const [targetImageCount, setTargetImageCount] = useState(DEFAULT_TARGET_IMAGE_COUNT);
   const [selected, setSelected] = useState<string[]>(stored);
   const [instruction, setInstruction] = useState("");
+  const [managerOpen, setManagerOpen] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | undefined>(undefined);
   const [activeCopywritingJob, setActiveCopywritingJob] = useState<{ id: string; target: CopywritingTarget } | undefined>(undefined);
   const [copyLanguage, setCopyLanguage] = useState(copyLanguageLabel(detail.copyLanguage));
@@ -121,6 +126,15 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
     if (selected.length > 0 || catalog.length === 0 || stored.length > 0) return;
     setSelected([catalog[0]!.id]);
   }, [catalog, selected.length, stored.length]);
+
+  // 自定义模板删除后同步清掉勾选，避免提交规划时被服务端按未知模板拒绝
+  useEffect(() => {
+    setSelected((current) => {
+      const available = new Set([...catalog.map((template) => template.id), ...userTemplates.map((template) => template.id)]);
+      const next = current.filter((id) => available.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [catalog, userTemplates]);
 
   const save = async (body: UpdateProjectInput, failureTitle: string) => {
     projectSaveQueue.current = projectSaveQueue.current
@@ -545,23 +559,45 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
           </button>
         </div>
         {planningMode === "MANUAL" ? (
-          <div className={styles.chipRow}>
-            {catalog.map((item) => {
-              const on = selected.includes(item.id);
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={styles.chip}
-                  data-on={on}
-                  aria-pressed={on}
-                  onClick={() => toggleType(item.id)}
-                >
-                  {item.name}
-                </button>
-              );
-            })}
-          </div>
+          <>
+            <div className={styles.chipRow}>
+              {catalog.map((item) => {
+                const on = selected.includes(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={styles.chip}
+                    data-on={on}
+                    aria-pressed={on}
+                    onClick={() => toggleType(item.id)}
+                  >
+                    {item.name}
+                  </button>
+                );
+              })}
+              {userTemplates.map((item) => {
+                const on = selected.includes(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={styles.chip}
+                    data-on={on}
+                    data-custom
+                    title="自定义模板"
+                    aria-pressed={on}
+                    onClick={() => toggleType(item.id)}
+                  >
+                    {item.name}
+                  </button>
+                );
+              })}
+            </div>
+            <button type="button" className={styles.manageTemplates} onClick={() => setManagerOpen(true)}>
+              管理自定义模板
+            </button>
+          </>
         ) : (
           <>
             <p className={styles.hint}>Agent 会根据卖点和素材自动选择一组有转化逻辑的图片类型。</p>
@@ -637,6 +673,12 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
           生成分镜
         </Button>
       )}
+
+      <UserTemplateManager
+        open={managerOpen}
+        items={userTemplates}
+        onClose={() => setManagerOpen(false)}
+      />
     </div>
   );
 }

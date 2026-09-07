@@ -560,6 +560,30 @@ components:
         enabled:
           default: true
           type: boolean
+    CreateUserTemplateInput:
+      type: object
+      required:
+        - name
+        - prompt
+      properties:
+        name:
+          minLength: 1
+          maxLength: 40
+          type: string
+        prompt:
+          minLength: 1
+          maxLength: 20000
+          description: Complete prompt template text. It is planning input with the same shape as built-in prompt_template entries and is injected into the planner payload; the planning Agent rewrites it into promptInstruction, which keeps its own 4000 budget. The 20000 bound is a generous planner-context sanity limit, not the final-prompt budget.
+          type: string
+        defaultSize:
+          default: 1024x1024
+          type: string
+          enum:
+            - 1024x1024
+            - 1024x1536
+        supportsImageReference:
+          default: true
+          type: boolean
     EditReferenceAsset:
       type: object
       required:
@@ -1670,6 +1694,70 @@ components:
           description: Editable final image-generation prompt. Must keep instructing the image model to preserve exact product identity. Worker prefixes selected image roles in their actual request order before sending it to the image model.
           maxLength: 4000
           type: string
+    UpdateUserTemplateInput:
+      type: object
+      properties:
+        name:
+          minLength: 1
+          maxLength: 40
+          type: string
+        prompt:
+          minLength: 1
+          maxLength: 20000
+          type: string
+        defaultSize:
+          type: string
+          enum:
+            - 1024x1024
+            - 1024x1536
+        supportsImageReference:
+          type: boolean
+    UserTemplateItem:
+      type: object
+      required:
+        - id
+        - name
+        - prompt
+        - defaultSize
+        - supportsImageReference
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          description: Server-generated custom template ID with the custom- prefix.
+          type: string
+        name:
+          type: string
+        prompt:
+          description: Full prompt template text; may contain {placeholders} the planning agent rewrites from project context.
+          type: string
+        defaultSize:
+          type: string
+          enum:
+            - 1024x1024
+            - 1024x1536
+        supportsImageReference:
+          type: boolean
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    UserTemplateList:
+      type: object
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserTemplateItem"
+        nextCursor:
+          anyOf:
+            - type: string
+            - type: "null"
     AiPlanningInput:
       type: object
       properties:

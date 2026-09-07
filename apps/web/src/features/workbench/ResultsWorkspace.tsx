@@ -11,7 +11,7 @@ import { JOB_STATUS_LABEL } from "../../lib/factClaims";
 import { activeGenerateJobs } from "../../lib/generateSelection";
 import { jobErrorText } from "../../lib/jobError";
 import { itemDisplayName } from "../../lib/itemName";
-import { useTemplates } from "../../api/hooks/useTemplates";
+import { useTemplateNames } from "../../api/hooks/useTemplates";
 import { ReviewStage } from "./ReviewStage";
 import styles from "./workbench.module.css";
 
@@ -28,7 +28,7 @@ export function ResultsWorkspace({
   const [activeExportId, setActiveExportId] = useState<string | undefined>(undefined);
   const [selectedOutputIds, setSelectedOutputIds] = useState<string[]>([]);
   const liveExport = useExport(activeExportId);
-  const templates = useTemplates();
+  const templateNames = useTemplateNames();
   const active = activeGenerateJobs(detail.jobs);
   const failed = detail.jobs.filter((job) => job.type === "GENERATE" && job.status === "FAILED");
   const record = liveExport.data;
@@ -79,7 +79,7 @@ export function ResultsWorkspace({
       {failed.map((job) => {
         // GENERATE 任务与分镜一一对应，展示分镜名以区分是哪张图失败
         const item = detail.items.find((candidate) => candidate.id === job.storyboardItemId);
-        const label = item ? itemDisplayName(item, templates.data ?? []) : null;
+        const label = item ? itemDisplayName(item, templateNames) : null;
         return (
           <aside key={job.id} className={styles.jobCard} data-status="FAILED">
             <p className={styles.jobStatus}>{JOB_STATUS_LABEL.FAILED}</p>
