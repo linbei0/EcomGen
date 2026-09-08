@@ -133,42 +133,20 @@ export interface TemplateGuidance {
   productOccupancy: string;
   whitespace: string;
   camera: string;
-  platformReservations: string[];
   /** 上游按品类撰写的完整拍摄提示清单；由规划 Agent 自行挑选与商品最贴合的条目改写，不在代码里代选。 */
   categoryTips: Record<string, string>;
   antiAiTips: string;
 }
-export function templateGuidance(template: EcomTemplate, platformTargets: readonly string[], variantName?: string | null): TemplateGuidance {
+export function templateGuidance(template: EcomTemplate, variantName?: string | null): TemplateGuidance {
   const variant = variantName ? template.variants[variantName] : undefined;
   return {
     visualFields: { ...template.prompt_template, ...template.defaults, ...(variant?.overrides ?? {}) },
     productOccupancy: template.productOccupancy,
     whitespace: template.whitespace,
     camera: template.camera,
-    platformReservations: platformReservationsFor(template.id, platformTargets),
     categoryTips: template.category_tips,
     antiAiTips: template.anti_ai_tips
   };
-}
-
-const PACKSHOT_IDS = new Set(["hero-image", "ghost-mannequin", "multi-angle-grid", "flat-lay"]);
-const INFO_IDS = new Set(["infographic", "poster-banner", "size-spec"]);
-
-/** 平台规则按模板职责套用，不按分镜列表第几张；价签区不再套在每张大陆电商图上。 */
-function platformReservationsFor(templateId: string, platformTargets: readonly string[]): string[] {
-  const rules = new Set<string>();
-  const packshot = PACKSHOT_IDS.has(templateId);
-  const info = INFO_IDS.has(templateId);
-  for (const platform of platformTargets) {
-    if (platform === "AMAZON" && packshot) rules.add("纯白背景 #FFFFFF，主体占画面至少 85%，不要任何文字、徽章、Logo、边框或无关道具");
-    else if (platform === "JD" && packshot) rules.add("纯白背景，商品居中，主体约占 80%，不要文字、拼接或诱导点击");
-    else if ((platform === "TAOBAO" || platform === "PDD") && packshot) rules.add("主体占画面 70-85%，高对比，几乎不要文字；不要生成价格或 Logo");
-    else if (platform === "DOUYIN" && (packshot || templateId === "lifestyle-scene" || templateId === "social-media" || templateId === "ugc-style")) rules.add("按商品卡可读来构图：中心主体、高对比，文字极少；不要二维码或他平台标识");
-    else if (platform === "SHOPIFY" && packshot) rules.add("干净统一背景，集合页缩略图可识别，不要促销标");
-    if (info) rules.add("仅使用已核验事实的短文案；不要生成价格、认证或未提供的承诺");
-  }
-  if (platformTargets.length) rules.add("不要生成价格、Logo 或促销文字");
-  return [...rules];
 }
 
 function loadTemplates(): EcomTemplate[] {

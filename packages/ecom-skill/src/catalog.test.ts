@@ -14,11 +14,9 @@ describe("ecom-details-image catalog adaptation", () => {
     expect(resolveProductFamily("unknown-widget")).toBeNull();
   });
 
-  it("scopes packshot reservations by platform and hands the full category tips to the planning agent", () => {
+  it("hands the full category tips to the planning agent", () => {
     const hero = ECOM_TEMPLATES[0];
-    expect(templateGuidance(hero, ["TAOBAO"]).platformReservations.join(" ")).toContain("70-85%");
-    expect(templateGuidance(hero, ["AMAZON"]).platformReservations.join(" ")).toContain("85%");
-    const guidance = templateGuidance(hero, ["TAOBAO"]);
+    const guidance = templateGuidance(hero);
     expect(Object.keys(guidance.categoryTips)).toContain("fashion");
     expect(guidance.categoryTips.fashion).toMatch(/fabric|drape|stitching/i);
   });
@@ -34,7 +32,7 @@ describe("user-defined templates", () => {
     expect(compiled.upstreamNumber).toBe(0);
     expect(compiled.defaultSize).toBe("1024x1024");
     expect(compiled.supports_image_reference).toBe(true);
-    const guidance = templateGuidance(compiled, []);
+    const guidance = templateGuidance(compiled);
     expect(guidance.visualFields.custom_prompt).toBe(source.prompt);
   });
 

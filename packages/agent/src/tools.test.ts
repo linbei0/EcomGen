@@ -8,9 +8,8 @@ describe("Pi planning business tools", () => {
   it("returns structured template guidance without exposing a prompt contract string", async () => {
     const tool = createPlanningTools(taobaoContext)[0];
     const result = await tool.execute("call-1", { templateIds: ["hero-image"] });
-    const guidance = (result.details as { templates: Array<{ guidance: { visualFields: Record<string, string>; platformReservations: string[]; categoryTips: Record<string, string> } }> }).templates[0];
+    const guidance = (result.details as { templates: Array<{ guidance: { visualFields: Record<string, string>; categoryTips: Record<string, string> } }> }).templates[0];
     expect(guidance.guidance.visualFields).toHaveProperty("type");
-    expect(guidance.guidance.platformReservations.join(" ")).toContain("70-85%");
     expect(guidance.guidance.categoryTips.fashion).toMatch(/fabric|drape|stitching/i);
     expect(JSON.stringify(guidance)).not.toContain("Upstream template");
   });

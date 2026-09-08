@@ -76,7 +76,7 @@ export function createPlanningTools(context: MarketGuidanceContext, webResearch?
           id: template.id,
           name: template.name,
           variant: variant ?? null,
-          guidance: templateGuidance(template, context.platformTargets, variant),
+          guidance: templateGuidance(template, variant),
           variants: Object.fromEntries(Object.entries(template.variants).map(([key, value]) => [key, value.description])),
           supportsImageReference: template.supports_image_reference
         };
