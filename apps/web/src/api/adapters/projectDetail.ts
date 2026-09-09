@@ -25,7 +25,7 @@ export interface PlanningConfigSnapshot {
   projectId: string;
   sourceJobId: string;
   payload: {
-    project: Pick<Project, "name" | "category" | "productDescription" | "verifiedFacts" | "prohibitedClaims" | "brandGuidelines" | "platformTargets" | "targetMarket" | "copyLanguage" | "reasoningProviderId" | "reasoningModelId" | "imageProviderId" | "imageModelId" | "defaultMode" | "imageResolution" | "imageAspectRatio" | "candidatesPerType" | "webResearchEnabled">;
+    project: Pick<Project, "name" | "category" | "productDescription" | "verifiedFacts" | "prohibitedClaims" | "brandGuidelines" | "platformTargets" | "targetMarket" | "copyLanguage" | "reasoningProviderId" | "reasoningModelId" | "imageProviderId" | "imageModelId" | "segmentationModel" | "defaultMode" | "imageResolution" | "imageAspectRatio" | "candidatesPerType" | "webResearchEnabled">;
     planning: { planningMode: PlanningMode; requestedTypes: string[]; targetImageCount: number | null; userInstruction: string | null };
   };
   createdAt: string;
@@ -53,6 +53,7 @@ const TARGET_MARKETS = new Set<Exclude<TargetMarket, null>>([
 ]);
 const ASPECTS = new Set<ImageAspectRatio>(["AUTO", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]);
 const SHOT_ROLES = new Set<StoryboardShotRole>(["HERO", "PAIN_POINT", "COMPARISON", "SCENE", "DETAIL", "TRUST", "VARIANT", "CTA"]);
+const SEGMENTATION_PROTOCOLS = new Set<string>(["fal", "grounded_sam", "seedream_layerize"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -297,6 +298,11 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
   const reasoningModelId = asString(raw.reasoningModelId) ?? null;
   const imageProviderId = asString(raw.imageProviderId) ?? null;
   const imageModelId = asString(raw.imageModelId) ?? null;
+  // 分割引用需完整（双 id + 已知协议）才回传，避免半截数据让面板回显或上限判断失真
+  const segmentationRaw = isRecord(raw.segmentationModel) ? raw.segmentationModel : null;
+  const segmentationProviderId = segmentationRaw ? asString(segmentationRaw.providerId) : undefined;
+  const segmentationModelId = segmentationRaw ? asString(segmentationRaw.modelId) : undefined;
+  const segmentationProtocol = segmentationRaw ? asString(segmentationRaw.protocol) : undefined;
   const defaultMode = asString(raw.defaultMode);
   const createdAt = asString(raw.createdAt);
   const updatedAt = asString(raw.updatedAt);
@@ -328,6 +334,10 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
     reasoningModelId,
     imageProviderId,
     imageModelId,
+    segmentationModel:
+      segmentationProviderId && segmentationModelId && segmentationProtocol && SEGMENTATION_PROTOCOLS.has(segmentationProtocol)
+        ? { providerId: segmentationProviderId, modelId: segmentationModelId, protocol: segmentationProtocol as NonNullable<Project["segmentationModel"]>["protocol"] }
+        : null,
     defaultMode,
     imageResolution: RESOLUTIONS.has(resolution as ImageResolution) ? (resolution as ImageResolution) : "1K",
     imageAspectRatio: ASPECTS.has(aspect as ImageAspectRatio) ? (aspect as ImageAspectRatio) : "AUTO",

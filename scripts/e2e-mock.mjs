@@ -2,18 +2,24 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { rmSync } from "node:fs";
 import { createServer } from "node:http";
+import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
+import { crc32, deflateSync } from "node:zlib";
 
 const root = resolve(import.meta.dirname, "..");
 const dataDir = join(root, "data-e2e-mock");
-const onePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL7WQAAAABJRU5ErkJggg==";
+// 生图产物用运行时生成的合法 1x1 PNG：旧的硬编码 base64 实际是损坏的 PNG，此前没有链路真正解码过它。
+const onePixelPng = solidPng(26, 58, 46).toString("base64");
 const onePixelReferencePng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+// SAM mock 返回的 mask 以亮度表示前景：用 1x1 纯白 PNG（运行时生成，避免依赖解码外部 base64）。
+const whiteMaskDataUri = `data:image/png;base64,${solidPng(255, 255, 255).toString("base64")}`;
+const layerElements = { elements: [{ name: "保温杯瓶身" }, { name: "杯盖" }] };
 const plan = { campaignStyleLock: "fixed deep green #1A3A2E and clean off-white #FFFFFF ecommerce system", items: [{ assetType: "hero-image", displayName: "通勤杯质感首图", shotRole: "HERO", templateVariant: "luxury", candidateCount: 1, referencedAssets: [], mode: "PIXEL_PROTECTED", promptInstruction: "Create a premium e-commerce hero image of the verified green insulated travel cup. Preserve the exact product identity: shape, silhouette, colors, materials, logo and label placement, and proportions; do not redesign the product. Keep the exact supplied product geometry and visible details. Use a clean off-white background, centered three-quarter product composition, Rembrandt lighting, and restrained deep green accents. Preserve generous whitespace and reserve a blank price-overlay zone without generating readable price, logo, or promotional text. Use the verified fact 304 stainless steel body only as visual material guidance; do not claim keeps hot for 24 hours. No extra props, hands, watermarks, fake logos, or invented product details.", factClaims: ["304 stainless steel body"], riskFlags: [], sortOrder: 0 }] };
 // 自定义模板场景：模型按 payload.userTemplates 中注入的 custom_prompt 撰写最终 Prompt；customTemplateId 在运行时由 API 生成后回填
 let customTemplateId = "";
 const customPlan = () => ({ campaignStyleLock: "warm festive gift box ecommerce system", items: [{ assetType: customTemplateId, displayName: "礼盒丝绒氛围图", shotRole: "SCENE", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "Create a warm festive e-commerce gift box scene with soft window light, triangular composition, rich red velvet accents and a festive ribbon close-up. Preserve exact product identity: shape, silhouette, colors, materials, logo and label placement, and proportions; do not redesign the product. No readable text, watermarks, or invented product details.", factClaims: [], riskFlags: [], sortOrder: 0 }] });
-const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "" };
+const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "", layerPlanPrompt: "", samRequests: [], groundedRequests: [], layerizeRequests: [] };
 const children = [];
 let mock;
 
@@ -52,6 +58,16 @@ try {
         response.end();
         return;
       }
+      // 图层元素识别：layer-planner 的系统提示以 marker 识别（用户文本可能被客户端编码，不可靠）
+      if (requestText.includes("layer planner for an e-commerce image workspace")) {
+        observed.layerPlanPrompt = requestText;
+        response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        response.write(`data: ${JSON.stringify({ id: "mock-layer-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(layerElements) }, finish_reason: null }] })}\n\n`);
+        response.write(`data: ${JSON.stringify({ id: "mock-layer-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+        response.write("data: [DONE]\n\n");
+        response.end();
+        return;
+      }
       observed.planningPrompt = body.toString("utf8");
       response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
       response.write(`data: ${JSON.stringify({ id: "mock-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(plan) }, finish_reason: null }] })}\n\n`);
@@ -66,9 +82,43 @@ try {
       return;
     }
     if (request.url === "/v1/images/edits" || request.url === "/v1/images/generations") {
+      // edits 走 multipart、generations 走 JSON；只有 JSON 载荷才按 model 分流到 Seedream 图层拆分
+      const contentType = String(request.headers["content-type"] ?? "");
+      const imageBody = contentType.includes("application/json") ? JSON.parse(body.toString("utf8") || "{}") : {};
+      if (imageBody.model === "doubao-seedream-5.0-pro-layerize") {
+        observed.layerizeRequests.push(imageBody);
+        // 火山方舟同步协议：data 下标 0 是已补绘底图（z_index 0）、后续是带 alpha 的图层
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ model: imageBody.model, data: [
+          { url: `data:image/png;base64,${solidPng(24, 32, 40).toString("base64")}`, z_index: 0 },
+          { url: whiteMaskDataUri, z_index: 1, name: "保温杯瓶身", bounding_box: { absolute: [0, 0, 1, 1], normalized: [0, 0, 1000, 1000] } }
+        ] }));
+        return;
+      }
       observed.imagePrompt = body.toString("utf8");
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ id: "mock-image", data: [{ b64_json: onePixelPng }] }));
+      return;
+    }
+    // fal SAM 3 同步分割端点：FalSegmentationProvider 默认 POST {baseUrl}/fal-ai/sam-3/image
+    if (request.url === "/v1/fal-ai/sam-3/image") {
+      const samBody = JSON.parse(body.toString("utf8"));
+      observed.samRequests.push(samBody);
+      // 空请求模拟 fal 校验层直接拒绝（探测只验证连通性与认证，不执行模型、不产生费用）
+      if (!samBody.image_url) {
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(JSON.stringify({ detail: "image_url is required" }));
+        return;
+      }
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ request_id: "mock-sam", masks: [{ url: whiteMaskDataUri, content_type: "image/png", width: 1, height: 1 }], scores: [0.99], boxes: [[0.5, 0.5, 1, 1]] }));
+      return;
+    }
+    // 自部署 grounded_sam 协议端点：GroundedSamSegmentationProvider POST {baseUrl}/，Bearer 认证
+    if (request.url === "/v1/" || request.url === "/v1") {
+      observed.groundedRequests.push({ authorization: request.headers.authorization, body: JSON.parse(body.toString("utf8")) });
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ request_id: "mock-gs", masks: [{ data: whiteMaskDataUri.split(",")[1], mime_type: "image/png", width: 1, height: 1, bbox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 }, score: 0.95 }] }));
       return;
     }
     response.writeHead(404).end();
@@ -97,13 +147,19 @@ try {
     models: [
       { id: "mock-reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
       { id: "mock-text", supportsVision: false, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
-      { id: "mock-image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" }
+      { id: "mock-image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" },
+      { id: "sam-3", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "fal" },
+      { id: "grounded-sam-2", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "grounded_sam" },
+      { id: "doubao-seedream-5.0-pro-layerize", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "seedream_layerize" }
     ]
   });
   const reasoningProbe = await requestJson(`${base}/providers/${provider.id}/test`, "POST", { modelId: "mock-reasoner", kind: "reasoning" });
   assert.equal(reasoningProbe.ok, true);
   const probe = await requestJson(`${base}/providers/${provider.id}/test`, "POST", { modelId: "mock-image", kind: "image" });
   assert.equal(probe.modelAvailable, true);
+  // 分割探测只做零费用连通性检查
+  const segmentationProbe = await requestJson(`${base}/providers/${provider.id}/test`, "POST", { modelId: "sam-3", kind: "segmentation" });
+  assert.equal(segmentationProbe.ok, true);
   const project = await requestJson(`${base}/projects`, "POST", {
     name: "Travel cup",
     category: "home",
@@ -188,6 +244,86 @@ try {
   const archive = Buffer.from(await zip.arrayBuffer());
   assert.equal(archive.subarray(0, 2).toString("utf8"), "PK");
   assert.match(archive.toString("binary"), /manifest\.json/);
+  // 分层导出链路：PATCH 分割模型 → vision 识别元素 → SAM 分割 → 图层 PNG / 背景层 / PSD 下载
+  await requestJson(`${base}/projects/${project.id}`, "PATCH", { segmentationModel: { providerId: provider.id, modelId: "sam-3" } });
+  assert.deepEqual((await requestJson(`${base}/projects/${project.id}`, "GET")).segmentationModel, { providerId: provider.id, modelId: "sam-3", protocol: "fal" });
+  const layerPlan = await requestJson(`${base}/outputs/${outputs[0].id}/layer-plan`, "POST", {});
+  const layerPlanJob = await waitJob(base, layerPlan.jobId);
+  assert.equal(layerPlanJob.status, "SUCCEEDED");
+  const layerPlanResult = await requestJson(`${base}/outputs/${outputs[0].id}/layer-plan`, "GET");
+  assert.equal(layerPlanResult.status, "SUCCEEDED");
+  assert.equal(layerPlanResult.outputHash, outputs[0].hash);
+  assert.deepEqual(layerPlanResult.elements.map((element) => element.name), ["保温杯瓶身", "杯盖"]);
+  assert.match(observed.layerPlanPrompt, /layer planner for an e-commerce image workspace/);
+  const layerExport = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports`, "POST", { planId: layerPlan.id, elements: [{ id: "el-1", name: "保温杯瓶身", source: "auto" }, { id: "manual-1", name: "自定义元素", source: "manual", bbox: { x: 0, y: 0, width: 0.5, height: 0.5 } }] });
+  assert.equal(layerExport.job.type, "LAYER_EXPORT");
+  const layerExportJob = await waitJob(base, layerExport.job.id);
+  assert.equal(layerExportJob.status, "SUCCEEDED");
+  const layerExportResult = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports`, "GET");
+  assert.equal(layerExportResult.status, "SUCCEEDED");
+  assert.equal(layerExportResult.includeBackground, true);
+  // 落盘顺序跟随 PSD 层序：背景是 children[0]，先 append 先写入
+  assert.deepEqual(layerExportResult.layerFiles.map((file) => file.kind), ["background", "element", "element", "composite"]);
+  assert.equal(observed.samRequests.length, 3);
+  // 第 1 条是连通性探测的空请求（4xx 校验层拒绝，无模型执行无费用）；随后才是逐元素的分割请求
+  assert.deepEqual(observed.samRequests[0], {});
+  assert.match(JSON.stringify(observed.samRequests[1]), /"image_url":"data:image\/png;base64,/);
+  assert.match(JSON.stringify(observed.samRequests[2]), /"box_prompts":\[/);
+  const psdResponse = await fetch(`${base}${layerExportResult.psdDownloadUrl}`);
+  assert.equal(psdResponse.status, 200);
+  const psdBytes = Buffer.from(await psdResponse.arrayBuffer());
+  assert.equal(psdBytes.subarray(0, 4).toString("binary"), "8BPS");
+  // 解析 PSD 内部图层记录验证真实层序。这里 mask 覆盖整张 1x1 图，挖空背景完全透明被正确省略
+  const requireWorker = createRequire(join(root, "apps/worker/package.json"));
+  const { readPsd } = requireWorker("ag-psd");
+  const parsedPsd = readPsd(psdBytes, { skipLayerImageData: true, skipCompositeImageData: true });
+  assert.deepEqual(parsedPsd.children.map((layer) => layer.name), ["01 保温杯瓶身", "02 自定义元素"]);
+  const layerPngResponse = await fetch(`${base}${layerExportResult.layerFiles[0].downloadUrl}`);
+  assert.equal(layerPngResponse.status, 200);
+  const layerPng = Buffer.from(await layerPngResponse.arrayBuffer());
+  assert.equal(layerPng.subarray(1, 4).toString("binary"), "PNG");
+  // grounded_sam 协议链路：自部署 Grounded-SAM 服务适配器（Bearer 认证 + text_prompt 契约 + 无背景层）
+  await requestJson(`${base}/projects/${project.id}`, "PATCH", { segmentationModel: { providerId: provider.id, modelId: "grounded-sam-2", protocol: "grounded_sam" } });
+  const groundedExport = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports`, "POST", { planId: layerPlan.id, elements: [{ id: "el-1", name: "保温杯瓶身", source: "auto" }], includeBackground: false });
+  const groundedExportJob = await waitJob(base, groundedExport.job.id);
+  assert.equal(groundedExportJob.status, "SUCCEEDED");
+  const groundedResult = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports`, "GET");
+  assert.equal(groundedResult.includeBackground, false);
+  assert.deepEqual(groundedResult.layerFiles.map((file) => file.kind), ["element", "composite"]);
+  assert.equal(observed.groundedRequests.length, 1);
+  assert.match(observed.groundedRequests[0].authorization, /^Bearer /);
+  assert.equal(observed.groundedRequests[0].body.text_prompt, "保温杯瓶身");
+  assert.match(observed.groundedRequests[0].body.image.data, /^[A-Za-z0-9+/=]+$/);
+  // seedream_layerize 协议链路：单次提交拆分全部元素，底图作已补绘背景层，图层 alpha 回贴原图抠像
+  await requestJson(`${base}/projects/${project.id}`, "PATCH", { segmentationModel: { providerId: provider.id, modelId: "doubao-seedream-5.0-pro-layerize", protocol: "seedream_layerize" } });
+  const seedreamExport = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports`, "POST", { planId: layerPlan.id, elements: [{ id: "el-1", name: "保温杯瓶身", source: "auto" }] });
+  const seedreamExportJob = await waitJob(base, seedreamExport.job.id);
+  assert.equal(seedreamExportJob.status, "SUCCEEDED");
+  const seedreamResult = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports`, "GET");
+  assert.deepEqual(seedreamResult.layerFiles.map((file) => file.kind), ["background", "element", "composite"]);
+  assert.equal(observed.layerizeRequests.length, 1);
+  assert.equal(observed.layerizeRequests[0].model, "doubao-seedream-5.0-pro-layerize");
+  assert.match(observed.layerizeRequests[0].prompt, /保温杯瓶身/);
+  // Seedream 的补绘底图非空，PSD 中背景必须位于 children[0]（最底层），元素叠加在其上
+  const seedreamPsdResponse = await fetch(`${base}${seedreamResult.psdDownloadUrl}`);
+  assert.equal(seedreamPsdResponse.status, 200);
+  const seedreamPsd = readPsd(Buffer.from(await seedreamPsdResponse.arrayBuffer()), { skipLayerImageData: true, skipCompositeImageData: true });
+  assert.deepEqual(seedreamPsd.children.map((layer) => layer.name), ["背景", "01 保温杯瓶身"]);
+  // 提示词免识别直接分层：prompt 元素只有语义名称（无 bbox）；输出已有成功方案时按现行语义挂接 planId，无方案时 planId 为空（api 单测覆盖）
+  const promptExport = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports`, "POST", { elements: [{ id: "p-1", name: "保温杯文案", source: "prompt" }], includeBackground: false });
+  assert.equal(promptExport.layerExport.planId, layerPlan.id);
+  const promptExportJob = await waitJob(base, promptExport.job.id);
+  assert.equal(promptExportJob.status, "SUCCEEDED");
+  assert.match(observed.layerizeRequests[1].prompt, /保温杯文案/);
+  // 历史导出：每次导出都有独立记录（新→旧），旧记录的 PSD 下载地址按记录 id 寻址仍可用
+  const layerExportHistory = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports/history`, "GET");
+  assert.equal(layerExportHistory.exports.length, 4);
+  assert.equal(layerExportHistory.exports[0].id, promptExport.layerExport.id);
+  const historicalPsd = await fetch(`${base}${layerExportHistory.exports[2].psdDownloadUrl}`);
+  assert.equal(historicalPsd.status, 200);
+  // 重复识别同内容输出应复用同一方案（200 而不是新任务）
+  const reusedLayerPlan = await requestJson(`${base}/outputs/${outputs[0].id}/layer-plan`, "POST", {});
+  assert.equal(reusedLayerPlan.id, layerPlan.id);
   // 自定义模板场景：创建模板 → MANUAL 规划（custom_prompt 注入规划上下文）→ 生图（Worker 回退解析自定义模板）
   const customTemplate = await requestJson(`${base}/user-templates`, "POST", { name: "Festive gift box scene", prompt: "Festive gift box hero scene with e2e-custom-marker ribbon detail, soft window light, triangular composition.", defaultSize: "1024x1024", supportsImageReference: false });
   assert.match(customTemplate.id, /^custom-/);
@@ -232,6 +368,12 @@ try {
 }
 
 function start(script, env) { const child = spawn(process.execPath, [script], { cwd: root, env, stdio: "pipe" }); child.stderr.on("data", (data) => process.stderr.write(`[${script}] ${data}`)); return child; }
+function pngChunk(type, data) { const length = Buffer.alloc(4); length.writeUInt32BE(data.length); const typeBuffer = Buffer.from(type, "ascii"); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])) >>> 0); return Buffer.concat([length, typeBuffer, data, crc]); }
+function solidPng(red, green, blue) {
+  const header = Buffer.alloc(13); header.writeUInt32BE(1, 0); header.writeUInt32BE(1, 4); header[8] = 8; header[9] = 6;
+  const raw = Buffer.from([0, red, green, blue, 255]);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), pngChunk("IHDR", header), pngChunk("IDAT", deflateSync(raw)), pngChunk("IEND", Buffer.alloc(0))]);
+}
 function stop(child) { if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(); return new Promise((resolveStop) => { child.once("exit", resolveStop); child.kill(); }); }
 function readBody(request) { return new Promise((resolveBody, reject) => { const chunks = []; request.on("data", (chunk) => chunks.push(Buffer.from(chunk))); request.on("end", () => resolveBody(Buffer.concat(chunks))); request.on("error", reject); }); }
 function listen(server) { return new Promise((resolvePort, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", () => resolvePort(server.address().port)); }); }

@@ -4,12 +4,14 @@ import { createHash, randomUUID } from "node:crypto";
 import { Worker } from "bullmq";
 import archiver from "archiver";
 import sharp from "sharp";
-import { planImageEdit, planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
-import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type ProjectRecord } from "@ecomgen/core";
+import { writePsdBuffer } from "ag-psd";
+import { planImageEdit, planLayerElements, planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
+import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
 import { compileUserTemplate, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
-import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, buildReasoningModel, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
+import { FalSegmentationProvider, GeminiImageProvider, GroundedSamSegmentationProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, buildReasoningModel, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
+import { createPsdLayerAccumulator, extractAlpha, invertMask, multiplyAlpha, unionOfMasks } from "./layer-composite.js";
 import { assertPixelProtectedInputs, assignImageHandles, imageHandle, selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata, withGenerationAssetRoles } from "./visual-assets.js";
 import { VisionDerivativeCache } from "./vision-cache.js";
 
@@ -48,10 +50,14 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
     else if (queueJob.data.kind === "generate") await executeGeneration(job);
     else if (queueJob.data.kind === "edit_plan") await executeEditPlan(job);
     else if (queueJob.data.kind === "edit_generate") await executeEditGeneration(job);
+    else if (queueJob.data.kind === "layer_plan") await executeLayerPlan(job);
+    else if (queueJob.data.kind === "layer_export") await executeLayerExport(job);
     else await executeExport(job);
-    const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") { await updateJob(job, { status: "CANCELLED", progress: current.progress }); } else await updateJob(job, { status: "SUCCEEDED", progress: 100 });
+    // 终态与清空外部请求标记在同一条 UPDATE 内原子完成：标记一旦设置就只在终态消失，
+    // 避免终态写入前进程崩溃时恢复层误判任务仍在付费请求窗口内。
+    const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") { await updateJob(job, { status: "CANCELLED", progress: current.progress, providerTaskId: null }); } else await updateJob(job, { status: "SUCCEEDED", progress: 100, providerTaskId: null });
   } catch (error) {
-    if (error instanceof JobCancelled) { await updateJob(job, { status: "CANCELLED", cancelRequested: true }); return; }
+    if (error instanceof JobCancelled) { await updateJob(job, { status: "CANCELLED", cancelRequested: true, providerTaskId: null }); return; }
     const message = error instanceof Error ? error.message : String(error);
     if (job.type === "EDIT_PLAN" || job.type === "EDIT_GENERATE") {
       const turnId = typeof job.input.editTurnId === "string" ? job.input.editTurnId : "";
@@ -414,6 +420,232 @@ async function executeExport(job: JobRecord): Promise<void> {
   const target = exportRecord ?? repository.createExport({ projectId: project.id, jobId: job.id, status: "QUEUED", storagePath: null }); const updated = repository.updateExport(target.id, { status: "SUCCEEDED", storagePath: stored.path }); await events.publish(project.id, "export.updated", { export: updated });
 }
 
+async function executeLayerPlan(job: JobRecord): Promise<void> {
+  const plan = layerPlanFor(job);
+  try {
+    const output = repository.getOutput(plan.outputId);
+    if (!output || output.projectId !== plan.projectId) throw new Error("Layer plan source output is missing or belongs to another project");
+    // 排队时 API 已把推理 Provider/模型写入 input 并计入指纹；执行只认这份快照，指纹与执行配置保持一致。
+    const reasoningProviderId = typeof job.input.reasoningProviderId === "string" ? job.input.reasoningProviderId : "";
+    const reasoningModelId = typeof job.input.reasoningModelId === "string" ? job.input.reasoningModelId : "";
+    if (!reasoningProviderId || !reasoningModelId) throw new Error("Layer plan job is missing its reasoning model snapshot");
+    const provider = providerFor(reasoningProviderId);
+    const model = provider.models.find((candidate) => candidate.id === reasoningModelId);
+    if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
+    if (!model.supportsVision) throw new Error("CAPABILITY_UNSUPPORTED: 图层识别需要视觉推理模型");
+    await updateJob(job, { progress: 25 });
+    // 执行前先落 RUNNING：否则前端在整个识别过程中都只能看到 QUEUED。
+    const running = repository.updateLayerPlan(plan.id, { status: "RUNNING", error: null });
+    if (running) await events.publish(job.projectId, "layer-plan.updated", { plan: running });
+    const image = await visionSourceImage(output.storagePath);
+    throwIfCancelled(job);
+    // 视觉识别是付费外部请求：标记后崩溃恢复一律按“结果未知”显式失败，不会重新执行已计费的调用。
+    await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED });
+    const elements = await planLayerElements({
+      model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking, supportsStructuredOutput: model.supportsStructuredOutput }),
+      apiKey: secrets.decrypt(provider.encryptedApiKey),
+      image
+    });
+    throwIfCancelled(job);
+    // 元素 id 在方案内稳定（el-N）；前端勾选后原样回传，manual 元素由前端自带 id。
+    const records = elements.map((element, index) => ({ id: `el-${index + 1}`, name: element.name, source: "auto" as const, bbox: null }));
+    const updated = repository.updateLayerPlan(plan.id, { status: "SUCCEEDED", elements: records, error: null });
+    if (updated) await events.publish(job.projectId, "layer-plan.updated", { plan: updated });
+  } catch (error) {
+    // 失败/取消必须同步到方案记录：REST 是状态真相，SSE 只负责通知前端失效重查。
+    if (error instanceof JobCancelled) {
+      const cancelled = repository.updateLayerPlan(plan.id, { status: "CANCELLED", error: null });
+      if (cancelled) await events.publish(job.projectId, "layer-plan.updated", { plan: cancelled });
+    } else {
+      const updated = repository.updateLayerPlan(plan.id, { status: "FAILED", error: { message: error instanceof Error ? error.message : String(error) } });
+      if (updated) await events.publish(job.projectId, "layer-plan.updated", { plan: updated });
+    }
+    throw error;
+  }
+  await updateJob(job, { progress: 90 });
+}
+
+async function executeLayerExport(job: JobRecord): Promise<void> {
+  const record = layerExportFor(job);
+  const project = projectFor(job);
+  try {
+    const output = repository.getOutput(record.outputId);
+    if (!output || output.projectId !== project.id) throw new Error("Layer export source output is missing or belongs to another project");
+    // planId 为空表示画框/提示词直接分层（无识别方案，不回写实测包围盒）；有 planId 时方案必须已成功。
+    const plan = record.planId ? repository.getLayerPlan(record.planId) : undefined;
+    if (record.planId && (!plan || plan.status !== "SUCCEEDED")) throw new Error("Layer plan is missing or has not succeeded");
+    // 排队时 API 已把分割 Provider/模型/协议写入 input 并计入指纹；执行只认这份快照，
+    // 排队后修改项目分割模型或 Provider 的协议声明都不影响本次执行。
+    const segmentationProviderId = typeof job.input.segmentationProviderId === "string" ? job.input.segmentationProviderId : "";
+    const segmentationModelId = typeof job.input.segmentationModelId === "string" ? job.input.segmentationModelId : "";
+    const protocol = job.input.segmentationProtocol === "fal" || job.input.segmentationProtocol === "grounded_sam" || job.input.segmentationProtocol === "seedream_layerize"
+      ? job.input.segmentationProtocol
+      : null;
+    if (!segmentationProviderId || !segmentationModelId || !protocol) throw new Error("Layer export job is missing its segmentation snapshot");
+    const provider = providerFor(segmentationProviderId);
+    const elements = layerExportElementsFor(job);
+    await updateJob(job, { progress: 10 });
+    // 执行前先落 RUNNING：否则前端在整段分割过程中都只能看到 QUEUED。
+    const running = repository.updateLayerExport(record.id, { status: "RUNNING", error: null });
+    if (running) await events.publish(project.id, "layer-export.updated", { layerExport: running });
+    const original = await storage.read(output.storagePath);
+    const meta = await sharp(original).metadata();
+    if (!meta.width || !meta.height) throw new Error("Source image dimensions are unavailable");
+    const width = meta.width; const height = meta.height;
+    // fal 接受公网 URL 或 data URI；本地产物没有公网地址，直接内联原图。
+    const imageUrl = `data:${mimeForStoragePath(output.storagePath)};base64,${original.toString("base64")}`;
+    // protocol 是项目配置里的显式字段；grounded_sam 面向国内自部署服务，fal 面向 fal.ai SAM 3，seedream 面向火山方舟图层拆分。
+    const apiKey = secrets.decrypt(provider.encryptedApiKey);
+    // 两条路径统一产出 {name, mask}：mask 只是选区，元素图层像素一律取自原图（PIXEL_PROTECTED）。
+    const cutoutTargets: Array<{ name: string; mask: Buffer }> = [];
+    const measuredBboxes = new Map<string, { x: number; y: number; width: number; height: number } | null>();
+    // 标记“已发出外部计费请求”：此后标记不再被替换或中途清空，直到终态一次性清掉；
+    // 进程在任意时点崩溃时，恢复层据此把任务判为结果未知并显式失败，而不是重新执行已计费的请求。
+    await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED });
+    // seedream 返回的补绘底图保持 RGBA，避免“编码 PNG 再解码”这一轮无用往返。
+    let inpaintedBackground: Buffer | undefined;
+    if (protocol === "seedream_layerize") {
+      // 一次调用拆分全部元素：手动框选换算为 0-1000 bbox 标签，自动元素用语义名称。
+      const layerizer = new SeedreamLayerizeProvider({ baseUrl: provider.baseUrl, apiKey }, { modelId: segmentationModelId });
+      const result = await layerizer.layerize({ imageUrl, prompt: seedreamLayerizePrompt(elements), quality: "auto" });
+      throwIfCancelled(job);
+      if (result.base) inpaintedBackground = await decodeRgba(result.base.data, width, height);
+      for (const layer of result.layers) {
+        throwIfCancelled(job);
+        const mask = await seedreamLayerMask(layer.png, layer.bbox, width, height);
+        // 空白图层是模型漏拆，不能静默跳过后当成成功：明确失败让用户调整描述或画框。
+        if (!maskHasForeground(mask)) throw new Error(`Seedream 图层「${layer.name ?? layer.zIndex}」没有有效前景，请调整元素描述或画框后重试`);
+        const matched = seedreamMatches(elements, layer);
+        if (matched) measuredBboxes.set(matched.id, layer.bbox);
+        cutoutTargets.push({ name: matched?.name ?? layer.name ?? `图层 ${layer.zIndex}`, mask });
+        await updateJob(job, { progress: 10 + Math.round((cutoutTargets.length / Math.max(1, result.layers.length)) * 50) });
+      }
+      if (cutoutTargets.length === 0) throw new Error("Seedream 未拆分出任何有效图层，请调整元素描述或画框后重试");
+    } else {
+      const segmenter = protocol === "grounded_sam"
+        ? new GroundedSamSegmentationProvider({ baseUrl: provider.baseUrl, apiKey })
+        : new FalSegmentationProvider({ baseUrl: provider.baseUrl, apiKey });
+      // 分割模型 id 允许直接写完整 fal 路径（含 "/"），否则使用适配器默认 fal-ai/sam-3/image。
+      const modelPath = protocol === "fal" && segmentationModelId.includes("/") ? segmentationModelId : undefined;
+      for (const [index, element] of elements.entries()) {
+        throwIfCancelled(job);
+        const box = element.bbox ? {
+          xMin: Math.round(element.bbox.x * width), yMin: Math.round(element.bbox.y * height),
+          xMax: Math.round((element.bbox.x + element.bbox.width) * width), yMax: Math.round((element.bbox.y + element.bbox.height) * height)
+        } : undefined;
+        // 语义名称（识别结果或用户输入的提示词）作为文本提示；手动框选直接用画框坐标。
+        const result = await segmenter.segment({ imageUrl, textPrompt: element.source === "manual" ? undefined : element.name, box, modelPath });
+        throwIfCancelled(job);
+        measuredBboxes.set(element.id, result.bbox);
+        const mask = await normalizeMask(result.mask.data, width, height);
+        if (!maskHasForeground(mask)) throw new Error(`SAM 未在「${element.name}」中分割出前景，请调整元素名称或画框后重试`);
+        cutoutTargets.push({ name: element.name, mask });
+        await updateJob(job, { progress: 10 + Math.round(((index + 1) / elements.length) * 50) });
+      }
+    }
+    throwIfCancelled(job);
+    // 把 SAM 实测包围盒回写方案：前端 chips 悬停即可按真实分割区域高亮，而不只是手动画框。
+    if (plan) {
+      const refreshedElements = plan.elements.map((planElement) => ({ ...planElement, bbox: measuredBboxes.get(planElement.id) ?? planElement.bbox }));
+      if (JSON.stringify(refreshedElements) !== JSON.stringify(plan.elements)) {
+        const refreshed = repository.updateLayerPlan(plan.id, { elements: refreshedElements });
+        if (refreshed) await events.publish(project.id, "layer-plan.updated", { plan: refreshed });
+      }
+    }
+    // mask 只是选区：元素图层像素原样取自原图，不做任何生成，保持 PIXEL_PROTECTED 语义。
+    // 原图 RGBA 只解码一次；每层全幅 RGBA 在 PNG 落盘、合成与 PSD 裁剪后即被释放，只保留裁剪副本。
+    const originalRgba = await decodeRgba(original, width, height);
+    const layerFiles: LayerExportLayerFileRecord[] = [];
+    // PSD 组装用累积器：背景先入 children（children[0] 是最底层），元素逐层叠加到同一份合成预览上。
+    const psd = createPsdLayerAccumulator(width, height);
+    if (record.includeBackground) {
+      // 挖空背景语义：原图 alpha ×(1-元素选区并集)，保留原图透明度；软边处元素与背景 alpha 之和略小于 1，
+      // 叠加后边缘会轻微变透明，这是“可移动元素”与“逐像素还原原图”不可兼得时的取舍，合成预览如实呈现。
+      const backgroundRgba = inpaintedBackground
+        ? multiplyAlpha(inpaintedBackground, extractAlpha(originalRgba))
+        : multiplyAlpha(originalRgba, invertMask(unionOfMasks(cutoutTargets.map((target) => target.mask), width, height)));
+      const stored = await storage.putLayerArtifact(project.id, record.id, "00_背景", await pngFromRgba(backgroundRgba, width, height));
+      layerFiles.push({ name: "00_背景.png", kind: "background", storagePath: stored.path, hash: stored.hash });
+      psd.append({ name: "背景", rgba: backgroundRgba });
+    }
+    for (const [index, target] of cutoutTargets.entries()) {
+      // 元素选区透明：元素 alpha = 原图 alpha × 选区，保留原图透明度与软边。
+      const cutoutRgba = multiplyAlpha(originalRgba, target.mask);
+      const label = `${String(index + 1).padStart(2, "0")}_${safeName(target.name)}`;
+      const stored = await storage.putLayerArtifact(project.id, record.id, label, await pngFromRgba(cutoutRgba, width, height));
+      layerFiles.push({ name: `${label}.png`, kind: "element", storagePath: stored.path, hash: stored.hash });
+      psd.append({ name: `${String(index + 1).padStart(2, "0")} ${target.name}`, rgba: cutoutRgba });
+    }
+    await updateJob(job, { progress: 85 });
+    const psdStored = await storage.putLayerArtifact(project.id, record.id, "图层", writePsdBuffer({ width, height, children: psd.children, imageData: { width, height, data: new Uint8ClampedArray(psd.composite) } }), ".psd");
+    layerFiles.push({ name: "图层.psd", kind: "composite", storagePath: psdStored.path, hash: psdStored.hash });
+    const updated = repository.updateLayerExport(record.id, { status: "SUCCEEDED", psdStoragePath: psdStored.path, layerFiles, error: null });
+    if (updated) await events.publish(project.id, "layer-export.updated", { layerExport: updated });
+    await updateJob(job, { progress: 95 });
+  } catch (error) {
+    // EXTERNAL_REQUEST_STARTED 标记保持到终态：付费请求之后的任何时点崩溃，恢复层都会判“结果未知”并显式失败，
+    // 不会重跑已计费的分割调用；标记由终态更新一次性清空，不在执行中途改写。
+    if (error instanceof JobCancelled) {
+      const cancelled = repository.updateLayerExport(record.id, { status: "CANCELLED", error: null });
+      if (cancelled) await events.publish(project.id, "layer-export.updated", { layerExport: cancelled });
+    } else {
+      // 分割已产生外部计费，任何失败都必须显式落到记录上，不允许静默重试掩盖。
+      const failed = repository.updateLayerExport(record.id, { status: "FAILED", error: { message: error instanceof Error ? error.message : String(error) } });
+      if (failed) await events.publish(project.id, "layer-export.updated", { layerExport: failed });
+    }
+    throw error;
+  }
+}
+
+/** Seedream 一次调用拆分全部元素：手动框选换算为 0-1000 归一化 bbox 标签，识别与提示词元素用语义名称。 */
+function seedreamLayerizePrompt(elements: Array<{ id: string; name: string; source: "auto" | "manual" | "prompt"; bbox: { x: number; y: number; width: number; height: number } | null }>): string {
+  return elements.map((element) => {
+    if (element.source !== "manual" || !element.bbox) return element.name;
+    const x1 = Math.round(element.bbox.x * 1000);
+    const y1 = Math.round(element.bbox.y * 1000);
+    const x2 = Math.round((element.bbox.x + element.bbox.width) * 1000);
+    const y2 = Math.round((element.bbox.y + element.bbox.height) * 1000);
+    return `${element.name}<bbox>${x1} ${y1} ${x2} ${y2}</bbox>`;
+  }).join("、");
+}
+
+/** Seedream 图层 alpha 只作选区回贴：图层与原图同尺寸直接取 alpha，局部图按 bbox 贴回全幅画布。 */
+async function seedreamLayerMask(layerPng: Buffer, bbox: { x: number; y: number; width: number; height: number } | null, width: number, height: number): Promise<Buffer> {
+  const meta = await sharp(layerPng).metadata();
+  if (!meta.width || !meta.height) throw new Error("Seedream layer image dimensions are unavailable");
+  if (meta.width === width && meta.height === height) return sharp(layerPng).ensureAlpha().extractChannel(3).raw().toBuffer();
+  const box = bbox ?? { x: 0, y: 0, width: 1, height: 1 };
+  const bx = Math.max(0, Math.min(width - 1, Math.round(box.x * width)));
+  const by = Math.max(0, Math.min(height - 1, Math.round(box.y * height)));
+  const bw = Math.max(1, Math.min(width - bx, Math.round(box.width * width)));
+  const bh = Math.max(1, Math.min(height - by, Math.round(box.height * height)));
+  const region = await sharp(layerPng).ensureAlpha().extractChannel(3).resize(bw, bh, { fit: "fill" }).raw().toBuffer();
+  const canvas = Buffer.alloc(width * height, 0);
+  for (let row = 0; row < bh; row += 1) region.copy(canvas, (by + row) * width + bx, row * bw, (row + 1) * bw);
+  return canvas;
+}
+
+/** 图层与请求元素对齐：manual 按归一化 bbox 重叠（IoU），其余按名称互含；未匹配时保留模型标签。 */
+function seedreamMatches(elements: Array<{ id: string; name: string; source: "auto" | "manual" | "prompt"; bbox: { x: number; y: number; width: number; height: number } | null }>, layer: { name: string | null; bbox: { x: number; y: number; width: number; height: number } | null }) {
+  for (const element of elements) {
+    if (element.source === "manual" && element.bbox && layer.bbox && normalizedIou(element.bbox, layer.bbox) >= 0.4) return element;
+  }
+  if (layer.name) {
+    for (const element of elements) {
+      if (element.source === "auto" && (layer.name.includes(element.name) || element.name.includes(layer.name))) return element;
+    }
+  }
+  return null;
+}
+
+function normalizedIou(a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }): number {
+  const x1 = Math.max(a.x, b.x); const y1 = Math.max(a.y, b.y);
+  const x2 = Math.min(a.x + a.width, b.x + b.width); const y2 = Math.min(a.y + a.height, b.y + b.height);
+  const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+  const union = a.width * a.height + b.width * b.height - inter;
+  return union <= 0 ? 0 : inter / union;
+}
+
 function projectFor(job: JobRecord): ProjectRecord { const project = repository.getProject(job.projectId); if (!project) throw new Error(`Project not found for job ${job.id}`); return project; }
 // 引用为 null 表示 Provider 被删除后项目尚未重新选择模型；入口虽已拦截，这里兜底给出可读错误
 function providerFor(id: string | null) {
@@ -506,9 +738,42 @@ function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "GENERATE") return "generate";
   if (type === "EDIT_PLAN") return "edit_plan";
   if (type === "EDIT_GENERATE") return "edit_generate";
+  if (type === "LAYER_PLAN") return "layer_plan";
+  if (type === "LAYER_EXPORT") return "layer_export";
   return "export";
 }
 function editTurnFor(job: JobRecord): EditTurnRecord { const turnId = typeof job.input.editTurnId === "string" ? job.input.editTurnId : ""; const turn = repository.getEditTurn(turnId); if (!turn || turn.projectId !== job.projectId) throw new Error("Edit turn is missing or belongs to another project"); return turn; }
+function layerPlanFor(job: JobRecord): LayerPlanRecord { const plan = repository.getLayerPlanByJobId(job.id); if (!plan || plan.projectId !== job.projectId) throw new Error("Layer plan is missing or belongs to another project"); return plan; }
+function layerExportFor(job: JobRecord): LayerExportRecord { const record = repository.getLayerExportByJobId(job.id); if (!record || record.projectId !== job.projectId) throw new Error("Layer export is missing or belongs to another project"); return record; }
+interface LayerExportElementInput { id: string; name: string; source: "auto" | "manual" | "prompt"; bbox: { x: number; y: number; width: number; height: number } | null; }
+// 导入元素来自 job.input（API 已用契约校验）；这里做最小防御性解析，manual 无 bbox 直接失败。
+function layerExportElementsFor(job: JobRecord): LayerExportElementInput[] {
+  const raw = Array.isArray(job.input.elements) ? job.input.elements : [];
+  const elements = raw.flatMap((entry): LayerExportElementInput[] => {
+    if (!entry || typeof entry !== "object") return [];
+    const value = entry as Record<string, unknown>;
+    if (typeof value.id !== "string" || typeof value.name !== "string" || (value.source !== "auto" && value.source !== "manual" && value.source !== "prompt")) return [];
+    const bboxRaw = value.bbox as Record<string, unknown> | null | undefined;
+    const bbox = bboxRaw && typeof bboxRaw.x === "number" && typeof bboxRaw.y === "number" && typeof bboxRaw.width === "number" && typeof bboxRaw.height === "number"
+      ? { x: bboxRaw.x, y: bboxRaw.y, width: bboxRaw.width, height: bboxRaw.height }
+      : null;
+    if (value.source === "manual" && !bbox) throw new Error(`手动元素「${value.name}」缺少画框坐标`);
+    return [{ id: value.id, name: value.name, source: value.source, bbox }];
+  });
+  if (elements.length === 0) throw new Error("Layer export has no elements");
+  return elements;
+}
+/** SAM 返回的 mask 可能与原图尺寸不同：统一缩放到原图尺寸的 8-bit 灰度选区（亮度=前景）。 */
+async function normalizeMask(mask: Buffer, width: number, height: number): Promise<Buffer> { return sharp(mask).greyscale().removeAlpha().resize(width, height, { fit: "fill" }).raw().toBuffer(); }
+function maskHasForeground(mask: Buffer): boolean { return mask.some((value) => value > 8); }
+// joinChannel 对 Buffer 输入在部分平台触发 libpng 读错误；直接改写 raw RGBA 的 alpha 字节更稳。
+async function decodeRgba(image: Buffer, width: number, height: number): Promise<Buffer> {
+  return sharp(image).ensureAlpha().resize(width, height, { fit: "fill" }).raw().toBuffer();
+}
+async function pngFromRgba(rgba: Buffer, width: number, height: number): Promise<Buffer> {
+  return sharp(rgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
+function mimeForStoragePath(path: string): string { if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg"; if (path.endsWith(".webp")) return "image/webp"; return "image/png"; }
 function canvasExpansionFor(turn: EditTurnRecord): { top: number; right: number; bottom: number; left: number } | null {
   const value = (turn.annotations as Record<string, unknown>).canvasExpansion;
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;

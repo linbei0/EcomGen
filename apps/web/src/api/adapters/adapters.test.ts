@@ -45,6 +45,7 @@ describe("adapters", () => {
       reasoningModelId: "m",
       imageProviderId: "i",
       imageModelId: "img",
+      segmentationModel: { providerId: "s", modelId: "sam-3", protocol: "seedream_layerize" },
       defaultMode: "CREATIVE",
       createdAt: "2026-08-01T00:00:00.000Z",
       updatedAt: "2026-08-01T00:00:00.000Z",
@@ -64,10 +65,30 @@ describe("adapters", () => {
     expect(detail.imageResolution).toBe("1K");
     expect(detail.imageAspectRatio).toBe("AUTO");
     expect(detail.candidatesPerType).toBe(1);
+    expect(detail.segmentationModel).toEqual({ providerId: "s", modelId: "sam-3", protocol: "seedream_layerize" });
     expect(detail.assets[0]?.url).toContain("/files/assets/a1");
     expect(detail.assets[0]?.kind).toBe("PRODUCT");
     expect(detail.storyboard).toBeNull();
     expect(detail.cover).toEqual({ productAssetId: null, coverOutputId: null, previewOutputIds: [], outputCount: 0 });
+  });
+
+  it("分割模型引用协议未知时置空，避免面板回显脏数据", () => {
+    const project = adaptProject({
+      id: "p1",
+      name: "耳机",
+      platformTargets: ["TAOBAO"],
+      targetMarket: null,
+      copyLanguage: null,
+      reasoningProviderId: "r",
+      reasoningModelId: "m",
+      imageProviderId: "i",
+      imageModelId: "img",
+      segmentationModel: { providerId: "s", modelId: "m", protocol: "unknown" },
+      defaultMode: "CREATIVE",
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+    });
+    expect(project?.segmentationModel).toBeNull();
   });
 
   it("项目列表封面解析原图与输出 id，并去掉封面重复项", () => {

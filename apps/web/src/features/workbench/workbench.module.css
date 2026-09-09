@@ -3161,3 +3161,359 @@
   gap: 8px;
   margin-top: 6px;
 }
+/* 编辑器「AI 分层导出」模式：右侧面板整体切换为图层识别与导出流程 */
+.editLayersHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editLayersBack {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.editLayersBack:hover {
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.editLayersTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+.editLayersBadge {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin-left: 2px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-s);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.editLayersBody {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  flex: 1;
+  min-height: 0;
+  /* 长模型名/输入内容不把面板撑出横向滚动条 */
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* grid 子项默认 min-width:auto，长内容会把轨道撑破 */
+.editLayersBody > * {
+  min-width: 0;
+}
+
+.editLayersFoot {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-1);
+}
+
+.editLayersChips {
+  display: grid;
+  gap: 6px;
+}
+
+.editLayersMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.editLayersMetaAction {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.editLayersMetaAction:hover {
+  text-decoration: underline;
+}
+
+.editLayersChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-s);
+  background: var(--bg-2);
+  color: var(--text-1);
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.editLayersChip[data-selectable="true"] {
+  cursor: pointer;
+}
+
+.editLayersChip:hover {
+  border-color: var(--accent-line);
+}
+
+.editLayersChip[data-selected="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+.editLayersThumb {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line-1);
+  border-radius: 4px;
+  background-color: var(--bg-3);
+  background-repeat: no-repeat;
+}
+
+.editLayersDot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--text-3);
+}
+
+.editLayersChipName {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+span.editLayersChipName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editLayersChipRemove {
+  border: none;
+  background: transparent;
+  color: var(--text-4);
+  cursor: pointer;
+  padding: 2px;
+  display: grid;
+  place-items: center;
+  opacity: 0.6;
+  transition: color 150ms ease, opacity 150ms ease;
+}
+
+.editLayersChipRemove:hover {
+  color: var(--danger);
+  opacity: 1;
+}
+
+.editLayersSkeleton {
+  display: grid;
+  gap: 8px;
+}
+
+.editLayersSkeletonRow {
+  height: 36px;
+  border-radius: var(--radius-s);
+  background: linear-gradient(90deg, var(--bg-2), var(--bg-3), var(--bg-2));
+  background-size: 200% 100%;
+  animation: editLayerPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes editLayerPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.editLayersStatus {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.editLayersBlock {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-2);
+}
+
+.editLayersPrompt {
+  display: grid;
+  gap: 6px;
+}
+
+/* 面板宽度有限，输入文字与整体小号排版保持一致 */
+.editLayersPrompt textarea {
+  font-size: 12px;
+}
+
+.editLayersPromptAction {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.editLayersEmpty {
+  margin: 0;
+  color: var(--text-4);
+  font-size: 11px;
+}
+
+.editLayersSwitch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.editLayersPreview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* 结果视图的图层卡片：棋盘图 + 单行名称 + 下载图标，避免长文件名把卡片挤乱 */
+.editLayersPreviewItem {
+  display: grid;
+  gap: 6px;
+  justify-items: stretch;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-s);
+  background: var(--bg-2);
+}
+
+.editLayersPreviewItem .editLayersChecker {
+  border: none;
+  border-radius: 3px;
+}
+
+.editLayersPreviewItem img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: transparent;
+}
+
+.editLayersPreviewCaption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+
+.editLayersPreviewName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editLayersDownload {
+  display: block;
+  text-decoration: none;
+}
+
+.editLayersRecognize {
+  display: grid;
+  gap: 8px;
+}
+
+/* 面板只有 320px：选中值分两行展示（Provider 名 + 模型 ID），压平 antd 默认单行省略 */
+.editLayersRecognize :global(.ant-select-selection-item) {
+  height: auto;
+  margin-block: 2px;
+  line-height: 1.25;
+}
+
+.editLayersModelValue {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.editLayersModelProvider {
+  color: var(--text-3);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.editLayersModelId {
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 透明棋盘格：单层 PNG 的透明区域需要可见，避免与纯白/纯黑背景混淆 */
+.editLayersChecker {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line-1);
+  border-radius: 4px;
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #e6e6e6 25%, transparent 25%),
+    linear-gradient(-45deg, #e6e6e6 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e6e6e6 75%),
+    linear-gradient(-45deg, transparent 75%, #e6e6e6 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
+
+.editLayersChecker img {
+  background: transparent;
+}
+
+.editLayersPreviewDownload {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-s);
+  color: var(--text-3);
+  text-decoration: none;
+}
+
+.editLayersPreviewDownload:hover {
+  color: var(--accent);
+  background: var(--accent-subtle);
+}

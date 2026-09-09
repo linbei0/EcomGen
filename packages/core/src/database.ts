@@ -131,12 +131,49 @@ function makeProjectProviderReferencesNullable(database: SqliteDatabase): void {
 }
 
 /**
+ * 分层导出支持无识别方案（画框/提示词直接分层）：旧库 layer_exports.plan_id 为 NOT NULL，重建表放宽为可空。
+ */
+function makeLayerExportPlanReferenceNullable(database: SqliteDatabase): void {
+  const columns = database.prepare("PRAGMA table_info(layer_exports)").all() as Array<{ name: string; notnull: number }>;
+  if (columns.length === 0 || !columns.some((column) => column.name === "plan_id" && column.notnull !== 0)) return;
+  database.exec("DROP TABLE IF EXISTS layer_exports_nullable_plan");
+  database.pragma("foreign_keys = OFF");
+  try {
+    const rebuild = database.transaction(() => database.exec(`
+      CREATE TABLE layer_exports_nullable_plan (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        output_id TEXT NOT NULL,
+        job_id TEXT NOT NULL,
+        plan_id TEXT,
+        status TEXT NOT NULL,
+        include_background INTEGER NOT NULL DEFAULT 0,
+        psd_storage_path TEXT,
+        layer_files_json TEXT,
+        error_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+      INSERT INTO layer_exports_nullable_plan (id,project_id,output_id,job_id,plan_id,status,include_background,psd_storage_path,layer_files_json,error_json,created_at,updated_at)
+      SELECT id,project_id,output_id,job_id,plan_id,status,include_background,psd_storage_path,layer_files_json,error_json,created_at,updated_at FROM layer_exports;
+      DROP TABLE layer_exports;
+      ALTER TABLE layer_exports_nullable_plan RENAME TO layer_exports;
+    `));
+    rebuild();
+  } finally {
+    database.pragma("foreign_keys = ON");
+  }
+}
+
+/**
  * 开发初期以本 schema 为唯一规范，不保留历史状态；
  * 新增可空列走一次性 ALTER，旧行保持 NULL 由上层按"未标注"处理。
  */
 function migrate(database: SqliteDatabase): void {
   removeLegacyOutputReviewColumns(database);
   makeProjectProviderReferencesNullable(database);
+  makeLayerExportPlanReferenceNullable(database);
   addStoryboardItemShotRole(database);
   database.exec(`
     CREATE TABLE IF NOT EXISTS providers (
@@ -400,6 +437,15 @@ function migrate(database: SqliteDatabase): void {
   if (!columnNames(database, "projects").has("archived_at")) {
     database.exec("ALTER TABLE projects ADD COLUMN archived_at TEXT");
   }
+  if (!columnNames(database, "projects").has("segmentation_provider_id")) {
+    database.exec("ALTER TABLE projects ADD COLUMN segmentation_provider_id TEXT");
+  }
+  if (!columnNames(database, "projects").has("segmentation_model_id")) {
+    database.exec("ALTER TABLE projects ADD COLUMN segmentation_model_id TEXT");
+  }
+  if (!columnNames(database, "projects").has("segmentation_protocol")) {
+    database.exec("ALTER TABLE projects ADD COLUMN segmentation_protocol TEXT");
+  }
   if (!columnNames(database, "outputs").has("generation_key")) {
     database.exec("ALTER TABLE outputs ADD COLUMN generation_key TEXT");
   }
@@ -432,6 +478,40 @@ function migrate(database: SqliteDatabase): void {
     const migrateSelections = database.transaction(() => { for (const row of rows) { const ids = JSON.parse(row.reference_asset_ids_json) as string[]; update.run(JSON.stringify(ids.map((id, order) => ({ id, source: "PROJECT", purpose: "PRODUCT_APPEARANCE", order }))), row.id); } });
     migrateSelections();
   }
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS layer_plans (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      output_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      output_hash TEXT NOT NULL,
+      status TEXT NOT NULL,
+      elements_json TEXT NOT NULL DEFAULT '[]',
+      error_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS layer_exports (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      output_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      plan_id TEXT,
+      status TEXT NOT NULL,
+      include_background INTEGER NOT NULL DEFAULT 0,
+      psd_storage_path TEXT,
+      layer_files_json TEXT,
+      error_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_layer_plans_job ON layer_plans(job_id);
+    CREATE INDEX IF NOT EXISTS idx_layer_plans_output ON layer_plans(output_id, created_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_layer_exports_job ON layer_exports(job_id);
+    CREATE INDEX IF NOT EXISTS idx_layer_exports_output ON layer_exports(output_id, created_at DESC);
+  `);
   database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_generation_key ON outputs(generation_key)");
   database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_outputs_generation_key_unique ON outputs(generation_key) WHERE generation_key IS NOT NULL");
   database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_generation_batch ON outputs(project_id, generation_batch_id, created_at)");

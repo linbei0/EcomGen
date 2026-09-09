@@ -92,6 +92,8 @@ components:
         - EXPORT
         - EDIT_PLAN
         - EDIT_GENERATE
+        - LAYER_PLAN
+        - LAYER_EXPORT
     JobStatus:
       type: string
       enum:
@@ -190,6 +192,8 @@ components:
             - edit-turn.updated
             - export.updated
             - provider.updated
+            - layer-plan.updated
+            - layer-export.updated
         projectId:
           format: uuid
           type: string
@@ -223,6 +227,13 @@ components:
             - const: custom
               type: string
             - type: "null"
+        segmentationProtocol:
+          description: Segmentation API protocol declared for this model; mutually exclusive with imageApiKind.
+          type: string
+          enum:
+            - fal
+            - grounded_sam
+            - seedream_layerize
     ModelDefinition:
       type: object
       allOf:
@@ -258,6 +269,13 @@ components:
                 - const: custom
                   type: string
                 - type: "null"
+            segmentationProtocol:
+              description: Segmentation API protocol declared for this model; mutually exclusive with imageApiKind.
+              type: string
+              enum:
+                - fal
+                - grounded_sam
+                - seedream_layerize
     Asset:
       type: object
       required:
@@ -490,6 +508,10 @@ components:
           type: string
         imageModelId:
           type: string
+        segmentationModel:
+          anyOf:
+            - $ref: "#/components/schemas/SegmentationModelRef"
+            - type: "null"
         defaultMode:
           type: string
           enum:
@@ -884,6 +906,8 @@ components:
             - EXPORT
             - EDIT_PLAN
             - EDIT_GENERATE
+            - LAYER_PLAN
+            - LAYER_EXPORT
         status:
           type: string
           enum:
@@ -937,6 +961,208 @@ components:
         updatedAt:
           format: date-time
           type: string
+    LayerBbox:
+      description: Normalized bounding box relative to the output image.
+      type: object
+      required:
+        - x
+        - y
+        - width
+        - height
+      properties:
+        x:
+          minimum: 0
+          maximum: 1
+          type: number
+        y:
+          minimum: 0
+          maximum: 1
+          type: number
+        width:
+          exclusiveMinimum: 0
+          maximum: 1
+          type: number
+        height:
+          exclusiveMinimum: 0
+          maximum: 1
+          type: number
+    LayerExport:
+      type: object
+      required:
+        - id
+        - projectId
+        - outputId
+        - jobId
+        - status
+        - includeBackground
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        projectId:
+          format: uuid
+          type: string
+        outputId:
+          format: uuid
+          type: string
+        jobId:
+          format: uuid
+          type: string
+        planId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        status:
+          type: string
+          enum:
+            - QUEUED
+            - RUNNING
+            - SUCCEEDED
+            - FAILED
+            - CANCELLED
+        includeBackground:
+          description: "Whether a background layer is produced under the element layers: Seedream uses its inpainted base image; SAM protocols use the original image with the element selections cut out (holed)."
+          type: boolean
+        psdStoragePath:
+          anyOf:
+            - type: string
+            - type: "null"
+        psdDownloadUrl:
+          anyOf:
+            - type: string
+            - type: "null"
+        layerFiles:
+          anyOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/LayerExportLayerFile"
+            - type: "null"
+        error:
+          anyOf:
+            - type: object
+              patternProperties:
+                ^(.*)$: {}
+            - type: "null"
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    LayerExportBundle:
+      type: object
+      required:
+        - job
+        - layerExport
+      properties:
+        job:
+          $ref: "#/components/schemas/Job"
+        layerExport:
+          $ref: "#/components/schemas/LayerExport"
+    LayerExportHistory:
+      type: object
+      required:
+        - exports
+      properties:
+        exports:
+          description: Layer exports of the output, newest first. Earlier records stay viewable and downloadable after a newer export replaces the latest one.
+          type: array
+          items:
+            $ref: "#/components/schemas/LayerExport"
+    LayerExportLayerFile:
+      type: object
+      required:
+        - name
+        - kind
+        - downloadUrl
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+            - element
+            - background
+            - composite
+        downloadUrl:
+          type: string
+    LayerPlan:
+      type: object
+      required:
+        - id
+        - projectId
+        - outputId
+        - jobId
+        - outputHash
+        - status
+        - elements
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        projectId:
+          format: uuid
+          type: string
+        outputId:
+          format: uuid
+          type: string
+        jobId:
+          format: uuid
+          type: string
+        outputHash:
+          description: Content hash of the output image; the plan is reused while this matches the current output and the reasoning model snapshot.
+          type: string
+        status:
+          type: string
+          enum:
+            - QUEUED
+            - RUNNING
+            - SUCCEEDED
+            - FAILED
+            - CANCELLED
+        elements:
+          type: array
+          items:
+            $ref: "#/components/schemas/LayerPlanElement"
+        error:
+          anyOf:
+            - type: object
+              patternProperties:
+                ^(.*)$: {}
+            - type: "null"
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    LayerPlanElement:
+      type: object
+      required:
+        - id
+        - name
+        - source
+      properties:
+        id:
+          description: Stable element ID inside the plan; manual elements reuse the client-provided ID.
+          type: string
+        name:
+          description: Editable element display name.
+          type: string
+        source:
+          type: string
+          enum:
+            - auto
+            - manual
+        bbox:
+          anyOf:
+            - $ref: "#/components/schemas/LayerBbox"
+            - type: "null"
     ModelCapability:
       type: object
       required:
@@ -965,6 +1191,13 @@ components:
             - const: custom
               type: string
             - type: "null"
+        segmentationProtocol:
+          description: Segmentation API protocol declared for this model (fal.ai SAM 3, self-hosted Grounded-SAM, or Volcengine Seedream layer decomposition); mutually exclusive with imageApiKind.
+          type: string
+          enum:
+            - fal
+            - grounded_sam
+            - seedream_layerize
     ModelRef:
       type: object
       required:
@@ -1181,6 +1414,10 @@ components:
         imageModelId:
           anyOf:
             - type: string
+            - type: "null"
+        segmentationModel:
+          anyOf:
+            - $ref: "#/components/schemas/SegmentationModelRef"
             - type: "null"
         defaultMode:
           type: string
@@ -1410,6 +1647,25 @@ components:
           anyOf:
             - type: string
             - type: "null"
+    SegmentationModelRef:
+      description: Segmentation model reference; the referenced model must be declared as a segmentation model on its provider.
+      type: object
+      required:
+        - providerId
+        - modelId
+      properties:
+        providerId:
+          format: uuid
+          type: string
+        modelId:
+          type: string
+        protocol:
+          description: Segmentation API protocol; derived from the model's declared segmentationProtocol and re-stated here for the Worker adapter. A body protocol that contradicts the declared one is rejected.
+          type: string
+          enum:
+            - fal
+            - grounded_sam
+            - seedream_layerize
     Storyboard:
       type: object
       required:
@@ -1596,6 +1852,10 @@ components:
           $ref: "#/components/schemas/ModelRef"
         imageModel:
           $ref: "#/components/schemas/ModelRef"
+        segmentationModel:
+          anyOf:
+            - $ref: "#/components/schemas/SegmentationModelRef"
+            - type: "null"
         defaultMode:
           type: string
           enum:
@@ -1893,6 +2153,56 @@ components:
               type: integer
             imageModel:
               $ref: "#/components/schemas/ModelRef"
+    CreateLayerExportElement:
+      description: Manual elements must carry the normalized bbox drawn on the canvas; prompt elements come from user-typed element names and need no bbox or recognition plan.
+      type: object
+      required:
+        - id
+        - name
+        - source
+      properties:
+        id:
+          minLength: 1
+          maxLength: 64
+          type: string
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        source:
+          type: string
+          enum:
+            - auto
+            - manual
+            - prompt
+        bbox:
+          $ref: "#/components/schemas/LayerBbox"
+    CreateLayerExportInput:
+      type: object
+      required:
+        - elements
+      properties:
+        elements:
+          minItems: 1
+          maxItems: 32
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateLayerExportElement"
+        includeBackground:
+          default: true
+          description: Generate a holed background layer under the element layers.
+          type: boolean
+        planId:
+          format: uuid
+          description: The recognition plan the auto elements were selected from; rejected if the plan has since changed.
+          type: string
+    CreateLayerPlanInput:
+      type: object
+      properties:
+        regenerationKey:
+          minLength: 1
+          description: Unique key for an intentional re-recognition run.
+          type: string
     EcomTemplateItem:
       type: object
       required:
@@ -2113,10 +2423,12 @@ components:
           minLength: 1
           type: string
         kind:
+          description: segmentation probes the declared segmentation API with zero cost.
           type: string
           enum:
             - reasoning
             - image
+            - segmentation
     UpdateAssetInput:
       type: object
       properties:

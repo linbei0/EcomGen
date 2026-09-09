@@ -79,13 +79,18 @@ export function normalizeModels(value: unknown): ModelDefinition[] {
   if (!Array.isArray(value) || value.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "models must contain at least one model");
   return value.map((model, index) => {
     const entry = readObject(model, `models[${index}]`);
+    const imageApiKind = entry.imageApiKind === "openai_images" || entry.imageApiKind === "gemini" || entry.imageApiKind === "custom" ? entry.imageApiKind : null;
+    // 分割协议只接受三个已知枚举值；与 imageApiKind 互斥，同时声明视为输入错误而不是静默取其一
+    const segmentationProtocol = entry.segmentationProtocol === "fal" || entry.segmentationProtocol === "grounded_sam" || entry.segmentationProtocol === "seedream_layerize" ? entry.segmentationProtocol : undefined;
+    if (imageApiKind && segmentationProtocol) throw new ApiError(400, "VALIDATION_ERROR", `models[${index}] cannot declare both imageApiKind and segmentationProtocol`);
     return {
       id: readText(entry.id, `models[${index}].id`),
       supportsVision: Boolean(entry.supportsVision),
       supportsThinking: Boolean(entry.supportsThinking),
       supportsTools: Boolean(entry.supportsTools),
       supportsStructuredOutput: Boolean(entry.supportsStructuredOutput),
-      imageApiKind: entry.imageApiKind === "openai_images" || entry.imageApiKind === "gemini" || entry.imageApiKind === "custom" ? entry.imageApiKind : null,
+      imageApiKind,
+      ...(segmentationProtocol ? { segmentationProtocol } : {}),
     };
   });
 }

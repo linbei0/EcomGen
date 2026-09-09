@@ -800,6 +800,88 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Job"
+  /outputs/{outputId}/layer-plan:
+    parameters:
+      - $ref: "#/components/parameters/OutputId"
+    get:
+      operationId: getLayerPlan
+      responses:
+        "200":
+          description: Layer plan state and recognized elements.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerPlan"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createLayerPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLayerPlanInput"
+      responses:
+        "200":
+          description: Existing plan reused for the same output content.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerPlan"
+        "202":
+          description: Layer recognition job queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerPlan"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /outputs/{outputId}/layer-exports:
+    parameters:
+      - $ref: "#/components/parameters/OutputId"
+    get:
+      operationId: getLayerExport
+      responses:
+        "200":
+          description: Latest layer export state for the output.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerExport"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createLayerExport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLayerExportInput"
+      responses:
+        "202":
+          description: Layer export job queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerExportBundle"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /outputs/{outputId}/layer-exports/history:
+    parameters:
+      - $ref: "#/components/parameters/OutputId"
+    get:
+      operationId: listLayerExports
+      responses:
+        "200":
+          description: All layer exports of the output, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerExportHistory"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{projectId}/export-jobs:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
@@ -858,6 +940,32 @@ paths:
       responses:
         "200":
           description: ZIP package bytes.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /files/layer-exports/{layerExportId}:
+    parameters:
+      - $ref: "#/components/parameters/LayerExportId"
+    get:
+      operationId: downloadLayerExport
+      responses:
+        "200":
+          description: Layered PSD file bytes.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /files/layer-exports/{layerExportId}/layers/{layerIndex}:
+    parameters:
+      - $ref: "#/components/parameters/LayerExportId"
+      - name: layerIndex
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 0
+    get:
+      operationId: downloadLayerExportLayer
+      responses:
+        "200":
+          description: Single layer PNG bytes.
         "404":
           $ref: "#/components/responses/NotFound"
   /events:

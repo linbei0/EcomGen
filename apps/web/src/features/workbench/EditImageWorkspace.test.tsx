@@ -361,4 +361,55 @@ describe("图片编辑画布", () => {
     expect(strokeStyles).toContain("#006dff");
     expect(strokeStyles).not.toContain("#ffbf2f");
   });
+
+  it("分层模式下只保留平移与画框工具，隐藏编辑工具", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`${BASE}/outputs/:outputId/layer-plan`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${BASE}/outputs/:outputId/layer-exports`, () => new HttpResponse(null, { status: 404 })),
+    );
+    renderEditor();
+    await user.click(screen.getByRole("button", { name: "AI 分层导出" }));
+
+    expect(await screen.findByRole("button", { name: "移动画布" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "拖拽画框添加元素" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "涂抹可编辑区域" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保护区域" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "文字标注" })).not.toBeInTheDocument();
+  });
+
+  it("分层模式下空格在输入框中不触发平移，在画布上仍可临时平移", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`${BASE}/outputs/:outputId/layer-plan`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${BASE}/outputs/:outputId/layer-exports`, () => new HttpResponse(null, { status: 404 })),
+    );
+    renderEditor();
+    await user.click(screen.getByRole("button", { name: "AI 分层导出" }));
+
+    const prompt = await screen.findByLabelText("分层提示词");
+    const inputSpace = new KeyboardEvent("keydown", { code: "Space", bubbles: true, cancelable: true });
+    prompt.dispatchEvent(inputSpace);
+    expect(inputSpace.defaultPrevented).toBe(false);
+
+    const canvasSpace = new KeyboardEvent("keydown", { code: "Space", bubbles: true, cancelable: true });
+    document.body.dispatchEvent(canvasSpace);
+    expect(canvasSpace.defaultPrevented).toBe(true);
+  });
+
+  it("分层模式下不再绘制编辑与保护遮罩", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`${BASE}/outputs/:outputId/layer-plan`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${BASE}/outputs/:outputId/layer-exports`, () => new HttpResponse(null, { status: 404 })),
+    );
+    renderEditor();
+    initializeCanvas();
+    renderPendingFrame();
+    tintFillStyles.length = 0;
+    await user.click(screen.getByRole("button", { name: "AI 分层导出" }));
+
+    expect(tintFillStyles).not.toContain("#006dff");
+    expect(tintFillStyles).not.toContain("#f07800");
+  });
 });

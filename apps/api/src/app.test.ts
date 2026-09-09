@@ -200,3 +200,232 @@ describe("assets from history", () => {
     expect(response.json<{ role: string }>().role).toBe("STYLE_REFERENCE");
   });
 });
+
+function seedLayerProject(segmentationModelId: string | null) {
+  const provider = repository.saveProvider({
+    name: "layer",
+    baseUrl: "https://example.test/v1",
+    encryptedApiKey: "encrypted",
+    reasoningProtocol: "openai",
+    models: [
+      { id: "reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
+      { id: "reasoner-2", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
+      { id: "sam-3", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "fal" },
+      { id: "layerize", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "seedream_layerize" }
+    ]
+  });
+  const project = repository.createProject({ name: "layer-cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: null, defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1, segmentationModel: segmentationModelId ? { providerId: provider.id, modelId: segmentationModelId } : null });
+  repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero", displayName: "主图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+  const item = repository.listStoryboardItems(project.id)[0]!;
+  const job = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "GENERATE", input: {} });
+  const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: `outputs/${project.id}/seed.png`, hash: "hash-1" });
+  return { provider, project, output };
+}
+
+describe("layer plan & layer exports", () => {
+  beforeEach(() => { vi.mocked(enqueue).mockClear(); });
+
+  it("layer-plan 入队 LAYER_PLAN 任务并按指纹复用同一方案", async () => {
+    const { project, output } = seedLayerProject(null);
+    const first = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-plan`, payload: {} });
+    expect(first.statusCode).toBe(202);
+    const plan = first.json<{ id: string; status: string; outputHash: string }>();
+    expect(plan).toMatchObject({ status: "QUEUED", outputHash: "hash-1", projectId: project.id, outputId: output.id });
+    expect(vi.mocked(enqueue).mock.calls.some(([, payload]) => payload.kind === "layer_plan")).toBe(true);
+
+    const second = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-plan`, payload: {} });
+    expect(second.statusCode).toBe(202);
+    expect(second.json<{ id: string }>().id).toBe(plan.id);
+  });
+
+  it("切换推理模型后重新识别不复用旧方案，并按新模型记录任务快照", async () => {
+    const { project, output } = seedLayerProject(null);
+    const first = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-plan`, payload: {} });
+    expect(first.statusCode).toBe(202);
+    const firstPlan = first.json<{ id: string }>();
+    // 识别成功后，同模型且未要求重新识别时复用旧方案
+    repository.updateLayerPlan(firstPlan.id, { status: "SUCCEEDED", elements: [{ id: "el-1", name: "瓶子", source: "auto", bbox: null }] });
+    const reuse = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-plan`, payload: {} });
+    expect(reuse.json<{ id: string }>().id).toBe(firstPlan.id);
+
+    // 切换推理模型后指纹不同：不复用旧方案，并让任务快照记录新模型
+    repository.updateProject(project.id, { reasoningModelId: "reasoner-2" });
+    const switched = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-plan`, payload: {} });
+    expect(switched.statusCode).toBe(202);
+    const switchedPlan = switched.json<{ id: string }>();
+    expect(switchedPlan.id).not.toBe(firstPlan.id);
+    const snapshotJob = repository.getJob(repository.getLayerPlan(switchedPlan.id)!.jobId);
+    expect(snapshotJob).toMatchObject({ providerId: project.reasoningProviderId, modelId: "reasoner-2" });
+  });
+
+  it("layer-plan 对不存在的 output 返回 404", async () => {
+    const response = await app.inject({ method: "POST", url: `/api/v1/outputs/${randomUUID()}/layer-plan`, payload: {} });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("layer-exports 依次校验分割模型、识别方案与元素合法性", async () => {
+    const { output } = seedLayerProject(null);
+    const noModel = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { elements: [{ id: "a", name: "瓶子", source: "auto" }] } });
+    expect(noModel.statusCode).toBe(422);
+    expect(noModel.json<{ error: { code: string } }>().error.code).toBe("PROVIDER_NOT_CONFIGURED");
+
+    const configured = seedLayerProject("sam-3");
+    const noPlan = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "a", name: "瓶子", source: "auto" }] } });
+    expect(noPlan.statusCode).toBe(409);
+
+    // 画框/提示词元素无需识别方案即可直接分层（planId 为空）；auto 元素仍要求已成功的识别方案
+    const manualOnly = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "m-1", name: "自定义", source: "manual", bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }] } });
+    expect(manualOnly.statusCode).toBe(202);
+    expect(manualOnly.json<{ layerExport: { planId: string | null; status: string } }>().layerExport).toMatchObject({ planId: null, status: "QUEUED" });
+
+    const promptOnly = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "p-1", name: "标题", source: "prompt" }] } });
+    expect(promptOnly.statusCode).toBe(202);
+
+    const plan = repository.createLayerPlan({ projectId: configured.project.id, outputId: configured.output.id, jobId: randomUUID(), outputHash: "hash-1", status: "SUCCEEDED", elements: [{ id: "el-1", name: "瓶子", source: "auto", bbox: null }], error: null });
+    const manualWithoutBbox = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "m-1", name: "背景", source: "manual" }] } });
+    expect(manualWithoutBbox.statusCode).toBe(400);
+
+    const unknownAuto = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { planId: plan.id, elements: [{ id: "el-x", name: "不存在", source: "auto" }] } });
+    expect(unknownAuto.statusCode).toBe(409);
+
+    // auto 元素引用方案局部 id，必须携带其所属 planId；重识别后旧选择不得静默套用到新方案
+    const stalePlan = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { planId: randomUUID(), elements: [{ id: "el-1", name: "瓶子", source: "auto" }] } });
+    expect(stalePlan.statusCode).toBe(409);
+
+    const valid = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { planId: plan.id, elements: [{ id: "el-1", name: "瓶子", source: "auto" }, { id: "m-1", name: "自定义", source: "manual", bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }] } });
+    expect(valid.statusCode).toBe(202);
+    const bundle = valid.json<{ job: { type: string }; layerExport: { id: string; planId: string; includeBackground: boolean; status: string } }>();
+    expect(bundle.job.type).toBe("LAYER_EXPORT");
+    expect(bundle.layerExport).toMatchObject({ planId: plan.id, includeBackground: true, status: "QUEUED" });
+    expect(vi.mocked(enqueue).mock.calls.some(([, payload]) => payload.kind === "layer_export")).toBe(true);
+
+    const duplicate = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { planId: plan.id, elements: [{ id: "el-1", name: "瓶子", source: "auto" }, { id: "m-1", name: "自定义", source: "manual", bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }] } });
+    expect(duplicate.statusCode).toBe(202);
+    expect(duplicate.json<{ layerExport: { id: string } }>().layerExport.id).toBe(bundle.layerExport.id);
+
+    // 历史导出按时间倒序列出每次导出；重复请求命中指纹不新增记录（前面已产生 manualOnly/promptOnly/valid 三条）
+    const another = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "p-9", name: "标题", source: "prompt" }] } });
+    expect(another.statusCode).toBe(202);
+    const history = await app.inject({ method: "GET", url: `/api/v1/outputs/${configured.output.id}/layer-exports/history` });
+    expect(history.statusCode).toBe(200);
+    const listed = history.json<{ exports: Array<{ id: string; psdDownloadUrl: string | null; layerFiles: Array<{ downloadUrl: string }> | null }> }>().exports;
+    expect(listed).toHaveLength(4);
+    expect(listed[0].id).toBe(another.json<{ layerExport: { id: string } }>().layerExport.id);
+    // 未完成的导出没有产物：下载链接为空且不暴露存储路径
+    expect(listed.every((item) => item.psdDownloadUrl === null)).toBe(true);
+    const missingHistory = await app.inject({ method: "GET", url: `/api/v1/outputs/${randomUUID()}/layer-exports/history` });
+    expect(missingHistory.statusCode).toBe(404);
+  });
+
+  it("layer-exports 按分割协议限制单次导出元素数量", async () => {
+    // 32 是契约层的全局硬上限（SAM 单次最多 32 个对象）；Seedream 协议在路由层进一步收紧到 16
+    const sam = seedLayerProject("sam-3");
+    const samElements = Array.from({ length: 33 }, (_, index) => ({ id: `p-${index}`, name: `元素${index}`, source: "prompt" as const }));
+    const rejectedSam = await app.inject({ method: "POST", url: `/api/v1/outputs/${sam.output.id}/layer-exports`, payload: { elements: samElements } });
+    expect(rejectedSam.statusCode).toBe(400);
+
+    // Seedream 图层拆分单次最多输出 16 个图层，上限比 SAM 协议更紧
+    const seedream = seedLayerProject("layerize");
+    const seedreamElements = Array.from({ length: 17 }, (_, index) => ({ id: `p-${index}`, name: `元素${index}`, source: "prompt" as const }));
+    const rejectedSeedream = await app.inject({ method: "POST", url: `/api/v1/outputs/${seedream.output.id}/layer-exports`, payload: { elements: seedreamElements } });
+    expect(rejectedSeedream.statusCode).toBe(400);
+    expect(rejectedSeedream.json<{ error: { message: string } }>().error.message).toContain("16");
+
+    const allowedSeedream = await app.inject({ method: "POST", url: `/api/v1/outputs/${seedream.output.id}/layer-exports`, payload: { elements: seedreamElements.slice(0, 16) } });
+    expect(allowedSeedream.statusCode).toBe(202);
+  });
+
+  it("切换分割模型后不复用旧导出，并按新模型记录任务快照", async () => {
+    const { provider, project, output } = seedLayerProject("sam-3");
+    const elements = [{ id: "m-1", name: "自定义", source: "manual" as const, bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }];
+    const first = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { elements } });
+    expect(first.statusCode).toBe(202);
+    const firstExport = first.json<{ layerExport: { id: string } }>().layerExport;
+
+    // 同一分割模型重复提交复用同一导出记录（指纹命中）
+    const duplicate = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { elements } });
+    expect(duplicate.json<{ layerExport: { id: string } }>().layerExport.id).toBe(firstExport.id);
+
+    // 切换到另一协议的分割模型：指纹不同必须新建导出，且任务快照使用新模型而非执行时项目配置
+    repository.updateProject(project.id, { segmentationModel: { providerId: provider.id, modelId: "layerize", protocol: "seedream_layerize" } });
+    const switched = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { elements } });
+    expect(switched.statusCode).toBe(202);
+    const switchedExport = switched.json<{ job: { providerId: string; modelId: string }; layerExport: { id: string } }>();
+    expect(switchedExport.layerExport.id).not.toBe(firstExport.id);
+    expect(switchedExport.job).toMatchObject({ providerId: provider.id, modelId: "layerize" });
+  });
+
+  it("重试分层任务时为新建任务重建对应的分层记录", async () => {
+    const { project, output } = seedLayerProject("sam-3");
+
+    // LAYER_PLAN：重试后新任务必须关联新的 LayerPlan，否则 Worker 按 jobId 找不到记录
+    const planJob = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "LAYER_PLAN", input: { outputId: output.id }, providerId: project.reasoningProviderId, modelId: "reasoner" });
+    repository.updateJob(planJob.id, { status: "FAILED", error: { message: "vision failed" } });
+    const plan = repository.createLayerPlan({ projectId: project.id, outputId: output.id, jobId: planJob.id, outputHash: output.hash, status: "FAILED", elements: [], error: { message: "vision failed" } });
+    const planRetry = await app.inject({ method: "POST", url: `/api/v1/jobs/${planJob.id}/retry` });
+    expect(planRetry.statusCode).toBe(202);
+    expect(repository.getLayerPlanByJobId(planRetry.json<{ id: string }>().id)).toMatchObject({ outputId: output.id, status: "QUEUED" });
+
+    // LAYER_EXPORT：重试后同样重建导出记录并保留原 planId 与背景选项
+    const exportJob = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "LAYER_EXPORT", input: { outputId: output.id, planId: plan.id, includeBackground: false, elements: [{ id: "m-1", name: "自定义", source: "manual", bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }] }, providerId: project.segmentationModel!.providerId, modelId: project.segmentationModel!.modelId });
+    repository.updateJob(exportJob.id, { status: "FAILED", error: { message: "provider failed" } });
+    repository.createLayerExport({ projectId: project.id, outputId: output.id, planId: plan.id, jobId: exportJob.id, status: "FAILED", includeBackground: false, psdStoragePath: null, layerFiles: null, error: { message: "provider failed" } });
+    const exportRetry = await app.inject({ method: "POST", url: `/api/v1/jobs/${exportJob.id}/retry` });
+    expect(exportRetry.statusCode).toBe(202);
+    expect(repository.getLayerExportByJobId(exportRetry.json<{ id: string }>().id)).toMatchObject({ planId: plan.id, includeBackground: false, status: "QUEUED" });
+  });
+});
+
+describe("segmentation model declarations & refs", () => {
+  function seedSegmentationProvider() {
+    const provider = repository.saveProvider({
+      name: "seg",
+      baseUrl: "https://example.test/v1",
+      encryptedApiKey: "encrypted",
+      reasoningProtocol: "openai",
+      models: [
+        { id: "reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
+        { id: "image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" },
+        { id: "sam-3", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "fal" }
+      ]
+    });
+    const project = repository.createProject({ name: "seg-cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1, segmentationModel: null });
+    return { provider, project };
+  }
+
+  it("同一模型不能同时声明生图与分割能力", async () => {
+    const response = await app.inject({
+      method: "POST", url: "/api/v1/providers",
+      payload: { name: "dup", baseUrl: "https://example.test/v1", reasoningProtocol: "openai", apiKey: "k", models: [{ id: "both", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images", segmentationProtocol: "fal" }] }
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("PATCH /projects/:id 校验分割引用：未声明 400、非分割 422、协议不匹配 400、声明模型派生协议", async () => {
+    const { provider, project } = seedSegmentationProvider();
+    const undeclared = await app.inject({ method: "PATCH", url: `/api/v1/projects/${project.id}`, payload: { segmentationModel: { providerId: provider.id, modelId: "unknown" } } });
+    expect(undeclared.statusCode).toBe(400);
+
+    const notSegmentation = await app.inject({ method: "PATCH", url: `/api/v1/projects/${project.id}`, payload: { segmentationModel: { providerId: provider.id, modelId: "reasoner" } } });
+    expect(notSegmentation.statusCode).toBe(422);
+    expect(notSegmentation.json<{ error: { code: string } }>().error.code).toBe("CAPABILITY_UNSUPPORTED");
+
+    const mismatched = await app.inject({ method: "PATCH", url: `/api/v1/projects/${project.id}`, payload: { segmentationModel: { providerId: provider.id, modelId: "sam-3", protocol: "seedream_layerize" } } });
+    expect(mismatched.statusCode).toBe(400);
+
+    const ok = await app.inject({ method: "PATCH", url: `/api/v1/projects/${project.id}`, payload: { segmentationModel: { providerId: provider.id, modelId: "sam-3" } } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json<{ segmentationModel: { providerId: string; modelId: string; protocol: string } }>().segmentationModel)
+      .toEqual({ providerId: provider.id, modelId: "sam-3", protocol: "fal" });
+  });
+
+  it("provider test kind=segmentation 拒绝未声明分割协议的模型", async () => {
+    const { provider } = seedSegmentationProvider();
+    const unsupported = await app.inject({ method: "POST", url: `/api/v1/providers/${provider.id}/test`, payload: { modelId: "reasoner", kind: "segmentation" } });
+    expect(unsupported.statusCode).toBe(422);
+    expect(unsupported.json<{ error: { code: string } }>().error.code).toBe("CAPABILITY_UNSUPPORTED");
+
+    const unknown = await app.inject({ method: "POST", url: `/api/v1/providers/${provider.id}/test`, payload: { modelId: "ghost", kind: "segmentation" } });
+    expect(unknown.statusCode).toBe(400);
+  });
+});

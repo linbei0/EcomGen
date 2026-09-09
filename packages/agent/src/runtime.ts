@@ -5,7 +5,7 @@ import { ECOM_TEMPLATES_HASH } from "@ecomgen/ecom-skill";
 import { boundedAgentStream } from "./stream.js";
 import { withStructuredOutput, type StructuredOutputSchema } from "./structured-output.js";
 
-export type AgentWorkflow = "PLAN" | "COPYWRITE" | "EDIT_PLAN" | "PROMPT_REVISION";
+export type AgentWorkflow = "PLAN" | "COPYWRITE" | "EDIT_PLAN" | "PROMPT_REVISION" | "LAYER_PLAN";
 export type ReasoningModel = Model<"openai-completions" | "openai-responses">;
 
 export interface AgentRuntimeOptions {

@@ -133,13 +133,13 @@
   border: 1px solid var(--line-1);
   border-radius: var(--radius-m);
   background: var(--bg-2);
-  padding: 10px 12px;
+  padding: 12px;
 }
 
 .modelRowMain {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -149,7 +149,7 @@
 
 .modelId {
   flex: 1 1 180px;
-  min-width: 160px;
+  min-width: 150px;
 }
 
 .switchItem {
@@ -162,8 +162,19 @@
   user-select: none;
 }
 
-.kindSelect {
-  width: 132px;
+.modelRowCaps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line-1);
+}
+
+.capsLabel {
+  color: var(--text-3);
+  font-size: 12px;
 }
 
 .testOk,

@@ -545,3 +545,64 @@ describe("EcomRepository", () => {
     database.close();
   });
 });
+
+describe("LayerPlan / LayerExport 持久化", () => {
+  it("plan/export 记录 CRUD 往返，status 与产物字段可更新", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", segmentationModel: { providerId: provider.id, modelId: "fal-ai/sam-3/image" }, defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    expect(repository.getProject(project.id)?.segmentationModel).toEqual({ providerId: provider.id, modelId: "fal-ai/sam-3/image", protocol: "fal" });
+    expect(repository.updateProject(project.id, { segmentationModel: { providerId: provider.id, modelId: "grounded-sam-2", protocol: "grounded_sam" } })?.segmentationModel).toMatchObject({ protocol: "grounded_sam" });
+
+    const job = repository.createJob({ id: "job-plan-1", projectId: project.id, storyboardItemId: null, type: "LAYER_PLAN", status: "QUEUED", input: { outputId: "out-1" } });
+    const plan = repository.createLayerPlan({ projectId: project.id, outputId: "out-1", jobId: job.id, outputHash: "hash-1", status: "QUEUED", elements: [], error: null });
+    expect(repository.getLayerPlanByOutput("out-1")?.id).toBe(plan.id);
+    expect(repository.getLayerPlanByJobId(job.id)?.outputHash).toBe("hash-1");
+    const succeeded = repository.updateLayerPlan(plan.id, { status: "SUCCEEDED", elements: [{ id: "el-1", name: "瓶子", source: "auto", bbox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 } }] });
+    expect(succeeded).toMatchObject({ status: "SUCCEEDED", elements: [{ id: "el-1", name: "瓶子", source: "auto" }] });
+
+    const exportJob = repository.createJob({ id: "job-export-1", projectId: project.id, storyboardItemId: null, type: "LAYER_EXPORT", status: "QUEUED", input: { outputId: "out-1" } });
+    const layerExport = repository.createLayerExport({ projectId: project.id, outputId: "out-1", jobId: exportJob.id, planId: plan.id, status: "QUEUED", includeBackground: true, psdStoragePath: null, layerFiles: null, error: null });
+    expect(repository.getLayerExportByJobId(exportJob.id)?.planId).toBe(plan.id);
+    // 画框/提示词直接分层时 planId 为空（无识别方案）
+    const promptExportJob = repository.createJob({ id: "job-export-2", projectId: project.id, storyboardItemId: null, type: "LAYER_EXPORT", status: "QUEUED", input: { outputId: "out-1" } });
+    const promptExport = repository.createLayerExport({ projectId: project.id, outputId: "out-1", jobId: promptExportJob.id, planId: null, status: "QUEUED", includeBackground: false, psdStoragePath: null, layerFiles: null, error: null });
+    expect(repository.getLayerExport(promptExport.id)?.planId).toBeNull();
+    const finished = repository.updateLayerExport(layerExport.id, { status: "SUCCEEDED", psdStoragePath: "layers/x/out.psd", layerFiles: [{ name: "01_瓶子", kind: "element", storagePath: "layers/x/01.png", hash: "abc" }] });
+    expect(finished).toMatchObject({ status: "SUCCEEDED", includeBackground: true, psdStoragePath: "layers/x/out.psd" });
+    expect(finished?.layerFiles).toHaveLength(1);
+    expect(repository.updateLayerExport(layerExport.id, { status: "FAILED", error: { message: "SAM failed" } })?.error).toEqual({ message: "SAM failed" });
+    // 删除 Provider 同步清空 segmentationModel 引用
+    repository.deleteProvider(provider.id);
+    expect(repository.getProject(project.id)?.segmentationModel).toBeNull();
+    database.close();
+  });
+
+  it("恢复中断任务时同步把分层记录推进到终态", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", segmentationModel: { providerId: provider.id, modelId: "fal-ai/sam-3/image" }, defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    // 未发出外部请求的 RUNNING 分层任务可安全重跑：记录回到 QUEUED 并清空错误
+    const planJob = repository.createJob({ id: "recover-plan", projectId: project.id, storyboardItemId: null, type: "LAYER_PLAN", status: "QUEUED", input: { outputId: "out-1" } });
+    const plan = repository.createLayerPlan({ projectId: project.id, outputId: "out-1", jobId: planJob.id, outputHash: "hash-1", status: "RUNNING", elements: [], error: { message: "stale" } });
+    // 已发出外部请求的 RUNNING 导出无法确认结果：记录置 FAILED，避免永远停在 RUNNING
+    const exportJob = repository.createJob({ id: "recover-export", projectId: project.id, storyboardItemId: null, type: "LAYER_EXPORT", status: "QUEUED", input: { outputId: "out-1" } });
+    const layerExport = repository.createLayerExport({ projectId: project.id, outputId: "out-1", jobId: exportJob.id, planId: null, status: "RUNNING", includeBackground: true, psdStoragePath: null, layerFiles: null, error: null });
+    database.prepare("UPDATE jobs SET status='RUNNING' WHERE id IN (?, ?)").run(planJob.id, exportJob.id);
+    database.prepare("UPDATE jobs SET provider_task_id=? WHERE id=?").run(EXTERNAL_REQUEST_STARTED, exportJob.id);
+
+    expect(repository.recoverInterruptedJobs().map((job) => job.id)).toEqual([planJob.id]);
+    expect(repository.getLayerPlan(plan.id)).toMatchObject({ status: "QUEUED", error: null });
+    expect(repository.getLayerExport(layerExport.id)).toMatchObject({ status: "FAILED", error: { message: "外部图像请求结果未知，已停止自动重试以避免重复计费" } });
+    // 崩溃发生在 PSD 落盘之后：导出记录已有完成证据，恢复时不得改判 FAILED，也不得重新执行计费请求
+    const lateJob = repository.createJob({ id: "recover-export-2", projectId: project.id, storyboardItemId: null, type: "LAYER_EXPORT", status: "QUEUED", input: { outputId: "out-1" } });
+    const lateExport = repository.createLayerExport({ projectId: project.id, outputId: "out-1", jobId: lateJob.id, planId: null, status: "SUCCEEDED", includeBackground: true, psdStoragePath: "layers/x/late.psd", layerFiles: null, error: null });
+    database.prepare("UPDATE jobs SET status='RUNNING',provider_task_id=? WHERE id=?").run(EXTERNAL_REQUEST_STARTED, lateJob.id);
+    expect(repository.recoverInterruptedJobs()).toEqual([]);
+    expect(repository.getJob(lateJob.id)).toMatchObject({ status: "FAILED", retryable: false, error: { message: "外部图像请求结果未知，已停止自动重试以避免重复计费" } });
+    expect(repository.getLayerExport(lateExport.id)).toMatchObject({ status: "SUCCEEDED", psdStoragePath: "layers/x/late.psd" });
+    database.close();
+  });
+});

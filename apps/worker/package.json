@@ -16,6 +16,7 @@
     "@ecomgen/ecom-skill": "workspace:*",
     "@ecomgen/jobs": "workspace:*",
     "@ecomgen/providers": "workspace:*",
+    "ag-psd": "^31.0.2",
     "archiver": "^7.0.1",
     "bullmq": "^6.1.2",
     "sharp": "^0.35.3"

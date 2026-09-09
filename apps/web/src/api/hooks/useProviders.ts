@@ -14,7 +14,7 @@ export type TestProviderResult =
 export interface TestProviderVariables {
   providerId: string;
   modelId: string;
-  kind: "reasoning" | "image";
+  kind: "reasoning" | "image" | "segmentation";
 }
 
 export function useProviders() {

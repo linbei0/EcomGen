@@ -661,6 +661,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/outputs/{outputId}/layer-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getLayerPlan"];
+        put?: never;
+        post: operations["createLayerPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outputs/{outputId}/layer-exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getLayerExport"];
+        put?: never;
+        post: operations["createLayerExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outputs/{outputId}/layer-exports/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listLayerExports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{projectId}/export-jobs": {
         parameters: {
             query?: never;
@@ -751,6 +805,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/files/layer-exports/{layerExportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                layerExportId: components["parameters"]["LayerExportId"];
+            };
+            cookie?: never;
+        };
+        get: operations["downloadLayerExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/files/layer-exports/{layerExportId}/layers/{layerIndex}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                layerExportId: components["parameters"]["LayerExportId"];
+                layerIndex: number;
+            };
+            cookie?: never;
+        };
+        get: operations["downloadLayerExportLayer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events": {
         parameters: {
             query?: never;
@@ -792,7 +883,7 @@ export interface components {
         /** @enum {string} */
         CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION";
         /** @enum {string} */
-        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE";
+        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT";
         /** @enum {string} */
         JobStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
         /** @enum {string} */
@@ -817,7 +908,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "job.updated" | "storyboard.updated" | "output.created" | "edit-session.updated" | "edit-turn.updated" | "export.updated" | "provider.updated";
+            type: "job.updated" | "storyboard.updated" | "output.created" | "edit-session.updated" | "edit-turn.updated" | "export.updated" | "provider.updated" | "layer-plan.updated" | "layer-export.updated";
             /** Format: uuid */
             projectId: string;
             /** Format: date-time */
@@ -830,6 +921,11 @@ export interface components {
             supportsTools: boolean;
             supportsStructuredOutput: boolean;
             imageApiKind: "openai_images" | "gemini" | "custom" | null;
+            /**
+             * @description Segmentation API protocol declared for this model; mutually exclusive with imageApiKind.
+             * @enum {string}
+             */
+            segmentationProtocol?: "fal" | "grounded_sam" | "seedream_layerize";
         };
         ModelDefinition: {
             id: string;
@@ -839,6 +935,11 @@ export interface components {
             supportsTools: boolean;
             supportsStructuredOutput: boolean;
             imageApiKind: "openai_images" | "gemini" | "custom" | null;
+            /**
+             * @description Segmentation API protocol declared for this model; mutually exclusive with imageApiKind.
+             * @enum {string}
+             */
+            segmentationProtocol?: "fal" | "grounded_sam" | "seedream_layerize";
         };
         Asset: {
             /** Format: uuid */
@@ -913,6 +1014,7 @@ export interface components {
             /** Format: uuid */
             imageProviderId: string;
             imageModelId: string;
+            segmentationModel?: components["schemas"]["SegmentationModelRef"] | null;
             /** @enum {string} */
             defaultMode: "CREATIVE" | "PIXEL_PROTECTED";
             imageResolution?: components["schemas"]["ImageResolution"];
@@ -1072,7 +1174,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE";
+            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT";
             /** @enum {string} */
             status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
             progress: number;
@@ -1095,6 +1197,83 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        /** @description Normalized bounding box relative to the output image. */
+        LayerBbox: {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        };
+        LayerExport: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            outputId: string;
+            /** Format: uuid */
+            jobId: string;
+            planId?: string | null;
+            /** @enum {string} */
+            status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+            /** @description Whether a background layer is produced under the element layers: Seedream uses its inpainted base image; SAM protocols use the original image with the element selections cut out (holed). */
+            includeBackground: boolean;
+            psdStoragePath?: string | null;
+            psdDownloadUrl?: string | null;
+            layerFiles?: components["schemas"]["LayerExportLayerFile"][] | null;
+            error?: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        LayerExportBundle: {
+            job: components["schemas"]["Job"];
+            layerExport: components["schemas"]["LayerExport"];
+        };
+        LayerExportHistory: {
+            /** @description Layer exports of the output, newest first. Earlier records stay viewable and downloadable after a newer export replaces the latest one. */
+            exports: components["schemas"]["LayerExport"][];
+        };
+        LayerExportLayerFile: {
+            name: string;
+            /** @enum {string} */
+            kind: "element" | "background" | "composite";
+            downloadUrl: string;
+        };
+        LayerPlan: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            outputId: string;
+            /** Format: uuid */
+            jobId: string;
+            /** @description Content hash of the output image; the plan is reused while this matches the current output and the reasoning model snapshot. */
+            outputHash: string;
+            /** @enum {string} */
+            status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+            elements: components["schemas"]["LayerPlanElement"][];
+            error?: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        LayerPlanElement: {
+            /** @description Stable element ID inside the plan; manual elements reuse the client-provided ID. */
+            id: string;
+            /** @description Editable element display name. */
+            name: string;
+            /** @enum {string} */
+            source: "auto" | "manual";
+            bbox?: components["schemas"]["LayerBbox"] | null;
+        };
         ModelCapability: {
             id: string;
             supportsVision: boolean;
@@ -1102,6 +1281,11 @@ export interface components {
             supportsTools: boolean;
             supportsStructuredOutput: boolean;
             imageApiKind?: "openai_images" | "gemini" | "custom" | null;
+            /**
+             * @description Segmentation API protocol declared for this model (fal.ai SAM 3, self-hosted Grounded-SAM, or Volcengine Seedream layer decomposition); mutually exclusive with imageApiKind.
+             * @enum {string}
+             */
+            segmentationProtocol?: "fal" | "grounded_sam" | "seedream_layerize";
         };
         ModelRef: {
             /** Format: uuid */
@@ -1167,6 +1351,7 @@ export interface components {
             reasoningModelId: string | null;
             imageProviderId: string | null;
             imageModelId: string | null;
+            segmentationModel?: components["schemas"]["SegmentationModelRef"] | null;
             /** @enum {string} */
             defaultMode: "CREATIVE" | "PIXEL_PROTECTED";
             imageResolution: components["schemas"]["ImageResolution"];
@@ -1248,6 +1433,17 @@ export interface components {
             items: components["schemas"]["SearchSourceConfig"][];
             nextCursor: string | null;
         };
+        /** @description Segmentation model reference; the referenced model must be declared as a segmentation model on its provider. */
+        SegmentationModelRef: {
+            /** Format: uuid */
+            providerId: string;
+            modelId: string;
+            /**
+             * @description Segmentation API protocol; derived from the model's declared segmentationProtocol and re-stated here for the Worker adapter. A body protocol that contradicts the declared one is rejected.
+             * @enum {string}
+             */
+            protocol?: "fal" | "grounded_sam" | "seedream_layerize";
+        };
         Storyboard: {
             /** Format: uuid */
             projectId: string;
@@ -1302,6 +1498,7 @@ export interface components {
             copyLanguage?: string | null;
             reasoningModel?: components["schemas"]["ModelRef"];
             imageModel?: components["schemas"]["ModelRef"];
+            segmentationModel?: components["schemas"]["SegmentationModelRef"] | null;
             /** @enum {string} */
             defaultMode?: "CREATIVE" | "PIXEL_PROTECTED";
             imageResolution?: components["schemas"]["ImageResolution"];
@@ -1427,6 +1624,31 @@ export interface components {
                 imageModel?: components["schemas"]["ModelRef"];
             };
         };
+        /** @description Manual elements must carry the normalized bbox drawn on the canvas; prompt elements come from user-typed element names and need no bbox or recognition plan. */
+        CreateLayerExportElement: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            source: "auto" | "manual" | "prompt";
+            bbox?: components["schemas"]["LayerBbox"];
+        };
+        CreateLayerExportInput: {
+            elements: components["schemas"]["CreateLayerExportElement"][];
+            /**
+             * @description Generate a holed background layer under the element layers.
+             * @default true
+             */
+            includeBackground: boolean;
+            /**
+             * Format: uuid
+             * @description The recognition plan the auto elements were selected from; rejected if the plan has since changed.
+             */
+            planId?: string;
+        };
+        CreateLayerPlanInput: {
+            /** @description Unique key for an intentional re-recognition run. */
+            regenerationKey?: string;
+        };
         EcomTemplateItem: {
             id: string;
             upstreamNumber: number;
@@ -1508,8 +1730,11 @@ export interface components {
         };
         TestProviderInput: {
             modelId: string;
-            /** @enum {string} */
-            kind?: "reasoning" | "image";
+            /**
+             * @description segmentation probes the declared segmentation API with zero cost.
+             * @enum {string}
+             */
+            kind?: "reasoning" | "image" | "segmentation";
         };
         UpdateAssetInput: {
             role?: components["schemas"]["AssetRole"];
@@ -1588,6 +1813,7 @@ export interface components {
         JobId: string;
         OutputId: string;
         ExportId: string;
+        LayerExportId: string;
         UserTemplateId: string;
         Cursor: string;
     };
@@ -2792,6 +3018,138 @@ export interface operations {
             };
         };
     };
+    getLayerPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Layer plan state and recognized elements. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LayerPlan"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createLayerPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLayerPlanInput"];
+            };
+        };
+        responses: {
+            /** @description Existing plan reused for the same output content. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LayerPlan"];
+                };
+            };
+            /** @description Layer recognition job queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LayerPlan"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getLayerExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Latest layer export state for the output. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LayerExport"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createLayerExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLayerExportInput"];
+            };
+        };
+        responses: {
+            /** @description Layer export job queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LayerExportBundle"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listLayerExports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outputId: components["parameters"]["OutputId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All layer exports of the output, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LayerExportHistory"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
     createExportJob: {
         parameters: {
             query?: never;
@@ -2894,6 +3252,49 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description ZIP package bytes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadLayerExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                layerExportId: components["parameters"]["LayerExportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Layered PSD file bytes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadLayerExportLayer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                layerExportId: components["parameters"]["LayerExportId"];
+                layerIndex: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Single layer PNG bytes. */
             200: {
                 headers: {
                     [name: string]: unknown;

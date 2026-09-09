@@ -11,7 +11,7 @@ export class LocalAssetStore {
   }
 
   public async initialize(): Promise<void> {
-    await Promise.all(["assets", "outputs", "exports", "edits", "tmp"].map((part) => mkdir(join(this.root, part), { recursive: true })));
+    await Promise.all(["assets", "outputs", "exports", "edits", "layers", "tmp"].map((part) => mkdir(join(this.root, part), { recursive: true })));
   }
 
   public async putAsset(projectId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
@@ -53,6 +53,14 @@ export class LocalAssetStore {
     return { path: relativePath, hash };
   }
 
+  /** 分层导出产物（元素图层 PNG、带孔洞背景层与 PSD）；按 layerExportId 聚合，随项目删除一并清理。 */
+  public async putLayerArtifact(projectId: string, layerExportId: string, name: string, content: Buffer, extension = ".png"): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const relativePath = join("layers", projectId, layerExportId, `${name}-${hash.slice(0, 12)}${this.safeExtension(extension)}`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
   public async read(relativePath: string): Promise<Buffer> {
     return readFile(this.absolute(relativePath));
   }
@@ -81,7 +89,7 @@ export class LocalAssetStore {
   /** 永久删除项目的全部本地产物；路径仍通过 absolute 校验，不能越出数据根目录。 */
   public async deleteProject(projectId: string): Promise<void> {
     await Promise.all(
-      ["assets", "outputs", "exports", "edits"].map((part) =>
+      ["assets", "outputs", "exports", "edits", "layers"].map((part) =>
         rm(this.absolute(join(part, projectId)), { recursive: true, force: true }),
       ),
     );

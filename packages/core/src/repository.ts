@@ -10,6 +10,7 @@ import type {
   PlatformTarget,
   ReasoningProtocolProfile,
   SearchSourceKind,
+  SegmentationModelRef,
   StoryboardMode,
   StoryboardShotRole,
   TargetMarket
@@ -70,6 +71,9 @@ export interface ProjectRecord {
   reasoningModelId: string | null;
   imageProviderId: string | null;
   imageModelId: string | null;
+  // AI 分层导出使用的分割模型（如 fal.ai SAM 3）；未配置时分层导出任务直接失败
+  /** 分割模型引用；protocol 显式声明 API 协议（fal | grounded_sam），未配置时任务直接失败。 */
+  segmentationModel: { providerId: string; modelId: string; protocol: NonNullable<SegmentationModelRef["protocol"]> } | null;
   defaultMode: StoryboardMode;
   imageResolution: ImageResolution;
   imageAspectRatio: ImageAspectRatio;
@@ -306,6 +310,51 @@ export interface ExportRecord {
   updatedAt: string;
 }
 
+/** AI 分层元素：auto 来自视觉模型识别；manual 来自用户画框（bbox 为归一化坐标）。 */
+export interface LayerPlanElementRecord {
+  id: string;
+  name: string;
+  source: "auto" | "manual";
+  bbox: { x: number; y: number; width: number; height: number } | null;
+}
+
+export interface LayerPlanRecord {
+  id: string;
+  projectId: string;
+  outputId: string;
+  jobId: string;
+  /** 创建 plan 时输出图的内容 hash；同 hash 的成功 plan 可直接复用。 */
+  outputHash: string;
+  status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+  elements: LayerPlanElementRecord[];
+  error: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LayerExportLayerFileRecord {
+  name: string;
+  kind: "element" | "background" | "composite";
+  storagePath: string;
+  hash: string;
+}
+
+export interface LayerExportRecord {
+  id: string;
+  projectId: string;
+  outputId: string;
+  jobId: string;
+  /** 识别方案引用；画框/提示词直接分层（无识别方案）时为 null。 */
+  planId: string | null;
+  status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+  includeBackground: boolean;
+  psdStoragePath: string | null;
+  layerFiles: LayerExportLayerFileRecord[] | null;
+  error: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** 首页列表封面：原图取最早 PRODUCT_TRUTH 图片；封面输出取最新输出。 */
 export interface ProjectCoverSummary {
   productAssetId: string | null;
@@ -343,6 +392,7 @@ export class EcomRepository {
     const clear = this.db.transaction(() => {
       this.db.prepare("UPDATE projects SET reasoning_provider_id=NULL, reasoning_model_id=NULL, updated_at=? WHERE reasoning_provider_id=?").run(now(), id);
       this.db.prepare("UPDATE projects SET image_provider_id=NULL, image_model_id=NULL, updated_at=? WHERE image_provider_id=?").run(now(), id);
+      this.db.prepare("UPDATE projects SET segmentation_provider_id=NULL, segmentation_model_id=NULL, updated_at=? WHERE segmentation_provider_id=?").run(now(), id);
       this.db.prepare("UPDATE storyboard_items SET image_provider_id=NULL, image_model_id=NULL, updated_at=? WHERE image_provider_id=?").run(now(), id);
       this.db.prepare("UPDATE jobs SET status='CANCELLED', retryable=0, cancel_requested=1, updated_at=? WHERE provider_id=? AND status IN ('QUEUED','RUNNING')").run(now(), id);
       this.db.prepare("DELETE FROM providers WHERE id=?").run(id);
@@ -430,18 +480,18 @@ export class EcomRepository {
     return covers;
   }
   public getProject(id: string): ProjectRecord | undefined { const row = this.db.prepare("SELECT * FROM projects WHERE id = ?").get(id); return row ? mapProject(row as Row) : undefined; }
-  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled" | "archivedAt"> & Partial<Pick<ProjectRecord, "webResearchEnabled" | "archivedAt">>): ProjectRecord {
-    const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, archivedAt: input.archivedAt ?? null, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,created_at,updated_at)
-      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@archivedAt,@createdAt,@updatedAt)`)
-      .run({ ...record, webResearchEnabled: record.webResearchEnabled ? 1 : 0, platformTargets: json(record.platformTargets), verifiedFacts: json(record.verifiedFacts), prohibitedClaims: json(record.prohibitedClaims), brandGuidelines: json(record.brandGuidelines) });
+  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled" | "archivedAt" | "segmentationModel"> & Partial<Pick<ProjectRecord, "webResearchEnabled" | "archivedAt">> & { segmentationModel?: { providerId: string; modelId: string; protocol?: NonNullable<SegmentationModelRef["protocol"]> } | null }): ProjectRecord {
+    const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, archivedAt: input.archivedAt ?? null, segmentationModel: input.segmentationModel ? { ...input.segmentationModel, protocol: input.segmentationModel.protocol ?? "fal" } : null, id: randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,segmentation_provider_id,segmentation_model_id,segmentation_protocol,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,created_at,updated_at)
+      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@segmentationProviderId,@segmentationModelId,@segmentationProtocol,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@archivedAt,@createdAt,@updatedAt)`)
+      .run({ ...record, webResearchEnabled: record.webResearchEnabled ? 1 : 0, platformTargets: json(record.platformTargets), verifiedFacts: json(record.verifiedFacts), prohibitedClaims: json(record.prohibitedClaims), brandGuidelines: json(record.brandGuidelines), segmentationProviderId: record.segmentationModel?.providerId ?? null, segmentationModelId: record.segmentationModel?.modelId ?? null, segmentationProtocol: record.segmentationModel?.protocol ?? null });
     return record;
   }
   public updateProject(id: string, patch: Partial<Omit<ProjectRecord, "id" | "createdAt">>): ProjectRecord | undefined {
     const current = this.getProject(id); if (!current) return undefined;
     const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,archived_at=@archivedAt,updated_at=@updatedAt WHERE id=@id`)
-      .run({ ...next, webResearchEnabled: next.webResearchEnabled ? 1 : 0, platformTargets: json(next.platformTargets), verifiedFacts: json(next.verifiedFacts), prohibitedClaims: json(next.prohibitedClaims), brandGuidelines: json(next.brandGuidelines) });
+    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,segmentation_provider_id=@segmentationProviderId,segmentation_model_id=@segmentationModelId,segmentation_protocol=@segmentationProtocol,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,archived_at=@archivedAt,updated_at=@updatedAt WHERE id=@id`)
+      .run({ ...next, webResearchEnabled: next.webResearchEnabled ? 1 : 0, platformTargets: json(next.platformTargets), verifiedFacts: json(next.verifiedFacts), prohibitedClaims: json(next.prohibitedClaims), brandGuidelines: json(next.brandGuidelines), segmentationProviderId: next.segmentationModel?.providerId ?? null, segmentationModelId: next.segmentationModel?.modelId ?? null, segmentationProtocol: next.segmentationModel?.protocol ?? null });
     return next;
   }
 
@@ -557,11 +607,23 @@ export class EcomRepository {
   public recoverInterruptedJobs(): JobRecord[] {
     const rows = this.db.prepare("SELECT * FROM jobs WHERE status='RUNNING'").all() as Row[];
     const recovered = rows.filter((row) => row.provider_task_id !== EXTERNAL_REQUEST_STARTED);
+    const unverifiable = rows.filter((row) => row.provider_task_id === EXTERNAL_REQUEST_STARTED);
     const updatedAt = now();
+    const unknownMessage = JSON.stringify({ message: "外部图像请求结果未知，已停止自动重试以避免重复计费" });
     const write = this.db.transaction(() => {
       this.db.prepare("UPDATE jobs SET status='QUEUED',progress=0,cancel_requested=0,updated_at=? WHERE status='RUNNING' AND (provider_task_id IS NULL OR provider_task_id<>?)").run(updatedAt, EXTERNAL_REQUEST_STARTED);
       this.db.prepare("UPDATE jobs SET status='FAILED',progress=100,retryable=0,error_json=?,updated_at=? WHERE status='RUNNING' AND provider_task_id=?")
-        .run(JSON.stringify({ message: "外部图像请求结果未知，已停止自动重试以避免重复计费" }), updatedAt, EXTERNAL_REQUEST_STARTED);
+        .run(unknownMessage, updatedAt, EXTERNAL_REQUEST_STARTED);
+      // 分层记录必须与 Job 同步进入终态，否则前端会一直看到 QUEUED/RUNNING 而任务其实已被重启或终止。
+      for (const row of recovered) {
+        this.db.prepare("UPDATE layer_plans SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
+        this.db.prepare("UPDATE layer_exports SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
+      }
+      for (const row of unverifiable) {
+        this.db.prepare("UPDATE layer_plans SET status='FAILED',error_json=?,updated_at=? WHERE job_id=?").run(unknownMessage, updatedAt, row.id);
+        // 已写出 PSD 的导出记录是完成事实的持久化证据：Job 崩溃在终态写入前也不改判它，PSD 与图层文件仍然可下载。
+        this.db.prepare("UPDATE layer_exports SET status='FAILED',error_json=?,updated_at=? WHERE job_id=? AND psd_storage_path IS NULL").run(unknownMessage, updatedAt, row.id);
+      }
     });
     write();
     return recovered.map((row) => mapJob({ ...row, status: "QUEUED", progress: 0, cancel_requested: 0 }));
@@ -694,6 +756,41 @@ export class EcomRepository {
   public getExport(id: string): ExportRecord | undefined { const row = this.db.prepare("SELECT * FROM exports WHERE id=?").get(id); return row ? mapExport(row as Row) : undefined; }
   public getExportByJobId(jobId: string): ExportRecord | undefined { const row = this.db.prepare("SELECT * FROM exports WHERE job_id=?").get(jobId); return row ? mapExport(row as Row) : undefined; }
   public updateExport(id: string, patch: Partial<Pick<ExportRecord, "status" | "storagePath">>): ExportRecord | undefined { const current = this.getExport(id); if (!current) return undefined; const next = { ...current, ...patch, updatedAt: now() }; this.db.prepare("UPDATE exports SET status=@status,storage_path=@storagePath,updated_at=@updatedAt WHERE id=@id").run(next); return next; }
+
+  public createLayerPlan(input: Omit<LayerPlanRecord, "id" | "createdAt" | "updatedAt">): LayerPlanRecord {
+    const record: LayerPlanRecord = { ...input, id: randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare("INSERT INTO layer_plans (id,project_id,output_id,job_id,output_hash,status,elements_json,error_json,created_at,updated_at) VALUES (@id,@projectId,@outputId,@jobId,@outputHash,@status,@elements,@error,@createdAt,@updatedAt)")
+      .run({ ...record, elements: json(record.elements), error: record.error ? json(record.error) : null });
+    return record;
+  }
+  public getLayerPlan(id: string): LayerPlanRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_plans WHERE id=?").get(id); return row ? mapLayerPlan(row as Row) : undefined; }
+  public getLayerPlanByOutput(outputId: string): LayerPlanRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_plans WHERE output_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(outputId); return row ? mapLayerPlan(row as Row) : undefined; }
+  public getLayerPlanByJobId(jobId: string): LayerPlanRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_plans WHERE job_id=?").get(jobId); return row ? mapLayerPlan(row as Row) : undefined; }
+  public updateLayerPlan(id: string, patch: Partial<Pick<LayerPlanRecord, "status" | "elements" | "error">>): LayerPlanRecord | undefined {
+    const current = this.getLayerPlan(id); if (!current) return undefined;
+    const next = { ...current, ...patch, updatedAt: now() };
+    this.db.prepare("UPDATE layer_plans SET status=@status,elements_json=@elements,error_json=@error,updated_at=@updatedAt WHERE id=@id")
+      .run({ ...next, elements: json(next.elements), error: next.error ? json(next.error) : null });
+    return next;
+  }
+  public createLayerExport(input: Omit<LayerExportRecord, "id" | "createdAt" | "updatedAt">): LayerExportRecord {
+    const record: LayerExportRecord = { ...input, id: randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare("INSERT INTO layer_exports (id,project_id,output_id,job_id,plan_id,status,include_background,psd_storage_path,layer_files_json,error_json,created_at,updated_at) VALUES (@id,@projectId,@outputId,@jobId,@planId,@status,@includeBackground,@psdStoragePath,@layerFiles,@error,@createdAt,@updatedAt)")
+      .run({ ...record, includeBackground: record.includeBackground ? 1 : 0, layerFiles: record.layerFiles ? json(record.layerFiles) : null, error: record.error ? json(record.error) : null });
+    return record;
+  }
+  public getLayerExport(id: string): LayerExportRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_exports WHERE id=?").get(id); return row ? mapLayerExport(row as Row) : undefined; }
+  public getLayerExportByJobId(jobId: string): LayerExportRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_exports WHERE job_id=?").get(jobId); return row ? mapLayerExport(row as Row) : undefined; }
+  public getLayerExportByOutput(outputId: string): LayerExportRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_exports WHERE output_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(outputId); return row ? mapLayerExport(row as Row) : undefined; }
+  /** 历史导出全集（新→旧）：行级文件与 PSD 均按记录 id 命名空间落盘，重跑不会覆盖，旧记录始终可回看。 */
+  public listLayerExportsByOutput(outputId: string): LayerExportRecord[] { const rows = this.db.prepare("SELECT * FROM layer_exports WHERE output_id=? ORDER BY created_at DESC, rowid DESC").all(outputId); return rows.map((row) => mapLayerExport(row as Row)); }
+  public updateLayerExport(id: string, patch: Partial<Pick<LayerExportRecord, "status" | "psdStoragePath" | "layerFiles" | "error">>): LayerExportRecord | undefined {
+    const current = this.getLayerExport(id); if (!current) return undefined;
+    const next = { ...current, ...patch, updatedAt: now() };
+    this.db.prepare("UPDATE layer_exports SET status=@status,psd_storage_path=@psdStoragePath,layer_files_json=@layerFiles,error_json=@error,updated_at=@updatedAt WHERE id=@id")
+      .run({ ...next, includeBackground: next.includeBackground ? 1 : 0, layerFiles: next.layerFiles ? json(next.layerFiles) : null, error: next.error ? json(next.error) : null });
+    return next;
+  }
 }
 
 function mapProvider(row: Row): ProviderRecord { return { id: String(row.id), name: String(row.name), baseUrl: String(row.base_url), reasoningProtocol: row.reasoning_protocol as ReasoningProtocolProfile, encryptedApiKey: String(row.encrypted_api_key), models: parse(row.models_json), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
@@ -716,6 +813,7 @@ function mapProject(row: Row): ProjectRecord {
     reasoningModelId: row.reasoning_model_id ? String(row.reasoning_model_id) : null,
     imageProviderId: row.image_provider_id ? String(row.image_provider_id) : null,
     imageModelId: row.image_model_id ? String(row.image_model_id) : null,
+    segmentationModel: row.segmentation_provider_id && row.segmentation_model_id ? { providerId: String(row.segmentation_provider_id), modelId: String(row.segmentation_model_id), protocol: row.segmentation_protocol === "grounded_sam" || row.segmentation_protocol === "seedream_layerize" ? row.segmentation_protocol : "fal" } : null,
     defaultMode: row.default_mode as StoryboardMode,
     imageResolution: (row.image_resolution as ImageResolution | undefined) ?? "1K",
     imageAspectRatio: (row.image_aspect_ratio as ImageAspectRatio | undefined) ?? "AUTO",
@@ -797,3 +895,5 @@ function mapEditSession(row: Row): EditSessionRecord { return { id: String(row.i
 function mapEditTurn(row: Row): EditTurnRecord { const ids = parse(row.reference_asset_ids_json ?? "[]") as string[]; const selections = parse(row.reference_selections_json ?? "[]") as ReferenceSelection[]; return { id: String(row.id), sessionId: String(row.session_id), projectId: String(row.project_id), baseOutputId: String(row.base_output_id), status: row.status as EditTurnStatus, message: String(row.message), annotations: parse(row.annotations_json ?? "{}"), editMaskPath: row.edit_mask_path ? String(row.edit_mask_path) : null, editMaskHash: row.edit_mask_hash ? String(row.edit_mask_hash) : null, protectMaskPath: row.protect_mask_path ? String(row.protect_mask_path) : null, protectMaskHash: row.protect_mask_hash ? String(row.protect_mask_hash) : null, referenceAssetIds: ids, referenceSelections: selections.length ? selections : ids.map((id, order) => ({ id, source: "PROJECT", purpose: "PRODUCT_APPEARANCE", order })), plan: row.plan_json ? parse(row.plan_json) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapEditReferenceAsset(row: Row): EditReferenceAssetRecord { return { id: String(row.id), projectId: String(row.project_id), sessionId: String(row.session_id), turnId: row.turn_id ? String(row.turn_id) : null, storagePath: String(row.storage_path), hash: String(row.hash), originalName: String(row.original_name), mimeType: String(row.mime_type), purpose: row.purpose as ReferencePurpose, createdAt: String(row.created_at), expiresAt: String(row.expires_at) }; }
 function mapExport(row: Row): ExportRecord { return { id: String(row.id), projectId: String(row.project_id), jobId: String(row.job_id), status: String(row.status), storagePath: row.storage_path ? String(row.storage_path) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapLayerPlan(row: Row): LayerPlanRecord { return { id: String(row.id), projectId: String(row.project_id), outputId: String(row.output_id), jobId: String(row.job_id), outputHash: String(row.output_hash), status: row.status as LayerPlanRecord["status"], elements: parse(row.elements_json ?? "[]"), error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapLayerExport(row: Row): LayerExportRecord { return { id: String(row.id), projectId: String(row.project_id), outputId: String(row.output_id), jobId: String(row.job_id), planId: row.plan_id == null ? null : String(row.plan_id), status: row.status as LayerExportRecord["status"], includeBackground: Boolean(row.include_background), psdStoragePath: row.psd_storage_path ? String(row.psd_storage_path) : null, layerFiles: row.layer_files_json ? parse(row.layer_files_json) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }

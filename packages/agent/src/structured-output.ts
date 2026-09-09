@@ -103,6 +103,28 @@ export const PROMPT_REVISION_SCHEMA: StructuredOutputSchema = {
   },
 };
 
+export const LAYER_ELEMENTS_OUTPUT_SCHEMA: StructuredOutputSchema = {
+  name: "ecomgen_layer_elements",
+  schema: {
+    type: "object",
+    ...noAdditionalProperties,
+    properties: {
+      elements: {
+        type: "array",
+        minItems: 1,
+        maxItems: 32,
+        items: {
+          type: "object",
+          ...noAdditionalProperties,
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        },
+      },
+    },
+    required: ["elements"],
+  },
+};
+
 /** Provider capability is carried on the model by the EcomGen reasoning adapter. */
 export function modelSupportsStructuredOutput(model: Model<"openai-completions" | "openai-responses">): boolean {
   return (model as Model<"openai-completions" | "openai-responses"> & { ecomgenSupportsStructuredOutput?: boolean }).ecomgenSupportsStructuredOutput === true;

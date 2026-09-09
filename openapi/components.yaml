@@ -49,6 +49,13 @@ components:
       schema:
         type: string
         format: uuid
+    LayerExportId:
+      name: layerExportId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     UserTemplateId:
       name: templateId
       in: path

@@ -11,9 +11,11 @@ import {
   type UpdateProviderInput,
 } from "../../api/hooks/useProviders";
 import { errorText } from "../../lib/errorText";
+import { SEGMENTATION_PROTOCOL_LABELS, type SegmentationProtocolValue } from "../../lib/modelOptions";
 import styles from "./providers.module.css";
 
 type ImageApiKindValue = NonNullable<ModelCapability["imageApiKind"]>;
+type SegmentationKindValue = SegmentationProtocolValue;
 
 interface ModelFormRow {
   id: string;
@@ -21,8 +23,8 @@ interface ModelFormRow {
   supportsThinking: boolean;
   supportsTools: boolean;
   supportsStructuredOutput: boolean;
-  /** 表单哨兵值："" 表示推理模型（提交时转 null） */
-  imageApiKind: "" | ImageApiKindValue;
+  /** 表单哨兵值："" 表示推理模型；生图 kind 提交为 imageApiKind，分割 kind 提交为 segmentationProtocol */
+  kind: "" | ImageApiKindValue | SegmentationKindValue;
 }
 
 interface ProviderFormValues {
@@ -44,18 +46,25 @@ const EMPTY_MODEL_ROW: ModelFormRow = {
   supportsThinking: false,
   supportsTools: false,
   supportsStructuredOutput: false,
-  imageApiKind: "",
+  kind: "",
 };
+
+function isSegmentationKind(kind: ModelFormRow["kind"]): kind is SegmentationKindValue {
+  return kind === "fal" || kind === "grounded_sam" || kind === "seedream_layerize";
+}
 
 function toModelCapability(row: ModelFormRow): ModelCapability {
   return {
     id: row.id.trim(),
-    // 生图模型的能力开关未渲染，antd onFinish 不返回未挂载字段，这里必须兜底
+    // 生图/分割模型的能力开关未渲染，antd onFinish 不返回未挂载字段，这里必须兜底
     supportsVision: Boolean(row.supportsVision),
     supportsThinking: Boolean(row.supportsThinking),
     supportsTools: Boolean(row.supportsTools),
     supportsStructuredOutput: Boolean(row.supportsStructuredOutput),
-    imageApiKind: row.imageApiKind === "" ? null : row.imageApiKind,
+    // 分割与生图互斥：分割 kind 提交为 segmentationProtocol，其余按 imageApiKind
+    ...(isSegmentationKind(row.kind)
+      ? { imageApiKind: null, segmentationProtocol: row.kind }
+      : { imageApiKind: row.kind === "" ? null : row.kind }),
   };
 }
 
@@ -74,7 +83,7 @@ export function ProviderFormView({ view, onDone }: Props) {
   const testProvider = useTestProvider();
   const { notification } = App.useApp();
   const [testRows, setTestRows] = useState<Record<number, TestRowState>>({});
-  const [modelKinds, setModelKinds] = useState<Record<number, "" | ImageApiKindValue>>({});
+  const [modelKinds, setModelKinds] = useState<Record<number, ModelFormRow["kind"]>>({});
 
   const initialValues: ProviderFormValues = editing
     ? {
@@ -88,7 +97,7 @@ export function ProviderFormView({ view, onDone }: Props) {
         supportsThinking: m.supportsThinking,
         supportsTools: m.supportsTools,
         supportsStructuredOutput: m.supportsStructuredOutput,
-        imageApiKind: m.imageApiKind ?? "",
+        kind: m.segmentationProtocol ?? m.imageApiKind ?? "",
       })),
     }
     : { name: "", baseUrl: "", reasoningProtocol: "openai", apiKey: "", models: [EMPTY_MODEL_ROW] };
@@ -136,7 +145,7 @@ export function ProviderFormView({ view, onDone }: Props) {
       return;
     }
     const persisted = editing.models.find((model) => model.id === row.id.trim());
-    if (!persisted || (persisted.imageApiKind ?? "") !== row.imageApiKind) {
+    if (!persisted || (persisted.segmentationProtocol ?? persisted.imageApiKind ?? "") !== row.kind) {
       notification.warning({ title: "请先保存模型，再测试连通性" });
       return;
     }
@@ -145,8 +154,8 @@ export function ProviderFormView({ view, onDone }: Props) {
       const result = await testProvider.mutateAsync({
         providerId: editing.id,
         modelId: row.id.trim(),
-        // 契约要求 kind：生图模型按 image 探测，其余按 reasoning
-        kind: row.imageApiKind === "" ? "reasoning" : "image",
+        // 契约要求 kind：生图按 image、分割按 segmentation（零费用探测）、其余按 reasoning
+        kind: row.kind === "" ? "reasoning" : isSegmentationKind(row.kind) ? "segmentation" : "image",
       });
       setTestRows((s) => ({
         ...s,
@@ -221,8 +230,8 @@ export function ProviderFormView({ view, onDone }: Props) {
           <div className={styles.modelList}>
             {fields.map((field, index) => {
               const testRow = testRows[index];
-              const imageApiKind = modelKinds[field.key] ?? models?.[field.name]?.imageApiKind ?? "";
-              const persisted = Boolean(editing && editing.models.some((model) => model.id === (models?.[field.name]?.id ?? "").trim() && (model.imageApiKind ?? "") === imageApiKind));
+              const kind = modelKinds[field.key] ?? models?.[field.name]?.kind ?? "";
+              const persisted = Boolean(editing && editing.models.some((model) => model.id === (models?.[field.name]?.id ?? "").trim() && (model.segmentationProtocol ?? model.imageApiKind ?? "") === kind));
               return (
                 <div key={field.key} className={styles.modelRow}>
                   <div className={styles.modelRowMain}>
@@ -233,43 +242,31 @@ export function ProviderFormView({ view, onDone }: Props) {
                     >
                       <Input placeholder="模型 ID，如 gpt-image-1" className="font-mono" />
                     </Form.Item>
-                    {imageApiKind === "" && (
-                      <>
-                        <label className={styles.switchItem}>
-                          <Form.Item name={[field.name, "supportsVision"]} valuePropName="checked" noStyle>
-                            <Switch size="small" />
-                          </Form.Item>
-                          <span>视觉</span>
-                        </label>
-                        <label className={styles.switchItem}>
-                          <Form.Item name={[field.name, "supportsThinking"]} valuePropName="checked" noStyle>
-                            <Switch size="small" />
-                          </Form.Item>
-                          <span>思考</span>
-                        </label>
-                        <label className={styles.switchItem}>
-                          <Form.Item name={[field.name, "supportsTools"]} valuePropName="checked" noStyle>
-                            <Switch size="small" />
-                          </Form.Item>
-                          <span>工具</span>
-                        </label>
-                        <label className={styles.switchItem}>
-                          <Form.Item name={[field.name, "supportsStructuredOutput"]} valuePropName="checked" noStyle>
-                            <Switch size="small" />
-                          </Form.Item>
-                          <span>结构化</span>
-                        </label>
-                      </>
-                    )}
-                    <Form.Item name={[field.name, "imageApiKind"]} className={styles.kindSelect} noStyle>
+                    {/* noStyle 下 Form.Item 不渲染包装节点，className 不会生效，尺寸必须直接给 Select */}
+                    <Form.Item name={[field.name, "kind"]} noStyle>
                       <Select
-                        aria-label={`模型 ${index + 1} 的生图 API 类型`}
-                        onChange={(value: "" | ImageApiKindValue) => setModelKinds((current) => ({ ...current, [field.key]: value }))}
+                        aria-label={`模型 ${index + 1} 的模型类型`}
+                        style={{ width: 200, flex: "none" }}
+                        popupMatchSelectWidth={false}
+                        onChange={(value: ModelFormRow["kind"]) => setModelKinds((current) => ({ ...current, [field.key]: value }))}
                         options={[
                           { value: "", label: "无（推理）" },
-                          { value: "openai_images", label: "openai_images" },
-                          { value: "gemini", label: "gemini (Nano Banana)" },
-                          { value: "custom", label: "custom" },
+                          {
+                            label: "生图",
+                            options: [
+                              { value: "openai_images", label: "OpenAI Images" },
+                              { value: "gemini", label: "Gemini（Nano Banana）" },
+                              { value: "custom", label: "自定义（custom）" },
+                            ],
+                          },
+                          {
+                            label: "分割",
+                            options: [
+                              { value: "fal", label: SEGMENTATION_PROTOCOL_LABELS.fal },
+                              { value: "grounded_sam", label: SEGMENTATION_PROTOCOL_LABELS.grounded_sam },
+                              { value: "seedream_layerize", label: SEGMENTATION_PROTOCOL_LABELS.seedream_layerize },
+                            ],
+                          },
                         ]}
                       />
                     </Form.Item>
@@ -294,6 +291,35 @@ export function ProviderFormView({ view, onDone }: Props) {
                       onClick={() => remove(field.name)}
                     />
                   </div>
+                  {kind === "" && (
+                    <div className={styles.modelRowCaps}>
+                      <span className={styles.capsLabel}>能力</span>
+                      <label className={styles.switchItem}>
+                        <Form.Item name={[field.name, "supportsVision"]} valuePropName="checked" noStyle>
+                          <Switch size="small" />
+                        </Form.Item>
+                        <span>视觉</span>
+                      </label>
+                      <label className={styles.switchItem}>
+                        <Form.Item name={[field.name, "supportsThinking"]} valuePropName="checked" noStyle>
+                          <Switch size="small" />
+                        </Form.Item>
+                        <span>思考</span>
+                      </label>
+                      <label className={styles.switchItem}>
+                        <Form.Item name={[field.name, "supportsTools"]} valuePropName="checked" noStyle>
+                          <Switch size="small" />
+                        </Form.Item>
+                        <span>工具</span>
+                      </label>
+                      <label className={styles.switchItem}>
+                        <Form.Item name={[field.name, "supportsStructuredOutput"]} valuePropName="checked" noStyle>
+                          <Switch size="small" />
+                        </Form.Item>
+                        <span>结构化</span>
+                      </label>
+                    </div>
+                  )}
                   {testRow?.state === "ok" && (
                     <p className={styles.testOk}>
                       <CircleCheck size={14} aria-hidden />

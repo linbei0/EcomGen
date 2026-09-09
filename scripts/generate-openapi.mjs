@@ -70,6 +70,11 @@ const operationSchemaRefs = {
   createEditTurn: { request: "CreateEditTurnInput", response: { "202": "EditTurnQueuedResponse" } },
   selectEditSessionOutput: { request: "SelectEditSessionOutputInput" },
   approveEditTurn: { response: { "202": "ApproveEditTurnResponse" } },
+  getLayerPlan: { response: { "200": "LayerPlan" } },
+  createLayerPlan: { request: "CreateLayerPlanInput", response: { "200": "LayerPlan", "202": "LayerPlan" } },
+    createLayerExport: { request: "CreateLayerExportInput", response: { "202": "LayerExportBundle" } },
+    getLayerExport: { response: { "200": "LayerExport" } },
+    listLayerExports: { response: { "200": "LayerExportHistory" } },
 };
 
 function normalizePathSchemas(pathsDocument) {

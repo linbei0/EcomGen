@@ -5,15 +5,15 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type UserTemplateRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type UserTemplateRecord } from "@ecomgen/core";
 import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyAssetFromHistoryInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, roleForUserAssetKind } from "@ecomgen/contracts";
-import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, probeReasoning } from "@ecomgen/providers";
+import { CopyAssetFromHistoryInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_LAYER_EXPORT_ELEMENTS_BY_PROTOCOL, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, roleForUserAssetKind } from "@ecomgen/contracts";
+import { FalSegmentationProvider, GeminiImageProvider, GroundedSamSegmentationProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, probeReasoning } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
-import { applyModelFields } from "./projectPatch.js";
+import { applyModelFields, parseModelRef } from "./projectPatch.js";
 import { parseBody } from "./http-input.js";
 import { registerWebStatic } from "./web-static.js";
 import { enumArray, enumValue, normalizeModels, objectOfStrings, parameter, readBoolean, readJsonObject, readJsonTextArray, readObject, readOptionalText, readOptionalTextArray, readPriority, readText, readTextArray, searchSourceBaseUrl } from "./input-normalizers.js";
@@ -93,14 +93,25 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.post("/api/v1/providers/:providerId/test", async (request) => {
     const providerId = parameter(request, "providerId"); const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId);
-    const body = parseBody(TestProviderInput, request.body); const modelId = readText(body.modelId, "modelId"); const kind = enumValue<"reasoning" | "image">(body.kind ?? "image", ["reasoning", "image"], "kind");
+    const body = parseBody(TestProviderInput, request.body); const modelId = readText(body.modelId, "modelId"); const kind = enumValue<"reasoning" | "image" | "segmentation">(body.kind ?? "image", ["reasoning", "image", "segmentation"], "kind");
     const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new ApiError(400, "VALIDATION_ERROR", "modelId is not declared by the selected provider");
     if (kind === "image" && !model.imageApiKind) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected image model has no image API configured");
+    if (kind === "segmentation" && !model.segmentationProtocol) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected segmentation model has no segmentation API configured");
     try {
       if (kind === "reasoning") {
         const probeModel = model;
         const probe = await probeReasoning({ providerId, modelId, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: probeModel.supportsVision, supportsThinking: probeModel.supportsThinking, supportsStructuredOutput: probeModel.supportsStructuredOutput, apiKey: secrets.decrypt(provider.encryptedApiKey) });
         return { ok: true, providerId, modelId, kind, latencyMs: probe.latencyMs, models: null, modelAvailable: true };
+      }
+      if (kind === "segmentation") {
+        // 分割探测只做零费用连通性检查（/models 或最小请求），不调用真实分割
+        const apiKey = secrets.decrypt(provider.encryptedApiKey);
+        const probe = model.segmentationProtocol === "grounded_sam"
+          ? await new GroundedSamSegmentationProvider({ baseUrl: provider.baseUrl, apiKey }).probe()
+          : model.segmentationProtocol === "seedream_layerize"
+            ? await new SeedreamLayerizeProvider({ baseUrl: provider.baseUrl, apiKey }).probe()
+            : await new FalSegmentationProvider({ baseUrl: provider.baseUrl, apiKey }).probe();
+        return { ok: true, providerId, modelId, kind, ...probe, modelAvailable: null };
       }
       const probe = model.imageApiKind === "gemini"
         ? await new GeminiImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) }).probe()
@@ -170,7 +181,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       imageResolution: body.imageResolution === undefined ? DEFAULT_IMAGE_RESOLUTION : enumValue<ImageResolution>(body.imageResolution, IMAGE_RESOLUTIONS, "imageResolution"),
       imageAspectRatio: body.imageAspectRatio === undefined ? DEFAULT_IMAGE_ASPECT_RATIO : enumValue<ImageAspectRatio>(body.imageAspectRatio, IMAGE_ASPECT_RATIOS, "imageAspectRatio"),
       candidatesPerType: body.candidatesPerType === undefined ? DEFAULT_CANDIDATES_PER_TYPE : candidatesPerType(body.candidatesPerType),
-      webResearchEnabled: body.webResearchEnabled === undefined ? false : readBoolean(body.webResearchEnabled, "webResearchEnabled")
+      webResearchEnabled: body.webResearchEnabled === undefined ? false : readBoolean(body.webResearchEnabled, "webResearchEnabled"),
+      segmentationModel: body.segmentationModel === undefined || body.segmentationModel === null ? null : readSegmentationModel(repository, body.segmentationModel)
     }));
   });
   app.get("/api/v1/projects/:projectId", async (request) => projectDetail(repository, parameter(request, "projectId")));
@@ -192,6 +204,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (body.candidatesPerType !== undefined) update.candidatesPerType = candidatesPerType(body.candidatesPerType);
     if (body.webResearchEnabled !== undefined) update.webResearchEnabled = readBoolean(body.webResearchEnabled, "webResearchEnabled");
     if (body.archived !== undefined) update.archivedAt = readBoolean(body.archived, "archived") ? new Date().toISOString() : null;
+    if (body.segmentationModel !== undefined) update.segmentationModel = body.segmentationModel === null ? null : readSegmentationModel(repository, body.segmentationModel);
     applyModelFields(body, update, (providerId, modelId, kind) => verifyModel(repository, providerId, modelId, kind));
     return repository.updateProject(id, update) as object;
   });
@@ -566,9 +579,23 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => {
     const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id); if (!job.retryable) throw new ApiError(409, "CONFLICT", "This job cannot be retried"); const input = job.type === "GENERATE" ? { ...job.input, revision: "retry" } : job.input;
+    // 分层任务重试必须同时重建分层记录，否则 Worker 按新 jobId 找不到对应记录会立即失败。
+    let createLayerRecord: ((retryJobId: string) => void) | undefined;
+    if (job.type === "LAYER_PLAN" || job.type === "LAYER_EXPORT") {
+      const outputId = typeof job.input.outputId === "string" ? job.input.outputId : "";
+      const output = outputId ? repository.getOutput(outputId) : undefined;
+      if (!output || output.projectId !== job.projectId) throw new ApiError(409, "CONFLICT", "无法重试：源输出已不存在");
+      if (job.type === "LAYER_PLAN") {
+        createLayerRecord = (retryJobId) => { repository.createLayerPlan({ projectId: job.projectId, outputId: output.id, jobId: retryJobId, outputHash: output.hash, status: "QUEUED", elements: [], error: null }); };
+      } else {
+        const planId = typeof job.input.planId === "string" ? job.input.planId : null;
+        const includeBackground = job.input.includeBackground !== false;
+        createLayerRecord = (retryJobId) => { repository.createLayerExport({ projectId: job.projectId, outputId: output.id, jobId: retryJobId, planId, status: "QUEUED", includeBackground, psdStoragePath: null, layerFiles: null, error: null }); };
+      }
+    }
     // 重试即替代原任务：先终结原失败任务再入队新任务，前端结果区不再残留旧卡片；retryable 在此关闭使并发双击得到 409。
     repository.updateJob(id, { status: "CANCELLED", cancelRequested: true, retryable: false });
-    const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); await enqueue(queue, { jobId: retry.id, kind: queueKindForJobType(retry.type) }); return reply.code(202).send(retry);
+    const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); createLayerRecord?.(retry.id); await enqueue(queue, { jobId: retry.id, kind: queueKindForJobType(retry.type) }); return reply.code(202).send(retry);
   });
   app.get("/api/v1/projects/:projectId/outputs", async (request) => repository.listOutputs(parameter(request, "projectId")));
   app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = parseBody(CreateExportJobRequest, request.body ?? {}); const input = { outputIds: body.outputIds, filenamePrefix: body.filenamePrefix }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueue(queue, { jobId: job.id, kind: "export" }); return reply.code(202).send({ job, export: exportRecord }); });
@@ -577,6 +604,90 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.get("/api/v1/files/edit-reference-assets/:referenceAssetId", async (request, reply) => sendStored(request, reply, storage, repository.getEditReferenceAsset(parameter(request, "referenceAssetId")), "reference asset"));
   app.get("/api/v1/files/outputs/:outputId", async (request, reply) => sendStored(request, reply, storage, repository.getOutput(parameter(request, "outputId")), "output"));
   app.get("/api/v1/files/exports/:exportId", async (request, reply) => sendStored(request, reply, storage, repository.getExport(parameter(request, "exportId")), "export"));
+  app.get("/api/v1/outputs/:outputId/layer-plan", async (request) => {
+    const output = repository.getOutput(parameter(request, "outputId"));
+    if (!output) missing("output", parameter(request, "outputId"));
+    const plan = repository.getLayerPlanByOutput(output.id);
+    if (!plan) missing("layer plan", output.id);
+    return publicLayerPlan(plan);
+  });
+  app.post("/api/v1/outputs/:outputId/layer-plan", async (request, reply) => {
+    const output = repository.getOutput(parameter(request, "outputId"));
+    if (!output) missing("output", parameter(request, "outputId"));
+    const project = repository.getProject(output.projectId);
+    if (!project) missing("project", output.projectId);
+    const body = parseBody(CreateLayerPlanInput, request.body ?? {});
+    // 输出内容未变化、上次识别成功、且推理模型快照一致时才复用；显式 regenerationKey 表示调用方要求重新识别。
+    const existing = repository.getLayerPlanByOutput(output.id);
+    const existingJob = existing ? repository.getJob(existing.jobId) : undefined;
+    const sameReasoningModel = existingJob?.providerId === project.reasoningProviderId && existingJob?.modelId === project.reasoningModelId;
+    if (existing && existing.status === "SUCCEEDED" && existing.outputHash === output.hash && sameReasoningModel && !body.regenerationKey) return reply.code(200).send(publicLayerPlan(existing));
+    const input = { outputId: output.id, outputHash: output.hash, regenerationKey: body.regenerationKey ?? null, reasoningProviderId: project.reasoningProviderId ?? null, reasoningModelId: project.reasoningModelId ?? null };
+    const fingerprint = requestFingerprint({ type: "LAYER_PLAN", projectId: output.projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null });
+    const duplicate = repository.findJobByFingerprint(output.projectId, fingerprint);
+    if (duplicate) { const duplicatePlan = repository.getLayerPlanByJobId(duplicate.id); if (duplicatePlan) return reply.code(duplicate.status === "SUCCEEDED" ? 200 : 202).send(publicLayerPlan(duplicatePlan)); }
+    const job = repository.createJob({ id: randomUUID(), projectId: output.projectId, storyboardItemId: null, type: "LAYER_PLAN", input, requestFingerprint: fingerprint, providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const plan = repository.createLayerPlan({ projectId: output.projectId, outputId: output.id, jobId: job.id, outputHash: output.hash, status: "QUEUED", elements: [], error: null });
+    await enqueue(queue, { jobId: job.id, kind: "layer_plan" });
+    return reply.code(202).send(publicLayerPlan(plan));
+  });
+  app.get("/api/v1/outputs/:outputId/layer-exports", async (request) => {
+    const output = repository.getOutput(parameter(request, "outputId"));
+    if (!output) missing("output", parameter(request, "outputId"));
+    const layerExport = repository.getLayerExportByOutput(output.id);
+    if (!layerExport) missing("layer export", output.id);
+    return publicLayerExport(layerExport);
+  });
+  // 历史导出全集：文件端点按记录 id 寻址，旧导出在重新分层/重新导出后仍可回看与下载
+  app.get("/api/v1/outputs/:outputId/layer-exports/history", async (request) => {
+    const output = repository.getOutput(parameter(request, "outputId"));
+    if (!output) missing("output", parameter(request, "outputId"));
+    return { exports: repository.listLayerExportsByOutput(output.id).map(publicLayerExport) };
+  });
+  app.post("/api/v1/outputs/:outputId/layer-exports", async (request, reply) => {
+    const output = repository.getOutput(parameter(request, "outputId"));
+    if (!output) missing("output", parameter(request, "outputId"));
+    const project = repository.getProject(output.projectId);
+    if (!project) missing("project", output.projectId);
+    if (!project.segmentationModel) throw new ApiError(422, "PROVIDER_NOT_CONFIGURED", "请先在项目设置中选择分割模型");
+    const body = parseBody(CreateLayerExportInput, request.body ?? {});
+    const includeBackground = body.includeBackground ?? true;
+    const plan = repository.getLayerPlanByOutput(output.id);
+    // 画框/提示词元素可以跳过视觉识别直接分层；auto 元素必须来自当前识别结果，避免引用过期元素。
+    const succeededPlan = plan?.status === "SUCCEEDED" ? plan : null;
+    const planId = succeededPlan?.id ?? null;
+    // auto 元素必须绑定勾选时的识别方案：方案被重新识别后 el-N 会指向新对象，仅靠局部 id 无法区分。
+    if (body.elements.some((element) => element.source === "auto") && body.planId !== planId) throw new ApiError(409, "CONFLICT", "识别方案已更新，请重新选择图层元素后再导出");
+    const planElementIds = new Set(succeededPlan?.elements.map((element) => element.id) ?? []);
+    for (const element of body.elements) {
+      if (element.source === "manual" && !element.bbox) throw new ApiError(400, "VALIDATION_ERROR", `手动元素「${element.name}」缺少画框坐标`);
+      if (element.source === "auto" && !planElementIds.has(element.id)) throw new ApiError(409, "CONFLICT", `元素「${element.name}」不在识别结果中，请先完成图层识别再导出`);
+    }
+    // 单次导出元素数受分割协议上限约束（Seedream 最多 16 层、SAM 单次最多 32 个对象），提前校验避免任务必然失败。
+    // 存储引用里的 protocol 可能是历史默认值，以模型当前声明为准，因此只传 providerId/modelId。
+    const segmentation = readSegmentationModel(repository, { providerId: project.segmentationModel.providerId, modelId: project.segmentationModel.modelId });
+    const maxLayerElements = MAX_LAYER_EXPORT_ELEMENTS_BY_PROTOCOL[segmentation.protocol];
+    if (body.elements.length > maxLayerElements) throw new ApiError(400, "VALIDATION_ERROR", `当前分割模型单次最多支持 ${maxLayerElements} 个图层元素，请减少元素后重试`);
+    const input = { outputId: output.id, planId, outputHash: output.hash, elements: body.elements, includeBackground, segmentationProviderId: segmentation.providerId, segmentationModelId: segmentation.modelId, segmentationProtocol: segmentation.protocol };
+    const fingerprint = requestFingerprint({ type: "LAYER_EXPORT", projectId: output.projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null });
+    const duplicate = repository.findJobByFingerprint(output.projectId, fingerprint);
+    if (duplicate) { const duplicateExport = repository.getLayerExportByJobId(duplicate.id); if (duplicateExport) return reply.code(duplicate.status === "SUCCEEDED" ? 200 : 202).send({ job: duplicate, layerExport: publicLayerExport(duplicateExport) }); }
+    const job = repository.createJob({ id: randomUUID(), projectId: output.projectId, storyboardItemId: null, type: "LAYER_EXPORT", input, requestFingerprint: fingerprint, providerId: project.segmentationModel.providerId, modelId: project.segmentationModel.modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const layerExport = repository.createLayerExport({ projectId: output.projectId, outputId: output.id, jobId: job.id, planId, status: "QUEUED", includeBackground, psdStoragePath: null, layerFiles: null, error: null });
+    await enqueue(queue, { jobId: job.id, kind: "layer_export" });
+    return reply.code(202).send({ job, layerExport: publicLayerExport(layerExport) });
+  });
+  app.get("/api/v1/files/layer-exports/:layerExportId", async (request, reply) => {
+    const record = repository.getLayerExport(parameter(request, "layerExportId"));
+    return sendStored(request, reply, storage, record?.psdStoragePath ? { storagePath: record.psdStoragePath } : undefined, "layer export");
+  });
+  app.get("/api/v1/files/layer-exports/:layerExportId/layers/:layerIndex", async (request, reply) => {
+    const layerExportId = parameter(request, "layerExportId");
+    const index = Number(parameter(request, "layerIndex"));
+    const file = repository.getLayerExport(layerExportId)?.layerFiles?.[index];
+    if (!file || !Number.isInteger(index) || index < 0) missing("layer file", `${layerExportId}#${parameter(request, "layerIndex")}`);
+    return sendStored(request, reply, storage, { storagePath: file.storagePath, hash: file.hash }, "layer file");
+  });
   app.get("/api/v1/events", { sse: "only" }, async (request, reply) => {
     const projectId = typeof request.query === "object" && request.query && "projectId" in request.query ? String((request.query as Record<string, unknown>).projectId) : ""; if (!projectId) throw new ApiError(400, "VALIDATION_ERROR", "projectId query parameter is required"); ensureProject(repository, projectId);
     reply.sse.keepAlive(); const unsubscribe = await events.subscribe(projectId, (event) => { void reply.sse.send({ id: event.id, event: event.type, data: event }); }); reply.sse.onClose(() => { void unsubscribe(); }); await reply.sse.send({ event: "connected", data: { projectId } });
@@ -586,6 +697,16 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
 }
 
 function publicProvider(value: ProviderRecord): object { const { encryptedApiKey, ...provider } = value; return { ...provider, hasApiKey: Boolean(encryptedApiKey) }; }
+function publicLayerPlan(plan: LayerPlanRecord): object { return { ...plan, error: plan.error ?? undefined }; }
+function publicLayerExport(record: LayerExportRecord): object {
+  return {
+    ...record,
+    psdStoragePath: record.psdStoragePath ?? undefined,
+    psdDownloadUrl: record.psdStoragePath ? `/files/layer-exports/${record.id}` : null,
+    layerFiles: record.layerFiles?.map((file, index) => ({ name: file.name, kind: file.kind, downloadUrl: `/files/layer-exports/${record.id}/layers/${index}` })) ?? null,
+    error: record.error ?? undefined,
+  };
+}
 function publicSearchSource(value: SearchSourceRecord): object { const { encryptedApiKey, ...source } = value; return { ...source, hasApiKey: Boolean(encryptedApiKey) }; }
 function publicUserTemplate(value: UserTemplateRecord): object { return { ...value }; }
 /** 规划校验与 Worker 共用同一编译口径；表极小，按请求读取即可保证最新。 */
@@ -684,10 +805,27 @@ function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "PLAN") return "plan";
   if (type === "COPYWRITE") return "copywrite";
   if (type === "GENERATE") return "generate";
+  if (type === "EDIT_PLAN") return "edit_plan";
+  if (type === "EDIT_GENERATE") return "edit_generate";
+  if (type === "LAYER_PLAN") return "layer_plan";
+  if (type === "LAYER_EXPORT") return "layer_export";
   return "export";
 }
 // ProviderId/modelId 为 null 表示项目尚未选择模型（Provider 被删除后置空），在入口拦截而不是打出一个注定失败的任务
 function verifyModel(repository: EcomRepository, providerId: string | null, modelId: string | null, kind: "reasoning" | "image"): void { if (!providerId || !modelId) throw new ApiError(422, "PROVIDER_NOT_CONFIGURED", "请先在项目设置中选择推理与图片模型"); const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new ApiError(400, "VALIDATION_ERROR", `${kind} model is not declared by the selected provider`); if (kind === "image" && !model.imageApiKind) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected image model has no image API configured"); }
+/** 分割模型引用必须指向声明了 segmentationProtocol 的模型；存储的 protocol 从模型声明派生，请求里显式给出的协议仅用于一致性校验。 */
+function readSegmentationModel(repository: EcomRepository, value: unknown): { providerId: string; modelId: string; protocol: "fal" | "grounded_sam" | "seedream_layerize" } {
+  const ref = parseModelRef(value, "segmentationModel");
+  const raw = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  const requested = raw.protocol === undefined || raw.protocol === null ? undefined : enumValue<"fal" | "grounded_sam" | "seedream_layerize">(raw.protocol, ["fal", "grounded_sam", "seedream_layerize"], "segmentationModel.protocol");
+  const provider = repository.getProvider(ref.providerId);
+  if (!provider) missing("provider", ref.providerId);
+  const model = provider.models.find((candidate) => candidate.id === ref.modelId);
+  if (!model) throw new ApiError(400, "VALIDATION_ERROR", "segmentation model is not declared by the selected provider");
+  if (!model.segmentationProtocol) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected segmentation model has no segmentation API configured");
+  if (requested && requested !== model.segmentationProtocol) throw new ApiError(400, "VALIDATION_ERROR", `segmentationModel.protocol must match the model's declared protocol (${model.segmentationProtocol})`);
+  return { providerId: ref.providerId, modelId: ref.modelId, protocol: model.segmentationProtocol };
+}
 function ensureProject(repository: EcomRepository, id: string): void { if (!repository.getProject(id)) missing("project", id); }
 function missing(resource: string, id: string): never { throw new ApiError(404, "NOT_FOUND", `${resource} not found: ${id}`); }
 export function assertProjectAssetCapacity(repository: Pick<EcomRepository, "listAssets">, projectId: string, role: AssetRole): void {
@@ -753,4 +891,4 @@ async function sendStored(request: FastifyRequest, reply: FastifyReply, storage:
     .send(storage.stream(record.storagePath));
   return reply;
 }
-function mimeForPath(path: string): string { if (path.endsWith(".png")) return "image/png"; if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg"; if (path.endsWith(".webp")) return "image/webp"; if (path.endsWith(".zip")) return "application/zip"; return "application/octet-stream"; }
+function mimeForPath(path: string): string { if (path.endsWith(".png")) return "image/png"; if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg"; if (path.endsWith(".webp")) return "image/webp"; if (path.endsWith(".zip")) return "application/zip"; if (path.endsWith(".psd")) return "image/vnd.adobe.photoshop"; return "application/octet-stream"; }

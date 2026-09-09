@@ -1,9 +1,9 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { AssetRole, EditTurnStatus, ImageAspectRatio, ImageResolution, PlanningMode, PlatformTarget, ReferencePurpose, UserAssetKind } from "./enums.js";
-import { EditReferenceAsset, EditTurn, Job, ModelRef, PlanningConfigSnapshot, Project, ReferenceSelection } from "./api-schemas.js";
+import { EditReferenceAsset, EditTurn, Job, LayerBbox, ModelRef, PlanningConfigSnapshot, Project, ReferenceSelection } from "./api-schemas.js";
 import { schemaRef } from "./ref.js";
 
-export const TestProviderInput = Type.Object({ modelId: Type.String({ minLength: 1 }), kind: Type.Optional(Type.Union([Type.Literal("reasoning"), Type.Literal("image")])) }, { $id: "#/components/schemas/TestProviderInput" });
+export const TestProviderInput = Type.Object({ modelId: Type.String({ minLength: 1 }), kind: Type.Optional(Type.Union([Type.Literal("reasoning"), Type.Literal("image"), Type.Literal("segmentation")], { description: "segmentation probes the declared segmentation API with zero cost." })) }, { $id: "#/components/schemas/TestProviderInput" });
 export type TestProviderInput = Static<typeof TestProviderInput>;
 
 export const CreateGenerationJobInput = Type.Object({
@@ -58,3 +58,15 @@ export const UploadEditReferenceAssetInput = Type.Object({ file: Type.String({ f
 export const CreateEditTurnInput = Type.Object({ baseOutputId: Type.Optional(Type.String({ format: "uuid" })), message: Type.String({ maxLength: 4000 }), annotations: Type.Optional(Type.String()), editMask: Type.Optional(Type.String({ format: "binary" })), protectMask: Type.Optional(Type.String({ format: "binary" })), referenceSelections: Type.Optional(Type.String()) }, { $id: "#/components/schemas/CreateEditTurnInput" });
 export const EditTurnQueuedResponse = Type.Object({ turnId: Type.String({ format: "uuid" }), planJobId: Type.String({ format: "uuid" }), status: schemaRef(EditTurnStatus) }, { $id: "#/components/schemas/EditTurnQueuedResponse" });
 export const ApproveEditTurnResponse = Type.Object({ job: schemaRef(Job), turn: schemaRef(EditTurn) }, { $id: "#/components/schemas/ApproveEditTurnResponse" });
+
+// AI 分层导出：plan 请求为空体（识别结果按 output 内容 hash 缓存）；
+// export 请求携带用户勾选的元素与手动框选，元素顺序即图层顺序。
+export const CreateLayerPlanInput = Type.Object({ regenerationKey: Type.Optional(Type.String({ minLength: 1, description: "Unique key for an intentional re-recognition run." })) }, { $id: "#/components/schemas/CreateLayerPlanInput" });
+export type CreateLayerPlanInput = Static<typeof CreateLayerPlanInput>;
+
+// prompt 元素来自用户输入的元素名称（无需画框与视觉识别）；manual 必须带画框；auto 必须来自已成功的识别方案。
+export const CreateLayerExportElement = Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }), name: Type.String({ minLength: 1, maxLength: 60 }), source: Type.Union([Type.Literal("auto"), Type.Literal("manual"), Type.Literal("prompt")]), bbox: Type.Optional(schemaRef(LayerBbox)) }, { $id: "#/components/schemas/CreateLayerExportElement", description: "Manual elements must carry the normalized bbox drawn on the canvas; prompt elements come from user-typed element names and need no bbox or recognition plan." });
+export type CreateLayerExportElement = Static<typeof CreateLayerExportElement>;
+
+export const CreateLayerExportInput = Type.Object({ elements: Type.Array(schemaRef(CreateLayerExportElement), { minItems: 1, maxItems: 32 }), includeBackground: Type.Optional(Type.Boolean({ default: true, description: "Generate a holed background layer under the element layers." })), planId: Type.Optional(Type.String({ format: "uuid", description: "The recognition plan the auto elements were selected from; rejected if the plan has since changed." })) }, { $id: "#/components/schemas/CreateLayerExportInput" });
+export type CreateLayerExportInput = Static<typeof CreateLayerExportInput>;
