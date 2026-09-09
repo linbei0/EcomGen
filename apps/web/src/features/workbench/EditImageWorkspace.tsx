@@ -227,9 +227,14 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
     if (!layersOpen && hover && ["brush", "erase", "protect"].includes(tool)) { context.save(); context.lineWidth = Math.max(2, overlay.width / 700); context.setLineDash([Math.max(5, overlay.width / 150), Math.max(4, overlay.width / 190)]); context.strokeStyle = tool === "erase" ? "#f0f3f5" : tool === "protect" ? PROTECT_OVERLAY_COLOR : EDIT_OVERLAY_COLOR; context.beginPath(); context.arc(hover.x, hover.y, brushSize / 2, 0, Math.PI * 2); context.stroke(); context.restore(); }
   };
 
-  const scheduleRender = (nextAnnotations = annotations, nextSelectedRectId = selectedRectId) => {
+  // rAF 延迟渲染执行的是调度那一刻的 redrawOverlay 闭包；快速框选时残留 rAF 可能在状态提交后才触发，
+  // 过期闭包会把刚画上的选框抹掉（表现为选框不出现，再点一下才显现）。执行时改用最新一次渲染的 redrawOverlay，
+  // 残留帧与最终帧等价，重放顺序不再影响结果
+  const redrawOverlayRef = useRef(redrawOverlay);
+  redrawOverlayRef.current = redrawOverlay;
+  const scheduleRender = () => {
     if (renderFrameRef.current !== null) return;
-    renderFrameRef.current = requestAnimationFrame(() => { renderFrameRef.current = null; redrawOverlay(nextAnnotations, nextSelectedRectId); });
+    renderFrameRef.current = requestAnimationFrame(() => { renderFrameRef.current = null; redrawOverlayRef.current(); });
   };
 
   useEffect(() => () => { if (renderFrameRef.current !== null) cancelAnimationFrame(renderFrameRef.current); }, []);

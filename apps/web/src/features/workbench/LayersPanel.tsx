@@ -59,7 +59,8 @@ export function LayersPanel({ outputId, outputUrl, manualElements, boxError, max
   const elementIdsRef = useRef<Set<string>>(new Set());
 
   const resolveUrl = useCallback((url: string) => (/^https?:\/\//.test(url) ? url : `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`), []);
-  const thumbUrl = outputUrl ? resolveUrl(outputUrl) : "";
+  // outputUrl 已是可直接访问的地址（adapter 层已拼好 /api/v1 前缀），再过 resolveUrl 会重复前缀导致 404
+  const thumbUrl = outputUrl ?? "";
 
   const refreshHistory = useCallback(async () => {
     // 以调用时刻的代为准：切换成图后旧请求作废；同一输出内重复刷新幂等，最后返回者胜

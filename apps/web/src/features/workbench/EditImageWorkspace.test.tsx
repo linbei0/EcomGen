@@ -412,4 +412,31 @@ describe("图片编辑画布", () => {
     expect(tintFillStyles).not.toContain("#006dff");
     expect(tintFillStyles).not.toContain("#f07800");
   });
+
+  it("快速框选提交后触发的残留渲染帧不会抹掉刚画上的选框", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`${BASE}/outputs/:outputId/layer-plan`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${BASE}/outputs/:outputId/layer-exports`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${BASE}/outputs/:outputId/layer-exports/history`, () => HttpResponse.json({ exports: [] })),
+    );
+    renderEditor();
+    initializeCanvas();
+    await user.click(screen.getByRole("button", { name: "AI 分层导出" }));
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-tool='layerbox']")!;
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 1000, height: 1000 } as DOMRect);
+    const committedBox = (call: readonly unknown[]) => call[0] === 100 && call[1] === 100 && call[2] === 200 && call[3] === 200;
+    const boxStrokes = () => canvasContext.strokeRect.mock.calls.filter(committedBox).length;
+
+    // 快速框选：pointerdown 调度的延迟渲染帧尚未触发，pointerup 已完成提交（无中间 move 事件）
+    firePointer(canvas, "pointerdown", 1, 100, 100);
+    firePointer(canvas, "pointerup", 1, 300, 300);
+    await screen.findByDisplayValue("自定义元素 1");
+    const strokesAfterCommit = boxStrokes();
+    expect(strokesAfterCommit).toBeGreaterThan(0);
+
+    // 残留帧此刻才执行：必须按提交后的最新状态重放，选框不得消失
+    renderPendingFrame();
+    expect(boxStrokes()).toBe(strokesAfterCommit + 1);
+  });
 });
