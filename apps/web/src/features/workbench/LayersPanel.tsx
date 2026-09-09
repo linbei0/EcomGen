@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { API_BASE_URL } from "../../config/env";
 import { errorText } from "../../lib/errorText";
 import type { SegmentationModelOption } from "../../lib/modelOptions";
+import { LayerStackDialog } from "./LayerStackDialog";
 import styles from "./workbench.module.css";
 
 export interface LayerBbox { x: number; y: number; width: number; height: number; }
@@ -14,7 +15,7 @@ export interface LayerPromptElement { id: string; name: string; }
 
 type LayerTaskStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 interface LayerPlanView { id: string; status: LayerTaskStatus; outputHash: string; elements: Array<{ id: string; name: string; source: "auto" | "manual"; bbox: LayerBbox | null }>; error: { message?: string } | null; }
-interface LayerExportView { id: string; status: LayerTaskStatus; includeBackground: boolean; psdDownloadUrl: string | null; layerFiles: Array<{ name: string; kind: "element" | "background" | "composite"; downloadUrl: string }> | null; error: { message?: string } | null; createdAt: string; }
+export interface LayerExportView { id: string; status: LayerTaskStatus; includeBackground: boolean; psdDownloadUrl: string | null; layerFiles: Array<{ name: string; kind: "element" | "background" | "composite"; downloadUrl: string }> | null; error: { message?: string } | null; createdAt: string; }
 
 interface LayersPanelProps { outputId: string; outputUrl: string | undefined; manualElements: LayerManualElement[]; boxError: string | null; maxElements: number; segmentationKey: string; segmentationOptions: SegmentationModelOption[]; onSegmentationKeyChange: (value: string) => void; onRenameManual: (id: string, name: string) => void; onRemoveManual: (id: string) => void; onHover: (bbox: LayerBbox | null) => void; onExit: () => void; }
 
@@ -52,6 +53,7 @@ export function LayersPanel({ outputId, outputUrl, manualElements, boxError, max
   const [includeBackground, setIncludeBackground] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stackOpen, setStackOpen] = useState(false);
   const [promptDraft, setPromptDraft] = useState("");
   const [promptElements, setPromptElements] = useState<LayerPromptElement[]>([]);
   const generationRef = useRef(0);
@@ -343,13 +345,15 @@ export function LayersPanel({ outputId, outputUrl, manualElements, boxError, max
     </div>
     {/* 底栏只在实际有内容时渲染，避免空闲时残留一条空分隔线 */}
     {!exportBusy && (exportDone || planSucceeded || manualElements.length > 0 || promptElements.length > 0) ? <div className={styles.editLayersFoot}>
-      {!exportDone ? <>
+      {exportDone ? <>
+        <Button block icon={<Layers3 size={14} />} onClick={() => setStackOpen(true)}>图层编排</Button>
+        {exportRecord?.psdDownloadUrl ? <a className={styles.editLayersDownload} href={resolveUrl(exportRecord.psdDownloadUrl)} download={`layers-${outputId.slice(0, 8)}.psd`}><Button type="primary" block icon={<Download size={14} />}>下载 PSD</Button></a> : null}
+        <Button block onClick={() => { setStackOpen(false); setExportRecord(null); setSelectedIds(new Set(allElements.map((element) => element.id))); }}>重新选择元素</Button>
+      </> : <>
         <label className={styles.editLayersSwitch}><span>包含背景层</span><input type="checkbox" checked={includeBackground} onChange={(event) => setIncludeBackground(event.target.checked)} style={{ accentColor: "var(--accent)" }} /></label>
         <Button type="primary" block disabled={selectedCount === 0 || overLimit} loading={submitting} onClick={() => void submitExport()}>生成图层文件</Button>
-      </> : <>
-        {exportRecord?.psdDownloadUrl ? <a className={styles.editLayersDownload} href={resolveUrl(exportRecord.psdDownloadUrl)} download={`layers-${outputId.slice(0, 8)}.psd`}><Button type="primary" block icon={<Download size={14} />}>下载 PSD</Button></a> : null}
-        <Button block onClick={() => { setExportRecord(null); setSelectedIds(new Set(allElements.map((element) => element.id))); }}>重新选择元素</Button>
       </>}
     </div> : null}
+    {stackOpen && exportRecord ? <LayerStackDialog record={exportRecord} outputId={outputId} onClose={() => setStackOpen(false)} /> : null}
   </>;
 }

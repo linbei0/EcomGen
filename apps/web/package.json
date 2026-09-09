@@ -13,7 +13,9 @@
   "dependencies": {
     "@ecomgen/contracts": "workspace:*",
     "@tanstack/react-query": "^5.101.4",
+    "ag-psd": "^31.0.2",
     "antd": "^6.6.0",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.31.0",
     "motion": "^13.1.0",
     "openapi-fetch": "~0.17.0",
