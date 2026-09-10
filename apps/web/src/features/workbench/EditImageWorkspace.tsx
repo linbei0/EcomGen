@@ -161,6 +161,8 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
   const [manualElements, setManualElements] = useState<LayerManualElement[]>([]);
   const [layerHover, setLayerHover] = useState<LayerBbox | null>(null);
   const [layerBoxError, setLayerBoxError] = useState<string | null>(null);
+  // 分层模式下选中的手动画框元素 id：移动/缩放与选中手柄的判定依据
+  const [layerSelectedId, setLayerSelectedId] = useState<string | null>(null);
   const spacePanRef = useRef(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reasoningModel, setReasoningModel] = useState("");
@@ -204,6 +206,12 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
         const bounds = { x: layerHover.x * overlay.width, y: layerHover.y * overlay.height, width: layerHover.width * overlay.width, height: layerHover.height * overlay.height };
         context.save(); context.fillStyle = LAYER_BOX_COLOR; context.strokeStyle = LAYER_BOX_COLOR; context.globalAlpha = 0.22; context.fillRect(bounds.x, bounds.y, bounds.width, bounds.height); context.globalAlpha = 1; context.lineWidth = Math.max(3, overlay.width / 450); context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height); context.restore();
       }
+      // 选中的手动框画 8 手柄：元素可能刚被删除，存在性守卫避免画到残留 id
+      const selectedLayerBox = layerSelectedId ? manualElements.find((element) => element.id === layerSelectedId) : null;
+      if (selectedLayerBox) {
+        const bounds = { x: selectedLayerBox.bbox.x * overlay.width, y: selectedLayerBox.bbox.y * overlay.height, width: selectedLayerBox.bbox.width * overlay.width, height: selectedLayerBox.bbox.height * overlay.height };
+        drawSelectionHandles(context, bounds, overlay.width);
+      }
     }
     if (!layersOpen) { context.save(); context.lineWidth = Math.max(3, overlay.width / 450);
     for (const annotation of nextAnnotations) {
@@ -221,7 +229,7 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
     }
     context.restore(); }
     const preview = previewRef.current;
-    if (preview?.type === "rect") { const bounds = { x: Math.min(preview.start.x, preview.end.x), y: Math.min(preview.start.y, preview.end.y), width: Math.abs(preview.start.x - preview.end.x), height: Math.abs(preview.start.y - preview.end.y) }; context.save(); context.strokeStyle = preview.color; context.fillStyle = preview.color; context.globalAlpha = 0.16; context.fillRect(bounds.x, bounds.y, bounds.width, bounds.height); context.globalAlpha = 1; context.setLineDash([Math.max(6, overlay.width / 110), Math.max(4, overlay.width / 170)]); context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height); context.restore(); if (!layersOpen && interactionRef.current.rectId) drawSelectionHandles(context, bounds, overlay.width); }
+    if (preview?.type === "rect") { const bounds = { x: Math.min(preview.start.x, preview.end.x), y: Math.min(preview.start.y, preview.end.y), width: Math.abs(preview.start.x - preview.end.x), height: Math.abs(preview.start.y - preview.end.y) }; context.save(); context.strokeStyle = preview.color; context.fillStyle = preview.color; context.globalAlpha = 0.16; context.fillRect(bounds.x, bounds.y, bounds.width, bounds.height); context.globalAlpha = 1; context.setLineDash([Math.max(6, overlay.width / 110), Math.max(4, overlay.width / 170)]); context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height); context.restore(); if (interactionRef.current.rectId) drawSelectionHandles(context, bounds, overlay.width); }
     if (preview?.type === "arrow" && !layersOpen) drawArrow(context, preview.start, preview.end, preview.color, overlay.width);
     const hover = hoverRef.current;
     if (!layersOpen && hover && ["brush", "erase", "protect"].includes(tool)) { context.save(); context.lineWidth = Math.max(2, overlay.width / 700); context.setLineDash([Math.max(5, overlay.width / 150), Math.max(4, overlay.width / 190)]); context.strokeStyle = tool === "erase" ? "#f0f3f5" : tool === "protect" ? PROTECT_OVERLAY_COLOR : EDIT_OVERLAY_COLOR; context.beginPath(); context.arc(hover.x, hover.y, brushSize / 2, 0, Math.PI * 2); context.stroke(); context.restore(); }
@@ -252,14 +260,14 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
   useEffect(() => {
     // 悬停高亮可能指向自动/提示词元素，父组件没有它们的包围盒；移除元素时由 onHover(null) 清理
     redrawOverlay(annotations, selectedRectId);
-  }, [annotations, selectedRectId, tool, brushSize, markColor, textDraft, layersOpen, manualElements, layerHover]);
+  }, [annotations, selectedRectId, tool, brushSize, markColor, textDraft, layersOpen, manualElements, layerHover, layerSelectedId]);
   useEffect(() => {
     if (!activeOutput) return;
     // 仅在切换到不同成图（或不同项目）时重置；关闭后重开同一张图保留全部编辑状态
     const editKey = `${projectId}:${activeOutput.id}`;
     if (prevEditKeyRef.current === editKey) return;
     prevEditKeyRef.current = editKey;
-    setSessionId(null); setSession(null); setTurn(null); setMessage(""); setAnnotations([]); setSelectedRectId(null); setReferenceSelections([]); setSuggestedReferenceSelections([]); setReferenceAssets(projectReferenceAssets()); setReferencePickerOpen(false); setOutpaintEdges({ top: 0, right: 0, bottom: 0, left: 0 }); setHistory([]); setHistoryIndex(-1); setTextDraft(null); setZoom(1); setPanOffset({ x: 0, y: 0 }); setCompareOutputId(null); setMemorySourceOutputId(undefined); setLayersOpen(false); setManualElements([]); setLayerHover(null); setLayerBoxError(null);
+    setSessionId(null); setSession(null); setTurn(null); setMessage(""); setAnnotations([]); setSelectedRectId(null); setReferenceSelections([]); setSuggestedReferenceSelections([]); setReferenceAssets(projectReferenceAssets()); setReferencePickerOpen(false); setOutpaintEdges({ top: 0, right: 0, bottom: 0, left: 0 }); setHistory([]); setHistoryIndex(-1); setTextDraft(null); setZoom(1); setPanOffset({ x: 0, y: 0 }); setCompareOutputId(null); setMemorySourceOutputId(undefined); setLayersOpen(false); setManualElements([]); setLayerHover(null); setLayerSelectedId(null); setLayerBoxError(null);
     let cancelled = false;
     void fetch(`${API_BASE_URL}/projects/${projectId}/outputs/${activeOutput.id}/edit-sessions`, { method: "POST" }).then(async (response) => { if (!response.ok) throw new Error(await response.text()); return response.json() as Promise<EditSessionState>; }).then((value) => { if (cancelled) return; setSessionId(value.id); setSession(value); setMemorySummary(value.memorySummary?.summary ?? ""); setMemoryConstraints((value.memorySummary?.constraints ?? []).join("\n")); setMemorySourceOutputId(value.memorySummary?.sourceOutputId); void loadReferenceAssets(value.id).catch(() => undefined); }).catch(() => undefined);
     return () => { cancelled = true; };
@@ -367,7 +375,24 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
     }
     return null;
   };
+  // 分层手动框的命中检测：与编辑 rect 相同的 8 手柄 + 容差，只是数据源是 manualElements（归一化 bbox）
+  const layerBoxHitAt = (point: Point) => {
+    const overlay = overlayRef.current; if (!overlay) return null;
+    const displayWidth = overlay.getBoundingClientRect().width || overlay.width;
+    const tolerance = Math.max(6, 8 * (overlay.width / displayWidth));
+    for (const element of [...manualElements].reverse()) {
+      const bounds = { x: element.bbox.x * overlay.width, y: element.bbox.y * overlay.height, width: element.bbox.width * overlay.width, height: element.bbox.height * overlay.height };
+      const handle = rectHandleForPoint(bounds, point, tolerance);
+      if (handle) return { id: element.id, bounds, handle };
+    }
+    return null;
+  };
   const updateRectCursor = (canvas: HTMLCanvasElement, point: Point, handle?: RectHandle | null) => {
+    if (layersOpen) {
+      const hit = handle ? null : layerBoxHitAt(point);
+      canvas.style.cursor = handle ? cursorForRectHandle(handle) : hit ? cursorForRectHandle(hit.handle) : "crosshair";
+      return;
+    }
     if (tool !== "rect") return;
     const hit = handle ? null : rectHitAt(point);
     canvas.style.cursor = handle ? cursorForRectHandle(handle) : hit ? cursorForRectHandle(hit.handle) : "crosshair";
@@ -376,6 +401,24 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
     const point = pointFor(event); if (!point) return; hoverRef.current = point;
     if (tool === "pan" || (layersOpen && spacePanRef.current)) { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); panRef.current = { startX: event.clientX, startY: event.clientY, originX: panOffset.x, originY: panOffset.y }; return; }
     if (layersOpen) {
+      // 已存在的手动框优先命中（8 手柄 + 拖拽移动），对齐编辑模式 rect 的交互
+      const hit = layerBoxHitAt(point);
+      if (hit) {
+        event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+        setLayerSelectedId(hit.id); updateRectCursor(event.currentTarget, point, hit.handle);
+        interactionRef.current = { start: point, last: point, erased: null, rectId: hit.id, rectBounds: hit.bounds, rectHandle: hit.handle };
+        return;
+      }
+      const overlay = overlayRef.current;
+      const contained = overlay ? [...manualElements].reverse().find((element) => {
+        const bounds = { x: element.bbox.x * overlay.width, y: element.bbox.y * overlay.height, width: element.bbox.width * overlay.width, height: element.bbox.height * overlay.height };
+        return contains(bounds, point);
+      }) : undefined;
+      if (contained) {
+        setLayerSelectedId(contained.id); updateRectCursor(event.currentTarget, point);
+        return;
+      }
+      setLayerSelectedId(null);
       event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
       interactionRef.current = { start: point, last: point, erased: null, rectId: null, rectBounds: null, rectHandle: null };
       previewRef.current = { type: "rect", start: point, end: point, color: LAYER_BOX_COLOR };
@@ -414,7 +457,19 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
   const pointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     if ((tool === "pan" || (layersOpen && spacePanRef.current)) && panRef.current) { setPanOffset({ x: panRef.current.originX + event.clientX - panRef.current.startX, y: panRef.current.originY + event.clientY - panRef.current.startY }); return; }
     const point = pointFor(event); if (!point) return; hoverRef.current = point;
-    if (layersOpen && !spacePanRef.current) { const dragging = interactionRef.current; if (dragging.start) { previewRef.current = { type: "rect", start: dragging.start, end: point, color: LAYER_BOX_COLOR }; scheduleRender(); } return; }
+    if (layersOpen && !spacePanRef.current) {
+      const dragging = interactionRef.current;
+      if (dragging.start && dragging.rectBounds && dragging.rectHandle) {
+        const width = overlayRef.current?.width ?? 0; const height = overlayRef.current?.height ?? 0;
+        const bounds = dragging.rectHandle === "move" ? moveBounds(dragging.rectBounds, dragging.start, point, width, height) : resizeBounds(dragging.rectBounds, dragging.rectHandle, point, width, height);
+        previewRef.current = { type: "rect", start: { x: bounds.x, y: bounds.y }, end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height }, color: LAYER_BOX_COLOR };
+        updateRectCursor(event.currentTarget, point, dragging.rectHandle); scheduleRender();
+        return;
+      }
+      if (dragging.start) { previewRef.current = { type: "rect", start: dragging.start, end: point, color: LAYER_BOX_COLOR }; scheduleRender(); return; }
+      updateRectCursor(event.currentTarget, point); scheduleRender();
+      return;
+    }
     const current = interactionRef.current; if (!current.last) { updateRectCursor(event.currentTarget, point); scheduleRender(); return; }
     if (tool === "rect" && current.rectBounds && current.rectHandle && current.start) {
       const width = overlayRef.current?.width ?? 0; const height = overlayRef.current?.height ?? 0;
@@ -437,6 +492,14 @@ export function EditImageWorkspace({ projectId, project, output, outputs, assets
       if (!dragging.start || !point) return;
       const width = overlayRef.current?.width ?? 0; const height = overlayRef.current?.height ?? 0;
       if (!width || !height) return;
+      // interactionRef 已被重置，但 dragging 仍指向旧对象；移动/缩放提交要在进入新框逻辑前处理
+      if (dragging.rectId && dragging.rectBounds && dragging.rectHandle) {
+        const bounds = dragging.rectHandle === "move" ? moveBounds(dragging.rectBounds, dragging.start, point, width, height) : resizeBounds(dragging.rectBounds, dragging.rectHandle, point, width, height);
+        // 不调 redrawOverlay：此时它的闭包还是旧 manualElements，重绘交给 manualElements 变更 effect
+        setManualElements((elements) => elements.map((element) => element.id === dragging.rectId ? { ...element, bbox: { x: bounds.x / width, y: bounds.y / height, width: bounds.width / width, height: bounds.height / height } } : element));
+        updateRectCursor(event.currentTarget, point);
+        return;
+      }
       const bounds = { x: Math.min(dragging.start.x, point.x) / width, y: Math.min(dragging.start.y, point.y) / height, width: Math.abs(dragging.start.x - point.x) / width, height: Math.abs(dragging.start.y - point.y) / height };
       if (bounds.width < 0.03 || bounds.height < 0.03) { setLayerBoxError("画框太小，请在画布上拖出更大的选区。"); scheduleRender(); return; }
       if (manualElements.length >= maxLayerElements) { setLayerBoxError(`已达到当前分割模型的元素上限（${maxLayerElements} 个），请先删除部分元素。`); scheduleRender(); return; }
