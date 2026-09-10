@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
-import { crc32, deflateSync } from "node:zlib";
+import { crc32, deflateSync, gzipSync } from "node:zlib";
 
 const root = resolve(import.meta.dirname, "..");
 const dataDir = join(root, "data-e2e-mock");
@@ -14,12 +14,12 @@ const onePixelPng = solidPng(26, 58, 46).toString("base64");
 const onePixelReferencePng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 // SAM mock 返回的 mask 以亮度表示前景：用 1x1 纯白 PNG（运行时生成，避免依赖解码外部 base64）。
 const whiteMaskDataUri = `data:image/png;base64,${solidPng(255, 255, 255).toString("base64")}`;
-const layerElements = { elements: [{ name: "保温杯瓶身" }, { name: "杯盖" }] };
+const layerElements = { elements: [{ name: "保温杯瓶身", promptEn: "thermos bottle body" }, { name: "杯盖", promptEn: "cup lid" }] };
 const plan = { campaignStyleLock: "fixed deep green #1A3A2E and clean off-white #FFFFFF ecommerce system", items: [{ assetType: "hero-image", displayName: "通勤杯质感首图", shotRole: "HERO", templateVariant: "luxury", candidateCount: 1, referencedAssets: [], mode: "PIXEL_PROTECTED", promptInstruction: "Create a premium e-commerce hero image of the verified green insulated travel cup. Preserve the exact product identity: shape, silhouette, colors, materials, logo and label placement, and proportions; do not redesign the product. Keep the exact supplied product geometry and visible details. Use a clean off-white background, centered three-quarter product composition, Rembrandt lighting, and restrained deep green accents. Preserve generous whitespace and reserve a blank price-overlay zone without generating readable price, logo, or promotional text. Use the verified fact 304 stainless steel body only as visual material guidance; do not claim keeps hot for 24 hours. No extra props, hands, watermarks, fake logos, or invented product details.", factClaims: ["304 stainless steel body"], riskFlags: [], sortOrder: 0 }] };
 // 自定义模板场景：模型按 payload.userTemplates 中注入的 custom_prompt 撰写最终 Prompt；customTemplateId 在运行时由 API 生成后回填
 let customTemplateId = "";
 const customPlan = () => ({ campaignStyleLock: "warm festive gift box ecommerce system", items: [{ assetType: customTemplateId, displayName: "礼盒丝绒氛围图", shotRole: "SCENE", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "Create a warm festive e-commerce gift box scene with soft window light, triangular composition, rich red velvet accents and a festive ribbon close-up. Preserve exact product identity: shape, silhouette, colors, materials, logo and label placement, and proportions; do not redesign the product. No readable text, watermarks, or invented product details.", factClaims: [], riskFlags: [], sortOrder: 0 }] });
-const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "", layerPlanPrompt: "", samRequests: [], groundedRequests: [], layerizeRequests: [] };
+const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "", layerPlanPrompt: "", samRequests: [], groundedRequests: [], layerizeRequests: [], giteeRequests: [] };
 const children = [];
 let mock;
 
@@ -121,6 +121,23 @@ try {
       response.end(JSON.stringify({ request_id: "mock-gs", masks: [{ data: whiteMaskDataUri.split(",")[1], mime_type: "image/png", width: 1, height: 1, bbox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 }, score: 0.95 }] }));
       return;
     }
+    // Gitee AI（模力方舟）SAM3 pipeline 端点：POST {baseUrl}/images/segmentation，Bearer 认证，multipart 表单（model/image/prompt）
+    if (request.url === "/v1/images/segmentation") {
+      const boundary = /boundary=(?:"([^"]+)"|([^;]+))/.exec(String(request.headers["content-type"] ?? ""));
+      const fields = boundary ? multipartFields(body, boundary[1] ?? boundary[2]) : {};
+      observed.giteeRequests.push({ authorization: request.headers.authorization, fields });
+      // 空表单模拟校验层直接拒绝（探测只验证连通性与认证，不执行模型、不产生费用）
+      if (!fields.image) {
+        response.writeHead(422, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: "image is required" }));
+        return;
+      }
+      // counts 是 pycocotools 变长编码的 [0,1]（1x1 全前景）经 gzip 的 base64：走适配器 gunzip+LEB 解码主路径
+      const counts = gzipSync(Buffer.from("01", "ascii")).toString("base64");
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ num_segments: 1, segments: [{ id: 1, label: fields.prompt.toString("utf8"), confidence: 0.95, bbox: [0, 0, 1, 1], mask: { encoding: "rle", size: [1, 1], counts } }] }));
+      return;
+    }
     response.writeHead(404).end();
   });
   const mockPort = await listen(mock);
@@ -150,7 +167,8 @@ try {
       { id: "mock-image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" },
       { id: "sam-3", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "fal" },
       { id: "grounded-sam-2", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "grounded_sam" },
-      { id: "doubao-seedream-5.0-pro-layerize", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "seedream_layerize" }
+      { id: "doubao-seedream-5.0-pro-layerize", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "seedream_layerize" },
+      { id: "sam3", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "gitee_sam3" }
     ]
   });
   const reasoningProbe = await requestJson(`${base}/providers/${provider.id}/test`, "POST", { modelId: "mock-reasoner", kind: "reasoning" });
@@ -292,7 +310,7 @@ try {
   assert.deepEqual(groundedResult.layerFiles.map((file) => file.kind), ["element", "composite"]);
   assert.equal(observed.groundedRequests.length, 1);
   assert.match(observed.groundedRequests[0].authorization, /^Bearer /);
-  assert.equal(observed.groundedRequests[0].body.text_prompt, "保温杯瓶身");
+  assert.equal(observed.groundedRequests[0].body.text_prompt, "thermos bottle body");
   assert.match(observed.groundedRequests[0].body.image.data, /^[A-Za-z0-9+/=]+$/);
   // seedream_layerize 协议链路：单次提交拆分全部元素，底图作已补绘背景层，图层 alpha 回贴原图抠像
   await requestJson(`${base}/projects/${project.id}`, "PATCH", { segmentationModel: { providerId: provider.id, modelId: "doubao-seedream-5.0-pro-layerize", protocol: "seedream_layerize" } });
@@ -321,6 +339,23 @@ try {
   assert.equal(layerExportHistory.exports[0].id, promptExport.layerExport.id);
   const historicalPsd = await fetch(`${base}${layerExportHistory.exports[2].psdDownloadUrl}`);
   assert.equal(historicalPsd.status, 200);
+  // gitee_sam3 协议链路：Gitee AI（模力方舟）SAM3 pipeline，Bearer 认证 + multipart 表单，只支持文本提示（无框输入）
+  const giteeProbe = await requestJson(`${base}/providers/${provider.id}/test`, "POST", { modelId: "sam3", kind: "segmentation" });
+  assert.equal(giteeProbe.ok, true);
+  await requestJson(`${base}/projects/${project.id}`, "PATCH", { segmentationModel: { providerId: provider.id, modelId: "sam3", protocol: "gitee_sam3" } });
+  const giteeExport = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports`, "POST", { planId: layerPlan.id, elements: [{ id: "el-1", name: "保温杯瓶身", source: "auto" }] });
+  const giteeExportJob = await waitJob(base, giteeExport.job.id);
+  assert.equal(giteeExportJob.status, "SUCCEEDED");
+  const giteeResult = await requestJson(`${base}/outputs/${outputs[0].id}/layer-exports`, "GET");
+  assert.deepEqual(giteeResult.layerFiles.map((file) => file.kind), ["background", "element", "composite"]);
+  assert.equal(observed.giteeRequests.length, 2);
+  // 第 1 条是连通性探测的空请求（422 校验层拒绝，无模型执行无费用）；随后才是分割请求
+  assert.match(observed.giteeRequests[0].authorization, /^Bearer /);
+  assert.equal(observed.giteeRequests[1].fields.model.toString("utf8"), "sam3");
+  assert.equal(observed.giteeRequests[1].fields.prompt.toString("utf8"), "thermos bottle body");
+  assert.ok(observed.giteeRequests[1].fields.image.length > 0);
+  const giteePsdResponse = await fetch(`${base}${giteeResult.psdDownloadUrl}`);
+  assert.equal(giteePsdResponse.status, 200);
   // 重复识别同内容输出应复用同一方案（200 而不是新任务）
   const reusedLayerPlan = await requestJson(`${base}/outputs/${outputs[0].id}/layer-plan`, "POST", {});
   assert.equal(reusedLayerPlan.id, layerPlan.id);
@@ -376,6 +411,24 @@ function solidPng(red, green, blue) {
 }
 function stop(child) { if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(); return new Promise((resolveStop) => { child.once("exit", resolveStop); child.kill(); }); }
 function readBody(request) { return new Promise((resolveBody, reject) => { const chunks = []; request.on("data", (chunk) => chunks.push(Buffer.from(chunk))); request.on("end", () => resolveBody(Buffer.concat(chunks))); request.on("error", reject); }); }
+// 解析 multipart 表单的 name→payload 映射；payload 保留原始字节（文本字段调用方自行 toString）
+function multipartFields(body, boundary) {
+  const fields = {};
+  const delimiter = Buffer.from(`--${boundary}`);
+  let cursor = body.indexOf(delimiter);
+  while (cursor !== -1) {
+    const next = body.indexOf(delimiter, cursor + delimiter.length);
+    if (next === -1) break;
+    const chunk = body.subarray(cursor + delimiter.length, next);
+    const headerEnd = chunk.indexOf("\r\n\r\n");
+    if (headerEnd !== -1) {
+      const name = /name="([^"]*)"/.exec(chunk.subarray(0, headerEnd).toString("utf8"))?.[1];
+      if (name) fields[name] = chunk.subarray(headerEnd + 4, chunk.length - 2);
+    }
+    cursor = next;
+  }
+  return fields;
+}
 function listen(server) { return new Promise((resolvePort, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", () => resolvePort(server.address().port)); }); }
 async function freePort() { const server = createServer(); const port = await listen(server); await new Promise((resolveClose) => server.close(resolveClose)); return port; }
 async function requestJson(url, method, body) { const response = await fetch(url, { method, headers: body === undefined ? undefined : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); const text = await response.text(); assert.ok(response.ok, `${method} ${url} failed (${response.status}): ${text}`); return text ? JSON.parse(text) : undefined; }

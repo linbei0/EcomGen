@@ -2,6 +2,7 @@ import type { Static } from "@sinclair/typebox";
 
 export * from "./enums.js";
 export * from "./ref.js";
+export * from "./segmentation.js";
 import type { AssetRole, ImageAspectRatio, ImageResolution, UserAssetKind } from "./enums.js";
 
 export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
@@ -13,14 +14,6 @@ export const MAX_GENERATION_REFERENCE_IMAGES = 4;
 export const MIN_TARGET_IMAGE_COUNT = 1;
 export const MAX_TARGET_IMAGE_COUNT = 12;
 export const DEFAULT_TARGET_IMAGE_COUNT = 6;
-/** 单次分层导出元素上限：SAM 3 单次最多分割 32 个对象；Seedream 图层拆分单次最多输出 16 个图层（另有 1 张底图）。 */
-export const MAX_LAYER_EXPORT_ELEMENTS_BY_PROTOCOL: Record<"fal" | "grounded_sam" | "seedream_layerize", number> = {
-  fal: 32,
-  grounded_sam: 32,
-  seedream_layerize: 16,
-};
-/** 未选择分割模型时的画框数量默认上限，取各协议中的最大值。 */
-export const DEFAULT_MAX_LAYER_EXPORT_ELEMENTS = MAX_LAYER_EXPORT_ELEMENTS_BY_PROTOCOL.fal;
 export const DEFAULT_IMAGE_RESOLUTION = "1K" as const;
 export const DEFAULT_IMAGE_ASPECT_RATIO = "AUTO" as const;
 export const DEFAULT_CANDIDATES_PER_TYPE = 1;

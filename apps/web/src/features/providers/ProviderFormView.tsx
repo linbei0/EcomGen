@@ -50,7 +50,8 @@ const EMPTY_MODEL_ROW: ModelFormRow = {
 };
 
 function isSegmentationKind(kind: ModelFormRow["kind"]): kind is SegmentationKindValue {
-  return kind === "fal" || kind === "grounded_sam" || kind === "seedream_layerize";
+  // 从协议标签表派生：新增分割协议时只改 contracts 的能力注册表（segmentation.ts），表单自动跟上
+  return Object.hasOwn(SEGMENTATION_PROTOCOL_LABELS, kind);
 }
 
 function toModelCapability(row: ModelFormRow): ModelCapability {
@@ -261,11 +262,7 @@ export function ProviderFormView({ view, onDone }: Props) {
                           },
                           {
                             label: "分割",
-                            options: [
-                              { value: "fal", label: SEGMENTATION_PROTOCOL_LABELS.fal },
-                              { value: "grounded_sam", label: SEGMENTATION_PROTOCOL_LABELS.grounded_sam },
-                              { value: "seedream_layerize", label: SEGMENTATION_PROTOCOL_LABELS.seedream_layerize },
-                            ],
+                            options: Object.entries(SEGMENTATION_PROTOCOL_LABELS).map(([value, label]) => ({ value, label })),
                           },
                         ]}
                       />

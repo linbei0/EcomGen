@@ -314,6 +314,8 @@ export interface ExportRecord {
 export interface LayerPlanElementRecord {
   id: string;
   name: string;
+  /** 视觉识别产出的英文分割提示，供只接受英文 prompt 的分割渠道（如 Gitee AI SAM 3）使用。 */
+  promptEn?: string;
   source: "auto" | "manual";
   bbox: { x: number; y: number; width: number; height: number } | null;
 }

@@ -116,8 +116,8 @@ export const LAYER_ELEMENTS_OUTPUT_SCHEMA: StructuredOutputSchema = {
         items: {
           type: "object",
           ...noAdditionalProperties,
-          properties: { name: { type: "string" } },
-          required: ["name"],
+          properties: { name: { type: "string" }, promptEn: { type: "string" } },
+          required: ["name", "promptEn"],
         },
       },
     },

@@ -1330,6 +1330,7 @@ components:
             - fal
             - grounded_sam
             - seedream_layerize
+            - gitee_sam3
     ModelDefinition:
       type: object
       allOf:
@@ -1372,6 +1373,7 @@ components:
                 - fal
                 - grounded_sam
                 - seedream_layerize
+                - gitee_sam3
     Asset:
       type: object
       required:
@@ -2250,6 +2252,9 @@ components:
         name:
           description: Editable element display name.
           type: string
+        promptEn:
+          description: English segmentation prompt recognized with the element; used by text-prompt-only segmentation channels such as Gitee AI SAM 3.
+          type: string
         source:
           type: string
           enum:
@@ -2288,12 +2293,13 @@ components:
               type: string
             - type: "null"
         segmentationProtocol:
-          description: Segmentation API protocol declared for this model (fal.ai SAM 3, self-hosted Grounded-SAM, or Volcengine Seedream layer decomposition); mutually exclusive with imageApiKind.
+          description: Segmentation API protocol declared for this model (fal.ai SAM 3, self-hosted Grounded-SAM, Volcengine Seedream layer decomposition, or Gitee AI SAM 3 pipeline); mutually exclusive with imageApiKind.
           type: string
           enum:
             - fal
             - grounded_sam
             - seedream_layerize
+            - gitee_sam3
     ModelRef:
       type: object
       required:
@@ -2762,6 +2768,7 @@ components:
             - fal
             - grounded_sam
             - seedream_layerize
+            - gitee_sam3
     Storyboard:
       type: object
       required:
@@ -3271,6 +3278,11 @@ components:
             - auto
             - manual
             - prompt
+        promptEn:
+          minLength: 1
+          maxLength: 80
+          description: English segmentation prompt for auto elements; the API copies it from the referenced plan, so clients usually omit it.
+          type: string
         bbox:
           $ref: "#/components/schemas/LayerBbox"
     CreateLayerExportInput:

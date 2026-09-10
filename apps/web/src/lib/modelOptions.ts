@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_LAYER_EXPORT_ELEMENTS, MAX_LAYER_EXPORT_ELEMENTS_BY_PROTOCOL } from "@ecomgen/contracts";
+import { DEFAULT_MAX_LAYER_EXPORT_ELEMENTS, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, type SegmentationProtocol } from "@ecomgen/contracts";
 
 /** 模型选择下拉的最小结构；ProviderConfig（schema.d.ts）与其结构兼容。 */
 export interface ModelOptionSource {
@@ -33,13 +33,12 @@ export function modelOptions(providers: ModelOptionSource[], kind: "reasoning" |
   );
 }
 
-export type SegmentationProtocolValue = "fal" | "grounded_sam" | "seedream_layerize";
+export type SegmentationProtocolValue = SegmentationProtocol;
 
-export const SEGMENTATION_PROTOCOL_LABELS: Record<SegmentationProtocolValue, string> = {
-  fal: "fal.ai SAM 3",
-  grounded_sam: "Grounded-SAM（自部署）",
-  seedream_layerize: "Seedream 图层拆分",
-};
+// 协议标签唯一事实源在 contracts 能力注册表；web 只做展示层引用。
+export const SEGMENTATION_PROTOCOL_LABELS = Object.fromEntries(
+  Object.entries(SEGMENTATION_PROTOCOL_CAPABILITIES).map(([protocol, capability]) => [protocol, capability.label])
+) as Record<SegmentationProtocol, string>;
 
 export interface SegmentationModelOption {
   value: string;
@@ -54,7 +53,7 @@ export function segmentationModelOptions(providers: ModelOptionSource[]): Segmen
   return providers.flatMap((provider) =>
     provider.models
       .filter((model): model is typeof model & { segmentationProtocol: SegmentationProtocolValue } =>
-        model.segmentationProtocol === "fal" || model.segmentationProtocol === "grounded_sam" || model.segmentationProtocol === "seedream_layerize")
+        isSegmentationProtocol(model.segmentationProtocol))
       .map((model) => ({
         value: `${provider.id}::${model.id}`,
         label: `${provider.name} / ${model.id}（${SEGMENTATION_PROTOCOL_LABELS[model.segmentationProtocol]}）`,
@@ -68,7 +67,7 @@ export function segmentationModelOptions(providers: ModelOptionSource[]): Segmen
 /** 当前分割模型允许的单次分层元素上限；未选择模型时按最大默认值放宽，最终由导出接口按协议校验。 */
 export function layerElementLimit(options: SegmentationModelOption[], key: string): number {
   const protocol = options.find((option) => option.value === key)?.protocol;
-  return protocol ? MAX_LAYER_EXPORT_ELEMENTS_BY_PROTOCOL[protocol] : DEFAULT_MAX_LAYER_EXPORT_ELEMENTS;
+  return protocol ? SEGMENTATION_PROTOCOL_CAPABILITIES[protocol].maxElements : DEFAULT_MAX_LAYER_EXPORT_ELEMENTS;
 }
 
 /** 首页一键创建取第一对可用模型；凑不齐一对时返回 null，由调用方引导去设置。 */

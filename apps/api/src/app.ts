@@ -8,9 +8,9 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type UserTemplateRecord } from "@ecomgen/core";
 import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
-import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyAssetFromHistoryInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_LAYER_EXPORT_ELEMENTS_BY_PROTOCOL, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, roleForUserAssetKind } from "@ecomgen/contracts";
-import { FalSegmentationProvider, GeminiImageProvider, GroundedSamSegmentationProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, probeReasoning } from "@ecomgen/providers";
+import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
+import { CopyAssetFromHistoryInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind } from "@ecomgen/contracts";
+import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, createSegmentationProvider, probeReasoning, type PromptSegmentationProtocol } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
 import { applyModelFields, parseModelRef } from "./projectPatch.js";
@@ -106,11 +106,10 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       if (kind === "segmentation") {
         // 分割探测只做零费用连通性检查（/models 或最小请求），不调用真实分割
         const apiKey = secrets.decrypt(provider.encryptedApiKey);
-        const probe = model.segmentationProtocol === "grounded_sam"
-          ? await new GroundedSamSegmentationProvider({ baseUrl: provider.baseUrl, apiKey }).probe()
-          : model.segmentationProtocol === "seedream_layerize"
-            ? await new SeedreamLayerizeProvider({ baseUrl: provider.baseUrl, apiKey }).probe()
-            : await new FalSegmentationProvider({ baseUrl: provider.baseUrl, apiKey }).probe();
+        // seedream 走整图图层合成协议（无逐元素接口），其余文本提示协议统一由工厂选择适配器
+        const probe = model.segmentationProtocol === "seedream_layerize"
+          ? await new SeedreamLayerizeProvider({ baseUrl: provider.baseUrl, apiKey }).probe()
+          : await createSegmentationProvider(model.segmentationProtocol as PromptSegmentationProtocol, { baseUrl: provider.baseUrl, apiKey }).probe();
         return { ok: true, providerId, modelId, kind, ...probe, modelAvailable: null };
       }
       const probe = model.imageApiKind === "gemini"
@@ -666,9 +665,13 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     // 单次导出元素数受分割协议上限约束（Seedream 最多 16 层、SAM 单次最多 32 个对象），提前校验避免任务必然失败。
     // 存储引用里的 protocol 可能是历史默认值，以模型当前声明为准，因此只传 providerId/modelId。
     const segmentation = readSegmentationModel(repository, { providerId: project.segmentationModel.providerId, modelId: project.segmentationModel.modelId });
-    const maxLayerElements = MAX_LAYER_EXPORT_ELEMENTS_BY_PROTOCOL[segmentation.protocol];
+    const maxLayerElements = SEGMENTATION_PROTOCOL_CAPABILITIES[segmentation.protocol].maxElements;
     if (body.elements.length > maxLayerElements) throw new ApiError(400, "VALIDATION_ERROR", `当前分割模型单次最多支持 ${maxLayerElements} 个图层元素，请减少元素后重试`);
-    const input = { outputId: output.id, planId, outputHash: output.hash, elements: body.elements, includeBackground, segmentationProviderId: segmentation.providerId, segmentationModelId: segmentation.modelId, segmentationProtocol: segmentation.protocol };
+    // auto 元素的英文分割提示由服务端从识别方案补齐：客户端只传 id/name/source/bbox，
+    // promptEn 属于识别产物而非用户输入，避免客户端伪造或携带过期方案的数据。
+    const promptEnById = new Map(succeededPlan?.elements.filter((element) => element.promptEn).map((element) => [element.id, element.promptEn]) ?? []);
+    const elements = body.elements.map((element) => (element.source === "auto" && promptEnById.has(element.id) ? { ...element, promptEn: promptEnById.get(element.id) } : element));
+    const input = { outputId: output.id, planId, outputHash: output.hash, elements, includeBackground, segmentationProviderId: segmentation.providerId, segmentationModelId: segmentation.modelId, segmentationProtocol: segmentation.protocol };
     const fingerprint = requestFingerprint({ type: "LAYER_EXPORT", projectId: output.projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null });
     const duplicate = repository.findJobByFingerprint(output.projectId, fingerprint);
     if (duplicate) { const duplicateExport = repository.getLayerExportByJobId(duplicate.id); if (duplicateExport) return reply.code(duplicate.status === "SUCCEEDED" ? 200 : 202).send({ job: duplicate, layerExport: publicLayerExport(duplicateExport) }); }
@@ -814,10 +817,10 @@ function queueKindForJobType(type: JobType): EcomJobKind {
 // ProviderId/modelId 为 null 表示项目尚未选择模型（Provider 被删除后置空），在入口拦截而不是打出一个注定失败的任务
 function verifyModel(repository: EcomRepository, providerId: string | null, modelId: string | null, kind: "reasoning" | "image"): void { if (!providerId || !modelId) throw new ApiError(422, "PROVIDER_NOT_CONFIGURED", "请先在项目设置中选择推理与图片模型"); const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new ApiError(400, "VALIDATION_ERROR", `${kind} model is not declared by the selected provider`); if (kind === "image" && !model.imageApiKind) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected image model has no image API configured"); }
 /** 分割模型引用必须指向声明了 segmentationProtocol 的模型；存储的 protocol 从模型声明派生，请求里显式给出的协议仅用于一致性校验。 */
-function readSegmentationModel(repository: EcomRepository, value: unknown): { providerId: string; modelId: string; protocol: "fal" | "grounded_sam" | "seedream_layerize" } {
+function readSegmentationModel(repository: EcomRepository, value: unknown): { providerId: string; modelId: string; protocol: SegmentationProtocol } {
   const ref = parseModelRef(value, "segmentationModel");
   const raw = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
-  const requested = raw.protocol === undefined || raw.protocol === null ? undefined : enumValue<"fal" | "grounded_sam" | "seedream_layerize">(raw.protocol, ["fal", "grounded_sam", "seedream_layerize"], "segmentationModel.protocol");
+  const requested = raw.protocol === undefined || raw.protocol === null ? undefined : enumValue(raw.protocol, [...SEGMENTATION_PROTOCOLS], "segmentationModel.protocol");
   const provider = repository.getProvider(ref.providerId);
   if (!provider) missing("provider", ref.providerId);
   const model = provider.models.find((candidate) => candidate.id === ref.modelId);

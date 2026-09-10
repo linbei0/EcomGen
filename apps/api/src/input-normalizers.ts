@@ -1,5 +1,6 @@
 import type { FastifyRequest } from "fastify";
 import type { ModelDefinition, SearchSourceKind } from "@ecomgen/contracts";
+import { isSegmentationProtocol } from "@ecomgen/contracts";
 import { ApiError } from "./errors.js";
 
 /** 输入归一化只处理兼容性，不承担资源存在性或状态机规则。 */
@@ -80,8 +81,8 @@ export function normalizeModels(value: unknown): ModelDefinition[] {
   return value.map((model, index) => {
     const entry = readObject(model, `models[${index}]`);
     const imageApiKind = entry.imageApiKind === "openai_images" || entry.imageApiKind === "gemini" || entry.imageApiKind === "custom" ? entry.imageApiKind : null;
-    // 分割协议只接受三个已知枚举值；与 imageApiKind 互斥，同时声明视为输入错误而不是静默取其一
-    const segmentationProtocol = entry.segmentationProtocol === "fal" || entry.segmentationProtocol === "grounded_sam" || entry.segmentationProtocol === "seedream_layerize" ? entry.segmentationProtocol : undefined;
+    // 分割协议从 contracts 注册表派生；与 imageApiKind 互斥，同时声明视为输入错误而不是静默取其一
+    const segmentationProtocol = isSegmentationProtocol(entry.segmentationProtocol) ? entry.segmentationProtocol : undefined;
     if (imageApiKind && segmentationProtocol) throw new ApiError(400, "VALIDATION_ERROR", `models[${index}] cannot declare both imageApiKind and segmentationProtocol`);
     return {
       id: readText(entry.id, `models[${index}].id`),

@@ -925,7 +925,7 @@ export interface components {
              * @description Segmentation API protocol declared for this model; mutually exclusive with imageApiKind.
              * @enum {string}
              */
-            segmentationProtocol?: "fal" | "grounded_sam" | "seedream_layerize";
+            segmentationProtocol?: "fal" | "grounded_sam" | "seedream_layerize" | "gitee_sam3";
         };
         ModelDefinition: {
             id: string;
@@ -939,7 +939,7 @@ export interface components {
              * @description Segmentation API protocol declared for this model; mutually exclusive with imageApiKind.
              * @enum {string}
              */
-            segmentationProtocol?: "fal" | "grounded_sam" | "seedream_layerize";
+            segmentationProtocol?: "fal" | "grounded_sam" | "seedream_layerize" | "gitee_sam3";
         };
         Asset: {
             /** Format: uuid */
@@ -1270,6 +1270,8 @@ export interface components {
             id: string;
             /** @description Editable element display name. */
             name: string;
+            /** @description English segmentation prompt recognized with the element; used by text-prompt-only segmentation channels such as Gitee AI SAM 3. */
+            promptEn?: string;
             /** @enum {string} */
             source: "auto" | "manual";
             bbox?: components["schemas"]["LayerBbox"] | null;
@@ -1282,10 +1284,10 @@ export interface components {
             supportsStructuredOutput: boolean;
             imageApiKind?: "openai_images" | "gemini" | "custom" | null;
             /**
-             * @description Segmentation API protocol declared for this model (fal.ai SAM 3, self-hosted Grounded-SAM, or Volcengine Seedream layer decomposition); mutually exclusive with imageApiKind.
+             * @description Segmentation API protocol declared for this model (fal.ai SAM 3, self-hosted Grounded-SAM, Volcengine Seedream layer decomposition, or Gitee AI SAM 3 pipeline); mutually exclusive with imageApiKind.
              * @enum {string}
              */
-            segmentationProtocol?: "fal" | "grounded_sam" | "seedream_layerize";
+            segmentationProtocol?: "fal" | "grounded_sam" | "seedream_layerize" | "gitee_sam3";
         };
         ModelRef: {
             /** Format: uuid */
@@ -1442,7 +1444,7 @@ export interface components {
              * @description Segmentation API protocol; derived from the model's declared segmentationProtocol and re-stated here for the Worker adapter. A body protocol that contradicts the declared one is rejected.
              * @enum {string}
              */
-            protocol?: "fal" | "grounded_sam" | "seedream_layerize";
+            protocol?: "fal" | "grounded_sam" | "seedream_layerize" | "gitee_sam3";
         };
         Storyboard: {
             /** Format: uuid */
@@ -1630,6 +1632,8 @@ export interface components {
             name: string;
             /** @enum {string} */
             source: "auto" | "manual" | "prompt";
+            /** @description English segmentation prompt for auto elements; the API copies it from the referenced plan, so clients usually omit it. */
+            promptEn?: string;
             bbox?: components["schemas"]["LayerBbox"];
         };
         CreateLayerExportInput: {

@@ -8,9 +8,9 @@ import { writePsdBuffer } from "ag-psd";
 import { planImageEdit, planLayerElements, planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
 import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
 import { compileUserTemplate, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
-import { resolveImageSize, userAssetKindForRole, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
+import { resolveImageSize, userAssetKindForRole, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
-import { FalSegmentationProvider, GeminiImageProvider, GroundedSamSegmentationProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, buildReasoningModel, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
+import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, buildReasoningModel, createSegmentationProvider, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { createPsdLayerAccumulator, extractAlpha, invertMask, multiplyAlpha, unionOfMasks } from "./layer-composite.js";
 import { assertPixelProtectedInputs, assignImageHandles, imageHandle, selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata, withGenerationAssetRoles } from "./visual-assets.js";
 import { VisionDerivativeCache } from "./vision-cache.js";
@@ -448,7 +448,7 @@ async function executeLayerPlan(job: JobRecord): Promise<void> {
     });
     throwIfCancelled(job);
     // 元素 id 在方案内稳定（el-N）；前端勾选后原样回传，manual 元素由前端自带 id。
-    const records = elements.map((element, index) => ({ id: `el-${index + 1}`, name: element.name, source: "auto" as const, bbox: null }));
+    const records = elements.map((element, index) => ({ id: `el-${index + 1}`, name: element.name, promptEn: element.promptEn, source: "auto" as const, bbox: null }));
     const updated = repository.updateLayerPlan(plan.id, { status: "SUCCEEDED", elements: records, error: null });
     if (updated) await events.publish(job.projectId, "layer-plan.updated", { plan: updated });
   } catch (error) {
@@ -478,10 +478,9 @@ async function executeLayerExport(job: JobRecord): Promise<void> {
     // 排队后修改项目分割模型或 Provider 的协议声明都不影响本次执行。
     const segmentationProviderId = typeof job.input.segmentationProviderId === "string" ? job.input.segmentationProviderId : "";
     const segmentationModelId = typeof job.input.segmentationModelId === "string" ? job.input.segmentationModelId : "";
-    const protocol = job.input.segmentationProtocol === "fal" || job.input.segmentationProtocol === "grounded_sam" || job.input.segmentationProtocol === "seedream_layerize"
-      ? job.input.segmentationProtocol
-      : null;
-    if (!segmentationProviderId || !segmentationModelId || !protocol) throw new Error("Layer export job is missing its segmentation snapshot");
+    if (!isSegmentationProtocol(job.input.segmentationProtocol)) throw new Error("Layer export job is missing its segmentation snapshot");
+    const protocol = job.input.segmentationProtocol;
+    if (!segmentationProviderId || !segmentationModelId) throw new Error("Layer export job is missing its segmentation snapshot");
     const provider = providerFor(segmentationProviderId);
     const elements = layerExportElementsFor(job);
     await updateJob(job, { progress: 10 });
@@ -522,22 +521,27 @@ async function executeLayerExport(job: JobRecord): Promise<void> {
       }
       if (cutoutTargets.length === 0) throw new Error("Seedream 未拆分出任何有效图层，请调整元素描述或画框后重试");
     } else {
-      const segmenter = protocol === "grounded_sam"
-        ? new GroundedSamSegmentationProvider({ baseUrl: provider.baseUrl, apiKey })
-        : new FalSegmentationProvider({ baseUrl: provider.baseUrl, apiKey });
+      // protocol 是项目配置里的显式字段：文本提示分割协议的差异由适配器各自消化，
+      // 业务层只按注册表能力决定是否携带框提示（LSP：SegmentationProviderLike 统一 segment/probe）。
+      const segmenter = createSegmentationProvider(protocol, { baseUrl: provider.baseUrl, apiKey });
       // 分割模型 id 允许直接写完整 fal 路径（含 "/"），否则使用适配器默认 fal-ai/sam-3/image。
       const modelPath = protocol === "fal" && segmentationModelId.includes("/") ? segmentationModelId : undefined;
+      const supportsBoxPrompts = SEGMENTATION_PROTOCOL_CAPABILITIES[protocol].supportsBoxPrompts;
       for (const [index, element] of elements.entries()) {
         throwIfCancelled(job);
-        const box = element.bbox ? {
+        // 框提示是否可用是协议能力（contracts 注册表声明），不是业务特判；
+        // 不支持的协议直接不传框，手动框选元素应改用支持框提示的协议。
+        const box = supportsBoxPrompts && element.bbox ? {
           xMin: Math.round(element.bbox.x * width), yMin: Math.round(element.bbox.y * height),
           xMax: Math.round((element.bbox.x + element.bbox.width) * width), yMax: Math.round((element.bbox.y + element.bbox.height) * height)
         } : undefined;
-        // 语义名称（识别结果或用户输入的提示词）作为文本提示；手动框选直接用画框坐标。
-        const result = await segmenter.segment({ imageUrl, textPrompt: element.source === "manual" ? undefined : element.name, box, modelPath });
+        // 文本提示优先用识别产出的英文 promptEn（部分分割渠道只接受英文），没有则退回元素名；
+        // 手动框选直接用画框坐标，不传文本提示。
+        const textPrompt = element.source === "manual" ? undefined : element.promptEn?.trim() || element.name;
+        const result = await segmenter.segment({ imageUrl, textPrompt, box, modelPath });
         throwIfCancelled(job);
         measuredBboxes.set(element.id, result.bbox);
-        const mask = await normalizeMask(result.mask.data, width, height);
+        const mask = await normalizeMask(result.mask, width, height);
         if (!maskHasForeground(mask)) throw new Error(`SAM 未在「${element.name}」中分割出前景，请调整元素名称或画框后重试`);
         cutoutTargets.push({ name: element.name, mask });
         await updateJob(job, { progress: 10 + Math.round(((index + 1) / elements.length) * 50) });
@@ -745,7 +749,7 @@ function queueKindForJobType(type: JobType): EcomJobKind {
 function editTurnFor(job: JobRecord): EditTurnRecord { const turnId = typeof job.input.editTurnId === "string" ? job.input.editTurnId : ""; const turn = repository.getEditTurn(turnId); if (!turn || turn.projectId !== job.projectId) throw new Error("Edit turn is missing or belongs to another project"); return turn; }
 function layerPlanFor(job: JobRecord): LayerPlanRecord { const plan = repository.getLayerPlanByJobId(job.id); if (!plan || plan.projectId !== job.projectId) throw new Error("Layer plan is missing or belongs to another project"); return plan; }
 function layerExportFor(job: JobRecord): LayerExportRecord { const record = repository.getLayerExportByJobId(job.id); if (!record || record.projectId !== job.projectId) throw new Error("Layer export is missing or belongs to another project"); return record; }
-interface LayerExportElementInput { id: string; name: string; source: "auto" | "manual" | "prompt"; bbox: { x: number; y: number; width: number; height: number } | null; }
+interface LayerExportElementInput { id: string; name: string; promptEn?: string; source: "auto" | "manual" | "prompt"; bbox: { x: number; y: number; width: number; height: number } | null; }
 // 导入元素来自 job.input（API 已用契约校验）；这里做最小防御性解析，manual 无 bbox 直接失败。
 function layerExportElementsFor(job: JobRecord): LayerExportElementInput[] {
   const raw = Array.isArray(job.input.elements) ? job.input.elements : [];
@@ -753,18 +757,27 @@ function layerExportElementsFor(job: JobRecord): LayerExportElementInput[] {
     if (!entry || typeof entry !== "object") return [];
     const value = entry as Record<string, unknown>;
     if (typeof value.id !== "string" || typeof value.name !== "string" || (value.source !== "auto" && value.source !== "manual" && value.source !== "prompt")) return [];
+    const promptEn = typeof value.promptEn === "string" && value.promptEn.trim().length > 0 ? value.promptEn : undefined;
     const bboxRaw = value.bbox as Record<string, unknown> | null | undefined;
     const bbox = bboxRaw && typeof bboxRaw.x === "number" && typeof bboxRaw.y === "number" && typeof bboxRaw.width === "number" && typeof bboxRaw.height === "number"
       ? { x: bboxRaw.x, y: bboxRaw.y, width: bboxRaw.width, height: bboxRaw.height }
       : null;
     if (value.source === "manual" && !bbox) throw new Error(`手动元素「${value.name}」缺少画框坐标`);
-    return [{ id: value.id, name: value.name, source: value.source, bbox }];
+    return [{ id: value.id, name: value.name, promptEn, source: value.source, bbox }];
   });
   if (elements.length === 0) throw new Error("Layer export has no elements");
   return elements;
 }
-/** SAM 返回的 mask 可能与原图尺寸不同：统一缩放到原图尺寸的 8-bit 灰度选区（亮度=前景）。 */
-async function normalizeMask(mask: Buffer, width: number, height: number): Promise<Buffer> { return sharp(mask).greyscale().removeAlpha().resize(width, height, { fit: "fill" }).raw().toBuffer(); }
+/**
+ * SAM 返回的 mask 可能是编码图片（fal PNG）或裸 8-bit 灰度（Gitee RLE 解码，自带尺寸）：
+ * 统一缩放到原图尺寸的灰度选区（亮度=前景）。
+ */
+async function normalizeMask(mask: { data: Buffer; mimeType: string; width: number | null; height: number | null }, width: number, height: number): Promise<Buffer> {
+  const rawWidth = mask.width ?? width;
+  const rawHeight = mask.height ?? height;
+  const image = mask.mimeType === "raw/gray8" ? sharp(mask.data, { raw: { width: rawWidth, height: rawHeight, channels: 1 } }) : sharp(mask.data);
+  return image.greyscale().removeAlpha().resize(width, height, { fit: "fill" }).raw().toBuffer();
+}
 function maskHasForeground(mask: Buffer): boolean { return mask.some((value) => value > 8); }
 // joinChannel 对 Buffer 输入在部分平台触发 libpng 读错误；直接改写 raw RGBA 的 alpha 字节更稳。
 async function decodeRgba(image: Buffer, width: number, height: number): Promise<Buffer> {
