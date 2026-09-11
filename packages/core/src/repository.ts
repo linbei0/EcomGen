@@ -6,6 +6,8 @@ import type {
   ImageResolution,
   JobStatus,
   JobType,
+  LibraryItemKind,
+  LibraryItemSource,
   ModelDefinition,
   PlatformTarget,
   ReasoningProtocolProfile,
@@ -95,6 +97,37 @@ export interface AssetRecord {
   width: number | null;
   height: number | null;
   createdAt: string;
+}
+
+/** 资产库视图行：由 assets 与 outputs 合并派生，不落库。 */
+export interface LibraryItemRecord {
+  id: string;
+  source: LibraryItemSource;
+  kind: LibraryItemKind;
+  name: string;
+  projectId: string;
+  projectName: string;
+  mimeType: string;
+  hash: string;
+  width: number | null;
+  height: number | null;
+  storagePath: string;
+  role: AssetRole | null;
+  createdAt: string;
+}
+
+export interface LibraryItemQuery {
+  kind?: LibraryItemKind | null;
+  q?: string | null;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface LibraryItemPage {
+  items: LibraryItemRecord[];
+  nextCursor: string | null;
+  /** 当前 kind/q 过滤后、去重后的完整数量，与已加载页数无关，供前端显示稳定总数。 */
+  total: number;
 }
 
 export interface StoryboardRecord {
@@ -217,6 +250,8 @@ export interface OutputRecord {
   generationSnapshot: GenerationSnapshot | null;
   storagePath: string;
   hash: string;
+  width?: number | null;
+  height?: number | null;
   /** 外部生成请求的稳定幂等键；编辑版本和普通候选均可用。 */
   generationKey?: string | null;
   parentOutputId?: string | null;
@@ -506,23 +541,150 @@ export class EcomRepository {
   }
 
   public listAssets(projectId: string): AssetRecord[] { return (this.db.prepare("SELECT * FROM assets WHERE project_id=? ORDER BY created_at").all(projectId) as Row[]).map(mapAsset); }
-  /** 历史上传：跨项目按内容 hash 去重（同图多项目只保留最新一条），按上传时间倒序；
-   * excludeProjectId 项目内已有 hash 一并排除，避免前端选到必然被项目内 hash 唯一性拒绝的图片。 */
-  public listAssetHistory(excludeProjectId: string | null): AssetRecord[] {
-    const excludedHashes = new Set(
-      excludeProjectId
-        ? (this.db.prepare("SELECT hash FROM assets WHERE project_id=?").all(excludeProjectId) as Row[]).map((row) => String(row.hash))
-        : [],
-    );
-    const seen = new Set<string>();
-    const result: AssetRecord[] = [];
-    for (const row of this.db.prepare("SELECT * FROM assets ORDER BY created_at DESC, rowid DESC").all() as Row[]) {
-      const asset = mapAsset(row);
-      if (excludedHashes.has(asset.hash) || seen.has(asset.hash)) continue;
-      seen.add(asset.hash);
-      result.push(asset);
+
+  /** 资产库视图：assets 与 outputs 合并、跨项目按内容 hash 去重（同图只保留最新一条），
+   * 按创建时间倒序。分页用 (createdAt,id) 合成游标，避免 offset 在增量入库时跳条。 */
+  public listLibraryItems(query: LibraryItemQuery = {}): LibraryItemPage {
+    const limit = Math.min(Math.max(query.limit ?? 40, 1), 100);
+    const rows = this.db.prepare(`
+      SELECT 'asset:' || a.id AS id, 'UPLOADED' AS source, a.role AS role, a.project_id AS project_id,
+             p.name AS project_name, a.storage_path AS storage_path, a.hash AS hash,
+             a.original_name AS name, a.mime_type AS mime_type, a.width AS width, a.height AS height,
+             a.created_at AS created_at
+      FROM assets a JOIN projects p ON p.id = a.project_id
+      UNION ALL
+      SELECT 'output:' || o.id AS id, 'GENERATED' AS source, NULL AS role, o.project_id AS project_id,
+             p.name AS project_name, o.storage_path AS storage_path, o.hash AS hash,
+             COALESCE(si.display_name, si.asset_type, '生成图') AS name, NULL AS mime_type,
+             o.width AS width, o.height AS height, o.created_at AS created_at
+      FROM outputs o JOIN projects p ON p.id = o.project_id
+      LEFT JOIN storyboard_items si ON si.id = o.storyboard_item_id
+    `).all() as Row[];
+
+    const all: LibraryItemRecord[] = rows.map((row) => {
+      const source = String(row.source) as LibraryItemSource;
+      return {
+        id: String(row.id),
+        source,
+        kind: libraryKind(source, row.role ? (String(row.role) as AssetRole) : null),
+        name: String(row.name ?? ""),
+        projectId: String(row.project_id),
+        projectName: String(row.project_name ?? ""),
+        mimeType: row.mime_type ? String(row.mime_type) : mimeTypeForPath(String(row.storage_path)),
+        hash: String(row.hash),
+        width: row.width === null || row.width === undefined ? null : Number(row.width),
+        height: row.height === null || row.height === undefined ? null : Number(row.height),
+        storagePath: String(row.storage_path),
+        role: row.role ? (String(row.role) as AssetRole) : null,
+        createdAt: String(row.created_at),
+      };
+    });
+
+    // 分层导出把每个元素/背景切图作为独立生成产物纳入库；PSD 复合层（composite）二进制不可预览，排除。
+    const layerRows = this.db.prepare(`
+      SELECT le.id AS layer_export_id, le.project_id AS project_id, p.name AS project_name,
+             le.layer_files_json AS layer_files_json, le.created_at AS created_at,
+             o.width AS width, o.height AS height,
+             COALESCE(si.display_name, si.asset_type, '生成图') AS output_name
+      FROM layer_exports le
+      JOIN projects p ON p.id = le.project_id
+      LEFT JOIN outputs o ON o.id = le.output_id
+      LEFT JOIN storyboard_items si ON si.id = o.storyboard_item_id
+      WHERE le.status = 'SUCCEEDED' AND le.layer_files_json IS NOT NULL
+    `).all() as Row[];
+    for (const row of layerRows) {
+      const files = parse(String(row.layer_files_json)) as LayerExportLayerFileRecord[];
+      const outputName = String(row.output_name ?? "生成图");
+      const width = row.width === null || row.width === undefined ? null : Number(row.width);
+      const height = row.height === null || row.height === undefined ? null : Number(row.height);
+      files.forEach((file, index) => {
+        if (!file || file.kind === "composite" || !file.hash || !file.storagePath) return;
+        all.push({
+          id: `layer:${String(row.layer_export_id)}:${index}`,
+          source: "GENERATED",
+          kind: "LAYER",
+          name: `${outputName} · ${file.name}`,
+          projectId: String(row.project_id),
+          projectName: String(row.project_name ?? ""),
+          mimeType: "image/png",
+          hash: file.hash,
+          width,
+          height,
+          storagePath: file.storagePath,
+          role: null,
+          createdAt: String(row.created_at),
+        });
+      });
     }
-    return result;
+
+    all.sort((a, b) => (a.createdAt === b.createdAt ? (a.id < b.id ? 1 : a.id > b.id ? -1 : 0) : a.createdAt < b.createdAt ? 1 : -1));
+
+    const seen = new Set<string>();
+    const deduped: LibraryItemRecord[] = [];
+    for (const record of all) {
+      if (seen.has(record.hash)) continue;
+      seen.add(record.hash);
+      deduped.push(record);
+    }
+
+    const kind = query.kind ?? null;
+    const needle = query.q?.trim().toLowerCase() ?? "";
+    const filtered = deduped.filter((item) => {
+      if (kind && item.kind !== kind) return false;
+      if (needle && !`${item.name}\n${item.projectName}`.toLowerCase().includes(needle)) return false;
+      return true;
+    });
+
+    let startIndex = 0;
+    const cursor = decodeLibraryCursor(query.cursor ?? null);
+    if (cursor) {
+      const index = filtered.findIndex((item) => item.createdAt < cursor.createdAt || (item.createdAt === cursor.createdAt && item.id < cursor.id));
+      startIndex = index < 0 ? filtered.length : index;
+    }
+    const items = filtered.slice(startIndex, startIndex + limit);
+    const nextCursor = startIndex + limit < filtered.length && items.length > 0
+      ? encodeLibraryCursor(items[items.length - 1])
+      : null;
+    return { items, nextCursor, total: filtered.length };
+  }
+
+  /** 按内容 hash 找到任一来源文件的存储路径，供缩略图惰性生成。 */
+  public findLibrarySourcePath(hash: string): string | undefined {
+    const asset = this.db.prepare("SELECT storage_path FROM assets WHERE hash=? LIMIT 1").get(hash) as Row | undefined;
+    if (asset) return String(asset.storage_path);
+    const output = this.db.prepare("SELECT storage_path FROM outputs WHERE hash=? LIMIT 1").get(hash) as Row | undefined;
+    if (output) return String(output.storage_path);
+    const layer = this.db.prepare(
+      "SELECT json_extract(je.value, '$.storagePath') AS storage_path FROM layer_exports le, json_each(le.layer_files_json) je WHERE json_extract(je.value, '$.hash')=? LIMIT 1",
+    ).get(hash) as Row | undefined;
+    return layer?.storage_path ? String(layer.storage_path) : undefined;
+  }
+
+  /** 解析合成库 ID 指向的真实文件；返回 undefined 表示条目已不存在。 */
+  public resolveLibrarySource(itemId: string): { source: LibraryItemSource; storagePath: string; hash: string; mimeType: string; originalName: string; role: AssetRole | null } | undefined {
+    const separator = itemId.indexOf(":");
+    const prefix = separator < 0 ? "" : itemId.slice(0, separator);
+    const id = separator < 0 ? "" : itemId.slice(separator + 1);
+    if (prefix === "asset") {
+      const asset = this.getAsset(id);
+      if (!asset) return undefined;
+      return { source: "UPLOADED", storagePath: asset.storagePath, hash: asset.hash, mimeType: asset.mimeType, originalName: asset.originalName, role: asset.role };
+    }
+    if (prefix === "output") {
+      const output = this.getOutput(id);
+      if (!output) return undefined;
+      return { source: "GENERATED", storagePath: output.storagePath, hash: output.hash, mimeType: mimeTypeForPath(output.storagePath), originalName: basename(output.storagePath), role: null };
+    }
+    if (prefix === "layer") {
+      // 分层 ID 形如 layer:<layerExportId>:<index>，最后一段是数组下标。
+      const lastSeparator = id.lastIndexOf(":");
+      const exportId = lastSeparator < 0 ? id : id.slice(0, lastSeparator);
+      const index = Number(id.slice(lastSeparator + 1));
+      const file = Number.isInteger(index) && index >= 0 ? this.getLayerExport(exportId)?.layerFiles?.[index] : undefined;
+      if (!file || file.kind === "composite") return undefined;
+      return { source: "GENERATED", storagePath: file.storagePath, hash: file.hash, mimeType: "image/png", originalName: file.name, role: null };
+    }
+    return undefined;
   }
   public getAsset(id: string): AssetRecord | undefined { const row = this.db.prepare("SELECT * FROM assets WHERE id=?").get(id); return row ? mapAsset(row as Row) : undefined; }
   public createAsset(input: Omit<AssetRecord, "id" | "createdAt">): AssetRecord {
@@ -668,8 +830,8 @@ export class EcomRepository {
       if (existing) return existing;
     }
     const record: OutputRecord = { ...input, generationBatchId: input.generationBatchId ?? null, generationKey, parentOutputId: input.parentOutputId ?? null, rootOutputId: input.rootOutputId ?? null, editSessionId: input.editSessionId ?? null, editTurnId: input.editTurnId ?? null, id: randomUUID(), createdAt: now() };
-    const result = this.db.prepare("INSERT OR IGNORE INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_batch_id,generation_key,generation_snapshot_json,storage_path,hash,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationBatchId,@generationKey,@generationSnapshot,@storagePath,@hash,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
-      .run({ ...record, generationSnapshot: record.generationSnapshot ? json(record.generationSnapshot) : null });
+    const result = this.db.prepare("INSERT OR IGNORE INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_batch_id,generation_key,generation_snapshot_json,storage_path,hash,width,height,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationBatchId,@generationKey,@generationSnapshot,@storagePath,@hash,@width,@height,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
+      .run({ ...record, width: record.width ?? null, height: record.height ?? null, generationSnapshot: record.generationSnapshot ? json(record.generationSnapshot) : null });
     if (result.changes === 0 && generationKey) {
       const existing = this.getOutputByGenerationKey(generationKey);
       if (existing) return existing;
@@ -840,6 +1002,33 @@ function mapAsset(row: Row): AssetRecord {
     createdAt: String(row.created_at)
   };
 }
+/** 上传素材按用途归入商品/参考；生成结果单列，不参与用途映射。 */
+function libraryKind(source: LibraryItemSource, role: AssetRole | null): LibraryItemKind {
+  if (source === "GENERATED") return "GENERATED";
+  return role === "PRODUCT_TRUTH" || role === "PACKAGING" ? "PRODUCT" : "REFERENCE";
+}
+function basename(storagePath: string): string {
+  const slash = storagePath.lastIndexOf("/");
+  return slash < 0 ? storagePath : storagePath.slice(slash + 1);
+}
+function mimeTypeForPath(storagePath: string): string {
+  const dot = storagePath.lastIndexOf(".");
+  const ext = dot < 0 ? "" : storagePath.slice(dot).toLowerCase();
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".gif") return "image/gif";
+  return "image/png";
+}
+function encodeLibraryCursor(item: LibraryItemRecord): string {
+  return Buffer.from(`${item.createdAt}\u0000${item.id}`, "utf8").toString("base64url");
+}
+function decodeLibraryCursor(cursor: string | null): { createdAt: string; id: string } | null {
+  if (!cursor) return null;
+  const decoded = Buffer.from(cursor, "base64url").toString("utf8");
+  const separator = decoded.indexOf("\u0000");
+  if (separator < 0) return null;
+  return { createdAt: decoded.slice(0, separator), id: decoded.slice(separator + 1) };
+}
 function mapStoryboard(row: Row): StoryboardRecord { return { projectId: String(row.project_id), version: Number(row.version), status: row.status as StoryboardRecord["status"], campaignStyleLock: String(row.campaign_style_lock), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapStoryboardItem(row: Row): StoryboardItemRecord {
   return {
@@ -882,6 +1071,8 @@ function mapOutput(row: Row): OutputRecord {
     generationSnapshot: row.generation_snapshot_json ? parse(row.generation_snapshot_json) : null,
     storagePath: String(row.storage_path),
     hash: String(row.hash),
+    width: row.width === null || row.width === undefined ? null : Number(row.width),
+    height: row.height === null || row.height === undefined ? null : Number(row.height),
     generationKey: row.generation_key ? String(row.generation_key) : null,
     parentOutputId: row.parent_output_id ? String(row.parent_output_id) : null,
     rootOutputId: row.root_output_id ? String(row.root_output_id) : null,

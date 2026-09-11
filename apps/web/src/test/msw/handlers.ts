@@ -48,14 +48,22 @@ export const PROVIDER_FIXTURE = {
   updatedAt: "2026-08-01T00:00:00.000Z",
 };
 
-/** 历史上传选择器专用：来自其他项目的图片，与当前项目 ASSET_FIXTURE 不同 hash。 */
-export const HISTORY_ASSET_FIXTURE = {
-  ...ASSET_FIXTURE,
-  id: "9a1c2d3e-4f50-4617-8a29-3b4c5d6e7f80",
-  role: "STYLE_REFERENCE" as const,
+/** 资产库选择器专用：来自其他项目的图片，与当前项目 ASSET_FIXTURE 不同 hash。 */
+export const LIBRARY_ITEM_FIXTURE = {
+  id: "asset:9a1c2d3e-4f50-4617-8a29-3b4c5d6e7f80",
+  source: "UPLOADED" as const,
   kind: "REFERENCE" as const,
+  name: "历史参考图.png",
+  projectId: PROJECT_FIXTURE.id,
+  projectName: PROJECT_FIXTURE.name,
+  mimeType: "image/png",
   hash: "history-hash",
-  originalName: "历史参考图.png",
+  width: 1024,
+  height: 1024,
+  url: `${BASE}/files/assets/9a1c2d3e-4f50-4617-8a29-3b4c5d6e7f80`,
+  thumbnailUrl: `${BASE}/files/thumbnails/history-hash`,
+  createdAt: "2026-08-01T00:00:00.000Z",
+  role: "STYLE_REFERENCE" as const,
 };
 
 /** 严格按根目录 openapi.yaml 手写；契约变更时先改契约，再同步 handlers 和组件。 */
@@ -70,11 +78,15 @@ export const handlers = [
     HttpResponse.json({ items: [], suggestedSelections: [] }),
   ),
 
-  http.get(`${BASE}/asset-history`, () =>
-    HttpResponse.json({ items: [ASSET_FIXTURE, HISTORY_ASSET_FIXTURE], nextCursor: null }),
+  http.get(`${BASE}/library-assets`, () =>
+    HttpResponse.json({ items: [LIBRARY_ITEM_FIXTURE], nextCursor: null, total: 1 }),
   ),
 
-  http.post(`${BASE}/projects/:projectId/assets/from-history`, () =>
+  http.get(`${BASE}/files/thumbnails/:hash`, () =>
+    new HttpResponse(new Uint8Array([137, 80, 78, 71]), { headers: { "Content-Type": "image/webp" } }),
+  ),
+
+  http.post(`${BASE}/projects/:projectId/assets/from-library`, () =>
     HttpResponse.json(ASSET_FIXTURE, { status: 201 }),
   ),
 

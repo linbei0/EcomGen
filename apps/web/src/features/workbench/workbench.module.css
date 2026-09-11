@@ -861,6 +861,23 @@
   font-size: 11px;
 }
 
+.historyMore {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
+
+.historyToolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.historyToolbar :global(.ant-input-affix-wrapper) {
+  flex: 1;
+}
+
 .missing {
   display: flex;
   flex-direction: column;

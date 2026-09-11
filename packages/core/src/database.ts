@@ -340,6 +340,8 @@ function migrate(database: SqliteDatabase): void {
       generation_snapshot_json TEXT,
       storage_path TEXT NOT NULL,
       hash TEXT NOT NULL,
+      width INTEGER,
+      height INTEGER,
       created_at TEXT NOT NULL,
       parent_output_id TEXT,
       root_output_id TEXT,
@@ -512,8 +514,17 @@ function migrate(database: SqliteDatabase): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_layer_exports_job ON layer_exports(job_id);
     CREATE INDEX IF NOT EXISTS idx_layer_exports_output ON layer_exports(output_id, created_at DESC);
   `);
+  // 资产库视图：生成结果此前未记录尺寸，旧行保持 NULL，由前端按占位比例兜底。
+  if (!columnNames(database, "outputs").has("width")) {
+    database.exec("ALTER TABLE outputs ADD COLUMN width INTEGER");
+  }
+  if (!columnNames(database, "outputs").has("height")) {
+    database.exec("ALTER TABLE outputs ADD COLUMN height INTEGER");
+  }
   database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_generation_key ON outputs(generation_key)");
   database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_outputs_generation_key_unique ON outputs(generation_key) WHERE generation_key IS NOT NULL");
   database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_generation_batch ON outputs(project_id, generation_batch_id, created_at)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_planning_config_snapshots_project_created ON planning_config_snapshots(project_id, created_at DESC)");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_assets_created ON assets(created_at DESC)");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_created ON outputs(created_at DESC)");
 }

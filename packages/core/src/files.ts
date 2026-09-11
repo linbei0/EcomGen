@@ -11,7 +11,7 @@ export class LocalAssetStore {
   }
 
   public async initialize(): Promise<void> {
-    await Promise.all(["assets", "outputs", "exports", "edits", "layers", "tmp"].map((part) => mkdir(join(this.root, part), { recursive: true })));
+    await Promise.all(["assets", "outputs", "exports", "edits", "layers", "thumbs", "tmp"].map((part) => mkdir(join(this.root, part), { recursive: true })));
   }
 
   public async putAsset(projectId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
@@ -59,6 +59,21 @@ export class LocalAssetStore {
     const relativePath = join("layers", projectId, layerExportId, `${name}-${hash.slice(0, 12)}${this.safeExtension(extension)}`);
     await this.write(relativePath, content);
     return { path: relativePath, hash };
+  }
+
+  /** 缩略图按内容 hash 寻址：同一张图跨项目共享一份，删除项目不影响派生缓存。 */
+  public thumbnailPath(hash: string): string {
+    return join("thumbs", `${hash}.webp`);
+  }
+
+  public async putThumbnail(hash: string, content: Buffer): Promise<string> {
+    const relativePath = this.thumbnailPath(hash);
+    await this.write(relativePath, content);
+    return relativePath;
+  }
+
+  public async hasThumbnail(hash: string): Promise<boolean> {
+    return this.exists(this.thumbnailPath(hash));
   }
 
   public async read(relativePath: string): Promise<Buffer> {

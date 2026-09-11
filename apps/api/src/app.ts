@@ -5,11 +5,11 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type UserTemplateRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type UserTemplateRecord } from "@ecomgen/core";
 import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
-import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyAssetFromHistoryInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind } from "@ecomgen/contracts";
+import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
+import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, createSegmentationProvider, probeReasoning, type PromptSegmentationProtocol } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -232,27 +232,35 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     assertProjectAssetCapacity(repository, projectId, role);
     assertProjectAssetHashUnique(repository, projectId, hash);
     const stored = await storage.putAsset(projectId, data.filename, content);
-    return repository.createAsset({ projectId, role, storagePath: stored.path, hash: stored.hash, originalName: data.filename, mimeType: data.mimetype, width: null, height: null });
+    const dimensions = await imageDimensions(content);
+    await writeThumbnail(storage, hash, content);
+    return repository.createAsset({ projectId, role, storagePath: stored.path, hash: stored.hash, originalName: data.filename, mimeType: data.mimetype, width: dimensions.width, height: dimensions.height });
   });
   // 先删文件再删行：行删了就找不到 storagePath；不级联分镜/输出/任务（契约 deleteAsset）
   app.delete("/api/v1/assets/:assetId", async (request, reply) => { const id = parameter(request, "assetId"); const asset = repository.getAsset(id); if (!asset) missing("asset", id); await storage.delete(asset.storagePath); repository.deleteAsset(id); return reply.code(204).send(); });
-  app.get("/api/v1/asset-history", async (request) => {
+  // 资产库：assets/outputs 的全局只读视图，不复制文件、不落库；缩略图按内容 hash 共享。
+  app.get("/api/v1/library-assets", async (request) => {
     const query = (request.query ?? {}) as Record<string, unknown>;
-    const excludeProjectId = typeof query.excludeProjectId === "string" && query.excludeProjectId ? query.excludeProjectId : null;
-    return { items: repository.listAssetHistory(excludeProjectId), nextCursor: null };
+    const kind = typeof query.kind === "string" && query.kind ? enumValue<LibraryItemKind>(query.kind, ["PRODUCT", "REFERENCE", "GENERATED", "LAYER"], "kind") : null;
+    const q = typeof query.q === "string" && query.q.trim() ? query.q.trim() : null;
+    const cursor = typeof query.cursor === "string" && query.cursor ? query.cursor : null;
+    const limit = typeof query.limit === "string" && query.limit ? Math.min(Math.max(Number.parseInt(query.limit, 10) || 40, 1), 100) : 40;
+    const page = repository.listLibraryItems({ kind, q, cursor, limit });
+    return { items: page.items.map(publicLibraryAsset), nextCursor: page.nextCursor, total: page.total };
   });
   // 复制而非共享 storage_path：DELETE 资产会删物理文件、deleteProject 按项目目录清理，共享路径会互相破坏
-  app.post("/api/v1/projects/:projectId/assets/from-history", async (request, reply) => {
+  app.post("/api/v1/projects/:projectId/assets/from-library", async (request, reply) => {
     const projectId = parameter(request, "projectId"); ensureProject(repository, projectId);
-    const body = parseBody(CopyAssetFromHistoryInput, request.body ?? {});
-    const source = repository.getAsset(body.assetId); if (!source) missing("asset", body.assetId);
-    const role = parseAssetRole(body.kind ?? body.role ?? source.role);
+    const body = parseBody(CopyLibraryAssetToProjectInput, request.body ?? {});
+    const source = repository.resolveLibrarySource(body.itemId); if (!source) missing("library asset", body.itemId);
+    const role = parseAssetRole(body.kind ?? body.role ?? source.role ?? "REFERENCE");
     assertProjectAssetCapacity(repository, projectId, role);
     assertProjectAssetHashUnique(repository, projectId, source.hash);
-    if (!(await storage.exists(source.storagePath))) throw new ApiError(404, "NOT_FOUND", "Source asset file is missing");
+    if (!(await storage.exists(source.storagePath))) throw new ApiError(404, "NOT_FOUND", "Source file is missing");
     const content = await storage.read(source.storagePath);
-    const stored = await storage.putAsset(projectId, source.originalName, content);
-    return reply.code(201).send(repository.createAsset({ projectId, role, storagePath: stored.path, hash: stored.hash, originalName: source.originalName, mimeType: source.mimeType, width: source.width, height: source.height }));
+    const originalName = source.originalName || "library-asset";
+    const stored = await storage.putAsset(projectId, originalName, content);
+    return reply.code(201).send(repository.createAsset({ projectId, role, storagePath: stored.path, hash: stored.hash, originalName, mimeType: source.mimeType, width: null, height: null }));
   });
   app.post("/api/v1/projects/:projectId/planning-jobs", async (request, reply) => {
     const projectId = parameter(request, "projectId"); const project = repository.getProject(projectId); if (!project) missing("project", projectId); const body = parseBody(CreatePlanningJobInput, request.body ?? {});
@@ -602,6 +610,17 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.get("/api/v1/files/assets/:assetId", async (request, reply) => sendStored(request, reply, storage, repository.getAsset(parameter(request, "assetId")), "asset"));
   app.get("/api/v1/files/edit-reference-assets/:referenceAssetId", async (request, reply) => sendStored(request, reply, storage, repository.getEditReferenceAsset(parameter(request, "referenceAssetId")), "reference asset"));
   app.get("/api/v1/files/outputs/:outputId", async (request, reply) => sendStored(request, reply, storage, repository.getOutput(parameter(request, "outputId")), "output"));
+  // 缩略图按内容 hash 寻址，跨项目共享；命中缓存直接流式返回，未命中（含历史图片）现场生成后落盘。
+  app.get("/api/v1/files/thumbnails/:hash", async (request, reply) => {
+    const hash = parameter(request, "hash");
+    const thumbnailPath = storage.thumbnailPath(hash);
+    if (!(await storage.exists(thumbnailPath))) {
+      const sourcePath = repository.findLibrarySourcePath(hash);
+      if (!sourcePath) missing("library image", hash);
+      await storage.putThumbnail(hash, await renderThumbnail(await storage.read(sourcePath)));
+    }
+    return sendStored(request, reply, storage, { storagePath: thumbnailPath, mimeType: "image/webp", hash }, "thumbnail");
+  });
   app.get("/api/v1/files/exports/:exportId", async (request, reply) => sendStored(request, reply, storage, repository.getExport(parameter(request, "exportId")), "export"));
   app.get("/api/v1/outputs/:outputId/layer-plan", async (request) => {
     const output = repository.getOutput(parameter(request, "outputId"));
@@ -895,3 +914,47 @@ async function sendStored(request: FastifyRequest, reply: FastifyReply, storage:
   return reply;
 }
 function mimeForPath(path: string): string { if (path.endsWith(".png")) return "image/png"; if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg"; if (path.endsWith(".webp")) return "image/webp"; if (path.endsWith(".zip")) return "application/zip"; if (path.endsWith(".psd")) return "image/vnd.adobe.photoshop"; return "application/octet-stream"; }
+function publicLibraryAsset(item: LibraryItemRecord): Record<string, unknown> {
+  const idBody = item.id.slice(item.id.indexOf(":") + 1);
+  // 分层条目 ID 为 layer:<layerExportId>:<index>，下载走分层文件端点。
+  const url = item.id.startsWith("layer:")
+    ? `/api/v1/files/layer-exports/${idBody.slice(0, idBody.lastIndexOf(":"))}/layers/${idBody.slice(idBody.lastIndexOf(":") + 1)}`
+    : item.source === "UPLOADED"
+      ? `/api/v1/files/assets/${idBody}`
+      : `/api/v1/files/outputs/${idBody}`;
+  return {
+    id: item.id,
+    source: item.source,
+    kind: item.kind,
+    name: item.name,
+    projectId: item.projectId,
+    projectName: item.projectName,
+    mimeType: item.mimeType,
+    hash: item.hash,
+    width: item.width,
+    height: item.height,
+    url,
+    thumbnailUrl: `/api/v1/files/thumbnails/${item.hash}`,
+    createdAt: item.createdAt,
+    role: item.role
+  };
+}
+/** 缩略图只承载网格预览：限制在 512px 内并按 EXIF 方向校正，统一转 webp 控制体积。 */
+async function renderThumbnail(content: Buffer): Promise<Buffer> {
+  return sharp(content).rotate().resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+}
+async function writeThumbnail(storage: LocalAssetStore, hash: string, content: Buffer): Promise<void> {
+  try {
+    await storage.putThumbnail(hash, await renderThumbnail(content));
+  } catch {
+    // 缩略图是派生缓存，入库失败不阻断上传；/files/thumbnails 会在首次访问时重试
+  }
+}
+async function imageDimensions(content: Buffer): Promise<{ width: number | null; height: number | null }> {
+  try {
+    const metadata = await sharp(content).metadata();
+    return { width: metadata.width ?? null, height: metadata.height ?? null };
+  } catch {
+    return { width: null, height: null };
+  }
+}

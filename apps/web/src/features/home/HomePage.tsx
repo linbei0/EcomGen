@@ -1,5 +1,5 @@
 import { App, Button, Drawer } from "antd";
-import { Aperture, Archive, Images, Plus, Settings2, Trash2 } from "lucide-react";
+import { Aperture, Archive, Images, LibraryBig, Plus, Settings2, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
@@ -94,6 +94,9 @@ export function HomePage() {
         </div>
         <div className={styles.topActions}>
           <HealthBadge />
+          <Button icon={<LibraryBig size={16} strokeWidth={1.75} />} onClick={() => void navigate("/library")}>
+            资产库
+          </Button>
           <Button icon={<Settings2 size={16} strokeWidth={1.75} />} onClick={() => setSettingsOpen(true)}>
             设置
           </Button>

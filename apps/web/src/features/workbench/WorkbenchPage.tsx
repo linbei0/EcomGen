@@ -1,5 +1,5 @@
 import { Button, Result, Skeleton, Tooltip } from "antd";
-import { Aperture, PanelLeftClose, PanelLeftOpen, Settings2 } from "lucide-react";
+import { Aperture, LibraryBig, PanelLeftClose, PanelLeftOpen, Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
@@ -100,6 +100,9 @@ export function WorkbenchPage() {
         <StageBar current={view} completed={done} onChange={setView} />
         <div className={styles.topActions}>
           <HealthBadge />
+          <Button icon={<LibraryBig size={16} strokeWidth={1.75} />} onClick={() => void navigate("/library")}>
+            资产库
+          </Button>
           <Button icon={<Settings2 size={16} strokeWidth={1.75} />} onClick={() => setSettingsOpen(true)}>
             设置
           </Button>

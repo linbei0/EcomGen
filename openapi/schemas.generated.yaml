@@ -53,6 +53,18 @@ components:
       enum:
         - PRODUCT
         - REFERENCE
+    LibraryItemSource:
+      type: string
+      enum:
+        - UPLOADED
+        - GENERATED
+    LibraryItemKind:
+      type: string
+      enum:
+        - PRODUCT
+        - REFERENCE
+        - GENERATED
+        - LAYER
     ImageResolution:
       type: string
       enum:
@@ -1168,6 +1180,76 @@ components:
           anyOf:
             - $ref: "#/components/schemas/LayerBbox"
             - type: "null"
+    LibraryAsset:
+      type: object
+      required:
+        - id
+        - source
+        - kind
+        - name
+        - projectId
+        - projectName
+        - mimeType
+        - hash
+        - url
+        - thumbnailUrl
+        - createdAt
+      properties:
+        id:
+          description: "Synthetic library item ID: 'asset:<uuid>' or 'output:<uuid>'."
+          type: string
+        source:
+          $ref: "#/components/schemas/LibraryItemSource"
+        kind:
+          $ref: "#/components/schemas/LibraryItemKind"
+        name:
+          type: string
+        projectId:
+          format: uuid
+          type: string
+        projectName:
+          type: string
+        mimeType:
+          type: string
+        hash:
+          type: string
+        width:
+          anyOf:
+            - type: integer
+            - type: "null"
+        height:
+          anyOf:
+            - type: integer
+            - type: "null"
+        url:
+          type: string
+        thumbnailUrl:
+          type: string
+        createdAt:
+          format: date-time
+          type: string
+        role:
+          anyOf:
+            - $ref: "#/components/schemas/AssetRole"
+            - type: "null"
+    LibraryAssetList:
+      type: object
+      required:
+        - items
+        - nextCursor
+        - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LibraryAsset"
+        nextCursor:
+          anyOf:
+            - type: string
+            - type: "null"
+        total:
+          minimum: 0
+          type: integer
     ModelCapability:
       type: object
       required:
@@ -2082,13 +2164,13 @@ components:
         version:
           minimum: 1
           type: integer
-    CopyAssetFromHistoryInput:
+    CopyLibraryAssetToProjectInput:
       type: object
       required:
-        - assetId
+        - itemId
       properties:
-        assetId:
-          format: uuid
+        itemId:
+          description: "Library item ID: 'asset:<uuid>' or 'output:<uuid>'."
           type: string
         role:
           $ref: "#/components/schemas/AssetRole"

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import sharp from "sharp";
 
 // App 级端点测试的边界在 Redis/BullMQ：状态真相是 SQLite 与 REST 响应，
 // 入队只需要确认发生且方向正确，不应要求本地真实 Redis。
@@ -108,47 +109,74 @@ async function seedSourceAsset(repository: EcomRepository, projectId: string, co
   return repository.createAsset({ projectId, role, storagePath: stored.path, hash: stored.hash, originalName: "source.png", mimeType: "image/png", width: null, height: null });
 }
 
-describe("assets from history", () => {
-  it("从历史复制图片到目标项目：新记录、独立文件、历史列表按 hash 去重并排除目标项目", async () => {
+describe("asset library", () => {
+  it("从资产库复制图片到目标项目：新记录、独立文件，库列表按 hash 去重并映射来源", async () => {
     const sourceProject = seedProject(repository, "source");
     const targetProject = seedProject(repository, "target");
-    const source = await seedSourceAsset(repository, sourceProject.id, Buffer.from("image-bytes"));
+    const source = await seedSourceAsset(repository, sourceProject.id, await samplePng());
+
+    const listing = await app.inject({ method: "GET", url: "/api/v1/library-assets" });
+    expect(listing.statusCode).toBe(200);
+    const listingBody = listing.json<{ items: Array<{ id: string; source: string; kind: string; url: string; thumbnailUrl: string }>; total: number }>();
+    expect(listingBody.total).toBe(listingBody.items.length);
+    const listed = listingBody.items.find((item) => item.id === `asset:${source.id}`);
+    expect(listed).toMatchObject({ source: "UPLOADED", kind: "PRODUCT", url: `/api/v1/files/assets/${source.id}` });
 
     const response = await app.inject({
       method: "POST",
-      url: `/api/v1/projects/${targetProject.id}/assets/from-history`,
-      payload: { assetId: source.id, kind: "PRODUCT" },
+      url: `/api/v1/projects/${targetProject.id}/assets/from-library`,
+      payload: { itemId: `asset:${source.id}`, kind: "PRODUCT" },
     });
     expect(response.statusCode).toBe(201);
     const copied = response.json<{ projectId: string; role: string; hash: string; storagePath: string }>();
-    expect(copied).toMatchObject({ projectId: targetProject.id, role: "PRODUCT_TRUTH", hash: source.hash, originalName: "source.png" });
+    expect(copied).toMatchObject({ projectId: targetProject.id, role: "PRODUCT_TRUTH", hash: source.hash });
     expect(copied.storagePath).not.toBe(source.storagePath);
     expect(await new LocalAssetStore(dataDir).exists(copied.storagePath)).toBe(true);
-
-    const allHistory = await app.inject({ method: "GET", url: "/api/v1/asset-history" });
-    const hashes = allHistory.json<{ items: Array<{ hash: string }> }>().items.map((item) => item.hash);
-    expect(hashes.filter((hash) => hash === source.hash)).toHaveLength(1);
-
-    const excluded = await app.inject({ method: "GET", url: `/api/v1/asset-history?excludeProjectId=${targetProject.id}` });
-    expect(excluded.json<{ items: Array<{ hash: string }> }>().items.map((item) => item.hash)).not.toContain(source.hash);
   });
 
-  it("源资产不存在或源文件缺失时返回 404 且不产生新记录", async () => {
+  it("缩略图端点按内容 hash 惰性生成 webp，并作为库条目 thumbnailUrl", async () => {
+    const project = seedProject(repository, "source");
+    const source = await seedSourceAsset(repository, project.id, await samplePng());
+    const listing = await app.inject({ method: "GET", url: "/api/v1/library-assets" });
+    const listed = listing.json<{ items: Array<{ id: string; thumbnailUrl: string }> }>().items.find((item) => item.id === `asset:${source.id}`);
+    const thumbnail = await app.inject({ method: "GET", url: listed!.thumbnailUrl });
+    expect(thumbnail.statusCode).toBe(200);
+    expect(thumbnail.headers["content-type"]).toContain("image/webp");
+  });
+
+  it("库列表包含生成结果并按 GENERATED 类型筛选", async () => {
+    const project = seedProject(repository, "source");
+    repository.saveStoryboard(project.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "杯子首图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    const item = repository.listStoryboardItems(project.id)[0]!;
+    const job = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
+    const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/gen.png", hash: "gen-hash", width: 1024, height: 1024 });
+
+    const listing = await app.inject({ method: "GET", url: "/api/v1/library-assets?kind=GENERATED" });
+    expect(listing.statusCode).toBe(200);
+    const listed = listing.json<{ items: Array<{ id: string; source: string; kind: string; name: string; url: string }> }>().items.find((entry) => entry.id === `output:${output.id}`);
+    expect(listed).toMatchObject({ source: "GENERATED", kind: "GENERATED", name: "杯子首图", url: `/api/v1/files/outputs/${output.id}` });
+
+    // kind 允许列表必须跟随 LibraryItemKind 枚举，防止新增类型后路由误拒。
+    const layerListing = await app.inject({ method: "GET", url: "/api/v1/library-assets?kind=LAYER" });
+    expect(layerListing.statusCode).toBe(200);
+  });
+
+  it("库条目不存在或源文件缺失时返回 404 且不产生新记录", async () => {
     const sourceProject = seedProject(repository, "source");
     const targetProject = seedProject(repository, "target");
     const unknown = await app.inject({
       method: "POST",
-      url: `/api/v1/projects/${targetProject.id}/assets/from-history`,
-      payload: { assetId: randomUUID() },
+      url: `/api/v1/projects/${targetProject.id}/assets/from-library`,
+      payload: { itemId: `asset:${randomUUID()}` },
     });
     expect(unknown.statusCode).toBe(404);
 
-    const source = await seedSourceAsset(repository, sourceProject.id, Buffer.from("missing"));
+    const source = await seedSourceAsset(repository, sourceProject.id, await samplePng());
     await new LocalAssetStore(dataDir).delete(source.storagePath);
     const missingFile = await app.inject({
       method: "POST",
-      url: `/api/v1/projects/${targetProject.id}/assets/from-history`,
-      payload: { assetId: source.id },
+      url: `/api/v1/projects/${targetProject.id}/assets/from-library`,
+      payload: { itemId: `asset:${source.id}` },
     });
     expect(missingFile.statusCode).toBe(404);
     expect(repository.listAssets(targetProject.id)).toHaveLength(0);
@@ -157,49 +185,38 @@ describe("assets from history", () => {
   it("目标项目已有同内容图片时拒绝复制", async () => {
     const sourceProject = seedProject(repository, "source");
     const targetProject = seedProject(repository, "target");
-    const source = await seedSourceAsset(repository, sourceProject.id, Buffer.from("image-bytes"));
-    const first = await app.inject({
-      method: "POST",
-      url: `/api/v1/projects/${targetProject.id}/assets/from-history`,
-      payload: { assetId: source.id },
-    });
+    const source = await seedSourceAsset(repository, sourceProject.id, await samplePng());
+    const first = await app.inject({ method: "POST", url: `/api/v1/projects/${targetProject.id}/assets/from-library`, payload: { itemId: `asset:${source.id}` } });
     expect(first.statusCode).toBe(201);
-    const second = await app.inject({
-      method: "POST",
-      url: `/api/v1/projects/${targetProject.id}/assets/from-history`,
-      payload: { assetId: source.id },
-    });
+    const second = await app.inject({ method: "POST", url: `/api/v1/projects/${targetProject.id}/assets/from-library`, payload: { itemId: `asset:${source.id}` } });
     expect(second.statusCode).toBe(400);
   });
 
-  it("商品图达到容量上限后拒绝从历史复制", async () => {
+  it("商品图达到容量上限后拒绝从库复制", async () => {
     const sourceProject = seedProject(repository, "source");
     const targetProject = seedProject(repository, "target");
     for (let index = 0; index < 6; index += 1) {
       repository.createAsset({ projectId: targetProject.id, role: "PRODUCT_TRUTH", storagePath: `assets/${targetProject.id}/${index}.png`, hash: `hash-${index}`, originalName: `${index}.png`, mimeType: "image/png", width: null, height: null });
     }
-    const source = await seedSourceAsset(repository, sourceProject.id, Buffer.from("image-bytes"));
-    const response = await app.inject({
-      method: "POST",
-      url: `/api/v1/projects/${targetProject.id}/assets/from-history`,
-      payload: { assetId: source.id, kind: "PRODUCT" },
-    });
+    const source = await seedSourceAsset(repository, sourceProject.id, await samplePng());
+    const response = await app.inject({ method: "POST", url: `/api/v1/projects/${targetProject.id}/assets/from-library`, payload: { itemId: `asset:${source.id}`, kind: "PRODUCT" } });
     expect(response.statusCode).toBe(400);
   });
 
   it("省略 kind 时沿用源资产 role", async () => {
     const sourceProject = seedProject(repository, "source");
     const targetProject = seedProject(repository, "target");
-    const source = await seedSourceAsset(repository, sourceProject.id, Buffer.from("reference"), "STYLE_REFERENCE");
-    const response = await app.inject({
-      method: "POST",
-      url: `/api/v1/projects/${targetProject.id}/assets/from-history`,
-      payload: { assetId: source.id },
-    });
+    const source = await seedSourceAsset(repository, sourceProject.id, await samplePng(), "STYLE_REFERENCE");
+    const response = await app.inject({ method: "POST", url: `/api/v1/projects/${targetProject.id}/assets/from-library`, payload: { itemId: `asset:${source.id}` } });
     expect(response.statusCode).toBe(201);
     expect(response.json<{ role: string }>().role).toBe("STYLE_REFERENCE");
   });
 });
+
+/** 缩略图/尺寸路径需要能解码的真实图片；固定尺寸让断言稳定。 */
+async function samplePng(): Promise<Buffer> {
+  return sharp({ create: { width: 16, height: 12, channels: 3, background: { r: 200, g: 120, b: 40 } } }).png().toBuffer();
+}
 
 function seedLayerProject(segmentationModelId: string | null) {
   const provider = repository.saveProvider({

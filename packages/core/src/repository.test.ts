@@ -73,27 +73,89 @@ describe("EcomRepository", () => {
     expect(repository.listPlanningConfigSnapshots(project.id)).toHaveLength(20);
     database.close();
   });
-  it("listAssetHistory 跨项目按 hash 去重、排除指定项目并按时间倒序", () => {
+  it("listLibraryItems 合并上传与生成、按 hash 去重、支持类型/搜索/游标分页", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
     const projectBase = { category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO" as const], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE" as const, imageResolution: "1K" as const, imageAspectRatio: "AUTO" as const, candidatesPerType: 1 };
-    const projectA = repository.createProject({ name: "a", ...projectBase });
-    const projectB = repository.createProject({ name: "b", ...projectBase });
-    const projectC = repository.createProject({ name: "c", ...projectBase });
+    const projectA = repository.createProject({ name: "Alpha 店铺", ...projectBase });
+    const projectB = repository.createProject({ name: "Beta 店铺", ...projectBase });
     const storagePath = "assets/source.png";
     const oldDuplicate = repository.createAsset({ projectId: projectA.id, role: "PRODUCT_TRUTH", storagePath, hash: "dup", originalName: "old.png", mimeType: "image/png", width: null, height: null });
     const newDuplicate = repository.createAsset({ projectId: projectB.id, role: "PRODUCT_TRUTH", storagePath, hash: "dup", originalName: "new.png", mimeType: "image/png", width: null, height: null });
     const unique = repository.createAsset({ projectId: projectB.id, role: "STYLE_REFERENCE", storagePath, hash: "unique", originalName: "unique.png", mimeType: "image/png", width: null, height: null });
-    const owned = repository.createAsset({ projectId: projectC.id, role: "STYLE_REFERENCE", storagePath, hash: "owned", originalName: "owned.png", mimeType: "image/png", width: null, height: null });
+    repository.saveStoryboard(projectA.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "杯子首图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    const item = repository.listStoryboardItems(projectA.id)[0]!;
+    const job = repository.createJob({ id: "library-gen-job", projectId: projectA.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
+    const generated = repository.createOutput({ projectId: projectA.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/gen.png", hash: "gen", width: 1024, height: 1024 });
     database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-01-01T00:00:00.000Z", oldDuplicate.id);
     database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-02-01T00:00:00.000Z", newDuplicate.id);
     database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-03-01T00:00:00.000Z", unique.id);
-    database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-04-01T00:00:00.000Z", owned.id);
-    const history = repository.listAssetHistory(projectC.id);
-    expect(history.map((asset) => asset.hash)).toEqual(["unique", "dup"]);
-    expect(history.find((asset) => asset.hash === "dup")?.id).toBe(newDuplicate.id);
-    expect(repository.listAssetHistory(null)).toHaveLength(3);
+    database.prepare("UPDATE outputs SET created_at=? WHERE id=?").run("2026-04-01T00:00:00.000Z", generated.id);
+
+    const all = repository.listLibraryItems({});
+    expect(all.items.map((entry) => entry.hash)).toEqual(["gen", "unique", "dup"]);
+    expect(all.total).toBe(3);
+    expect(all.items.find((entry) => entry.hash === "dup")?.id).toBe(`asset:${newDuplicate.id}`);
+    expect(all.items.find((entry) => entry.hash === "gen")).toMatchObject({ source: "GENERATED", kind: "GENERATED", width: 1024, name: "杯子首图", projectName: "Alpha 店铺" });
+
+    expect(repository.listLibraryItems({ kind: "GENERATED" }).items.map((entry) => entry.hash)).toEqual(["gen"]);
+    expect(repository.listLibraryItems({ kind: "PRODUCT" }).items.map((entry) => entry.hash)).toEqual(["dup"]);
+    expect(repository.listLibraryItems({ kind: "REFERENCE" }).items.map((entry) => entry.hash)).toEqual(["unique"]);
+    expect(repository.listLibraryItems({ q: "Alpha" }).items.map((entry) => entry.hash)).toEqual(["gen"]);
+
+    const firstPage = repository.listLibraryItems({ limit: 2 });
+    expect(firstPage.items.map((entry) => entry.hash)).toEqual(["gen", "unique"]);
+    expect(firstPage.nextCursor).not.toBeNull();
+    expect(firstPage.total).toBe(3);
+    const secondPage = repository.listLibraryItems({ limit: 2, cursor: firstPage.nextCursor });
+    expect(secondPage.items.map((entry) => entry.hash)).toEqual(["dup"]);
+    expect(secondPage.nextCursor).toBeNull();
+
+    const assetSource = repository.resolveLibrarySource(`asset:${newDuplicate.id}`);
+    expect(assetSource).toMatchObject({ source: "UPLOADED", hash: "dup", role: "PRODUCT_TRUTH" });
+    const outputSource = repository.resolveLibrarySource(`output:${generated.id}`);
+    expect(outputSource).toMatchObject({ source: "GENERATED", storagePath: "outputs/gen.png", mimeType: "image/png" });
+    expect(repository.resolveLibrarySource("asset:missing")).toBeUndefined();
+    database.close();
+  });
+  it("listLibraryItems 纳入分层导出的元素/背景切图，排除 PSD 复合层", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "分层店铺", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO" as const], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE" as const, imageResolution: "1K" as const, imageAspectRatio: "AUTO" as const, candidatesPerType: 1 });
+    repository.saveStoryboard(project.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "杯子首图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    const item = repository.listStoryboardItems(project.id)[0]!;
+    const generateJob = repository.createJob({ id: "layer-gen-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
+    const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: generateJob.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/hero.png", hash: "hero-output", width: 1024, height: 1024 });
+    const exportJob = repository.createJob({ id: "layer-export-job", projectId: project.id, storyboardItemId: item.id, type: "LAYER_EXPORT", input: {} });
+    const layerExport = repository.createLayerExport({
+      projectId: project.id,
+      outputId: output.id,
+      jobId: exportJob.id,
+      planId: null,
+      status: "SUCCEEDED",
+      includeBackground: true,
+      psdStoragePath: "layers/x/composite.psd",
+      layerFiles: [
+        { name: "01_瓶子.png", kind: "element", storagePath: "layers/x/01.png", hash: "layer-bottle" },
+        { name: "00_背景.png", kind: "background", storagePath: "layers/x/00.png", hash: "layer-bg" },
+        { name: "图层.psd", kind: "composite", storagePath: "layers/x/composite.psd", hash: "layer-psd" },
+      ],
+      error: null,
+    });
+    database.prepare("UPDATE layer_exports SET created_at=? WHERE id=?").run("2026-05-01T00:00:00.000Z", layerExport.id);
+
+    expect(repository.listLibraryItems({ kind: "GENERATED" }).items.map((entry) => entry.hash)).toEqual(["hero-output"]);
+    const layers = repository.listLibraryItems({ kind: "LAYER" });
+    expect(layers.items.map((entry) => entry.hash)).toEqual(["layer-bg", "layer-bottle"]);
+    const bottle = layers.items.find((entry) => entry.hash === "layer-bottle")!;
+    expect(bottle).toMatchObject({ id: `layer:${layerExport.id}:0`, source: "GENERATED", kind: "LAYER", name: "杯子首图 · 01_瓶子.png", width: 1024, height: 1024 });
+    expect(layers.items.some((entry) => entry.hash === "layer-psd")).toBe(false);
+
+    expect(repository.resolveLibrarySource(`layer:${layerExport.id}:0`)).toMatchObject({ source: "GENERATED", storagePath: "layers/x/01.png", hash: "layer-bottle", originalName: "01_瓶子.png" });
+    expect(repository.resolveLibrarySource(`layer:${layerExport.id}:2`)).toBeUndefined();
+    expect(repository.findLibrarySourcePath("layer-bottle")).toBe("layers/x/01.png");
     database.close();
   });
   it("恢复任务时不自动重试结果未知的外部图像请求", () => {

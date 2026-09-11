@@ -10,6 +10,9 @@ const HomePage = lazy(() =>
 const WorkbenchPage = lazy(() =>
   import("../features/workbench/WorkbenchPage").then((module) => ({ default: module.WorkbenchPage })),
 );
+const LibraryPage = lazy(() =>
+  import("../features/library/LibraryPage").then((module) => ({ default: module.LibraryPage })),
+);
 
 function RouteFallback() {
   return (
@@ -33,6 +36,14 @@ export const router = createBrowserRouter([
     element: (
       <Suspense fallback={<RouteFallback />}>
         <WorkbenchPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/library",
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <LibraryPage />
       </Suspense>
     ),
   },

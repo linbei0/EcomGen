@@ -1,12 +1,12 @@
 import { App, Image, Popconfirm } from "antd";
-import { History, Palette, Package, ShieldCheck, Trash2, Upload as UploadIcon, type LucideIcon } from "lucide-react";
+import { LibraryBig, Palette, Package, ShieldCheck, Trash2, Upload as UploadIcon, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
 
 import type { Asset, ProjectDetail, UserAssetKind } from "../../api/adapters/projectDetail";
 import { useDeleteAsset, useUploadAsset } from "../../api/hooks/useAssets";
 import { errorText } from "../../lib/errorText";
 import { kindForRole, USER_ASSET_KIND_META, USER_ASSET_KIND_ORDER } from "../../lib/roles";
-import { AssetHistoryDialog } from "./AssetHistoryDialog";
+import { LibraryPickerDialog } from "../library/LibraryPickerDialog";
 import styles from "./workbench.module.css";
 
 export function AssetsStage({
@@ -19,10 +19,14 @@ export function AssetsStage({
   const { notification } = App.useApp();
   const [kind, setKind] = useState<UserAssetKind>("PRODUCT");
   const [dragOver, setDragOver] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const upload = useUploadAsset();
   const removeAsset = useDeleteAsset();
   const grouped = useMemo(() => groupAssets(detail.assets), [detail.assets]);
+  const existingHashes = useMemo(
+    () => new Set(detail.assets.map((asset) => asset.hash).filter((hash): hash is string => Boolean(hash))),
+    [detail.assets],
+  );
 
   const uploadFiles = async (images: File[]) => {
     const queue = [...images];
@@ -119,25 +123,27 @@ export function AssetsStage({
           <button
             type="button"
             className={styles.historyLink}
+            aria-label="从资产库添加"
             onClick={(event) => {
               // 行内按钮浮在透明 file input 之上：阻断冒泡，避免触发 label 的文件选择
               event.preventDefault();
               event.stopPropagation();
-              setHistoryOpen(true);
+              setLibraryOpen(true);
             }}
           >
-            <History size={12} strokeWidth={1.75} aria-hidden />
-            上传记录
+            <LibraryBig size={12} strokeWidth={1.75} aria-hidden />
+            资产库
           </button>
           中选择。
         </p>
       </label>
 
-      <AssetHistoryDialog
-        open={historyOpen}
+      <LibraryPickerDialog
+        open={libraryOpen}
         projectId={detail.id}
         kind={kind}
-        onClose={() => setHistoryOpen(false)}
+        excludeHashes={existingHashes}
+        onClose={() => setLibraryOpen(false)}
       />
 
       {USER_ASSET_KIND_ORDER.map((item) => {

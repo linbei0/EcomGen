@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { adaptAsset, type Asset, type UserAssetKind } from "../adapters/projectDetail";
+import { adaptAsset, type UserAssetKind } from "../adapters/projectDetail";
 import { api, unwrap } from "../client";
 import { ApiError } from "../errors";
 import { qk } from "../queryKeys";
@@ -52,36 +52,4 @@ export function useDeleteAsset() {
   });
 }
 
-/** 历史上传列表：跨项目按 hash 去重，enabled 控制仅在选择器打开时请求。 */
-export function useAssetHistory(excludeProjectId: string, enabled: boolean) {
-  return useQuery({
-    queryKey: qk.assetHistory(excludeProjectId),
-    enabled,
-    queryFn: async () => {
-      const raw = await unwrap(api.GET("/asset-history", { params: { query: { excludeProjectId } } }));
-      return (raw.items ?? []).map(adaptAsset).filter((item): item is Asset => item !== null);
-    },
-  });
-}
 
-export function useCopyAssetFromHistory() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ projectId, assetId, kind }: { projectId: string; assetId: string; kind: UserAssetKind }) => {
-      const raw = await unwrap(
-        api.POST("/projects/{projectId}/assets/from-history", {
-          params: { path: { projectId } },
-          body: { assetId, kind },
-        }),
-      );
-      const asset = adaptAsset(raw);
-      if (!asset) {
-        throw new ApiError({ code: "UNKNOWN", message: "复制响应无法解析", status: 0 });
-      }
-      return asset;
-    },
-    onSuccess: (_asset, { projectId }) => {
-      void queryClient.invalidateQueries({ queryKey: qk.project(projectId) });
-    },
-  });
-}

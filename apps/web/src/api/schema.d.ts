@@ -226,14 +226,14 @@ export interface paths {
         patch: operations["updateAsset"];
         trace?: never;
     };
-    "/asset-history": {
+    "/library-assets": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listAssetHistory"];
+        get: operations["listLibraryAssets"];
         put?: never;
         post?: never;
         delete?: never;
@@ -242,7 +242,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/projects/{projectId}/assets/from-history": {
+    "/projects/{projectId}/assets/from-library": {
         parameters: {
             query?: never;
             header?: never;
@@ -253,7 +253,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["copyAssetFromHistory"];
+        post: operations["copyLibraryAssetToProject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -751,6 +751,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/files/thumbnails/{hash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                hash: string;
+            };
+            cookie?: never;
+        };
+        get: operations["downloadThumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/files/assets/{assetId}": {
         parameters: {
             query?: never;
@@ -874,6 +892,10 @@ export interface components {
         AssetRole: "PRODUCT_TRUTH" | "PACKAGING" | "STYLE_REFERENCE" | "LAYOUT_REFERENCE";
         /** @enum {string} */
         UserAssetKind: "PRODUCT" | "REFERENCE";
+        /** @enum {string} */
+        LibraryItemSource: "UPLOADED" | "GENERATED";
+        /** @enum {string} */
+        LibraryItemKind: "PRODUCT" | "REFERENCE" | "GENERATED" | "LAYER";
         /** @enum {string} */
         ImageResolution: "1K" | "2K" | "4K";
         /** @enum {string} */
@@ -1276,6 +1298,30 @@ export interface components {
             source: "auto" | "manual";
             bbox?: components["schemas"]["LayerBbox"] | null;
         };
+        LibraryAsset: {
+            /** @description Synthetic library item ID: 'asset:<uuid>' or 'output:<uuid>'. */
+            id: string;
+            source: components["schemas"]["LibraryItemSource"];
+            kind: components["schemas"]["LibraryItemKind"];
+            name: string;
+            /** Format: uuid */
+            projectId: string;
+            projectName: string;
+            mimeType: string;
+            hash: string;
+            width?: number | null;
+            height?: number | null;
+            url: string;
+            thumbnailUrl: string;
+            /** Format: date-time */
+            createdAt: string;
+            role?: components["schemas"]["AssetRole"] | null;
+        };
+        LibraryAssetList: {
+            items: components["schemas"]["LibraryAsset"][];
+            nextCursor: string | null;
+            total: number;
+        };
         ModelCapability: {
             id: string;
             supportsVision: boolean;
@@ -1591,9 +1637,9 @@ export interface components {
         ConfirmStoryboardInput: {
             version?: number;
         };
-        CopyAssetFromHistoryInput: {
-            /** Format: uuid */
-            assetId: string;
+        CopyLibraryAssetToProjectInput: {
+            /** @description Library item ID: 'asset:<uuid>' or 'output:<uuid>'. */
+            itemId: string;
             role?: components["schemas"]["AssetRole"];
             kind?: components["schemas"]["UserAssetKind"];
         };
@@ -2386,10 +2432,13 @@ export interface operations {
             };
         };
     };
-    listAssetHistory: {
+    listLibraryAssets: {
         parameters: {
             query?: {
-                excludeProjectId?: string;
+                kind?: components["schemas"]["LibraryItemKind"];
+                q?: string;
+                cursor?: components["parameters"]["Cursor"];
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -2397,18 +2446,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Recently uploaded assets across projects, deduplicated by content hash. */
+            /** @description Global asset library view over uploads and generated results, deduplicated by content hash. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssetList"];
+                    "application/json": components["schemas"]["LibraryAssetList"];
                 };
             };
         };
     };
-    copyAssetFromHistory: {
+    copyLibraryAssetToProject: {
         parameters: {
             query?: never;
             header?: never;
@@ -2419,11 +2468,11 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CopyAssetFromHistoryInput"];
+                "application/json": components["schemas"]["CopyLibraryAssetToProjectInput"];
             };
         };
         responses: {
-            /** @description Asset copied into the project. */
+            /** @description Asset copied from the library into the project. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -3200,6 +3249,27 @@ export interface operations {
                     "application/json": components["schemas"]["Export"];
                 };
             };
+        };
+    };
+    downloadThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lazily generated webp thumbnail for a library asset, keyed by content hash. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     downloadAsset: {

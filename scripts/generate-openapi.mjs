@@ -60,6 +60,8 @@ const operationSchemaRefs = {
   testProviderConnection: { request: "TestProviderInput", response: { "200": "TestProviderConnectionResult" } },
   uploadAsset: { request: "UploadAssetInput" },
   updateAsset: { request: "UpdateAssetInput" },
+  listLibraryAssets: { response: { "200": "LibraryAssetList" } },
+  copyLibraryAssetToProject: { request: "CopyLibraryAssetToProjectInput", response: { "201": "Asset" } },
   listPlanningConfigSnapshots: { response: { "200": "PlanningConfigSnapshotList" } },
   applyPlanningConfigSnapshot: { response: { "200": "ApplyPlanningConfigSnapshotResult" } },
   confirmStoryboard: { request: "ConfirmStoryboardInput" },

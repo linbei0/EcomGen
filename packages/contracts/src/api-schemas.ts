@@ -1,5 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { AssetRole, CopywritingTarget, EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus, ImageAspectRatio, ImageResolution, PlanningMode, ReferencePurpose, ReferenceSource, SearchSourceKind, StoryboardShotRole, UserAssetKind } from "./enums.js";
+import { AssetRole, CopywritingTarget, EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus, ImageAspectRatio, ImageResolution, LibraryItemKind, LibraryItemSource, PlanningMode, ReferencePurpose, ReferenceSource, SearchSourceKind, StoryboardShotRole, UserAssetKind } from "./enums.js";
 import { SEGMENTATION_PROTOCOLS } from "./segmentation.js";
 import { schemaRef } from "./ref.js";
 
@@ -95,6 +95,29 @@ export type UpdateSearchSourceInput = Static<typeof UpdateSearchSourceInput>;
 
 export const AssetList = Type.Object({ items: Type.Array(schemaRef(Asset)), nextCursor: Type.Union([Type.String(), Type.Null()]) }, { $id: "#/components/schemas/AssetList" });
 export type AssetList = Static<typeof AssetList>;
+
+// 资产库是现有 assets/outputs 两张表的全局只读视图：id 用 source 前缀合成（asset:|output:），
+// 物理文件仍归各自项目所有；生成项没有 mime_type/original_name，由 storyboard 展示名与扩展名派生。
+export const LibraryAsset = Type.Object({
+  id: Type.String({ description: "Synthetic library item ID: 'asset:<uuid>' or 'output:<uuid>'." }),
+  source: schemaRef(LibraryItemSource),
+  kind: schemaRef(LibraryItemKind),
+  name: Type.String(),
+  projectId: Type.String({ format: "uuid" }),
+  projectName: Type.String(),
+  mimeType: Type.String(),
+  hash: Type.String(),
+  width: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+  height: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+  url: Type.String(),
+  thumbnailUrl: Type.String(),
+  createdAt: Type.String({ format: "date-time" }),
+  role: Type.Optional(Type.Union([schemaRef(AssetRole), Type.Null()])),
+}, { $id: "#/components/schemas/LibraryAsset" });
+export type LibraryAsset = Static<typeof LibraryAsset>;
+
+export const LibraryAssetList = Type.Object({ items: Type.Array(schemaRef(LibraryAsset)), nextCursor: Type.Union([Type.String(), Type.Null()]), total: Type.Integer({ minimum: 0 }) }, { $id: "#/components/schemas/LibraryAssetList" });
+export type LibraryAssetList = Static<typeof LibraryAssetList>;
 
 export const CreateProviderInput = Type.Object({ name: Type.String({ minLength: 1 }), baseUrl: Type.String({ format: "uri" }), reasoningProtocol: Type.Union([Type.Literal("openai"), Type.Literal("dashscope_qwen"), Type.Literal("openai_responses")]), apiKey: Type.String({ minLength: 1 }), models: Type.Array(schemaRef(ModelCapability), { minItems: 1 }) }, { $id: "#/components/schemas/CreateProviderInput" });
 export type CreateProviderInput = Static<typeof CreateProviderInput>;

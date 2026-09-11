@@ -250,6 +250,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   throwIfCancelled(job);
   await updateJob(job, { progress: 80, providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED }); const stored = await storage.putOutput(project.id, result.image, extensionForMime(result.mimeType), generationKey);
   throwIfCancelled(job);
+  const { width, height } = await outputDerivatives(storage, stored.hash, result.image);
   const output = repository.createOutput({
     projectId: project.id,
     storyboardItemId: item.id,
@@ -258,6 +259,8 @@ async function executeGeneration(job: JobRecord): Promise<void> {
     generationSnapshot: { providerId, modelId, resolution, aspectRatio, size, candidateIndex, ...(revision ? { revision } : {}) },
     storagePath: stored.path,
     hash: stored.hash,
+    width,
+    height,
     generationKey,
     generationBatchId,
   });
@@ -393,7 +396,8 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
           ? await compositeOutpaint(sourceImage, result.image, outpaintCanvas)
           : await sharp(result.image).png().toBuffer();
     const stored = await storage.putOutput(project.id, composed, ".png", generationKey);
-    const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: config.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", executionMode: plan.executionMode, targetDescription: plan.targetDescription, targetConfidence: plan.targetConfidence, sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy, referenceSelections: turn.referenceSelections, referenceHashes: Object.fromEntries(turn.referenceSelections.map((selection) => { const asset = selection.source === "PROJECT" ? assets.find((candidate) => candidate.id === selection.id) : temporaryAssets.find((candidate) => candidate.id === selection.id); return [selection.id, asset?.hash ?? null]; })) }, storagePath: stored.path, hash: stored.hash, generationKey, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
+    const { width, height } = await outputDerivatives(storage, stored.hash, composed);
+    const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: config.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", executionMode: plan.executionMode, targetDescription: plan.targetDescription, targetConfidence: plan.targetConfidence, sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy, referenceSelections: turn.referenceSelections, referenceHashes: Object.fromEntries(turn.referenceSelections.map((selection) => { const asset = selection.source === "PROJECT" ? assets.find((candidate) => candidate.id === selection.id) : temporaryAssets.find((candidate) => candidate.id === selection.id); return [selection.id, asset?.hash ?? null]; })) }, storagePath: stored.path, hash: stored.hash, width, height, generationKey, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
     await updateJob(job, { providerTaskId: null });
     createdOutputs.push(output);
   }
@@ -857,6 +861,22 @@ async function providerMaskFor(source: Buffer, editMask: Buffer, protectMask?: B
 class JobCancelled extends Error { }
 function throwIfCancelled(job: JobRecord): void { const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") throw new JobCancelled(`Job ${job.id} was cancelled`); }
 function extensionForMime(mimeType: string): string { return mimeType.includes("webp") ? ".webp" : mimeType.includes("jpeg") ? ".jpg" : ".png"; }
+
+/** 生成结果入库派生：读取尺寸并尽量写入缩略图缓存；任一步失败都不阻断生成主流程。 */
+async function outputDerivatives(storage: LocalAssetStore, hash: string, image: Buffer): Promise<{ width: number | null; height: number | null }> {
+  try {
+    const metadata = await sharp(image).metadata();
+    try {
+      if (!(await storage.hasThumbnail(hash))) {
+        const thumbnail = await sharp(image).rotate().resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+        await storage.putThumbnail(hash, thumbnail);
+      }
+    } catch { /* 缩略图失败可接受，浏览时由 API 惰性兜底 */ }
+    return { width: metadata.width ?? null, height: metadata.height ?? null };
+  } catch {
+    return { width: null, height: null };
+  }
+}
 function exportFileName(project: ProjectRecord, output: { storyboardItemId: string; storagePath: string }, index: number): string { const item = repository.getStoryboardItem(output.storyboardItemId); const extension = output.storagePath.slice(output.storagePath.lastIndexOf(".")); return `${safeName(project.name)}_${String(index + 1).padStart(2, "0")}_${safeName(item?.assetType ?? "image")}${extension}`; }
 function safeName(value: string): string { return value.replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80) || "ecomgen"; }
 async function createZip(files: Array<{ name: string; content: Buffer }>): Promise<Buffer> { return new Promise((resolve, reject) => { const output = new PassThrough(); const chunks: Buffer[] = []; output.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk))); output.on("end", () => resolve(Buffer.concat(chunks))); output.on("error", reject); const zip = archiver("zip", { zlib: { level: 9 } }); zip.on("error", reject); zip.pipe(output); files.forEach((file) => zip.append(file.content, { name: file.name })); void zip.finalize(); }); }

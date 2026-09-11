@@ -13,6 +13,10 @@ export const USER_ASSET_KIND_PRODUCT = "PRODUCT" as const;
 /** 用户可见入口：参考图。内部默认写入 STYLE_REFERENCE。 */
 export const USER_ASSET_KIND_REFERENCE = "REFERENCE" as const;
 export const UserAssetKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE" }, { $id: "#/components/schemas/UserAssetKind" });
+/** 资产库条目的物理来源：项目上传或生成结果。 */
+export const LibraryItemSource = Type.Enum({ UPLOADED: "UPLOADED", GENERATED: "GENERATED" }, { $id: "#/components/schemas/LibraryItemSource" });
+/** 资产库筛选类别：上传素材按用途分为商品/参考，生成结果单列。 */
+export const LibraryItemKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE", GENERATED: "GENERATED", LAYER: "LAYER" }, { $id: "#/components/schemas/LibraryItemKind" });
 export const ImageResolution = Type.Enum({ K1: "1K", K2: "2K", K4: "4K" }, { $id: "#/components/schemas/ImageResolution" });
 export const ImageAspectRatio = Type.Enum({ AUTO: "AUTO", SQUARE: "1:1", PORTRAIT_2_3: "2:3", LANDSCAPE_3_2: "3:2", PORTRAIT: "3:4", LANDSCAPE: "4:3", PORTRAIT_4_5: "4:5", LANDSCAPE_5_4: "5:4", PORTRAIT_9_16: "9:16", WIDE: "16:9", ULTRA_WIDE: "21:9" }, { $id: "#/components/schemas/ImageAspectRatio" });
 export const PlanningMode = Type.Enum({ AI: "AI", MANUAL: "MANUAL" }, { $id: "#/components/schemas/PlanningMode" });
@@ -35,6 +39,8 @@ export type StoryboardMode = Static<typeof StoryboardMode>;
 export type StoryboardShotRole = Static<typeof StoryboardShotRole>;
 export type AssetRole = Static<typeof AssetRole>;
 export type UserAssetKind = Static<typeof UserAssetKind>;
+export type LibraryItemSource = Static<typeof LibraryItemSource>;
+export type LibraryItemKind = Static<typeof LibraryItemKind>;
 export type ImageResolution = Static<typeof ImageResolution>;
 export type ImageAspectRatio = Static<typeof ImageAspectRatio>;
 export type PlanningMode = Static<typeof PlanningMode>;

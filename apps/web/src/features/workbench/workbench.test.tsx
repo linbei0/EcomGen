@@ -12,7 +12,7 @@ import {
   PROVIDER_ID,
   projectDetailPayload,
 } from "../../test/msw/fixtures";
-import { BASE, HISTORY_ASSET_FIXTURE, PROVIDER_FIXTURE } from "../../test/msw/handlers";
+import { BASE, LIBRARY_ITEM_FIXTURE, PROVIDER_FIXTURE } from "../../test/msw/handlers";
 import { server } from "../../test/msw/server";
 import { renderWithProviders } from "../../test/render";
 import { WorkbenchPage } from "./WorkbenchPage";
@@ -88,27 +88,27 @@ describe("工作台 · 配置", () => {
     await waitFor(() => expect(posted).toBe(1));
   });
 
-  it("从上传记录选择图片并复制为当前项目素材", async () => {
+  it("从资产库选择图片并复制为当前项目素材", async () => {
     const user = userEvent.setup();
     const copies: Record<string, unknown>[] = [];
     server.use(
-      http.get(`${BASE}/asset-history`, () =>
-        HttpResponse.json({ items: [HISTORY_ASSET_FIXTURE], nextCursor: null }),
+      http.get(`${BASE}/library-assets`, () =>
+        HttpResponse.json({ items: [LIBRARY_ITEM_FIXTURE], nextCursor: null }),
       ),
-      http.post(`${BASE}/projects/:projectId/assets/from-history`, async ({ request }) => {
+      http.post(`${BASE}/projects/:projectId/assets/from-library`, async ({ request }) => {
         copies.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json(HISTORY_ASSET_FIXTURE, { status: 201 });
+        return HttpResponse.json(ASSET_FIXTURE, { status: 201 });
       }),
     );
     renderWorkbench();
     await screen.findByDisplayValue("无线耳机 SPU");
 
-    await user.click(screen.getByRole("button", { name: "上传记录" }));
+    await user.click(screen.getByRole("button", { name: "从资产库添加" }));
     await user.click(await screen.findByRole("button", { name: "选择 历史参考图.png" }));
     await user.click(await screen.findByRole("button", { name: "添加 1 张" }));
 
     await waitFor(() =>
-      expect(copies).toEqual([{ assetId: HISTORY_ASSET_FIXTURE.id, kind: "PRODUCT" }]),
+      expect(copies).toEqual([{ itemId: LIBRARY_ITEM_FIXTURE.id, kind: "PRODUCT" }]),
     );
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "添加 1 张" })).not.toBeInTheDocument(),

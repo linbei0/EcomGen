@@ -329,37 +329,49 @@ paths:
           description: Asset deleted.
         "404":
           $ref: "#/components/responses/NotFound"
-  /asset-history:
+  /library-assets:
     get:
-      operationId: listAssetHistory
+      operationId: listLibraryAssets
       parameters:
-        - name: excludeProjectId
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/LibraryItemKind"
+        - name: q
           in: query
           required: false
           schema:
             type: string
-            format: uuid
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
       responses:
         "200":
-          description: Recently uploaded assets across projects, deduplicated by content hash.
+          description: Global asset library view over uploads and generated results, deduplicated by content hash.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AssetList"
-  /projects/{projectId}/assets/from-history:
+                $ref: "#/components/schemas/LibraryAssetList"
+  /projects/{projectId}/assets/from-library:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
     post:
-      operationId: copyAssetFromHistory
+      operationId: copyLibraryAssetToProject
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CopyAssetFromHistoryInput"
+              $ref: "#/components/schemas/CopyLibraryAssetToProjectInput"
       responses:
         "201":
-          description: Asset copied into the project.
+          description: Asset copied from the library into the project.
           content:
             application/json:
               schema:
@@ -912,6 +924,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Export"
+  /files/thumbnails/{hash}:
+    parameters:
+      - name: hash
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: downloadThumbnail
+      responses:
+        "200":
+          description: Lazily generated webp thumbnail for a library asset, keyed by content hash.
+        "404":
+          $ref: "#/components/responses/NotFound"
   /files/assets/{assetId}:
     parameters:
       - $ref: "#/components/parameters/AssetId"
