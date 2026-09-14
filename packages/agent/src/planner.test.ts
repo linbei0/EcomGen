@@ -34,6 +34,8 @@ vi.mock("@earendil-works/pi-ai/api/openai-completions.lazy", () => ({
   openAICompletionsApi: () => ({ stream: captured.streamMock }),
 }));
 
+import { ECOM_SUITES } from "@ecomgen/ecom-suite";
+
 import { planImageEdit, planStoryboard, reviseImagePrompt, type EditPlannerInput, type PlannerInput } from "./planner.js";
 
 const input: PlannerInput = {
@@ -98,6 +100,20 @@ describe("planStoryboard", () => {
     expect(captured.prompt).toContain("Do not add a platform feed extra shot");
     const result = await planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: ["hero-image"] });
     expect(result.items[0]?.displayName).toBe("整机斜侧展示首图");
+  });
+
+  it("expands requested suite shots one by one and rejects unresolved placeholders", async () => {
+    captured.errorMessage = undefined;
+    captured.prompt = "";
+    const suite = ECOM_SUITES[0]!;
+    const shots = suite.shots.slice(0, 2);
+    captured.responseText = JSON.stringify({ campaignStyleLock: "clean", items: shots.map((shot, index) => ({ assetType: shot.assetType, displayName: `套图分镜 ${index + 1}`, shotRole: shot.shotRole, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "A complete final prompt with no placeholders.", factClaims: [], riskFlags: [], sortOrder: index })) });
+    const result = await planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: [], requestedSuiteShots: shots.map((shot) => shot.assetType), suites: [...ECOM_SUITES] });
+    expect(result.items.map((item) => item.assetType)).toEqual(shots.map((shot) => shot.assetType));
+
+    captured.responseText = JSON.stringify({ campaignStyleLock: "clean", items: [{ assetType: shots[0]!.assetType, displayName: "套图分镜 1", shotRole: shots[0]!.shotRole, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero {product}", factClaims: [], riskFlags: [], sortOrder: 0 }] });
+    await expect(planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: [], requestedSuiteShots: [shots[0]!.assetType], suites: [...ECOM_SUITES] })).rejects.toThrow(/placeholder/);
+    captured.responseText = undefined;
   });
 
   it("要求 AI 返回指定数量的分镜，并拒绝数量不符的结果", async () => {

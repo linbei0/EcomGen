@@ -435,6 +435,17 @@ function migrate(database: SqliteDatabase): void {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS user_suites (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      l1 TEXT NOT NULL,
+      l2 TEXT NOT NULL,
+      leaf TEXT NOT NULL,
+      product_family TEXT,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
   if (!columnNames(database, "projects").has("archived_at")) {
     database.exec("ALTER TABLE projects ADD COLUMN archived_at TEXT");

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ECOM_SUITES } from "@ecomgen/ecom-suite";
 import { createPlanningTools } from "./tools.js";
 
 const taobaoContext = { platformTargets: ["TAOBAO"] as const, targetMarket: null, copyLanguage: null, productCategory: "服装" };
@@ -85,5 +86,18 @@ describe("Pi planning business tools", () => {
         { sourceId: "tavily", status: "SUCCEEDED", errorMessage: null },
       ]);
     } finally { fetchMock.mockRestore(); }
+  });
+
+  it("exposes requested suite shot definitions and rejects unknown suites", async () => {
+    const suite = ECOM_SUITES[0]!;
+    const tools = createPlanningTools(taobaoContext, undefined, [], [suite]);
+    expect(tools).toHaveLength(3);
+    const readSuite = tools[2]!;
+    const result = await readSuite.execute("call-suite", { suiteIds: [suite.id] });
+    const payload = result.details as { suites: Array<{ id: string; shots: Array<{ assetType: string; shotRole: string; promptTemplate: string }> }> };
+    expect(payload.suites[0]!.id).toBe(suite.id);
+    expect(payload.suites[0]!.shots[0]!.assetType).toBe(`${suite.id}::${suite.shots[0]!.shotId}`);
+    expect(payload.suites[0]!.shots[0]!.promptTemplate.length).toBeGreaterThan(0);
+    await expect(readSuite.execute("call-suite-missing", { suiteIds: ["missing-suite"] })).rejects.toThrow("Unknown ecom suite");
   });
 });

@@ -7,6 +7,7 @@ export function serializePlanningBody(input: PlanningJobInput): string {
   return JSON.stringify({
     planningMode: input.planningMode,
     requestedTypes: types,
+    requestedSuiteShots: input.requestedSuiteShots,
     imageTypes: types,
     userInstruction: input.userInstruction,
     candidatesPerType: input.candidatesPerType,

@@ -70,6 +70,72 @@ export interface paths {
         patch: operations["updateUserTemplate"];
         trace?: never;
     };
+    "/suites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSuites"];
+        put?: never;
+        post: operations["createUserSuite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/suites/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["refreshSuites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/suites/{suiteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suiteId: components["parameters"]["SuiteId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getSuite"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteUserSuite"];
+        options?: never;
+        head?: never;
+        patch: operations["updateUserSuite"];
+        trace?: never;
+    };
+    "/suite-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSuiteCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/providers": {
         parameters: {
             query?: never;
@@ -913,6 +979,8 @@ export interface components {
         /** @enum {string} */
         SearchSourceKind: "brave" | "tavily" | "searxng";
         /** @enum {string} */
+        EcomSuiteOrigin: "builtin" | "user";
+        /** @enum {string} */
         EditOperation: "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "OUTPAINT" | "NATURAL_FUSION";
         /** @enum {string} */
         EditExecutionMode: "MODEL_DIRECTED" | "MASKED" | "OUTPAINT" | "NEED_INPUT";
@@ -1009,6 +1077,8 @@ export interface components {
         CreatePlanningJobInput: {
             planningMode?: components["schemas"]["PlanningMode"];
             requestedTypes?: string[];
+            /** @description 套图分镜 assetType 列表（<suiteId>::<shotId>，仅手动规划使用）；每个分镜生成一条分镜，可与 requestedTypes 混选。 */
+            requestedSuiteShots?: string[];
             imageTypes?: string[];
             userInstruction?: string;
             candidatesPerType?: number;
@@ -1075,6 +1145,88 @@ export interface components {
             defaultSize: "1024x1024" | "1024x1536";
             /** @default true */
             supportsImageReference: boolean;
+        };
+        EcomSuiteCategoriesResponse: {
+            l1: string[];
+            l2: {
+                [key: string]: string[];
+            };
+        };
+        EcomSuiteDetail: components["schemas"]["EcomSuiteFile"] & {
+            origin: components["schemas"]["EcomSuiteOrigin"];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        EcomSuiteFile: {
+            /** @default 1 */
+            schemaVersion: number;
+            /**
+             * @default ecomgen.suite
+             * @constant
+             */
+            kind: "ecomgen.suite";
+            id?: string;
+            name: string;
+            description?: string;
+            category: components["schemas"]["SuiteCategory"];
+            productFamily?: string;
+            keywords?: string[];
+            styleLock: components["schemas"]["SuiteStyleLock"];
+            shots: components["schemas"]["EcomSuiteShot"][];
+            provenance?: {
+                sourceKind?: string;
+                sourceImageCount?: number;
+                detached?: boolean;
+                notes?: string;
+            };
+        };
+        EcomSuiteShot: {
+            shotId: string;
+            order: number;
+            shotRole: components["schemas"]["StoryboardShotRole"];
+            displayName: string;
+            intent?: string;
+            /** @description 服务端派生为 <suiteId>::<shotId>，上传文件可省略。 */
+            assetType?: string;
+            /** @enum {string} */
+            mode?: "CREATIVE" | "PIXEL_PROTECTED";
+            aspectRatio?: components["schemas"]["ImageAspectRatio"];
+            resolution?: components["schemas"]["ImageResolution"];
+            camera?: string;
+            lighting?: string;
+            background?: string;
+            props?: string;
+            productOccupancy?: string;
+            whitespace?: string;
+            textZone?: string;
+            promptTemplate: string;
+            /** @default true */
+            supportsImageReference: boolean;
+        };
+        EcomSuiteShotSummary: {
+            shotId: string;
+            order: number;
+            shotRole: components["schemas"]["StoryboardShotRole"];
+            displayName: string;
+        };
+        EcomSuiteSummary: {
+            id: string;
+            name: string;
+            description?: string;
+            category: components["schemas"]["SuiteCategory"];
+            productFamily?: string;
+            shotCount: number;
+            shots: components["schemas"]["EcomSuiteShotSummary"][];
+            origin: components["schemas"]["EcomSuiteOrigin"];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        EcomSuitesResponse: {
+            items: components["schemas"]["EcomSuiteSummary"][];
         };
         EditReferenceAsset: {
             /** Format: uuid */
@@ -1532,6 +1684,30 @@ export interface components {
             factClaims?: string[];
             riskFlags: string[];
         };
+        SuiteCategory: {
+            l1: string;
+            l2: string;
+            leaf: string;
+            leafKeywords?: string[];
+        };
+        SuitePaletteColor: {
+            name: string;
+            hex: string;
+        };
+        SuiteStyleLock: {
+            direction?: string;
+            palette?: components["schemas"]["SuitePaletteColor"][];
+            temperature?: string;
+            backgroundSystem?: string;
+            lightingSystem?: string;
+            surfaceSystem?: string;
+            typography?: string;
+            iconSystem?: string;
+            presentationRules?: string;
+            noDrift?: string[];
+            /** @description 整句风格锁文本，规划时按 {style_lock} 注入每条分镜 Prompt。 */
+            lockText: string;
+        };
         UpdateProjectInput: {
             name?: string;
             category?: string | null;
@@ -1618,6 +1794,7 @@ export interface components {
         AiPlanningInput: {
             planningMode?: components["schemas"]["PlanningMode"];
             requestedTypes?: string[];
+            requestedSuiteShots?: string[];
             imageTypes?: string[];
             userInstruction?: string;
             candidatesPerType?: number;
@@ -1756,7 +1933,9 @@ export interface components {
         ManualPlanningInput: {
             /** @constant */
             planningMode: "MANUAL";
-            requestedTypes: string[];
+            requestedTypes?: string[];
+            /** @description 手动规划必须提供 requestedTypes 与 requestedSuiteShots 中至少一项。 */
+            requestedSuiteShots?: string[];
             userInstruction?: string;
             candidatesPerType?: number;
             imageResolution?: components["schemas"]["ImageResolution"];
@@ -1865,6 +2044,7 @@ export interface components {
         ExportId: string;
         LayerExportId: string;
         UserTemplateId: string;
+        SuiteId: string;
         Cursor: string;
     };
     requestBodies: never;
@@ -2005,6 +2185,165 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    listSuites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Available e-commerce image suites (built-in, drop-in directory, and user-imported). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomSuitesResponse"];
+                };
+            };
+        };
+    };
+    createUserSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EcomSuiteFile"];
+            };
+        };
+        responses: {
+            /** @description User suite imported. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomSuiteDetail"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    refreshSuites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Suite catalog reloaded from the drop-in directory and database. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomSuitesResponse"];
+                };
+            };
+        };
+    };
+    getSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suiteId: components["parameters"]["SuiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Suite detail with every storyboard shot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomSuiteDetail"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteUserSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suiteId: components["parameters"]["SuiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User suite deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateUserSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suiteId: components["parameters"]["SuiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EcomSuiteFile"];
+            };
+        };
+        responses: {
+            /** @description User suite updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomSuiteDetail"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listSuiteCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Built-in suite category taxonomy (L1 and L2) for browsing and search. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomSuiteCategoriesResponse"];
+                };
+            };
         };
     };
     listProviders: {

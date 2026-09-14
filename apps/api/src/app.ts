@@ -5,11 +5,12 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type UserTemplateRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type UserTemplateRecord } from "@ecomgen/core";
 import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
+import { SUITE_TAXONOMY } from "@ecomgen/ecom-suite";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind } from "@ecomgen/contracts";
+import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, createSegmentationProvider, probeReasoning, type PromptSegmentationProtocol } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -24,6 +25,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: true, genReqId: () => randomUUID() });
   const database = openDatabase(join(options.dataDir, "ecomgen.sqlite"));
   const repository = new EcomRepository(database);
+  const suiteCatalog = new SuiteCatalog({ dataDir: options.dataDir, repository });
+  await suiteCatalog.refresh();
   const storage = new LocalAssetStore(options.dataDir); await storage.initialize();
   const secrets = new SecretBox(options.masterKey);
   const redis = createRedisConnection(options.redisUrl);
@@ -73,6 +76,39 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const id = parameter(request, "templateId"); if (!repository.getUserTemplate(id)) missing("user template", id);
     // 模板是规划期资产：允许删除，引用它的旧分镜在生成期显式报错（见 worker 模板解析），不做静默降级
     repository.deleteUserTemplate(id);
+    return reply.code(204).send();
+  });
+  app.get("/api/v1/suites", async () => ({ items: suiteCatalog.listSummaries() }));
+  app.get("/api/v1/suite-categories", async () => ({ l1: [...SUITE_TAXONOMY.l1], l2: SUITE_TAXONOMY.l2 }));
+  app.post("/api/v1/suites/refresh", async () => { await suiteCatalog.refresh(); return { items: suiteCatalog.listSummaries() }; });
+  app.get("/api/v1/suites/:suiteId", async (request) => {
+    const id = parameter(request, "suiteId"); const suite = suiteCatalog.getSuite(id); if (!suite) missing("suite", id);
+    return suite;
+  });
+  app.post("/api/v1/suites", async (request, reply) => {
+    const body = parseBody(EcomSuiteFile, request.body);
+    assertValidSuiteDocument(body);
+    const id = suiteIdForImport(body.id, suiteCatalog);
+    repository.saveUserSuite({ id, name: body.name, l1: body.category.l1, l2: body.category.l2, leaf: body.category.leaf, productFamily: body.productFamily ?? null, payload: { ...body, id } });
+    await suiteCatalog.refresh();
+    const suite = suiteCatalog.getSuite(id); if (!suite) throw new ApiError(500, "INTERNAL_ERROR", "Suite was saved but could not be reloaded");
+    return reply.code(201).send(suite);
+  });
+  app.patch("/api/v1/suites/:suiteId", async (request) => {
+    const id = parameter(request, "suiteId"); if (!repository.getUserSuite(id)) missing("user suite", id);
+    const body = parseBody(EcomSuiteFile, request.body);
+    assertValidSuiteDocument(body);
+    repository.saveUserSuite({ id, name: body.name, l1: body.category.l1, l2: body.category.l2, leaf: body.category.leaf, productFamily: body.productFamily ?? null, payload: { ...body, id } });
+    await suiteCatalog.refresh();
+    const suite = suiteCatalog.getSuite(id); if (!suite) missing("suite", id);
+    return suite;
+  });
+  app.delete("/api/v1/suites/:suiteId", async (request, reply) => {
+    const id = parameter(request, "suiteId");
+    // 内置套图与目录投放套图不落库，只有导入套图可删；引用它的旧分镜在生成期显式报错，不做静默降级
+    if (!repository.getUserSuite(id)) throw new ApiError(409, "CONFLICT", "Only user-imported suites can be deleted");
+    repository.deleteUserSuite(id);
+    await suiteCatalog.refresh();
     return reply.code(204).send();
   });
   app.get("/api/v1/providers", async () => ({ items: repository.listProviders().map(publicProvider), nextCursor: null }));
@@ -268,15 +304,19 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       throw new ApiError(400, "VALIDATION_ERROR", "PIXEL_PROTECTED planning requires at least one PRODUCT_TRUTH image");
     }
     const requestedTypes = readOptionalTextArray(body.requestedTypes ?? body.imageTypes); if (requestedTypes?.length && resolveTemplatesWithUser(requestedTypes, compiledUserTemplates(repository)).length !== requestedTypes.length) throw new ApiError(400, "VALIDATION_ERROR", "requestedTypes contains an unknown ecom-details-image template ID or alias");
+    const requestedSuiteShots = resolveRequestedSuiteShots(body.requestedSuiteShots, suiteCatalog);
     const planningMode = body.planningMode === undefined ? "AI" : enumValue<PlanningMode>(body.planningMode, ["AI", "MANUAL"], "planningMode");
-    if (planningMode === "MANUAL" && !requestedTypes?.length) throw new ApiError(400, "VALIDATION_ERROR", "MANUAL planning requires requestedTypes");
+    if (planningMode === "MANUAL" && !requestedTypes?.length && requestedSuiteShots.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "MANUAL planning requires requestedTypes or requestedSuiteShots");
+    if (planningMode === "MANUAL" && requestedTypes?.length && requestedSuiteShots.length > 0) throw new ApiError(400, "VALIDATION_ERROR", "MANUAL planning accepts requestedTypes or requestedSuiteShots, not both");
     if (planningMode === "MANUAL" && body.targetImageCount !== undefined) throw new ApiError(400, "VALIDATION_ERROR", "targetImageCount is only supported for AI planning");
+    if (planningMode === "AI" && requestedSuiteShots.length > 0) throw new ApiError(400, "VALIDATION_ERROR", "requestedSuiteShots is only supported for MANUAL planning");
     const targetImageCount = planningMode === "AI"
       ? body.targetImageCount === undefined ? DEFAULT_TARGET_IMAGE_COUNT : planningImageCount(body.targetImageCount)
       : undefined;
     const input = {
       planningMode,
       requestedTypes,
+      requestedSuiteShots: requestedSuiteShots.length ? requestedSuiteShots : undefined,
       userInstruction: readOptionalText(body.userInstruction),
       candidatesPerType: body.candidatesPerType === undefined ? undefined : candidatesPerType(body.candidatesPerType),
       targetImageCount,
@@ -733,6 +773,34 @@ function publicSearchSource(value: SearchSourceRecord): object { const { encrypt
 function publicUserTemplate(value: UserTemplateRecord): object { return { ...value }; }
 /** 规划校验与 Worker 共用同一编译口径；表极小，按请求读取即可保证最新。 */
 function compiledUserTemplates(repository: EcomRepository): ReturnType<typeof compileUserTemplate>[] { return repository.listUserTemplates().map((record) => compileUserTemplate({ id: record.id, name: record.name, prompt: record.prompt, defaultSize: record.defaultSize, supportsImageReference: record.supportsImageReference })); }
+const SUITE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
+/** 导入套图必须落在 custom-suite- 命名空间，避免覆盖内置或目录投放套图。 */
+function suiteIdForImport(requested: string | undefined, catalog: SuiteCatalog): string {
+  if (requested) {
+    if (!requested.startsWith("custom-suite-") || !SUITE_ID_PATTERN.test(requested)) throw new ApiError(400, "VALIDATION_ERROR", "Imported suite id must start with custom-suite- and use lowercase letters, digits, dot, dash or underscore");
+    if (catalog.getSuite(requested)) throw new ApiError(409, "CONFLICT", `Suite id already exists: ${requested}`);
+    return requested;
+  }
+  let id = `custom-suite-${randomBytes(4).toString("hex")}`;
+  while (catalog.getSuite(id)) id = `custom-suite-${randomBytes(4).toString("hex")}`;
+  return id;
+}
+function assertValidSuiteDocument(value: unknown): void {
+  const result = validateEcomSuiteFile(value);
+  if (!result.ok) throw new ApiError(400, "VALIDATION_ERROR", "Invalid suite document", result.errors.map((reason) => ({ path: "/", reason })));
+}
+/** 手动规划可混选套图分镜与单图模板；分镜 assetType 必须是当前编目已知项，未知即报错而非静默丢弃。 */
+function resolveRequestedSuiteShots(requested: unknown, catalog: SuiteCatalog): string[] {
+  const assetTypes = readOptionalTextArray(requested) ?? [];
+  if (assetTypes.length === 0) return [];
+  if (assetTypes.length > MAX_REQUESTED_SUITE_SHOTS) throw new ApiError(400, "VALIDATION_ERROR", `requestedSuiteShots supports at most ${MAX_REQUESTED_SUITE_SHOTS} shots`);
+  const resolved: string[] = [];
+  for (const assetType of assetTypes) {
+    if (!catalog.resolveShot(assetType)) throw new ApiError(400, "VALIDATION_ERROR", `requestedSuiteShots contains an unknown suite shot: ${assetType}`);
+    if (!resolved.includes(assetType)) resolved.push(assetType);
+  }
+  return resolved;
+}
 function publicReferenceAsset(value: AssetRecord | EditReferenceAssetRecord): object {
   const temporary = "sessionId" in value;
   return { id: value.id, source: temporary ? "TEMPORARY" : "PROJECT", purpose: temporary ? value.purpose : defaultPurposeForRole(value.role), role: temporary ? null : value.role, originalName: value.originalName, mimeType: value.mimeType, hash: value.hash, createdAt: value.createdAt, expiresAt: temporary ? value.expiresAt : null, url: temporary ? `/files/edit-reference-assets/${value.id}` : `/files/assets/${value.id}` };

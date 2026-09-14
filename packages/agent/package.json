@@ -9,6 +9,7 @@
     "@sinclair/typebox": "^0.34.33",
     "@ecomgen/contracts": "workspace:*",
     "@ecomgen/ecom-skill": "workspace:*",
+    "@ecomgen/ecom-suite": "workspace:*",
     "@earendil-works/pi-agent-core": "^0.84.2",
     "@earendil-works/pi-ai": "^0.84.2"
   }

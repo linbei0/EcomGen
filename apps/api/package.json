@@ -13,6 +13,7 @@
     "@ecomgen/contracts": "workspace:*",
     "@ecomgen/core": "workspace:*",
     "@ecomgen/ecom-skill": "workspace:*",
+    "@ecomgen/ecom-suite": "workspace:*",
     "@ecomgen/jobs": "workspace:*",
     "@ecomgen/providers": "workspace:*",
     "@fastify/cors": "^11.1.0",

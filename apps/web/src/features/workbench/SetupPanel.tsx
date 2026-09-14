@@ -1,8 +1,10 @@
 import { App, AutoComplete, Button, Input, Popover, Select, Switch, Tooltip } from "antd";
-import { ChevronDown, Globe2, History, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store, WandSparkles } from "lucide-react";
+import { ChevronDown, Globe2, History, Images, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store, WandSparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useSuites } from "../../api/hooks/useSuites";
+import { loadSuiteShots, saveSuiteShots } from "../../lib/suiteSelection";
 
-import type { PlanningMode, ProjectDetail, TargetMarket, UpdateProjectInput } from "../../api/adapters/projectDetail";
+import type { ProjectDetail, TargetMarket, UpdateProjectInput } from "../../api/adapters/projectDetail";
 import { useApplyPlanningConfigSnapshot, usePlanningConfigSnapshots } from "../../api/hooks/usePlanningConfigSnapshots";
 import { useCreatePlanningJob } from "../../api/hooks/usePlanning";
 import { useCopywritingResult, useCreateCopywritingJob, type CopywritingTarget } from "../../api/hooks/useCopywriting";
@@ -22,6 +24,7 @@ import { randomUuid } from "../../lib/randomUuid";
 import { canResubmitPlan, isActiveJob, latestPlanJob } from "../../lib/planJob";
 import { PLATFORM_LABEL, RESOLUTION_LABEL } from "../../lib/roles";
 import { ASPECT_SELECT_OPTIONS, renderAspectOption } from "./aspectOptions";
+import { SuitePickerDialog } from "./SuitePickerDialog";
 import { UserTemplateManager } from "./UserTemplateManager";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import styles from "./workbench.module.css";
@@ -65,6 +68,8 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const templates = useTemplates();
   const userTemplatesQuery = useUserTemplates();
   const userTemplates = userTemplatesQuery.data ?? [];
+  const suitesQuery = useSuites();
+  const suiteCatalog = suitesQuery.data ?? [];
   const createPlan = useCreatePlanningJob(detail.id);
   const planningSnapshots = usePlanningConfigSnapshots(detail.id);
   const applyPlanningSnapshot = useApplyPlanningConfigSnapshot(detail.id);
@@ -72,13 +77,16 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const retryJob = useRetryJob(detail.id);
   const catalog = templates.data ?? [];
   const stored = useMemo(() => loadImageTypes(detail.id), [detail.id]);
+  const storedSuiteShots = useMemo(() => loadSuiteShots(detail.id), [detail.id]);
   const [name, setName] = useState(detail.name);
   const [description, setDescription] = useState(detail.productDescription ?? "");
   const [facts, setFacts] = useState(toLines(detail.verifiedFacts));
   const [claims, setClaims] = useState(toLines(detail.prohibitedClaims));
-  const [planningMode, setPlanningMode] = useState<PlanningMode>("AI");
+  const [selectionMode, setSelectionMode] = useState<"AI" | "MANUAL" | "SUITE">("AI");
   const [targetImageCount, setTargetImageCount] = useState(DEFAULT_TARGET_IMAGE_COUNT);
   const [selected, setSelected] = useState<string[]>(stored);
+  const [selectedSuiteShots, setSelectedSuiteShots] = useState<string[]>(storedSuiteShots);
+  const [suitePickerOpen, setSuitePickerOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [managerOpen, setManagerOpen] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | undefined>(undefined);
@@ -246,6 +254,23 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
     });
   };
 
+  // 套图分镜选择：按套图分组展示，避免不同模板的分镜混在一起；组内可全部清空。
+  const selectedShotGroups = useMemo(() => {
+    const groups: Array<{ suiteId: string; suiteName: string; shots: Array<{ assetType: string; label: string }> }> = [];
+    for (const assetType of selectedSuiteShots) {
+      const suiteId = assetType.split("::")[0] ?? assetType;
+      const suite = suiteCatalog.find((item) => item.id === suiteId);
+      let group = groups.find((item) => item.suiteId === suiteId);
+      if (!group) {
+        group = { suiteId, suiteName: suite?.name ?? suiteId, shots: [] };
+        groups.push(group);
+      }
+      const shot = suite?.shots.find((item) => `${suite.id}::${item.shotId}` === assetType);
+      group.shots.push({ assetType, label: shot?.displayName ?? assetType });
+    }
+    return groups;
+  }, [selectedSuiteShots, suiteCatalog]);
+
   const startCopywriting = async (target: CopywritingTarget) => {
     if (copywritingUnavailableReason) {
       notification.warning({ title: copywritingUnavailableReason });
@@ -281,22 +306,28 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       notification.error({ title: "请先上传至少一张产品图" });
       return;
     }
-    if (planningMode === "MANUAL" && selected.length === 0) {
+    if (selectionMode === "MANUAL" && selected.length === 0) {
       notification.error({ title: "至少选择一种图片类型" });
+      return;
+    }
+    if (selectionMode === "SUITE" && selectedSuiteShots.length === 0) {
+      notification.error({ title: "至少选择一个套图分镜" });
       return;
     }
     try {
       const created = await createPlan.mutateAsync({
-        planningMode,
-        requestedTypes: planningMode === "MANUAL" ? selected : undefined,
+        planningMode: selectionMode === "AI" ? "AI" : "MANUAL",
+        requestedTypes: selectionMode === "MANUAL" ? selected : undefined,
+        requestedSuiteShots: selectionMode === "SUITE" ? selectedSuiteShots : undefined,
         userInstruction: instruction.trim() || undefined,
         candidatesPerType,
-        ...(planningMode === "AI" ? { targetImageCount } : {}),
+        ...(selectionMode === "AI" ? { targetImageCount } : {}),
         imageResolution,
         imageAspectRatio,
         regenerationKey: seedJob?.status === "SUCCEEDED" ? randomUuid() : undefined,
       });
       if (selected.length > 0) saveImageTypes(detail.id, selected);
+      if (selectedSuiteShots.length > 0) saveSuiteShots(detail.id, selectedSuiteShots);
       setActiveJobId(created.id);
       if (created.reused) {
         notification.info({
@@ -320,9 +351,13 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       setDefaultMode(project.defaultMode); setReasoningKeyDraft(modelKey(project.reasoningProviderId, project.reasoningModelId));
       setImageKeyDraft(modelKey(project.imageProviderId, project.imageModelId)); setImageResolution(project.imageResolution);
       setImageAspectRatio(project.imageAspectRatio); candidateRef.current = project.candidatesPerType; setCandidatesPerType(project.candidatesPerType);
-      setPlanningMode(planning.planningMode); setSelected(planning.requestedTypes);
+      const snapshotShots = planning.requestedSuiteShots ?? [];
+      setSelectionMode(planning.planningMode === "AI" ? "AI" : snapshotShots.length > 0 ? "SUITE" : "MANUAL");
+      setSelected(planning.requestedTypes);
+      setSelectedSuiteShots(snapshotShots);
       setTargetImageCount(planning.targetImageCount ?? DEFAULT_TARGET_IMAGE_COUNT); setInstruction(planning.userInstruction ?? "");
       if (planning.requestedTypes.length > 0) saveImageTypes(detail.id, planning.requestedTypes);
+      if (snapshotShots.length > 0) saveSuiteShots(detail.id, snapshotShots);
       notification.success({ title: "已套用最近配置" });
     } catch (error) {
       notification.error({ title: "套用配置失败", description: errorText(error) });
@@ -551,14 +586,59 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
 
       <Section title="出图类型" icon={<Layers3 size={14} strokeWidth={1.75} aria-hidden />}>
         <div className={styles.kindToggle} role="group" aria-label="规划方式">
-          <button type="button" data-active={planningMode === "AI"} onClick={() => setPlanningMode("AI")}>
+          <button type="button" data-active={selectionMode === "AI"} onClick={() => setSelectionMode("AI")}>
             AI 智能规划
           </button>
-          <button type="button" data-active={planningMode === "MANUAL"} onClick={() => setPlanningMode("MANUAL")}>
+          <button type="button" data-active={selectionMode === "MANUAL"} onClick={() => setSelectionMode("MANUAL")}>
             手动选择
           </button>
+          <button type="button" data-active={selectionMode === "SUITE"} onClick={() => setSelectionMode("SUITE")}>
+            套图
+          </button>
         </div>
-        {planningMode === "MANUAL" ? (
+        {selectionMode === "SUITE" ? (
+          <>
+            <div className={styles.suitePanelHead}>
+              <span className={styles.suitePanelTitle}>
+                <Images size={14} strokeWidth={1.75} aria-hidden /> 套图分镜
+                {selectedSuiteShots.length > 0 ? <em>{selectedSuiteShots.length} 个</em> : null}
+              </span>
+              <Button
+                size="small"
+                type={selectedSuiteShots.length > 0 ? "default" : "primary"}
+                onClick={() => setSuitePickerOpen(true)}
+              >
+                {selectedSuiteShots.length > 0 ? "调整选择" : "选择分镜"}
+              </Button>
+            </div>
+            {selectedSuiteShots.length > 0 ? (
+              <div className={styles.suiteGroups}>
+                {selectedShotGroups.map((group) => (
+                  <div key={group.suiteId} className={styles.suiteGroup}>
+                    <span className={styles.suiteGroupHead}>{group.suiteName} · {group.shots.length} 个分镜</span>
+                    <div className={styles.chipRow}>
+                      {group.shots.map(({ assetType, label }) => (
+                        <button
+                          key={assetType}
+                          type="button"
+                          className={styles.chip}
+                          data-on
+                          data-suite
+                          title="点击取消选择"
+                          onClick={() => setSelectedSuiteShots((current) => current.filter((item) => item !== assetType))}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.suiteHint}>从套图模板里挑选分镜，每个分镜生成一张属于你商品的图片。</p>
+            )}
+          </>
+        ) : selectionMode === "MANUAL" ? (
           <>
             <div className={styles.chipRow}>
               {catalog.map((item) => {
@@ -678,6 +758,13 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
         open={managerOpen}
         items={userTemplates}
         onClose={() => setManagerOpen(false)}
+      />
+
+      <SuitePickerDialog
+        open={suitePickerOpen}
+        value={selectedSuiteShots}
+        onChange={setSelectedSuiteShots}
+        onClose={() => setSuitePickerOpen(false)}
       />
     </div>
   );

@@ -26,7 +26,7 @@ export interface PlanningConfigSnapshot {
   sourceJobId: string;
   payload: {
     project: Pick<Project, "name" | "category" | "productDescription" | "verifiedFacts" | "prohibitedClaims" | "brandGuidelines" | "platformTargets" | "targetMarket" | "copyLanguage" | "reasoningProviderId" | "reasoningModelId" | "imageProviderId" | "imageModelId" | "segmentationModel" | "defaultMode" | "imageResolution" | "imageAspectRatio" | "candidatesPerType" | "webResearchEnabled">;
-    planning: { planningMode: PlanningMode; requestedTypes: string[]; targetImageCount: number | null; userInstruction: string | null };
+    planning: { planningMode: PlanningMode; requestedTypes: string[]; requestedSuiteShots?: string[]; targetImageCount: number | null; userInstruction: string | null };
   };
   createdAt: string;
 }

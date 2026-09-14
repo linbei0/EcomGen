@@ -39,3 +39,17 @@ export const ASPECT_LABEL = {
   "16:9": "16:9 宽屏",
   "21:9": "21:9 超宽屏",
 } as const;
+
+/** 套图分镜角色展示：顺序与 StoryboardShotRole 契约一致，色值由 CSS 按 data-role 渲染。 */
+export const SHOT_ROLE_ORDER = ["HERO", "PAIN_POINT", "COMPARISON", "SCENE", "DETAIL", "TRUST", "VARIANT", "CTA"] as const;
+
+export const SHOT_ROLE_LABEL: Record<(typeof SHOT_ROLE_ORDER)[number], string> = {
+  HERO: "主图",
+  PAIN_POINT: "痛点",
+  COMPARISON: "对比",
+  SCENE: "场景",
+  DETAIL: "细节",
+  TRUST: "信任",
+  VARIANT: "变体",
+  CTA: "转化",
+};

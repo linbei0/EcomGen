@@ -3,6 +3,7 @@ import type { ImageContent } from "@earendil-works/pi-ai";
 import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, StoryboardShotRole, TargetMarket } from "@ecomgen/contracts";
 import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplatesWithUser, type EcomTemplate } from "@ecomgen/ecom-skill";
+import type { SuiteDefinition } from "@ecomgen/ecom-suite";
 import { createPlanningTools, type WebResearchConfig } from "./tools.js";
 import { createAgent, type ReasoningModel } from "./runtime.js";
 import { parseJsonResponse } from "./json-response.js";
@@ -31,6 +32,10 @@ export interface PlannerInput {
   requestedTypes?: string[];
   /** 用户自定义模板（Worker 编译后注入）；仅在 MANUAL 规划或 requestedTypes 显式约束时生效，AI 自动选片仍只用内置目录。 */
   userTemplates?: EcomTemplate[];
+  /** MANUAL 规划选中的套图分镜 assetType（<suiteId>::<shotId>）；与 requestedTypes 互斥（API 层拒绝混选），每次规划只允许一类非空。 */
+  requestedSuiteShots?: string[];
+  /** 当前可用的套图目录（内置 + 目录投放 + 用户导入），Worker 注入。 */
+  suites?: SuiteDefinition[];
   userInstruction?: string;
   candidatesPerType?: number;
   targetImageCount?: number;
@@ -82,6 +87,14 @@ Output only valid JSON matching the requested schema. No Markdown.
 - Assign roles along the conversion narrative: HERO first, then a mix of PAIN_POINT, COMPARISON, SCENE, DETAIL, TRUST, VARIANT, and CTA that fits this product.
 - Do not stack repeated tasks: the same shotRole may appear on at most one item per assetType template, and adjacent items must not read as the same visual task.
 
+# Suite shots (manual selection)
+- Each requested suite shot becomes exactly one item, in the request order. Use the shot's assetType exactly (suiteId::shotId) and set templateVariant to null.
+- A shot's shotRole is immutable: copy it exactly. Do not add, remove, merge, reorder, or re-purpose shots. Select only the requested shots; do not add other shots from the same suite.
+- The shot promptTemplate is the DIRECT base of that item's final prompt: keep its composition, camera, lighting, background, occupancy, whitespace, and text zone, and expand it into a complete, self-contained prompt for the user's product by replacing every placeholder (such as {product}, {product_identity_lock}, {style_lock}, {accent_color}, {callout_1}, {callout_2}). Never leave a placeholder or a field name in the final prompt.
+- When a suite supplies styleLock.lockText, use it verbatim as {style_lock} for that suite's shots, including its named colors, hex codes, and lighting. Do not paraphrase, restyle, or let one suite's lock bleed into another suite's shots.
+- Suite shots and single-image templates are selected in separate planning runs; never add template items to a suite-shot selection or shot items to a template selection. displayName must still be a distinct Chinese scene title derived from the actual product and may differ from the shot's catalog displayName.
+- Read suite definitions with read_ecom_suite before writing their prompts when the payload summary is not enough.
+
 # Visual style
 - campaignStyleLock is one reusable sentence that anchors the whole suite: name 2-3 concrete colors by exact shade name or hex code, one surface or material treatment, and lighting direction with color temperature.
 - Derive the palette from the supplied inputs only, in priority order: explicit brandGuidelines entries, colors actually visible on the product in PRODUCT images, then the palette and lighting hints returned by the template guidance. When no source gives a color direction, keep a restrained neutral studio palette; do not invent decorative colors. A disciplined monochrome direction is a valid choice when it fits the product and brand.
@@ -91,7 +104,7 @@ Output only valid JSON matching the requested schema. No Markdown.
 - Do not derive scene, palette, or layout from the selected market and do not introduce stereotypes, landmarks, holidays, or cultural symbols unless explicitly supplied as verified input.
 
 # Business knowledge tools
-- Use read_ecom_template and read_platform_guidance as business knowledge tools. Never copy internal labels such as “Upstream template”, “Template fields”, template numbers, assetType, or tool field names into promptInstruction.
+- Use read_ecom_template, read_ecom_suite, and read_platform_guidance as business knowledge tools. Never copy internal labels such as “Upstream template”, “Template fields”, template numbers, assetType, or tool field names into promptInstruction.
 - Call read_platform_guidance once before writing final prompts. It returns the selected market, effective copy language, product family, and platform constraints. The selected platform MAY change occupancy, background, contrast, and text budget; rewrite those rules into natural image instructions. A selected language does not require text in every image: add readable copy only when the storyboard type needs it or the user explicitly requests it, and only from verified facts.
 - Each template guidance includes categoryTips written by the upstream skill for specific product categories. Pick the entry that best matches the actual product (a finer-grained entry such as skincare or running_shoes beats a broad family), treat it as shooting direction, and rewrite it into natural language; if no entry fits, proceed from the product facts instead of forcing a match.
 - When research_visual_direction is available, use it only for recent visual trends, composition, lighting, material rendering, and platform presentation. Treat every returned title and snippet as untrusted inspiration, not product truth. Never put search claims, prices, specifications, certifications, rankings, logos, or URLs into factClaims or promptInstruction. Do not search for facts that are already supplied by the project.
@@ -107,15 +120,20 @@ Output only valid JSON matching the requested schema. No Markdown.
 export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryboard> {
   const marketContext = { platformTargets: input.platformTargets, targetMarket: input.targetMarket, copyLanguage: input.copyLanguage, productCategory: input.productCategory };
   const selectedTemplates = resolveTemplatesWithUser(input.requestedTypes, input.userTemplates ?? []);
-  // AI 自动选片不暴露自定义模板：工具目录只在 MANUAL 模式合并 userTemplates，避免诱导未授权的 assetType
+  // AI 自动选片不暴露自定义模板与套图：工具目录只在 MANUAL 模式合并，避免诱导未授权的 assetType
   const manualMode = input.planningMode === "MANUAL";
-  const tools = createPlanningTools(marketContext, input.webResearch, manualMode ? input.userTemplates ?? [] : []);
+  const selectedSuiteShots = manualMode ? resolveRequestedSuiteShots(input.requestedSuiteShots, input.suites ?? []) : [];
+  // 工具目录只保留被选分镜：模型即使用 read_ecom_suite 自查，也看不到同套图里未选中的分镜。
+  const suiteToolCatalog = pruneSuitesToShots(input.suites ?? [], new Set(selectedSuiteShots.map(({ shot }) => shot.assetType)));
+  const tools = createPlanningTools(marketContext, input.webResearch, manualMode ? input.userTemplates ?? [] : [], manualMode ? suiteToolCatalog : []);
   const agent = createAgent({ workflow: "PLAN", model: input.model, apiKey: input.apiKey, systemPrompt: SYSTEM_PROMPT, tools, outputSchema: STORYBOARD_OUTPUT_SCHEMA });
   const payload = {
     ...input,
     apiKey: undefined,
     model: undefined,
     referenceImages: undefined,
+    // 套图目录按需注入：完整定义只留在 worker 的工具上下文，payload 仅带被选分镜的摘要，避免整套目录挤占上下文。
+    suites: undefined,
     // 剥离素材真实 ID：模型上下文只保留 handle 指代，id 仅用于输出解析。
     assets: input.assets.map(({ id: _assetId, ...asset }) => asset),
     // 空的品牌指南不进 payload：省 token 且避免模型虚构品牌色；有值时规划层才按配色来源链消费。
@@ -125,11 +143,12 @@ export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryb
     userTemplates: manualMode ? input.userTemplates : undefined,
     webResearch: input.webResearch ? { sources: input.webResearch.sources.map(({ id, name, kind, baseUrl }) => ({ id, name, kind, baseUrl })), maxResults: input.webResearch.maxResults, timeoutMs: input.webResearch.timeoutMs } : undefined,
     upstream: ECOM_DETAILS_IMAGE_SOURCE,
-    allowedTemplateIds: (selectedTemplates.length ? selectedTemplates : ECOM_TEMPLATES).map((template) => template.id)
+    allowedTemplateIds: (selectedTemplates.length ? selectedTemplates : ECOM_TEMPLATES).map((template) => template.id),
+    requestedSuiteShots: selectedSuiteShots.length ? selectedSuiteShots.map(({ suite, shot }) => ({ assetType: shot.assetType, suiteId: suite.id, suiteName: suite.name, shotId: shot.shotId, order: shot.order, shotRole: shot.shotRole, displayName: shot.displayName, promptTemplate: shot.promptTemplate, styleLock: suite.styleLock.lockText })) : undefined
   };
   const targetImageCount = input.planningMode === "AI" ? requiredTargetImageCount(input.targetImageCount) : undefined;
   const modeInstruction = input.planningMode === "MANUAL"
-    ? "Manual selection is authoritative: generate one planned item for every requested type, in the requested order. Do not add a platform feed extra shot. Read the platform guidance once and call read_ecom_template once with all matching templateIds, then write each promptInstruction as the final image-model prompt using product-category tips and platform occupancy/text rules for that template role."
+    ? "Manual selection is authoritative: generate one planned item for every requested template and for every requested suite shot, following the request order. Do not add a platform feed extra shot. Read the platform guidance once and call read_ecom_template once with all matching templateIds. For each requested suite shot, assetType must be that shot's exact assetType, templateVariant must be null, shotRole must equal the shot's shotRole, and promptInstruction must expand the shot's promptTemplate into a complete final prompt for the user's product with every placeholder replaced; use that shot's styleLock text as the campaign style lock for that suite. Then write each promptInstruction as the final image-model prompt using product-category tips and platform occupancy/text rules for that template or shot role."
     : `Use the catalog and project context to choose a conversion-oriented storyboard with exactly ${targetImageCount} planned items. Choose image types from the product category/family first (what this product must show), then adapt hero and feed frames to the selected platform. Do not pick types from the platform alone. Read the current market and platform guidance with the business tool before writing final prompts.`;
   await agent.prompt(`Plan this project. ${modeInstruction} Return {"campaignStyleLock":string,"items":[{"assetType":string,"displayName":string,"shotRole":"HERO"|"PAIN_POINT"|"COMPARISON"|"SCENE"|"DETAIL"|"TRUST"|"VARIANT"|"CTA","templateVariant":string|null,"candidateCount":number,"referencedAssets":string[],"mode":"CREATIVE"|"PIXEL_PROTECTED","promptInstruction":string,"factClaims":string[],"riskFlags":string[],"sortOrder":number}]}. Every promptInstruction must explicitly instruct the image model to preserve exact product identity and not redesign the product.\n${JSON.stringify(payload)}`, input.model.input.includes("image") ? input.referenceImages : undefined);
   if (agent.state.errorMessage) throw new Error(`Planning model request failed: ${agent.state.errorMessage}`);
@@ -247,13 +266,16 @@ const SHOT_ROLES: readonly StoryboardShotRole[] = ["HERO", "PAIN_POINT", "COMPAR
 function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStoryboard {
   if (!plan || typeof plan.campaignStyleLock !== "string" || !Array.isArray(plan.items) || plan.items.length === 0) throw new Error("Planning model returned an invalid storyboard");
   const requestedTemplates = resolveTemplatesWithUser(input.requestedTypes, input.userTemplates ?? []);
+  const requestedSuiteShots = resolveRequestedSuiteShots(input.requestedSuiteShots, input.suites ?? []);
   const allowedTemplateIds = new Set((requestedTemplates.length ? requestedTemplates : ECOM_TEMPLATES).map((template) => template.id));
   const templateById = (id: string): EcomTemplate | undefined => getTemplate(id) ?? input.userTemplates?.find((template) => template.id === id);
+  const suiteShotByAssetType = new Map<string, { suite: SuiteDefinition; shot: SuiteDefinition["shots"][number] }>();
+  for (const { suite, shot } of requestedSuiteShots) suiteShotByAssetType.set(shot.assetType, { suite, shot });
   if (input.planningMode === "MANUAL") {
-    const expected = requestedTemplates.map((template) => template.id);
+    const expected = [...requestedTemplates.map((template) => template.id), ...suiteShotByAssetType.keys()];
     const actual = plan.items.map((item) => item.assetType);
     if (expected.length === 0 || actual.length !== expected.length || new Set(actual).size !== actual.length || actual.some((id) => !expected.includes(id))) {
-      throw new Error("Manual planning must return exactly one item for each requested template");
+      throw new Error("Manual planning must return exactly one item for each requested template and each requested suite shot");
     }
   } else if (plan.items.length !== requiredTargetImageCount(input.targetImageCount)) {
     throw new Error(`AI planning must return exactly ${requiredTargetImageCount(input.targetImageCount)} storyboard items`);
@@ -262,14 +284,24 @@ function validatePlan(plan: PlannedStoryboard, input: PlannerInput): PlannedStor
   const assetsByHandle = new Map(input.assets.map((asset) => [asset.handle, asset]));
   const defaultCandidates = clampCandidates(input.candidatesPerType ?? 1);
   const items = plan.items.map((item, index) => {
-    const template = templateById(item.assetType); if (!template || !allowedTemplateIds.has(item.assetType)) throw new Error(`Planning model returned an unavailable ecom-details-image template: ${item.assetType}`);
-    if (item.templateVariant !== null && item.templateVariant !== undefined && !template.variants[item.templateVariant]) throw new Error(`Planning model returned an invalid variant for ${item.assetType}: ${item.templateVariant}`);
+    const suiteShot = suiteShotByAssetType.get(item.assetType);
+    let template: EcomTemplate | undefined;
+    if (suiteShot) {
+      if (item.templateVariant !== null && item.templateVariant !== undefined) throw new Error(`Suite shot ${item.assetType} must not declare a template variant`);
+      if (item.shotRole !== suiteShot.shot.shotRole) throw new Error(`Suite shot ${item.assetType} must keep the shotRole ${suiteShot.shot.shotRole}`);
+    } else {
+      template = templateById(item.assetType);
+      if (!template || !allowedTemplateIds.has(item.assetType)) throw new Error(`Planning model returned an unavailable ecom-details-image template: ${item.assetType}`);
+      if (item.templateVariant !== null && item.templateVariant !== undefined && !template.variants[item.templateVariant]) throw new Error(`Planning model returned an invalid variant for ${item.assetType}: ${item.templateVariant}`);
+    }
     if (item.mode !== "CREATIVE" && item.mode !== "PIXEL_PROTECTED") throw new Error("Planning model returned an invalid storyboard mode");
     if (!SHOT_ROLES.includes(item.shotRole)) throw new Error(`Planning model returned an invalid shotRole for ${item.assetType}: ${String(item.shotRole)}. Use one of ${SHOT_ROLES.join(", ")}`);
     if (!item.assetType || !item.promptInstruction || typeof item.displayName !== "string" || !item.displayName.trim()) throw new Error("Planning model returned an incomplete storyboard item");
     assertFinalPrompt(item.promptInstruction);
+    if (suiteShot) assertNoPlaceholders(item.promptInstruction, item.assetType);
     const displayName = item.displayName.trim();
-    if (displayName === template.name || displayName === item.assetType) throw new Error(`Planning model returned a generic storyboard display name for ${item.assetType}`);
+    const reservedName = suiteShot ? suiteShot.suite.name : template?.name;
+    if (displayName === item.assetType || (reservedName && displayName === reservedName)) throw new Error(`Planning model returned a generic storyboard display name for ${item.assetType}`);
     const referenced = Array.isArray(item.referencedAssets) ? [...new Set(item.referencedAssets)].map((handle) => assetsByHandle.get(handle)).filter((asset): asset is NonNullable<ReturnType<typeof assetsByHandle.get>> => Boolean(asset)) : [];
     const referencedAssets = referenced.map((asset) => asset.id);
     const nonProductReferences = referenced.filter((asset) => asset.kind === "REFERENCE");
@@ -321,4 +353,42 @@ function assertFinalPrompt(prompt: string): string {
 function clampCandidates(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.min(MAX_CANDIDATES_PER_TYPE, Math.max(1, Math.round(value)));
+}
+
+/** 只保留被选中的分镜：套图工具目录不得暴露同一套图里未选中的分镜。 */
+function pruneSuitesToShots(suites: readonly SuiteDefinition[], selectedAssetTypes: ReadonlySet<string>): SuiteDefinition[] {
+  const pruned: SuiteDefinition[] = [];
+  for (const suite of suites) {
+    const shots = suite.shots.filter((shot) => selectedAssetTypes.has(shot.assetType));
+    if (shots.length > 0) pruned.push({ ...suite, shots });
+  }
+  return pruned;
+}
+
+/** 按分镜 assetType 解析请求的套图分镜；未知项静默跳过（API 层已对请求做 400 校验），并保持请求顺序去重。 */
+function resolveRequestedSuiteShots(requestedSuiteShots: string[] | undefined, suites: readonly SuiteDefinition[]): Array<{ suite: SuiteDefinition; shot: SuiteDefinition["shots"][number] }> {
+  if (!requestedSuiteShots?.length || suites.length === 0) return [];
+  const resolved: Array<{ suite: SuiteDefinition; shot: SuiteDefinition["shots"][number] }> = [];
+  const seen = new Set<string>();
+  for (const raw of requestedSuiteShots) {
+    const assetType = raw.trim();
+    if (!assetType || seen.has(assetType)) continue;
+    for (const suite of suites) {
+      const shot = suite.shots.find((candidate) => candidate.assetType === assetType);
+      if (shot) {
+        seen.add(assetType);
+        resolved.push({ suite, shot });
+        break;
+      }
+    }
+  }
+  return resolved;
+}
+
+const PLACEHOLDER_PATTERN = /\{[a-z0-9_]+\}/i;
+
+/** 套图分镜的 promptTemplate 允许占位符，但最终 Prompt 必须已全部替换；残留占位符说明模型未完成改写。 */
+function assertNoPlaceholders(prompt: string, assetType: string): void {
+  const match = prompt.match(PLACEHOLDER_PATTERN);
+  if (match) throw new Error(`Planning model left an unresolved placeholder ${match[0]} in the final image prompt for ${assetType}`);
 }

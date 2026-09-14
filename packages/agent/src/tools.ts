@@ -1,6 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { ECOM_TEMPLATES, templateGuidance, type EcomTemplate } from "@ecomgen/ecom-skill";
+import type { SuiteDefinition } from "@ecomgen/ecom-suite";
 import { readPlatformGuidance, type MarketGuidanceContext } from "./platform-guidance.js";
 
 export { readPlatformGuidance, type MarketGuidanceContext } from "./platform-guidance.js";
@@ -48,6 +49,11 @@ type ReadTemplateParameters = Static<typeof readTemplateParameters>;
 const readPlatformParameters = Type.Object({});
 type ReadPlatformParameters = Static<typeof readPlatformParameters>;
 
+const readSuiteParameters = Type.Object({
+  suiteIds: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 6 })
+});
+type ReadSuiteParameters = Static<typeof readSuiteParameters>;
+
 const researchVisualDirectionParameters = Type.Object({
   query: Type.String({ minLength: 3, maxLength: 240, description: "仅查询近期视觉趋势、构图、光线、材质表现或目标平台版式；不要查询商品事实" }),
   maxResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 5 }))
@@ -58,8 +64,8 @@ function textResult<T>(details: T): AgentToolResult<T> {
   return { content: [{ type: "text", text: JSON.stringify(details) }], details };
 }
 
-/** Pi 只能通过只读业务工具读取电商规范；联网研究必须使用受控搜索工具。extraTemplates 为 MANUAL 规划注入的用户自定义模板。 */
-export function createPlanningTools(context: MarketGuidanceContext, webResearch?: WebResearchConfig, extraTemplates: readonly EcomTemplate[] = []): AgentTool[] {
+/** Pi 只能通过只读业务工具读取电商规范；联网研究必须使用受控搜索工具。extraTemplates 为 MANUAL 规划注入的用户自定义模板，suites 为 MANUAL 规划可选的套图目录。 */
+export function createPlanningTools(context: MarketGuidanceContext, webResearch?: WebResearchConfig, extraTemplates: readonly EcomTemplate[] = [], suites: readonly SuiteDefinition[] = []): AgentTool[] {
   const catalog: readonly EcomTemplate[] = extraTemplates.length ? [...ECOM_TEMPLATES, ...extraTemplates] : ECOM_TEMPLATES;
   const readTemplate: AgentTool<typeof readTemplateParameters> = {
     name: "read_ecom_template",
@@ -95,7 +101,50 @@ export function createPlanningTools(context: MarketGuidanceContext, webResearch?
     }
   };
 
+  const readSuite: AgentTool<typeof readSuiteParameters> = {
+    name: "read_ecom_suite",
+    label: "读取套图分镜规范",
+    description: "按套图 ID 批量读取套图分镜定义。返回每套的整句风格锁与每个分镜的 shotRole、构图、机位、光线、背景、主体占比、留白、文字区与 promptTemplate。promptTemplate 是该分镜最终 Prompt 的直接基线：替换其中的 {product}、{product_identity_lock}、{style_lock}、{accent_color}、{callout_*} 等占位符并改写成商品自己的最终 Prompt，禁止把占位符、字段名或内部元数据留在最终 Prompt 中。",
+    parameters: readSuiteParameters,
+    execute: async (_toolCallId: string, params: ReadSuiteParameters): Promise<AgentToolResult<unknown>> => {
+      const resolved = params.suiteIds.map((suiteId) => {
+        const suite = suites.find((candidate) => candidate.id === suiteId);
+        if (!suite) throw new Error(`Unknown ecom suite: ${suiteId}`);
+        return {
+          id: suite.id,
+          name: suite.name,
+          description: suite.description ?? null,
+          category: suite.category,
+          productFamily: suite.productFamily ?? null,
+          styleLock: suite.styleLock,
+          shots: suite.shots.map((shot) => ({
+            assetType: shot.assetType,
+            shotId: shot.shotId,
+            order: shot.order,
+            shotRole: shot.shotRole,
+            displayName: shot.displayName,
+            intent: shot.intent ?? null,
+            mode: shot.mode,
+            aspectRatio: shot.aspectRatio ?? null,
+            resolution: shot.resolution ?? null,
+            camera: shot.camera ?? null,
+            lighting: shot.lighting ?? null,
+            background: shot.background ?? null,
+            props: shot.props ?? null,
+            productOccupancy: shot.productOccupancy ?? null,
+            whitespace: shot.whitespace ?? null,
+            textZone: shot.textZone ?? null,
+            promptTemplate: shot.promptTemplate,
+            supportsImageReference: shot.supportsImageReference
+          }))
+        };
+      });
+      return textResult({ suites: resolved });
+    }
+  };
+
   const tools: AgentTool[] = [readTemplate, readPlatform];
+  if (suites.length > 0) tools.push(readSuite);
   if (webResearch?.sources.some((source) => source.kind === "searxng" || source.apiKey?.trim())) tools.push(createVisualResearchTool(webResearch));
   return tools;
 }

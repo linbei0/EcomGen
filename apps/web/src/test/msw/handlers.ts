@@ -133,7 +133,10 @@ export const handlers = [
     });
   }),
 
-  http.get(`${BASE}/ecom-templates`, () => HttpResponse.json(TEMPLATE_FIXTURES)),
+    http.get(`${BASE}/ecom-templates`, () => HttpResponse.json(TEMPLATE_FIXTURES)),
+    http.get(`${BASE}/suites`, () => HttpResponse.json({ items: [] })),
+    http.get(`${BASE}/suite-categories`, () => HttpResponse.json({ l1: [], l2: {} })),
+
 
   http.get(`${BASE}/user-templates`, () =>
     HttpResponse.json({ items: userTemplateStore, nextCursor: null }),

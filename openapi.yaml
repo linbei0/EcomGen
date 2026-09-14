@@ -84,6 +84,97 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /suites:
+    get:
+      operationId: listSuites
+      responses:
+        "200":
+          description: Available e-commerce image suites (built-in, drop-in directory, and user-imported).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuitesResponse"
+    post:
+      operationId: createUserSuite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EcomSuiteFile"
+      responses:
+        "201":
+          description: User suite imported.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuiteDetail"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /suites/refresh:
+    post:
+      operationId: refreshSuites
+      responses:
+        "200":
+          description: Suite catalog reloaded from the drop-in directory and database.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuitesResponse"
+  /suites/{suiteId}:
+    parameters:
+      - $ref: "#/components/parameters/SuiteId"
+    get:
+      operationId: getSuite
+      responses:
+        "200":
+          description: Suite detail with every storyboard shot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuiteDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateUserSuite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EcomSuiteFile"
+      responses:
+        "200":
+          description: User suite updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuiteDetail"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteUserSuite
+      responses:
+        "204":
+          description: User suite deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /suite-categories:
+    get:
+      operationId: listSuiteCategories
+      responses:
+        "200":
+          description: Built-in suite category taxonomy (L1 and L2) for browsing and search.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuiteCategoriesResponse"
   /providers:
     get:
       operationId: listProviders
@@ -1085,6 +1176,13 @@ components:
       schema:
         type: string
         pattern: ^custom-[0-9a-f]{8}$
+    SuiteId:
+      name: suiteId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-z0-9][a-z0-9._-]{0,127}$
     Cursor:
       name: cursor
       in: query
@@ -1248,6 +1346,11 @@ components:
         - brave
         - tavily
         - searxng
+    EcomSuiteOrigin:
+      type: string
+      enum:
+        - builtin
+        - user
     EditOperation:
       type: string
       enum:
@@ -1533,6 +1636,13 @@ components:
           type: array
           items:
             type: string
+        requestedSuiteShots:
+          maxItems: 12
+          description: 套图分镜 assetType 列表（<suiteId>::<shotId>，仅手动规划使用）；每个分镜生成一条分镜，可与 requestedTypes 混选。
+          type: array
+          items:
+            minLength: 1
+            type: string
         imageTypes:
           type: array
           items:
@@ -1742,6 +1852,206 @@ components:
         supportsImageReference:
           default: true
           type: boolean
+    EcomSuiteCategoriesResponse:
+      type: object
+      required:
+        - l1
+        - l2
+      properties:
+        l1:
+          type: array
+          items:
+            type: string
+        l2:
+          type: object
+          patternProperties:
+            ^(.*)$:
+              type: array
+              items:
+                type: string
+    EcomSuiteDetail:
+      allOf:
+        - $ref: "#/components/schemas/EcomSuiteFile"
+        - type: object
+          required:
+            - origin
+          properties:
+            origin:
+              $ref: "#/components/schemas/EcomSuiteOrigin"
+            createdAt:
+              format: date-time
+              type: string
+            updatedAt:
+              format: date-time
+              type: string
+    EcomSuiteFile:
+      type: object
+      required:
+        - name
+        - category
+        - styleLock
+        - shots
+      properties:
+        schemaVersion:
+          minimum: 1
+          default: 1
+          type: integer
+        kind:
+          default: ecomgen.suite
+          const: ecomgen.suite
+          type: string
+        id:
+          type: string
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        description:
+          maxLength: 400
+          type: string
+        category:
+          $ref: "#/components/schemas/SuiteCategory"
+        productFamily:
+          type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        styleLock:
+          $ref: "#/components/schemas/SuiteStyleLock"
+        shots:
+          minItems: 1
+          maxItems: 12
+          type: array
+          items:
+            $ref: "#/components/schemas/EcomSuiteShot"
+        provenance:
+          type: object
+          properties:
+            sourceKind:
+              type: string
+            sourceImageCount:
+              minimum: 0
+              type: integer
+            detached:
+              type: boolean
+            notes:
+              type: string
+    EcomSuiteShot:
+      type: object
+      required:
+        - shotId
+        - order
+        - shotRole
+        - displayName
+        - promptTemplate
+      properties:
+        shotId:
+          minLength: 1
+          maxLength: 64
+          type: string
+        order:
+          minimum: 1
+          type: integer
+        shotRole:
+          $ref: "#/components/schemas/StoryboardShotRole"
+        displayName:
+          minLength: 1
+          type: string
+        intent:
+          type: string
+        assetType:
+          description: 服务端派生为 <suiteId>::<shotId>，上传文件可省略。
+          type: string
+        mode:
+          type: string
+          enum:
+            - CREATIVE
+            - PIXEL_PROTECTED
+        aspectRatio:
+          $ref: "#/components/schemas/ImageAspectRatio"
+        resolution:
+          $ref: "#/components/schemas/ImageResolution"
+        camera:
+          type: string
+        lighting:
+          type: string
+        background:
+          type: string
+        props:
+          type: string
+        productOccupancy:
+          type: string
+        whitespace:
+          type: string
+        textZone:
+          type: string
+        promptTemplate:
+          minLength: 1
+          type: string
+        supportsImageReference:
+          default: true
+          type: boolean
+    EcomSuiteShotSummary:
+      type: object
+      required:
+        - shotId
+        - order
+        - shotRole
+        - displayName
+      properties:
+        shotId:
+          type: string
+        order:
+          type: integer
+        shotRole:
+          $ref: "#/components/schemas/StoryboardShotRole"
+        displayName:
+          type: string
+    EcomSuiteSummary:
+      type: object
+      required:
+        - id
+        - name
+        - category
+        - shotCount
+        - shots
+        - origin
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: "#/components/schemas/SuiteCategory"
+        productFamily:
+          type: string
+        shotCount:
+          minimum: 1
+          type: integer
+        shots:
+          type: array
+          items:
+            $ref: "#/components/schemas/EcomSuiteShotSummary"
+        origin:
+          $ref: "#/components/schemas/EcomSuiteOrigin"
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    EcomSuitesResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EcomSuiteSummary"
     EditReferenceAsset:
       type: object
       required:
@@ -2988,6 +3298,71 @@ components:
           type: array
           items:
             type: string
+    SuiteCategory:
+      type: object
+      required:
+        - l1
+        - l2
+        - leaf
+      properties:
+        l1:
+          minLength: 1
+          type: string
+        l2:
+          minLength: 1
+          type: string
+        leaf:
+          minLength: 1
+          type: string
+        leafKeywords:
+          type: array
+          items:
+            type: string
+    SuitePaletteColor:
+      type: object
+      required:
+        - name
+        - hex
+      properties:
+        name:
+          minLength: 1
+          type: string
+        hex:
+          minLength: 1
+          type: string
+    SuiteStyleLock:
+      type: object
+      required:
+        - lockText
+      properties:
+        direction:
+          type: string
+        palette:
+          type: array
+          items:
+            $ref: "#/components/schemas/SuitePaletteColor"
+        temperature:
+          type: string
+        backgroundSystem:
+          type: string
+        lightingSystem:
+          type: string
+        surfaceSystem:
+          type: string
+        typography:
+          type: string
+        iconSystem:
+          type: string
+        presentationRules:
+          type: string
+        noDrift:
+          type: array
+          items:
+            type: string
+        lockText:
+          minLength: 1
+          description: 整句风格锁文本，规划时按 {style_lock} 注入每条分镜 Prompt。
+          type: string
     UpdateProjectInput:
       type: object
       properties:
@@ -3237,6 +3612,12 @@ components:
         requestedTypes:
           type: array
           items:
+            type: string
+        requestedSuiteShots:
+          maxItems: 12
+          type: array
+          items:
+            minLength: 1
             type: string
         imageTypes:
           type: array
@@ -3562,7 +3943,6 @@ components:
       type: object
       required:
         - planningMode
-        - requestedTypes
       properties:
         planningMode:
           const: MANUAL
@@ -3571,6 +3951,13 @@ components:
           minItems: 1
           type: array
           items:
+            type: string
+        requestedSuiteShots:
+          maxItems: 12
+          description: 手动规划必须提供 requestedTypes 与 requestedSuiteShots 中至少一项。
+          type: array
+          items:
+            minLength: 1
             type: string
         userInstruction:
           maxLength: 4000

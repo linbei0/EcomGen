@@ -6,7 +6,7 @@ import archiver from "archiver";
 import sharp from "sharp";
 import { writePsdBuffer } from "ag-psd";
 import { planImageEdit, planLayerElements, planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
-import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
+import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
 import { compileUserTemplate, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
 import { resolveImageSize, userAssetKindForRole, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
@@ -20,6 +20,8 @@ if (!masterKey) throw new Error("ECOMGEN_MASTER_KEY must be a base64-encoded 32-
 const projectRoot = resolve(import.meta.dirname, "../../..");
 const dataDir = resolveDataDir(process.env.ECOMGEN_DATA_DIR, projectRoot);
 const repository = new EcomRepository(openDatabase(resolve(dataDir, "ecomgen.sqlite")));
+const suiteCatalog = new SuiteCatalog({ dataDir, repository });
+await suiteCatalog.refresh();
 const storage = new LocalAssetStore(dataDir); await storage.initialize();
 const visionCache = new VisionDerivativeCache(dataDir); await visionCache.initialize();
 const secrets = new SecretBox(masterKey);
@@ -78,13 +80,15 @@ process.once("SIGTERM", () => { void stop().then(() => process.exit(0)); });
 
 async function executePlan(job: JobRecord): Promise<void> {
   throwIfCancelled(job);
+  // 计划阶段重新扫描套图目录与用户套图，保证刚导入的竞图套图立即对规划可见。
+  await suiteCatalog.refresh();
   const project = projectFor(job); const provider = providerFor(project.reasoningProviderId); const model = provider.models.find((candidate) => candidate.id === project.reasoningModelId);
   if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
   await updateJob(job, { progress: 25 });
   const assets = repository.listAssets(project.id);
   const visualAssets = selectVisionAssets(assets);
   const referenceImages = model.supportsVision ? await visionImageContents(visualAssets) : undefined;
-  const input = job.input as { planningMode?: PlanningMode; requestedTypes?: string[]; userInstruction?: string; candidatesPerType?: number; targetImageCount?: number; imageResolution?: ImageResolution; imageAspectRatio?: ImageAspectRatio };
+  const input = job.input as { planningMode?: PlanningMode; requestedTypes?: string[]; requestedSuiteShots?: string[]; userInstruction?: string; candidatesPerType?: number; targetImageCount?: number; imageResolution?: ImageResolution; imageAspectRatio?: ImageAspectRatio };
   if (input.imageResolution || input.imageAspectRatio || input.candidatesPerType) {
     repository.updateProject(project.id, {
       imageResolution: input.imageResolution ?? project.imageResolution,
@@ -115,6 +119,8 @@ async function executePlan(job: JobRecord): Promise<void> {
     visionAttachments: visionAttachmentMetadata(visualAssets.map((asset) => ({ ...asset, name: asset.originalName })), imageHandles),
     planningMode: input.planningMode ?? "AI",
     requestedTypes: input.requestedTypes,
+    requestedSuiteShots: input.requestedSuiteShots,
+    suites: suiteCatalog.listSuites(),
     userTemplates: compiledUserTemplates(),
     userInstruction: input.userInstruction,
     candidatesPerType: input.candidatesPerType ?? project.candidatesPerType,
@@ -143,7 +149,7 @@ async function executePlan(job: JobRecord): Promise<void> {
         candidatesPerType: input.candidatesPerType ?? project.candidatesPerType, webResearchEnabled: project.webResearchEnabled,
       },
       planning: {
-        planningMode: input.planningMode ?? "AI", requestedTypes: input.requestedTypes ?? [],
+        planningMode: input.planningMode ?? "AI", requestedTypes: input.requestedTypes ?? [], requestedSuiteShots: input.requestedSuiteShots ?? [],
         targetImageCount: input.targetImageCount ?? null, userInstruction: input.userInstruction ?? null,
       },
     },
@@ -206,10 +212,16 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const modelId = job.modelId ?? item.imageModelId;
   if (!providerId || !modelId) throw new Error("该项目尚未选择生图模型（Provider 可能已被删除），请在项目设置中重新选择");
   const provider = providerFor(providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new Error("Configured image model no longer exists in its provider"); if (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini") throw new Error("Selected image model has no executable image API");
-  const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing"); const template = getTemplate(item.assetType) ?? compiledUserTemplates().find((userTemplate) => userTemplate.id === item.assetType); if (!template) throw new Error(`分镜引用的模板不存在或已被删除（${item.assetType}），无法生成；请删除该分镜或重新规划`);
+  const storyboard = repository.getStoryboard(project.id); if (!storyboard) throw new Error("Storyboard is missing");
+  // 分镜可能引用单图模板或套图分镜（assetType 为 <suiteId>::<shotId>）；两者都查不到时显式报错，不做静默降级。
+  const template = getTemplate(item.assetType) ?? compiledUserTemplates().find((userTemplate) => userTemplate.id === item.assetType);
+  const suiteShot = template ? undefined : suiteCatalog.resolveShot(item.assetType);
+  if (!template && !suiteShot) throw new Error(`分镜引用的模板或套图分镜不存在或已被删除（${item.assetType}），无法生成；请删除该分镜或重新规划`);
+  const supportsImageReference = template ? template.supports_image_reference : suiteShot?.shot.supportsImageReference !== false;
+  const fallbackDefaultSize = template ? template.defaultSize : "1024x1536";
   const projectAssets = repository.listAssets(project.id);
   const inputs = selectGenerationAssets(projectAssets, item);
-  const generationInputs = template.supports_image_reference ? inputs : [];
+  const generationInputs = supportsImageReference ? inputs : [];
   if (item.mode === "PIXEL_PROTECTED") assertPixelProtectedInputs(generationInputs);
   const revision = typeof job.input.revision === "string" ? job.input.revision.trim() : "";
   const isRetry = revision === "retry";
@@ -217,7 +229,9 @@ async function executeGeneration(job: JobRecord): Promise<void> {
   const candidateIndex = typeof job.input.candidateIndex === "number" ? job.input.candidateIndex : 1;
   const resolution = (typeof job.input.imageResolution === "string" ? job.input.imageResolution : item.imageResolution) as ImageResolution;
   const aspectRatio = (typeof job.input.imageAspectRatio === "string" ? job.input.imageAspectRatio : item.imageAspectRatio) as ImageAspectRatio;
-  const size = resolveImageSize(resolution, aspectRatio, template.defaultSize);
+  // 套图分镜自带期望比例：仅当项目/分镜未指定（AUTO）时采用，避免覆盖用户的显式选择。
+  const effectiveAspectRatio = aspectRatio === "AUTO" && suiteShot?.shot.aspectRatio ? (suiteShot.shot.aspectRatio as ImageAspectRatio) : aspectRatio;
+  const size = resolveImageSize(resolution, effectiveAspectRatio, fallbackDefaultSize);
   const basePrompt = item.promptInstruction.trim();
   if (!basePrompt) throw new Error("Storyboard item has no final image prompt; re-plan the storyboard before generating");
   if (/upstream template|template fields|anti-ai guidance|category guidance|promptcontract/i.test(basePrompt)) {
@@ -256,7 +270,7 @@ async function executeGeneration(job: JobRecord): Promise<void> {
     storyboardItemId: item.id,
     jobId: job.id,
     candidateIndex,
-    generationSnapshot: { providerId, modelId, resolution, aspectRatio, size, candidateIndex, ...(revision ? { revision } : {}) },
+    generationSnapshot: { providerId, modelId, resolution, aspectRatio: effectiveAspectRatio, size, candidateIndex, ...(revision ? { revision } : {}) },
     storagePath: stored.path,
     hash: stored.hash,
     width,

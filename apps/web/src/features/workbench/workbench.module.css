@@ -261,7 +261,7 @@
 
 .kindToggle {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -1018,6 +1018,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-height: 172px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .chip {
@@ -1029,12 +1032,81 @@
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .chip[data-on="true"] {
-  border-color: var(--accent-line);
+  border-color: var(--accent);
   background: var(--accent-subtle);
   color: var(--text-1);
+}
+
+.chip[data-on="true"]::after {
+  content: "✓";
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.suiteGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.suitePanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.suitePanelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.suitePanelTitle em {
+  font-style: normal;
+  font-size: 11px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.suiteGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.suiteGroup .chipRow {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.suiteGroupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.suiteGroupHead::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-2);
 }
 
 .hint,
@@ -3085,6 +3157,19 @@
 
 .manageTemplates:hover {
   text-decoration: underline;
+}
+
+/* 套图分镜选择区：与单图模板 chip 并列，选中分镜以强调样式区分 */
+.chip[data-suite="true"] {
+  border-style: solid;
+  border-color: var(--accent-line);
+}
+
+.suiteHint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.6;
 }
 
 .userTemplateList {

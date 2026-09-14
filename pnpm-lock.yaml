@@ -38,6 +38,9 @@ importers:
       '@ecomgen/ecom-skill':
         specifier: workspace:*
         version: link:../../packages/ecom-skill
+      '@ecomgen/ecom-suite':
+        specifier: workspace:*
+        version: link:../../packages/ecom-suite
       '@ecomgen/jobs':
         specifier: workspace:*
         version: link:../../packages/jobs
@@ -193,6 +196,9 @@ importers:
       '@ecomgen/ecom-skill':
         specifier: workspace:*
         version: link:../ecom-skill
+      '@ecomgen/ecom-suite':
+        specifier: workspace:*
+        version: link:../ecom-suite
       '@sinclair/typebox':
         specifier: ^0.34.33
         version: 0.34.52
@@ -208,6 +214,9 @@ importers:
       '@ecomgen/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ecomgen/ecom-suite':
+        specifier: workspace:*
+        version: link:../ecom-suite
       archiver:
         specifier: ^7.0.1
         version: 7.0.1
@@ -223,6 +232,8 @@ importers:
         version: 7.6.13
 
   packages/ecom-skill: {}
+
+  packages/ecom-suite: {}
 
   packages/jobs:
     dependencies:

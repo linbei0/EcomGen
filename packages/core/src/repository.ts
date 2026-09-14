@@ -18,6 +18,7 @@ import type {
   TargetMarket
 } from "@ecomgen/contracts";
 import type { EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
+import type { SuiteDocumentInput } from "@ecomgen/ecom-suite";
 import type { SqliteDatabase } from "./database.js";
 
 /** 写入 jobs.provider_task_id 的内部标记：请求已发出但 Provider 尚未返回结果。 */
@@ -53,6 +54,19 @@ export interface UserTemplateRecord {
   prompt: string;
   defaultSize: "1024x1024" | "1024x1536";
   supportsImageReference: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 用户导入的套图；payload 保存完整套图文档，索引列用于列表归类与搜索。 */
+export interface UserSuiteRecord {
+  id: string;
+  name: string;
+  l1: string;
+  l2: string;
+  leaf: string;
+  productFamily: string | null;
+  payload: SuiteDocumentInput;
   createdAt: string;
   updatedAt: string;
 }
@@ -286,6 +300,8 @@ export interface PlanningConfigSnapshotPayload {
   planning: {
     planningMode: "AI" | "MANUAL";
     requestedTypes: string[];
+    // 手动规划可同时选择套图分镜；旧快照无此字段，保持可选以兼容历史数据
+    requestedSuiteShots?: string[];
     targetImageCount: number | null;
     userInstruction: string | null;
   };
@@ -476,6 +492,36 @@ export class EcomRepository {
   }
   public deleteUserTemplate(id: string): boolean {
     return this.db.prepare("DELETE FROM user_templates WHERE id=?").run(id).changes > 0;
+  }
+
+  public listUserSuites(): UserSuiteRecord[] {
+    return (this.db.prepare("SELECT * FROM user_suites ORDER BY created_at ASC").all() as Row[]).map(mapUserSuite);
+  }
+  public getUserSuite(id: string): UserSuiteRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM user_suites WHERE id = ?").get(id);
+    return row ? mapUserSuite(row as Row) : undefined;
+  }
+  public saveUserSuite(input: Omit<UserSuiteRecord, "createdAt" | "updatedAt"> & { id?: string }): UserSuiteRecord {
+    const existing = input.id ? this.getUserSuite(input.id) : undefined;
+    const record: UserSuiteRecord = { ...input, id: input.id ?? randomUUID(), createdAt: existing?.createdAt ?? now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO user_suites (id,name,l1,l2,leaf,product_family,payload_json,created_at,updated_at)
+      VALUES (@id,@name,@l1,@l2,@leaf,@productFamily,@payloadJson,@createdAt,@updatedAt)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,l1=excluded.l1,l2=excluded.l2,leaf=excluded.leaf,product_family=excluded.product_family,payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
+      .run({
+        id: record.id,
+        name: record.name,
+        l1: record.l1,
+        l2: record.l2,
+        leaf: record.leaf,
+        productFamily: record.productFamily,
+        payloadJson: JSON.stringify(record.payload),
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt
+      });
+    return record;
+  }
+  public deleteUserSuite(id: string): boolean {
+    return this.db.prepare("DELETE FROM user_suites WHERE id=?").run(id).changes > 0;
   }
 
   public listProjects(archived = false): ProjectRecord[] {
@@ -961,6 +1007,7 @@ function mapProvider(row: Row): ProviderRecord { return { id: String(row.id), na
 function mapSearchSource(row: Row): SearchSourceRecord { return { id: String(row.id), name: String(row.name), kind: row.kind as SearchSourceKind, baseUrl: String(row.base_url), encryptedApiKey: row.encrypted_api_key ? String(row.encrypted_api_key) : null, priority: Number(row.priority), enabled: Boolean(row.enabled), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 
 function mapUserTemplate(row: Row): UserTemplateRecord { return { id: String(row.id), name: String(row.name), prompt: String(row.prompt), defaultSize: row.default_size === "1024x1536" ? "1024x1536" : "1024x1024", supportsImageReference: Boolean(row.supports_image_reference), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapUserSuite(row: Row): UserSuiteRecord { return { id: String(row.id), name: String(row.name), l1: String(row.l1), l2: String(row.l2), leaf: String(row.leaf), productFamily: row.product_family == null ? null : String(row.product_family), payload: JSON.parse(String(row.payload_json)) as SuiteDocumentInput, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapProject(row: Row): ProjectRecord {
   return {
     id: String(row.id),

@@ -75,6 +75,97 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /suites:
+    get:
+      operationId: listSuites
+      responses:
+        "200":
+          description: Available e-commerce image suites (built-in, drop-in directory, and user-imported).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuitesResponse"
+    post:
+      operationId: createUserSuite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EcomSuiteFile"
+      responses:
+        "201":
+          description: User suite imported.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuiteDetail"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /suites/refresh:
+    post:
+      operationId: refreshSuites
+      responses:
+        "200":
+          description: Suite catalog reloaded from the drop-in directory and database.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuitesResponse"
+  /suites/{suiteId}:
+    parameters:
+      - $ref: "#/components/parameters/SuiteId"
+    get:
+      operationId: getSuite
+      responses:
+        "200":
+          description: Suite detail with every storyboard shot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuiteDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateUserSuite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EcomSuiteFile"
+      responses:
+        "200":
+          description: User suite updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuiteDetail"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteUserSuite
+      responses:
+        "204":
+          description: User suite deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /suite-categories:
+    get:
+      operationId: listSuiteCategories
+      responses:
+        "200":
+          description: Built-in suite category taxonomy (L1 and L2) for browsing and search.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomSuiteCategoriesResponse"
   /providers:
     get:
       operationId: listProviders

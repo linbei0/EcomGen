@@ -63,6 +63,13 @@ components:
       schema:
         type: string
         pattern: "^custom-[0-9a-f]{8}$"
+    SuiteId:
+      name: suiteId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9._-]{0,127}$"
     Cursor:
       name: cursor
       in: query
