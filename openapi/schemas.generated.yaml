@@ -106,6 +106,7 @@ components:
         - EDIT_GENERATE
         - LAYER_PLAN
         - LAYER_EXPORT
+        - SUITE_FORGE
     JobStatus:
       type: string
       enum:
@@ -1134,6 +1135,7 @@ components:
             - EDIT_GENERATE
             - LAYER_PLAN
             - LAYER_EXPORT
+            - SUITE_FORGE
         status:
           type: string
           enum:
@@ -2580,6 +2582,53 @@ components:
           minLength: 1
           description: Unique key for an intentional re-recognition run.
           type: string
+    CreateSuiteForgeJobInput:
+      type: object
+      required:
+        - providerId
+        - modelId
+        - files
+      properties:
+        providerId:
+          format: uuid
+          type: string
+        modelId:
+          minLength: 1
+          type: string
+        files:
+          minItems: 1
+          maxItems: 12
+          description: 爆款套图源图，5–12 张为佳。
+          type: array
+          items:
+            format: binary
+            type: string
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        l1:
+          minLength: 1
+          type: string
+        l2:
+          minLength: 1
+          type: string
+        leaf:
+          minLength: 1
+          type: string
+        productFamily:
+          type: string
+        targetShotCount:
+          minimum: 5
+          maximum: 12
+          type: integer
+        userInstruction:
+          maxLength: 4000
+          description: 额外反推要求，例如只保留某个卖点结构。
+          type: string
+        idempotencyKey:
+          minLength: 1
+          type: string
     EcomTemplateItem:
       type: object
       required:
@@ -2764,6 +2813,34 @@ components:
       properties:
         outputId:
           format: uuid
+          type: string
+    SuiteForgeResult:
+      type: object
+      required:
+        - jobId
+        - status
+        - suite
+        - createdAt
+      properties:
+        jobId:
+          format: uuid
+          type: string
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - COMMITTED
+        suite:
+          $ref: "#/components/schemas/EcomSuiteFile"
+        suiteId:
+          anyOf:
+            - type: string
+            - type: "null"
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
           type: string
     TestProviderConnectionResult:
       type: object

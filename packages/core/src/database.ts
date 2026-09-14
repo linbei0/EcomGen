@@ -167,6 +167,54 @@ function makeLayerExportPlanReferenceNullable(database: SqliteDatabase): void {
 }
 
 /**
+ * 全局套图反推任务不绑定项目：旧库 jobs.project_id 为 NOT NULL，重建表放宽为可空。
+ * 项目任务的级联删除语义保持不变（project_id 为空的行不受影响）。
+ */
+function makeJobsProjectNullable(database: SqliteDatabase): void {
+  const columns = database.prepare("PRAGMA table_info(jobs)").all() as Array<{ name: string; notnull: number }>;
+  if (columns.length === 0 || !columns.some((column) => column.name === "project_id" && column.notnull !== 0)) return;
+  database.exec("DROP TABLE IF EXISTS jobs_nullable_project");
+  database.pragma("foreign_keys = OFF");
+  try {
+    const rebuild = database.transaction(() => database.exec(`
+      CREATE TABLE jobs_nullable_project (
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
+        storyboard_item_id TEXT,
+        type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        progress INTEGER NOT NULL,
+        retryable INTEGER NOT NULL,
+        input_json TEXT NOT NULL,
+        request_fingerprint TEXT,
+        provider_id TEXT,
+        model_id TEXT,
+        estimated_cost_json TEXT,
+        actual_cost_json TEXT,
+        cancel_requested INTEGER NOT NULL DEFAULT 0,
+        provider_task_id TEXT,
+        error_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (storyboard_item_id) REFERENCES storyboard_items(id) ON DELETE SET NULL
+      );
+      INSERT INTO jobs_nullable_project (
+        id,project_id,storyboard_item_id,type,status,progress,retryable,input_json,request_fingerprint,provider_id,model_id,estimated_cost_json,actual_cost_json,cancel_requested,provider_task_id,error_json,created_at,updated_at
+      )
+      SELECT
+        id,project_id,storyboard_item_id,type,status,progress,retryable,input_json,request_fingerprint,provider_id,model_id,estimated_cost_json,actual_cost_json,cancel_requested,provider_task_id,error_json,created_at,updated_at
+      FROM jobs;
+      DROP TABLE jobs;
+      ALTER TABLE jobs_nullable_project RENAME TO jobs;
+    `));
+    rebuild();
+  } finally {
+    database.pragma("foreign_keys = ON");
+  }
+}
+
+/**
  * 开发初期以本 schema 为唯一规范，不保留历史状态；
  * 新增可空列走一次性 ALTER，旧行保持 NULL 由上层按"未标注"处理。
  */
@@ -174,6 +222,7 @@ function migrate(database: SqliteDatabase): void {
   removeLegacyOutputReviewColumns(database);
   makeProjectProviderReferencesNullable(database);
   makeLayerExportPlanReferenceNullable(database);
+  makeJobsProjectNullable(database);
   addStoryboardItemShotRole(database);
   database.exec(`
     CREATE TABLE IF NOT EXISTS providers (
@@ -277,7 +326,7 @@ function migrate(database: SqliteDatabase): void {
     );
     CREATE TABLE IF NOT EXISTS jobs (
       id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL,
+      project_id TEXT,
       storyboard_item_id TEXT,
       type TEXT NOT NULL,
       status TEXT NOT NULL,
@@ -445,6 +494,15 @@ function migrate(database: SqliteDatabase): void {
       payload_json TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS suite_forge_results (
+      job_id TEXT PRIMARY KEY,
+      payload_json TEXT NOT NULL,
+      status TEXT NOT NULL,
+      suite_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
     );
   `);
   if (!columnNames(database, "projects").has("archived_at")) {

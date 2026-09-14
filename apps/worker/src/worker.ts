@@ -1,14 +1,15 @@
 import { PassThrough } from "node:stream";
 import { resolve } from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Worker } from "bullmq";
 import archiver from "archiver";
 import sharp from "sharp";
 import { writePsdBuffer } from "ag-psd";
-import { planImageEdit, planLayerElements, planStoryboard, reviseImagePrompt, writeCopywriting } from "@ecomgen/agent";
+import { forgeSuite, planImageEdit, planLayerElements, planStoryboard, reviseImagePrompt, writeCopywriting, type SuiteForgeHints } from "@ecomgen/agent";
 import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
 import { compileUserTemplate, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
-import { resolveImageSize, userAssetKindForRole, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
+import { normalizeSuiteDocument, type SuiteDocumentInput } from "@ecomgen/ecom-suite";
+import { resolveImageSize, userAssetKindForRole, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, validateEcomSuiteFile, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, buildReasoningModel, createSegmentationProvider, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { createPsdLayerAccumulator, extractAlpha, invertMask, multiplyAlpha, unionOfMasks } from "./layer-composite.js";
@@ -54,6 +55,7 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
     else if (queueJob.data.kind === "edit_generate") await executeEditGeneration(job);
     else if (queueJob.data.kind === "layer_plan") await executeLayerPlan(job);
     else if (queueJob.data.kind === "layer_export") await executeLayerExport(job);
+    else if (queueJob.data.kind === "suite_forge") await executeSuiteForge(job);
     else await executeExport(job);
     // 终态与清空外部请求标记在同一条 UPDATE 内原子完成：标记一旦设置就只在终态消失，
     // 避免终态写入前进程崩溃时恢复层误判任务仍在付费请求窗口内。
@@ -65,7 +67,7 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
       const turnId = typeof job.input.editTurnId === "string" ? job.input.editTurnId : "";
       if (turnId) {
         const turn = repository.updateEditTurn(turnId, { status: "FAILED", error: { message } });
-        if (turn) await events.publish(job.projectId, "edit-turn.updated", { turn });
+        if (turn) await events.publish(projectIdFor(job), "edit-turn.updated", { turn });
       }
     }
     await updateJob(job, { status: "FAILED", progress: 100, error: { message, providerStatus: error instanceof ProviderError ? error.status : undefined } });
@@ -155,6 +157,64 @@ async function executePlan(job: JobRecord): Promise<void> {
     },
   });
   await updateJob(job, { progress: 90 }); await events.publish(project.id, "storyboard.updated", { storyboard, items: repository.listStoryboardItems(project.id) });
+}
+
+interface SuiteForgeSourceInput { storagePath?: unknown; hash?: unknown; originalName?: unknown; mimeType?: unknown; }
+interface SuiteForgeJobInput { providerId?: unknown; modelId?: unknown; sources?: unknown; hints?: unknown; }
+
+// 全局套图反推任务不绑定项目：模型由请求写入 job.providerId/modelId，源图读取自 suite-forge 存储目录。
+// 产出只落草稿（suite_forge_results），用户在前端确认后才写入 user_suites，避免污染用户套图库。
+async function executeSuiteForge(job: JobRecord): Promise<void> {
+  const input = job.input as SuiteForgeJobInput;
+  const providerId = typeof input.providerId === "string" ? input.providerId : job.providerId;
+  const modelId = typeof input.modelId === "string" ? input.modelId : job.modelId;
+  if (!providerId || !modelId) throw new Error("套图反推任务缺少推理模型配置");
+  const provider = repository.getProvider(providerId);
+  if (!provider) throw new Error(`Configured provider not found: ${providerId}`);
+  const model = provider.models.find((candidate) => candidate.id === modelId);
+  if (!model) throw new Error("配置的推理模型已不在其 Provider 中");
+  if (!model.supportsVision) throw new Error("套图反推需要支持视觉的推理模型");
+  const sources = (Array.isArray(input.sources) ? input.sources : []).filter((source): source is SuiteForgeSourceInput => Boolean(source) && typeof (source as SuiteForgeSourceInput).storagePath === "string");
+  if (sources.length === 0) throw new Error("套图反推任务缺少源图");
+  await updateJob(job, { progress: 20 });
+  const images: Array<{ type: "image"; mimeType: string; data: string }> = [];
+  for (const source of sources) {
+    throwIfCancelled(job);
+    const original = await storage.read(source.storagePath as string);
+    const compressed = await cachedCompressForVision(original, typeof source.hash === "string" ? source.hash : undefined);
+    images.push({ type: "image", mimeType: compressed.mimeType, data: compressed.data.toString("base64") });
+  }
+  await updateJob(job, { progress: 40 });
+  throwIfCancelled(job);
+  const forged = await forgeSuite({
+    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking, supportsStructuredOutput: model.supportsStructuredOutput }),
+    apiKey: secrets.decrypt(provider.encryptedApiKey),
+    images,
+    hints: (input.hints ?? undefined) as SuiteForgeHints | undefined
+  });
+  throwIfCancelled(job);
+  // 模型产出先过契约校验，再归一化派生 assetType=<id>::<shotId>；worker 预先分配最终 ID，使草稿预览与确认入库一致。
+  const validation = validateEcomSuiteFile(forged);
+  if (!validation.ok) throw new Error(`套图反推结果未通过契约校验：${validation.errors.join("；")}`);
+  const id = mintForgeSuiteId();
+  const normalized = normalizeSuiteDocument(forged as unknown as SuiteDocumentInput, "user", { id });
+  await updateJob(job, { progress: 85 });
+  repository.saveSuiteForgeResult({
+    jobId: job.id,
+    payload: {
+      schemaVersion: 1,
+      kind: "ecomgen.suite",
+      id: normalized.id,
+      name: normalized.name,
+      description: normalized.description,
+      category: normalized.category,
+      productFamily: normalized.productFamily,
+      keywords: normalized.keywords,
+      styleLock: normalized.styleLock,
+      shots: normalized.shots,
+      provenance: normalized.provenance
+    }
+  });
 }
 
 async function executeCopywriting(job: JobRecord): Promise<void> {
@@ -454,7 +514,7 @@ async function executeLayerPlan(job: JobRecord): Promise<void> {
     await updateJob(job, { progress: 25 });
     // 执行前先落 RUNNING：否则前端在整个识别过程中都只能看到 QUEUED。
     const running = repository.updateLayerPlan(plan.id, { status: "RUNNING", error: null });
-    if (running) await events.publish(job.projectId, "layer-plan.updated", { plan: running });
+    if (running) await events.publish(projectIdFor(job), "layer-plan.updated", { plan: running });
     const image = await visionSourceImage(output.storagePath);
     throwIfCancelled(job);
     // 视觉识别是付费外部请求：标记后崩溃恢复一律按“结果未知”显式失败，不会重新执行已计费的调用。
@@ -468,15 +528,15 @@ async function executeLayerPlan(job: JobRecord): Promise<void> {
     // 元素 id 在方案内稳定（el-N）；前端勾选后原样回传，manual 元素由前端自带 id。
     const records = elements.map((element, index) => ({ id: `el-${index + 1}`, name: element.name, promptEn: element.promptEn, source: "auto" as const, bbox: null }));
     const updated = repository.updateLayerPlan(plan.id, { status: "SUCCEEDED", elements: records, error: null });
-    if (updated) await events.publish(job.projectId, "layer-plan.updated", { plan: updated });
+      if (updated) await events.publish(projectIdFor(job), "layer-plan.updated", { plan: updated });
   } catch (error) {
     // 失败/取消必须同步到方案记录：REST 是状态真相，SSE 只负责通知前端失效重查。
     if (error instanceof JobCancelled) {
       const cancelled = repository.updateLayerPlan(plan.id, { status: "CANCELLED", error: null });
-      if (cancelled) await events.publish(job.projectId, "layer-plan.updated", { plan: cancelled });
+      if (cancelled) await events.publish(projectIdFor(job), "layer-plan.updated", { plan: cancelled });
     } else {
       const updated = repository.updateLayerPlan(plan.id, { status: "FAILED", error: { message: error instanceof Error ? error.message : String(error) } });
-      if (updated) await events.publish(job.projectId, "layer-plan.updated", { plan: updated });
+    if (updated) await events.publish(projectIdFor(job), "layer-plan.updated", { plan: updated });
     }
     throw error;
   }
@@ -668,7 +728,9 @@ function normalizedIou(a: { x: number; y: number; width: number; height: number 
   return union <= 0 ? 0 : inter / union;
 }
 
-function projectFor(job: JobRecord): ProjectRecord { const project = repository.getProject(job.projectId); if (!project) throw new Error(`Project not found for job ${job.id}`); return project; }
+// 全局任务（套图反推）不绑定项目，projectId 为 null；任何项目态 handler 都要显式取用而非静默传 null。
+function projectIdFor(job: JobRecord): string { if (!job.projectId) throw new Error(`Job ${job.id} is not bound to a project`); return job.projectId; }
+function projectFor(job: JobRecord): ProjectRecord { const project = repository.getProject(projectIdFor(job)); if (!project) throw new Error(`Project not found for job ${job.id}`); return project; }
 // 引用为 null 表示 Provider 被删除后项目尚未重新选择模型；入口虽已拦截，这里兜底给出可读错误
 function providerFor(id: string | null) {
   if (!id) throw new Error("该项目尚未选择 Provider（可能已被删除），请在项目设置中重新选择");
@@ -678,6 +740,12 @@ function providerFor(id: string | null) {
 }
 /** 一个 Job 的每个候选使用独立稳定键，重试不会再次落库或写出另一份文件。 */
 function generationKeyFor(jobId: string, candidateIndex: number): string { return `ecomgen:generation:${jobId}:candidate:${candidateIndex}`; }
+/** 反推套图预先分配最终 ID：草稿预览与确认入库共用同一 ID，assetType 不会在确认时突变。 */
+function mintForgeSuiteId(): string {
+  let id = `custom-suite-${randomBytes(4).toString("hex")}`;
+  while (suiteCatalog.getSuite(id)) id = `custom-suite-${randomBytes(4).toString("hex")}`;
+  return id;
+}
 interface EditGenerationConfig { reasoningProviderId: string; reasoningModelId: string; imageProviderId: string; imageModelId: string; imageResolution: ImageResolution; candidateCount: number; }
 function editGenerationConfigFor(project: ProjectRecord, turn: EditTurnRecord): EditGenerationConfig {
   // 编辑链路允许注解覆盖模型，但 fallback 始终依赖项目引用；引用为空时直接失败而不是产出 null 配置
@@ -753,7 +821,7 @@ async function reviseGenerationPrompt(project: ProjectRecord, prompt: string, re
     revision
   });
 }
-async function updateJob(job: JobRecord, patch: Parameters<EcomRepository["updateJob"]>[1]): Promise<void> { const updated = repository.updateJob(job.id, patch); if (updated) await events.publish(job.projectId, "job.updated", updated); }
+async function updateJob(job: JobRecord, patch: Parameters<EcomRepository["updateJob"]>[1]): Promise<void> { const updated = repository.updateJob(job.id, patch); if (updated && job.projectId) await events.publish(job.projectId, "job.updated", updated); }
 function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "PLAN") return "plan";
   if (type === "COPYWRITE") return "copywrite";
@@ -762,6 +830,7 @@ function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "EDIT_GENERATE") return "edit_generate";
   if (type === "LAYER_PLAN") return "layer_plan";
   if (type === "LAYER_EXPORT") return "layer_export";
+  if (type === "SUITE_FORGE") return "suite_forge";
   return "export";
 }
 function editTurnFor(job: JobRecord): EditTurnRecord { const turnId = typeof job.input.editTurnId === "string" ? job.input.editTurnId : ""; const turn = repository.getEditTurn(turnId); if (!turn || turn.projectId !== job.projectId) throw new Error("Edit turn is missing or belongs to another project"); return turn; }

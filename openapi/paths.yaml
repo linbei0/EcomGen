@@ -166,6 +166,58 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EcomSuiteCategoriesResponse"
+  /suite-forge-jobs:
+    post:
+      operationId: createSuiteForgeJob
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateSuiteForgeJobInput"
+      responses:
+        "202":
+          description: Suite forge job accepted (or an existing job reused for an identical request).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /suite-forge-jobs/{jobId}/result:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    get:
+      operationId: getSuiteForgeResult
+      responses:
+        "200":
+          description: Draft or committed forged suite for the job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuiteForgeResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /suite-forge-jobs/{jobId}/commit:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    post:
+      operationId: commitSuiteForgeResult
+      responses:
+        "200":
+          description: Forged suite imported into the user suite catalog.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuiteForgeResult"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /providers:
     get:
       operationId: listProviders

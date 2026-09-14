@@ -19,7 +19,39 @@ const plan = { campaignStyleLock: "fixed deep green #1A3A2E and clean off-white 
 // 自定义模板场景：模型按 payload.userTemplates 中注入的 custom_prompt 撰写最终 Prompt；customTemplateId 在运行时由 API 生成后回填
 let customTemplateId = "";
 const customPlan = () => ({ campaignStyleLock: "warm festive gift box ecommerce system", items: [{ assetType: customTemplateId, displayName: "礼盒丝绒氛围图", shotRole: "SCENE", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "Create a warm festive e-commerce gift box scene with soft window light, triangular composition, rich red velvet accents and a festive ribbon close-up. Preserve exact product identity: shape, silhouette, colors, materials, logo and label placement, and proportions; do not redesign the product. No readable text, watermarks, or invented product details.", factClaims: [], riskFlags: [], sortOrder: 0 }] });
-const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "", layerPlanPrompt: "", samRequests: [], groundedRequests: [], layerizeRequests: [], giteeRequests: [] };
+// 套图反推 mock：EcomGen 输出契约（system prompt 尾部）作为唯一 marker，返回一份可被 EcomSuiteFile 校验的套图 JSON。
+const forgeSuite = () => ({
+  schemaVersion: 1,
+  kind: "ecomgen.suite",
+  id: "suite-meizhuang-jiemianru",
+  name: "净透氨基酸洁面套图",
+  description: "从爆款洗面奶套图反推的通用洁面分镜模板。",
+  productFamily: "beauty",
+  category: { l1: "美妆", l2: "面部护理", leaf: "洁面乳", leafKeywords: ["洗面奶", "氨基酸", "洁面"] },
+  styleLock: { direction: "clean studio", lockText: "clean off-white ecommerce studio system", palette: [{ name: "off-white", hex: "#F7F5F0" }], noDrift: ["no brand logos"] },
+  shots: ["HERO", "PAIN_POINT", "DETAIL", "SCENE", "CTA"].map((shotRole, index) => ({
+    shotId: `shot-${index + 1}`,
+    order: index + 1,
+    shotRole,
+    displayName: `分镜 ${index + 1}`,
+    intent: "funnel step",
+    assetType: `suite-meizhuang-jiemianru::shot-${index + 1}`,
+    mode: "CREATIVE",
+    aspectRatio: "1:1",
+    resolution: "2K",
+    camera: "50mm",
+    lighting: "soft studio light",
+    background: "off-white",
+    props: "none",
+    productOccupancy: "35%",
+    whitespace: "top",
+    textZone: "bottom",
+    promptTemplate: `clean off-white ecommerce studio system, {product}, {product_identity_lock}, clean composition, no logos, no text`,
+    supportsImageReference: true
+  })),
+  provenance: { sourceKind: "viral-reference-set", sourceImageCount: 2, detached: true, notes: "e2e-mock" }
+});
+const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "", layerPlanPrompt: "", suiteForgePrompt: "", samRequests: [], groundedRequests: [], layerizeRequests: [], giteeRequests: [] };
 const children = [];
 let mock;
 
@@ -44,6 +76,16 @@ try {
         response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
         response.write(`data: ${JSON.stringify({ id: "mock-copywriting", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(copy) }, finish_reason: null }] })}\n\n`);
         response.write(`data: ${JSON.stringify({ id: "mock-copywriting", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+        response.write("data: [DONE]\n\n");
+        response.end();
+        return;
+      }
+      // 套图反推：system prompt 尾部的 EcomGen 输出契约是最稳定的识别 marker
+      if (requestText.includes("ECOMGEN OUTPUT CONTRACT (highest priority)")) {
+        observed.suiteForgePrompt = requestText;
+        response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        response.write(`data: ${JSON.stringify({ id: "mock-suite-forge", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(forgeSuite()) }, finish_reason: null }] })}\n\n`);
+        response.write(`data: ${JSON.stringify({ id: "mock-suite-forge", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
         response.write("data: [DONE]\n\n");
         response.end();
         return;
@@ -395,7 +437,45 @@ try {
   const customGenerationJob = await waitJob(base, customGeneration.jobs[0].id);
   assert.equal(customGenerationJob.status, "SUCCEEDED");
   assert.match(observed.imagePrompt, /festive ribbon close-up/);
-  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate");
+  // 全局套图反推链路：脱离项目上传源图 → Worker 视觉反推 → 草稿预览 → 确认入库 → 套图目录可见
+  const forgeForm = new FormData();
+  forgeForm.append("providerId", provider.id);
+  forgeForm.append("modelId", "mock-reasoner");
+  forgeForm.append("name", "净透氨基酸洁面套图");
+  forgeForm.append("l1", "美妆");
+  forgeForm.append("targetShotCount", "5");
+  forgeForm.append("files", new Blob([Buffer.from(onePixelPng, "base64")], { type: "image/png" }), "viral-1.png");
+  forgeForm.append("files", new Blob([Buffer.from(onePixelReferencePng, "base64")], { type: "image/png" }), "viral-2.png");
+  const forgeResponse = await fetch(`${base}/suite-forge-jobs`, { method: "POST", body: forgeForm });
+  const forgeText = await forgeResponse.text();
+  assert.equal(forgeResponse.status, 202, forgeText);
+  const forgeJob = JSON.parse(forgeText);
+  assert.equal(forgeJob.type, "SUITE_FORGE");
+  assert.equal(forgeJob.projectId, null);
+  const forgeDone = await waitJob(base, forgeJob.id);
+  assert.equal(forgeDone.status, "SUCCEEDED");
+  assert.match(observed.suiteForgePrompt, /ECOMGEN OUTPUT CONTRACT/);
+  const forgeResult = await requestJson(`${base}/suite-forge-jobs/${forgeJob.id}/result`, "GET");
+  assert.equal(forgeResult.status, "DRAFT");
+  assert.equal(forgeResult.suite.name, "净透氨基酸洁面套图");
+  assert.equal(forgeResult.suite.shots.length, 5);
+  // 同源图重复提交命中请求指纹，复用同一任务而不重复计费
+  const duplicateForgeForm = new FormData();
+  duplicateForgeForm.append("providerId", provider.id);
+  duplicateForgeForm.append("modelId", "mock-reasoner");
+  duplicateForgeForm.append("name", "净透氨基酸洁面套图");
+  duplicateForgeForm.append("l1", "美妆");
+  duplicateForgeForm.append("targetShotCount", "5");
+  duplicateForgeForm.append("files", new Blob([Buffer.from(onePixelPng, "base64")], { type: "image/png" }), "viral-1.png");
+  duplicateForgeForm.append("files", new Blob([Buffer.from(onePixelReferencePng, "base64")], { type: "image/png" }), "viral-2.png");
+  const duplicateForge = await fetch(`${base}/suite-forge-jobs`, { method: "POST", body: duplicateForgeForm });
+  assert.equal((await duplicateForge.json()).id, forgeJob.id);
+  const committedForge = await requestJson(`${base}/suite-forge-jobs/${forgeJob.id}/commit`, "POST");
+  assert.equal(committedForge.status, "COMMITTED");
+  assert.match(committedForge.suiteId, /^custom-suite-/);
+  const suites = await requestJson(`${base}/suites`, "GET");
+  assert.ok(suites.items.some((suite) => suite.id === committedForge.suiteId), "committed suite should be listed");
+  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge");
 } finally {
   await Promise.all(children.map(stop));
   if (mock) await new Promise((resolveClose) => mock.close(resolveClose));

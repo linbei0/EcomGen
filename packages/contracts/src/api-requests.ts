@@ -1,6 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { AssetRole, EditTurnStatus, ImageAspectRatio, ImageResolution, PlanningMode, PlatformTarget, ReferencePurpose, UserAssetKind } from "./enums.js";
-import { EditReferenceAsset, EditTurn, Job, LayerBbox, ModelRef, PlanningConfigSnapshot, Project, ReferenceSelection } from "./api-schemas.js";
+import { EcomSuiteFile, EditReferenceAsset, EditTurn, Job, LayerBbox, ModelRef, PlanningConfigSnapshot, Project, ReferenceSelection } from "./api-schemas.js";
 import { schemaRef } from "./ref.js";
 
 export const TestProviderInput = Type.Object({ modelId: Type.String({ minLength: 1 }), kind: Type.Optional(Type.Union([Type.Literal("reasoning"), Type.Literal("image"), Type.Literal("segmentation")], { description: "segmentation probes the declared segmentation API with zero cost." })) }, { $id: "#/components/schemas/TestProviderInput" });
@@ -70,3 +70,31 @@ export type CreateLayerExportElement = Static<typeof CreateLayerExportElement>;
 
 export const CreateLayerExportInput = Type.Object({ elements: Type.Array(schemaRef(CreateLayerExportElement), { minItems: 1, maxItems: 32 }), includeBackground: Type.Optional(Type.Boolean({ default: true, description: "Generate a holed background layer under the element layers." })), planId: Type.Optional(Type.String({ format: "uuid", description: "The recognition plan the auto elements were selected from; rejected if the plan has since changed." })) }, { $id: "#/components/schemas/CreateLayerExportInput" });
 export type CreateLayerExportInput = Static<typeof CreateLayerExportInput>;
+
+// 套图工坊（suite forge）：一次运行把用户上传的爆款套图反推为可复用的套图模板。
+// 该任务不绑定项目，源图以 multipart 文件随请求上传；provider/model 由用户在页面自选，服务端校验视觉能力。
+export const CreateSuiteForgeJobInput = Type.Object({
+  providerId: Type.String({ format: "uuid" }),
+  modelId: Type.String({ minLength: 1 }),
+  files: Type.Array(Type.String({ format: "binary" }), { minItems: 1, maxItems: 12, description: "爆款套图源图，5–12 张为佳。" }),
+  name: Type.Optional(Type.String({ minLength: 1, maxLength: 60 })),
+  l1: Type.Optional(Type.String({ minLength: 1 })),
+  l2: Type.Optional(Type.String({ minLength: 1 })),
+  leaf: Type.Optional(Type.String({ minLength: 1 })),
+  productFamily: Type.Optional(Type.String()),
+  targetShotCount: Type.Optional(Type.Integer({ minimum: 5, maximum: 12 })),
+  userInstruction: Type.Optional(Type.String({ maxLength: 4000, description: "额外反推要求，例如只保留某个卖点结构。" })),
+  idempotencyKey: Type.Optional(Type.String({ minLength: 1 })),
+}, { $id: "#/components/schemas/CreateSuiteForgeJobInput" });
+export type CreateSuiteForgeJobInput = Static<typeof CreateSuiteForgeJobInput>;
+
+// 反推结果草稿：worker 产出后先落草稿，用户在前端预览确认后才写入 user_suites。
+export const SuiteForgeResult = Type.Object({
+  jobId: Type.String({ format: "uuid" }),
+  status: Type.Union([Type.Literal("DRAFT"), Type.Literal("COMMITTED")]),
+  suite: schemaRef(EcomSuiteFile),
+  suiteId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  createdAt: Type.String({ format: "date-time" }),
+  updatedAt: Type.Optional(Type.String({ format: "date-time" })),
+}, { $id: "#/components/schemas/SuiteForgeResult" });
+export type SuiteForgeResult = Static<typeof SuiteForgeResult>;

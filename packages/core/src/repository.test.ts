@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
 import { openDatabase } from "./database.js";
 import { EcomRepository, EXTERNAL_REQUEST_STARTED } from "./repository.js";
+import type { SuiteDocumentInput } from "@ecomgen/ecom-suite";
 
 function seedProvider(repository: EcomRepository) {
   return repository.saveProvider({
@@ -170,6 +171,41 @@ describe("EcomRepository", () => {
     expect(repository.recoverInterruptedJobs().map((job) => job.id)).toEqual([safe.id]);
     expect(repository.getJob(safe.id)?.status).toBe("QUEUED");
     expect(repository.getJob(uncertain.id)).toMatchObject({ status: "FAILED", retryable: false, error: { message: "外部图像请求结果未知，已停止自动重试以避免重复计费" } });
+    database.close();
+  });
+
+  it("全局套图反推任务不绑定项目，指纹按 NULL 隔离且草稿可入库", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const forgeJob = repository.createJob({ id: "forge-1", projectId: null, storyboardItemId: null, type: "SUITE_FORGE", input: { providerId: "p", modelId: "m" }, requestFingerprint: "forge-fp" });
+    expect(forgeJob.projectId).toBeNull();
+
+    // 崩溃恢复必须覆盖无项目归属的运行中任务
+    database.prepare("UPDATE jobs SET status='RUNNING' WHERE id=?").run(forgeJob.id);
+    expect(repository.recoverInterruptedJobs().map((job) => job.id)).toEqual([forgeJob.id]);
+    expect(repository.getJob(forgeJob.id)?.status).toBe("QUEUED");
+
+    const provider = seedProvider(repository);
+    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    // 指纹含 NULL 项目：全局任务与项目任务互不串号
+    expect(repository.findJobByFingerprint(null, "forge-fp")?.id).toBe("forge-1");
+    repository.createJob({ id: "project-job", projectId: project.id, storyboardItemId: null, type: "PLAN", input: {}, requestFingerprint: "forge-fp" });
+    expect(repository.findJobByFingerprint(project.id, "forge-fp")?.id).toBe("project-job");
+    expect(repository.findJobByFingerprint(null, "forge-fp")?.id).toBe("forge-1");
+
+    const payload = {
+      name: "示例套图",
+      category: { l1: "美妆", l2: "面部护理", leaf: "洁面乳" },
+      styleLock: { lockText: "warm beige studio" },
+      shots: [{ shotId: "hero", order: 1, shotRole: "HERO", displayName: "主图", promptTemplate: "hero {product}" }],
+    } satisfies SuiteDocumentInput;
+    expect(repository.saveSuiteForgeResult({ jobId: forgeJob.id, payload })).toMatchObject({ status: "DRAFT", suiteId: null });
+    // upsert 不产生重复草稿
+    expect(repository.saveSuiteForgeResult({ jobId: forgeJob.id, payload }).jobId).toBe(forgeJob.id);
+    expect(repository.commitSuiteForgeResult(forgeJob.id, "custom-suite-ab12cd34")).toMatchObject({ status: "COMMITTED", suiteId: "custom-suite-ab12cd34" });
+    expect(repository.getSuiteForgeResult(forgeJob.id)?.suiteId).toBe("custom-suite-ab12cd34");
+    // 全局任务不进入任何项目的任务列表
+    expect(repository.listJobs(project.id).map((job) => job.id)).toEqual(["project-job"]);
     database.close();
   });
 

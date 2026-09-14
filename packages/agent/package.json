@@ -10,6 +10,7 @@
     "@ecomgen/contracts": "workspace:*",
     "@ecomgen/ecom-skill": "workspace:*",
     "@ecomgen/ecom-suite": "workspace:*",
+    "@ecomgen/ecom-suite-forge": "workspace:*",
     "@earendil-works/pi-agent-core": "^0.84.2",
     "@earendil-works/pi-ai": "^0.84.2"
   }

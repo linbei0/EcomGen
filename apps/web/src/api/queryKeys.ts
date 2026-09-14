@@ -6,6 +6,8 @@ export const qk = {
   suites: ["suites"] as const,
   suiteCategories: ["suite-categories"] as const,
   suite: (id: string) => ["suites", id] as const,
+  suiteForgeJob: (id: string) => ["suite-forge-jobs", id] as const,
+  suiteForgeResult: (id: string) => ["suite-forge-jobs", id, "result"] as const,
   providers: ["providers"] as const,
   searchSources: ["search-sources"] as const,
   projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,

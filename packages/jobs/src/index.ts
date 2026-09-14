@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { EventEnvelope } from "@ecomgen/contracts";
 
 export const QUEUE_NAME = process.env.ECOMGEN_QUEUE_NAME ?? "ecomgen";
-export type EcomJobKind = "plan" | "copywrite" | "generate" | "export" | "edit_plan" | "edit_generate" | "layer_plan" | "layer_export";
+export type EcomJobKind = "plan" | "copywrite" | "generate" | "export" | "edit_plan" | "edit_generate" | "layer_plan" | "layer_export" | "suite_forge";
 export interface EcomJobPayload { jobId: string; kind: EcomJobKind; }
 export const EVENT_CHANNEL_PREFIX = "ecomgen:project-events:";
 
@@ -20,7 +20,8 @@ export async function enqueue(queue: Queue<EcomJobPayload>, payload: EcomJobPayl
   // 图像请求可能已经在 Provider 侧生效；生成任务保留手动重试，避免 BullMQ 自动再次计费。
   // layer_export 同理：SAM 分割按次计费，失败后不自动重跑。
   // 规划与图层识别耗时分钟级，完整重跑代价高，最多尝试 2 次（失败后自动重跑 1 次）。
-  const attempts = payload.kind === "generate" || payload.kind === "edit_generate" || payload.kind === "layer_export" ? 1 : payload.kind === "plan" || payload.kind === "layer_plan" ? 2 : 3;
+  // 套图反推同为纯推理视觉任务、无付费图生图，按 plan 处理：最多尝试 2 次。
+  const attempts = payload.kind === "generate" || payload.kind === "edit_generate" || payload.kind === "layer_export" ? 1 : payload.kind === "plan" || payload.kind === "layer_plan" || payload.kind === "suite_forge" ? 2 : 3;
   const options: JobsOptions = { jobId: payload.jobId, attempts, backoff: { type: "exponential", delay: 1000 } };
   await queue.add(payload.kind, payload, options);
 }

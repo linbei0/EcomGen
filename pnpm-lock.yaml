@@ -159,6 +159,9 @@ importers:
       '@ecomgen/ecom-skill':
         specifier: workspace:*
         version: link:../../packages/ecom-skill
+      '@ecomgen/ecom-suite':
+        specifier: workspace:*
+        version: link:../../packages/ecom-suite
       '@ecomgen/jobs':
         specifier: workspace:*
         version: link:../../packages/jobs
@@ -199,6 +202,9 @@ importers:
       '@ecomgen/ecom-suite':
         specifier: workspace:*
         version: link:../ecom-suite
+      '@ecomgen/ecom-suite-forge':
+        specifier: workspace:*
+        version: link:../ecom-suite-forge
       '@sinclair/typebox':
         specifier: ^0.34.33
         version: 0.34.52
@@ -234,6 +240,8 @@ importers:
   packages/ecom-skill: {}
 
   packages/ecom-suite: {}
+
+  packages/ecom-suite-forge: {}
 
   packages/jobs:
     dependencies:

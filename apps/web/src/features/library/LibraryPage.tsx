@@ -1,8 +1,8 @@
 import { App, Button, Empty, Image, Input, Segmented, Select, Skeleton } from "antd";
-import { Aperture, Check, Download, LibraryBig, RefreshCw, Search, Settings2 } from "lucide-react";
+import { Aperture, Check, Download, LibraryBig, RefreshCw, Search, Settings2, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { LIBRARY_KIND_OPTIONS, type LibraryItem, type LibraryKindFilter } from "../../api/adapters/library";
 import { useCopyLibraryAssetToProject, useLibraryItems } from "../../api/hooks/useLibrary";
@@ -67,6 +67,7 @@ const LibraryCard = memo(function LibraryCard({ item, selected, onToggle }: Libr
 
 export function LibraryPage() {
   const { notification } = App.useApp();
+  const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [kind, setKind] = useState<LibraryKindFilter>("ALL");
   const [search, setSearch] = useState("");
@@ -161,6 +162,9 @@ export function LibraryPage() {
         </Link>
         <div className={styles.topActions}>
           <HealthBadge />
+          <Button icon={<Sparkles size={16} strokeWidth={1.75} />} onClick={() => void navigate("/suite-forge")}>
+            套图工坊
+          </Button>
           <Button icon={<Settings2 size={16} strokeWidth={1.75} />} onClick={() => setSettingsOpen(true)}>
             设置
           </Button>

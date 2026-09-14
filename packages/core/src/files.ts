@@ -11,7 +11,7 @@ export class LocalAssetStore {
   }
 
   public async initialize(): Promise<void> {
-    await Promise.all(["assets", "outputs", "exports", "edits", "layers", "thumbs", "tmp"].map((part) => mkdir(join(this.root, part), { recursive: true })));
+    await Promise.all(["assets", "outputs", "exports", "edits", "layers", "thumbs", "tmp", "suite-forge"].map((part) => mkdir(join(this.root, part), { recursive: true })));
   }
 
   public async putAsset(projectId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
@@ -57,6 +57,14 @@ export class LocalAssetStore {
   public async putLayerArtifact(projectId: string, layerExportId: string, name: string, content: Buffer, extension = ".png"): Promise<{ path: string; hash: string }> {
     const hash = createHash("sha256").update(content).digest("hex");
     const relativePath = join("layers", projectId, layerExportId, `${name}-${hash.slice(0, 12)}${this.safeExtension(extension)}`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
+  /** 套图反推来源图：不入项目，按 job 聚合到 suite-forge 命名空间，任务失败时随清理一并删除。 */
+  public async putSuiteForgeSource(jobId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const relativePath = join("suite-forge", jobId, `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(originalName)}`);
     await this.write(relativePath, content);
     return { path: relativePath, hash };
   }

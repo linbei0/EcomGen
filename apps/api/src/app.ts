@@ -5,7 +5,7 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type UserTemplateRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type UserTemplateRecord } from "@ecomgen/core";
 import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
 import { SUITE_TAXONOMY } from "@ecomgen/ecom-suite";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
@@ -110,6 +110,57 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     repository.deleteUserSuite(id);
     await suiteCatalog.refresh();
     return reply.code(204).send();
+  });
+  // 套图工坊：把一组爆款整图反推为可复用套图模板。任务不绑定项目，源图以 multipart 随请求上传，
+  // 推理模型由前端自选并要求支持视觉；产出先落草稿，用户在页面确认后才写入 user_suites。
+  app.post("/api/v1/suite-forge-jobs", async (request, reply) => {
+    const fields: Record<string, string> = {};
+    const uploads: Array<{ filename: string; mimeType: string; buffer: Buffer; hash: string }> = [];
+    for await (const part of request.parts()) {
+      if (part.type === "file") {
+        if (!part.mimetype.startsWith("image/")) throw new ApiError(400, "VALIDATION_ERROR", "Only image files are supported");
+        const buffer = await part.toBuffer();
+        uploads.push({ filename: part.filename || "source", mimeType: part.mimetype, buffer, hash: contentHash(buffer) });
+        continue;
+      }
+      fields[part.fieldname] = typeof part.value === "string" ? part.value : String(part.value ?? "");
+    }
+    if (uploads.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "At least one source image is required");
+    if (uploads.length > MAX_SUITE_FORGE_SOURCES) throw new ApiError(400, "VALIDATION_ERROR", `A suite forge run supports at most ${MAX_SUITE_FORGE_SOURCES} source images`);
+    const providerId = readText(fields.providerId, "providerId");
+    const modelId = readText(fields.modelId, "modelId");
+    const hints = suiteForgeHints(fields);
+    const idempotencyKey = readOptionalText(fields.idempotencyKey) ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
+    const fingerprint = requestFingerprint({ type: "SUITE_FORGE", providerId, modelId, sourceHashes: uploads.map((upload) => upload.hash), hints, idempotencyKey });
+    const existing = repository.findJobByFingerprint(null, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    verifyVisionModel(repository, providerId, modelId);
+    const jobId = randomUUID();
+    const sources: Array<{ storagePath: string; hash: string; originalName: string; mimeType: string; width: number | null; height: number | null }> = [];
+    for (const upload of uploads) {
+      const stored = await storage.putSuiteForgeSource(jobId, upload.filename, upload.buffer);
+      const dimensions = await imageDimensions(upload.buffer);
+      sources.push({ storagePath: stored.path, hash: stored.hash, originalName: upload.filename, mimeType: upload.mimeType, width: dimensions.width, height: dimensions.height });
+    }
+    const job = repository.createJob({ id: jobId, projectId: null, storyboardItemId: null, type: "SUITE_FORGE", input: { providerId, modelId, sources, hints }, requestFingerprint: fingerprint, providerId, modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    await enqueue(queue, { jobId: job.id, kind: "suite_forge" });
+    return reply.code(202).send(job);
+  });
+  app.get("/api/v1/suite-forge-jobs/:jobId/result", async (request) => {
+    const jobId = parameter(request, "jobId");
+    const record = repository.getSuiteForgeResult(jobId); if (!record) missing("suite forge result", jobId);
+    return publicSuiteForgeResult(record);
+  });
+  app.post("/api/v1/suite-forge-jobs/:jobId/commit", async (request) => {
+    const jobId = parameter(request, "jobId");
+    const record = repository.getSuiteForgeResult(jobId); if (!record) missing("suite forge result", jobId);
+    if (record.status === "COMMITTED" && record.suiteId) return publicSuiteForgeResult(record);
+    assertValidSuiteDocument(record.payload);
+    const requested = record.payload.id;
+    const id = requested && requested.startsWith("custom-suite-") && !suiteCatalog.getSuite(requested) ? requested : suiteIdForImport(undefined, suiteCatalog);
+    repository.saveUserSuite({ id, name: record.payload.name, l1: record.payload.category.l1, l2: record.payload.category.l2, leaf: record.payload.category.leaf, productFamily: record.payload.productFamily ?? null, payload: { ...record.payload, id } });
+    await suiteCatalog.refresh();
+    const committed = repository.commitSuiteForgeResult(jobId, id) ?? record;
+    return publicSuiteForgeResult(committed);
   });
   app.get("/api/v1/providers", async () => ({ items: repository.listProviders().map(publicProvider), nextCursor: null }));
   app.post("/api/v1/providers", async (request, reply) => {
@@ -633,11 +684,11 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       const output = outputId ? repository.getOutput(outputId) : undefined;
       if (!output || output.projectId !== job.projectId) throw new ApiError(409, "CONFLICT", "无法重试：源输出已不存在");
       if (job.type === "LAYER_PLAN") {
-        createLayerRecord = (retryJobId) => { repository.createLayerPlan({ projectId: job.projectId, outputId: output.id, jobId: retryJobId, outputHash: output.hash, status: "QUEUED", elements: [], error: null }); };
+        createLayerRecord = (retryJobId) => { repository.createLayerPlan({ projectId: output.projectId, outputId: output.id, jobId: retryJobId, outputHash: output.hash, status: "QUEUED", elements: [], error: null }); };
       } else {
         const planId = typeof job.input.planId === "string" ? job.input.planId : null;
         const includeBackground = job.input.includeBackground !== false;
-        createLayerRecord = (retryJobId) => { repository.createLayerExport({ projectId: job.projectId, outputId: output.id, jobId: retryJobId, planId, status: "QUEUED", includeBackground, psdStoragePath: null, layerFiles: null, error: null }); };
+        createLayerRecord = (retryJobId) => { repository.createLayerExport({ projectId: output.projectId, outputId: output.id, jobId: retryJobId, planId, status: "QUEUED", includeBackground, psdStoragePath: null, layerFiles: null, error: null }); };
       }
     }
     // 重试即替代原任务：先终结原失败任务再入队新任务，前端结果区不再残留旧卡片；retryable 在此关闭使并发双击得到 409。
@@ -789,6 +840,31 @@ function assertValidSuiteDocument(value: unknown): void {
   const result = validateEcomSuiteFile(value);
   if (!result.ok) throw new ApiError(400, "VALIDATION_ERROR", "Invalid suite document", result.errors.map((reason) => ({ path: "/", reason })));
 }
+const MAX_SUITE_FORGE_SOURCES = 12;
+function publicSuiteForgeResult(record: SuiteForgeResultRecord): object { return { jobId: record.jobId, status: record.status, suite: record.payload, suiteId: record.suiteId ?? null, createdAt: record.createdAt, updatedAt: record.updatedAt }; }
+/** multipart 字段全部是字符串，这里按反推约束逐项解析；targetShotCount 与契约一致限定 5–12。 */
+function suiteForgeHints(fields: Record<string, string>): Record<string, unknown> {
+  const hints: Record<string, unknown> = {};
+  const name = readOptionalText(fields.name); if (name) hints.name = name;
+  const l1 = readOptionalText(fields.l1); if (l1) hints.l1 = l1;
+  const l2 = readOptionalText(fields.l2); if (l2) hints.l2 = l2;
+  const leaf = readOptionalText(fields.leaf); if (leaf) hints.leaf = leaf;
+  const productFamily = readOptionalText(fields.productFamily); if (productFamily) hints.productFamily = productFamily;
+  const targetShotCount = readOptionalText(fields.targetShotCount);
+  if (targetShotCount) {
+    const count = Number(targetShotCount);
+    if (!Number.isInteger(count) || count < 5 || count > 12) throw new ApiError(400, "VALIDATION_ERROR", "targetShotCount must be an integer between 5 and 12");
+    hints.targetShotCount = count;
+  }
+  const userInstruction = readOptionalText(fields.userInstruction); if (userInstruction) hints.userInstruction = userInstruction;
+  return hints;
+}
+function verifyVisionModel(repository: EcomRepository, providerId: string, modelId: string): void {
+  const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId);
+  const model = provider.models.find((candidate) => candidate.id === modelId);
+  if (!model) throw new ApiError(400, "VALIDATION_ERROR", "Selected reasoning model is not declared by its provider");
+  if (!model.supportsVision) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected reasoning model must support Vision for suite forging");
+}
 /** 手动规划可混选套图分镜与单图模板；分镜 assetType 必须是当前编目已知项，未知即报错而非静默丢弃。 */
 function resolveRequestedSuiteShots(requested: unknown, catalog: SuiteCatalog): string[] {
   const assetTypes = readOptionalTextArray(requested) ?? [];
@@ -899,6 +975,7 @@ function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "EDIT_GENERATE") return "edit_generate";
   if (type === "LAYER_PLAN") return "layer_plan";
   if (type === "LAYER_EXPORT") return "layer_export";
+  if (type === "SUITE_FORGE") return "suite_forge";
   return "export";
 }
 // ProviderId/modelId 为 null 表示项目尚未选择模型（Provider 被删除后置空），在入口拦截而不是打出一个注定失败的任务

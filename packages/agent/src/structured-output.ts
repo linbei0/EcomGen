@@ -125,6 +125,89 @@ export const LAYER_ELEMENTS_OUTPUT_SCHEMA: StructuredOutputSchema = {
   },
 };
 
+const SUITE_PALETTE_COLOR_SCHEMA = {
+  type: "object",
+  ...noAdditionalProperties,
+  properties: { name: { type: "string" }, hex: { type: "string" } },
+  required: ["name", "hex"],
+} as const;
+
+const SUITE_SHOT_SCHEMA = {
+  type: "object",
+  ...noAdditionalProperties,
+  properties: {
+    shotId: { type: "string" },
+    order: { type: "integer", minimum: 1 },
+    shotRole: { type: "string", enum: ["HERO", "PAIN_POINT", "COMPARISON", "SCENE", "DETAIL", "TRUST", "VARIANT", "CTA"] },
+    displayName: { type: "string" },
+    intent: { type: "string" },
+    assetType: { type: "string" },
+    mode: { type: "string", enum: ["CREATIVE", "PIXEL_PROTECTED"] },
+    aspectRatio: { type: "string", enum: ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"] },
+    resolution: { type: "string", enum: ["1K", "2K", "4K"] },
+    camera: { type: "string" },
+    lighting: { type: "string" },
+    background: { type: "string" },
+    props: { type: "string" },
+    productOccupancy: { type: "string" },
+    whitespace: { type: "string" },
+    textZone: { type: "string" },
+    promptTemplate: { type: "string" },
+    supportsImageReference: { type: "boolean" },
+  },
+  required: ["shotId", "order", "shotRole", "displayName", "intent", "assetType", "mode", "aspectRatio", "resolution", "camera", "lighting", "background", "props", "productOccupancy", "whitespace", "textZone", "promptTemplate", "supportsImageReference"],
+} as const;
+
+// 套图反推的唯一产出契约：字段与 packages/contracts 的 EcomSuiteFile 对齐，
+// strict 模式要求所有字段必填，因此提示词也要求模型逐字段填满。
+export const SUITE_FORGE_OUTPUT_SCHEMA: StructuredOutputSchema = {
+  name: "ecomgen_suite_forge",
+  schema: {
+    type: "object",
+    ...noAdditionalProperties,
+    properties: {
+      schemaVersion: { type: "integer", minimum: 1 },
+      kind: { type: "string", enum: ["ecomgen.suite"] },
+      id: { type: "string" },
+      name: { type: "string" },
+      description: { type: "string" },
+      category: {
+        type: "object",
+        ...noAdditionalProperties,
+        properties: { l1: { type: "string" }, l2: { type: "string" }, leaf: { type: "string" }, leafKeywords: { type: "array", items: { type: "string" } } },
+        required: ["l1", "l2", "leaf", "leafKeywords"],
+      },
+      productFamily: { type: "string", enum: ["fashion", "electronics", "beauty", "food", "home", "jewelry"] },
+      styleLock: {
+        type: "object",
+        ...noAdditionalProperties,
+        properties: {
+          direction: { type: "string" },
+          palette: { type: "array", items: SUITE_PALETTE_COLOR_SCHEMA },
+          temperature: { type: "string" },
+          backgroundSystem: { type: "string" },
+          lightingSystem: { type: "string" },
+          surfaceSystem: { type: "string" },
+          typography: { type: "string" },
+          iconSystem: { type: "string" },
+          presentationRules: { type: "string" },
+          noDrift: { type: "array", items: { type: "string" } },
+          lockText: { type: "string" },
+        },
+        required: ["direction", "palette", "temperature", "backgroundSystem", "lightingSystem", "surfaceSystem", "typography", "iconSystem", "presentationRules", "noDrift", "lockText"],
+      },
+      shots: { type: "array", minItems: 5, maxItems: 12, items: SUITE_SHOT_SCHEMA },
+      provenance: {
+        type: "object",
+        ...noAdditionalProperties,
+        properties: { sourceKind: { type: "string" }, sourceImageCount: { type: "integer", minimum: 0 }, detached: { type: "boolean" }, notes: { type: "string" } },
+        required: ["sourceKind", "sourceImageCount", "detached", "notes"],
+      },
+    },
+    required: ["schemaVersion", "kind", "id", "name", "description", "category", "productFamily", "styleLock", "shots", "provenance"],
+  },
+};
+
 /** Provider capability is carried on the model by the EcomGen reasoning adapter. */
 export function modelSupportsStructuredOutput(model: Model<"openai-completions" | "openai-responses">): boolean {
   return (model as Model<"openai-completions" | "openai-responses"> & { ecomgenSupportsStructuredOutput?: boolean }).ecomgenSupportsStructuredOutput === true;

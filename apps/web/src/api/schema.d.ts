@@ -136,6 +136,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/suite-forge-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createSuiteForgeJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/suite-forge-jobs/{jobId}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getSuiteForgeResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/suite-forge-jobs/{jobId}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["commitSuiteForgeResult"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/providers": {
         parameters: {
             query?: never;
@@ -971,7 +1023,7 @@ export interface components {
         /** @enum {string} */
         CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION";
         /** @enum {string} */
-        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT";
+        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE";
         /** @enum {string} */
         JobStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
         /** @enum {string} */
@@ -1348,7 +1400,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT";
+            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE";
             /** @enum {string} */
             status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
             progress: number;
@@ -1876,6 +1928,22 @@ export interface components {
             /** @description Unique key for an intentional re-recognition run. */
             regenerationKey?: string;
         };
+        CreateSuiteForgeJobInput: {
+            /** Format: uuid */
+            providerId: string;
+            modelId: string;
+            /** @description 爆款套图源图，5–12 张为佳。 */
+            files: string[];
+            name?: string;
+            l1?: string;
+            l2?: string;
+            leaf?: string;
+            productFamily?: string;
+            targetShotCount?: number;
+            /** @description 额外反推要求，例如只保留某个卖点结构。 */
+            userInstruction?: string;
+            idempotencyKey?: string;
+        };
         EcomTemplateItem: {
             id: string;
             upstreamNumber: number;
@@ -1946,6 +2014,18 @@ export interface components {
         SelectEditSessionOutputInput: {
             /** Format: uuid */
             outputId: string;
+        };
+        SuiteForgeResult: {
+            /** Format: uuid */
+            jobId: string;
+            /** @enum {string} */
+            status: "DRAFT" | "COMMITTED";
+            suite: components["schemas"]["EcomSuiteFile"];
+            suiteId?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         TestProviderConnectionResult: {
             ok: boolean;
@@ -2344,6 +2424,80 @@ export interface operations {
                     "application/json": components["schemas"]["EcomSuiteCategoriesResponse"];
                 };
             };
+        };
+    };
+    createSuiteForgeJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["CreateSuiteForgeJobInput"];
+            };
+        };
+        responses: {
+            /** @description Suite forge job accepted (or an existing job reused for an identical request). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    getSuiteForgeResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft or committed forged suite for the job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuiteForgeResult"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    commitSuiteForgeResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forged suite imported into the user suite catalog. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuiteForgeResult"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listProviders: {

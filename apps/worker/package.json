@@ -14,6 +14,7 @@
     "@ecomgen/contracts": "workspace:*",
     "@ecomgen/core": "workspace:*",
     "@ecomgen/ecom-skill": "workspace:*",
+    "@ecomgen/ecom-suite": "workspace:*",
     "@ecomgen/jobs": "workspace:*",
     "@ecomgen/providers": "workspace:*",
     "ag-psd": "^31.0.2",

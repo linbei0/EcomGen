@@ -71,6 +71,17 @@ export interface UserSuiteRecord {
   updatedAt: string;
 }
 
+/** 全局套图反推任务的结果草稿；确认入库后写入 user_suites 并置为 COMMITTED。 */
+export type SuiteForgeStatus = "DRAFT" | "COMMITTED";
+export interface SuiteForgeResultRecord {
+  jobId: string;
+  payload: SuiteDocumentInput;
+  status: SuiteForgeStatus;
+  suiteId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProjectRecord {
   id: string;
   name: string;
@@ -181,7 +192,8 @@ export interface StoryboardItemRecord {
 
 export interface JobRecord {
   id: string;
-  projectId: string;
+  /** 全局套图反推任务不绑定项目，projectId 为 null。 */
+  projectId: string | null;
   storyboardItemId: string | null;
   type: JobType;
   status: JobStatus;
@@ -524,6 +536,29 @@ export class EcomRepository {
     return this.db.prepare("DELETE FROM user_suites WHERE id=?").run(id).changes > 0;
   }
 
+  /** 套图反推成功即落草稿；重复写同一 job 会覆盖为最新草稿。 */
+  public saveSuiteForgeResult(input: { jobId: string; payload: SuiteDocumentInput }): SuiteForgeResultRecord {
+    const createdAt = now();
+    const record: SuiteForgeResultRecord = { jobId: input.jobId, payload: input.payload, status: "DRAFT", suiteId: null, createdAt, updatedAt: createdAt };
+    this.db.prepare(`INSERT INTO suite_forge_results (job_id,payload_json,status,suite_id,created_at,updated_at)
+      VALUES (@jobId,@payload,'DRAFT',NULL,@createdAt,@updatedAt)
+      ON CONFLICT(job_id) DO UPDATE SET payload_json=excluded.payload_json,status='DRAFT',suite_id=NULL,updated_at=excluded.updated_at`)
+      .run({ jobId: record.jobId, payload: json(record.payload), createdAt, updatedAt: createdAt });
+    return record;
+  }
+  public getSuiteForgeResult(jobId: string): SuiteForgeResultRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM suite_forge_results WHERE job_id=?").get(jobId);
+    return row ? mapSuiteForgeResult(row as Row) : undefined;
+  }
+  /** 确认入库：记录已写入的 user_suites.id，状态转为 COMMITTED，草稿仍可回看。 */
+  public commitSuiteForgeResult(jobId: string, suiteId: string): SuiteForgeResultRecord | undefined {
+    const current = this.getSuiteForgeResult(jobId);
+    if (!current) return undefined;
+    const updatedAt = now();
+    this.db.prepare("UPDATE suite_forge_results SET status='COMMITTED',suite_id=?,updated_at=? WHERE job_id=?").run(suiteId, updatedAt, jobId);
+    return { ...current, status: "COMMITTED", suiteId, updatedAt };
+  }
+
   public listProjects(archived = false): ProjectRecord[] {
     const order = archived ? "archived_at DESC, updated_at DESC" : "updated_at DESC";
     return (this.db.prepare(`SELECT * FROM projects WHERE archived_at IS ${archived ? "NOT " : ""}NULL ORDER BY ${order}`).all() as Row[]).map(mapProject);
@@ -813,7 +848,8 @@ export class EcomRepository {
     this.db.prepare("UPDATE jobs SET status=@status,progress=@progress,retryable=@retryable,provider_task_id=@providerTaskId,error_json=@error,actual_cost_json=@actualCost,cancel_requested=@cancelRequested,updated_at=@updatedAt WHERE id=@id")
       .run({ ...next, retryable: next.retryable ? 1 : 0, cancelRequested: next.cancelRequested ? 1 : 0, actualCost: next.actualCost ? json(next.actualCost) : null, error: next.error ? json(next.error) : null }); return next;
   }
-  public findJobByFingerprint(projectId: string, fingerprint: string): JobRecord | undefined { const row = this.db.prepare("SELECT * FROM jobs WHERE project_id=? AND request_fingerprint=? AND status IN ('QUEUED','RUNNING','SUCCEEDED') ORDER BY created_at DESC LIMIT 1").get(projectId, fingerprint); return row ? mapJob(row as Row) : undefined; }
+  /** 指纹去重同时覆盖项目任务与全局任务：projectId 为 null 时按 project_id IS NULL 匹配。 */
+  public findJobByFingerprint(projectId: string | null, fingerprint: string): JobRecord | undefined { const row = this.db.prepare("SELECT * FROM jobs WHERE project_id IS ? AND request_fingerprint=? AND status IN ('QUEUED','RUNNING','SUCCEEDED') ORDER BY created_at DESC LIMIT 1").get(projectId, fingerprint); return row ? mapJob(row as Row) : undefined; }
   public recoverInterruptedJobs(): JobRecord[] {
     const rows = this.db.prepare("SELECT * FROM jobs WHERE status='RUNNING'").all() as Row[];
     const recovered = rows.filter((row) => row.provider_task_id !== EXTERNAL_REQUEST_STARTED);
@@ -1008,6 +1044,7 @@ function mapSearchSource(row: Row): SearchSourceRecord { return { id: String(row
 
 function mapUserTemplate(row: Row): UserTemplateRecord { return { id: String(row.id), name: String(row.name), prompt: String(row.prompt), defaultSize: row.default_size === "1024x1536" ? "1024x1536" : "1024x1024", supportsImageReference: Boolean(row.supports_image_reference), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapUserSuite(row: Row): UserSuiteRecord { return { id: String(row.id), name: String(row.name), l1: String(row.l1), l2: String(row.l2), leaf: String(row.leaf), productFamily: row.product_family == null ? null : String(row.product_family), payload: JSON.parse(String(row.payload_json)) as SuiteDocumentInput, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapSuiteForgeResult(row: Row): SuiteForgeResultRecord { return { jobId: String(row.job_id), payload: JSON.parse(String(row.payload_json)) as SuiteDocumentInput, status: row.status as SuiteForgeStatus, suiteId: row.suite_id == null ? null : String(row.suite_id), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapProject(row: Row): ProjectRecord {
   return {
     id: String(row.id),
@@ -1103,7 +1140,7 @@ function mapStoryboardItem(row: Row): StoryboardItemRecord {
     updatedAt: String(row.updated_at)
   };
 }
-function mapJob(row: Row): JobRecord { return { id: String(row.id), projectId: String(row.project_id), storyboardItemId: row.storyboard_item_id ? String(row.storyboard_item_id) : null, type: row.type as JobType, status: row.status as JobStatus, progress: Number(row.progress), retryable: Boolean(row.retryable), input: parse(row.input_json), requestFingerprint: row.request_fingerprint ? String(row.request_fingerprint) : null, providerId: row.provider_id ? String(row.provider_id) : null, modelId: row.model_id ? String(row.model_id) : null, estimatedCost: row.estimated_cost_json ? parse(row.estimated_cost_json) : null, actualCost: row.actual_cost_json ? parse(row.actual_cost_json) : null, cancelRequested: Boolean(row.cancel_requested), providerTaskId: row.provider_task_id ? String(row.provider_task_id) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapJob(row: Row): JobRecord { return { id: String(row.id), projectId: row.project_id == null ? null : String(row.project_id), storyboardItemId: row.storyboard_item_id ? String(row.storyboard_item_id) : null, type: row.type as JobType, status: row.status as JobStatus, progress: Number(row.progress), retryable: Boolean(row.retryable), input: parse(row.input_json), requestFingerprint: row.request_fingerprint ? String(row.request_fingerprint) : null, providerId: row.provider_id ? String(row.provider_id) : null, modelId: row.model_id ? String(row.model_id) : null, estimatedCost: row.estimated_cost_json ? parse(row.estimated_cost_json) : null, actualCost: row.actual_cost_json ? parse(row.actual_cost_json) : null, cancelRequested: Boolean(row.cancel_requested), providerTaskId: row.provider_task_id ? String(row.provider_task_id) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapCopywritingResult(row: Row): CopywritingResultRecord { return { jobId: String(row.job_id), projectId: String(row.project_id), target: row.target as CopywritingTarget, content: String(row.content), createdAt: String(row.created_at) }; }
 function mapWebResearchAudit(row: Row): WebResearchAuditRecord { return { jobId: String(row.job_id), availability: row.availability as WebResearchAvailability, invocationCount: Number(row.invocation_count), successfulAttemptCount: Number(row.successful_attempt_count), failedAttemptCount: Number(row.failed_attempt_count), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapWebResearchAttempt(row: Row): WebResearchAttemptRecord { return { id: String(row.id), jobId: String(row.job_id), query: String(row.query), sourceId: String(row.source_id), sourceName: String(row.source_name), sourceKind: String(row.source_kind), status: row.status as WebResearchAttemptStatus, resultCount: Number(row.result_count), errorMessage: row.error_message ? String(row.error_message) : null, createdAt: String(row.created_at) }; }

@@ -23,7 +23,7 @@ export const PlanningMode = Type.Enum({ AI: "AI", MANUAL: "MANUAL" }, { $id: "#/
 /** 套图来源：随仓库内置或由用户导入/目录投放。 */
 export const EcomSuiteOrigin = Type.Enum({ BUILTIN: "builtin", USER: "user" }, { $id: "#/components/schemas/EcomSuiteOrigin" });
 export const CopywritingTarget = Type.Enum({ PRODUCT_DESCRIPTION: "PRODUCT_DESCRIPTION", PLANNING_INSTRUCTION: "PLANNING_INSTRUCTION" }, { $id: "#/components/schemas/CopywritingTarget" });
-export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERATE: "GENERATE", EXPORT: "EXPORT", EDIT_PLAN: "EDIT_PLAN", EDIT_GENERATE: "EDIT_GENERATE", LAYER_PLAN: "LAYER_PLAN", LAYER_EXPORT: "LAYER_EXPORT" }, { $id: "#/components/schemas/JobType" });
+export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERATE: "GENERATE", EXPORT: "EXPORT", EDIT_PLAN: "EDIT_PLAN", EDIT_GENERATE: "EDIT_GENERATE", LAYER_PLAN: "LAYER_PLAN", LAYER_EXPORT: "LAYER_EXPORT", SUITE_FORGE: "SUITE_FORGE" }, { $id: "#/components/schemas/JobType" });
 export const JobStatus = Type.Enum({ QUEUED: "QUEUED", RUNNING: "RUNNING", SUCCEEDED: "SUCCEEDED", FAILED: "FAILED", CANCELLED: "CANCELLED" }, { $id: "#/components/schemas/JobStatus" });
 export const ReasoningProtocolProfile = Type.Enum({ OPENAI: "openai", DASHSCOPE_QWEN: "dashscope_qwen", OPENAI_RESPONSES: "openai_responses" }, { $id: "#/components/schemas/ReasoningProtocolProfile" });
 export const SearchSourceKind = Type.Enum({ BRAVE: "brave", TAVILY: "tavily", SEARXNG: "searxng" }, { $id: "#/components/schemas/SearchSourceKind" });
