@@ -9,6 +9,8 @@
     "dev:worker": "pnpm --filter @ecomgen/worker dev",
     "dev:web": "pnpm --filter @ecomgen/web dev",
     "test": "pnpm -r test",
+    "test:affected": "node scripts/affected.mjs test",
+    "build:affected": "node scripts/affected.mjs build",
     "test:e2e:mock": "node scripts/e2e-mock.mjs",
     "test:contracts": "pnpm --filter @ecomgen/contracts test",
     "gen:openapi": "pnpm --filter @ecomgen/contracts build && node scripts/generate-openapi.mjs",

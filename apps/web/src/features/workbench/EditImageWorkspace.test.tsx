@@ -18,7 +18,8 @@ const tintFillStyles: string[] = [];
 let currentAlpha = 1;
 let currentFillStyle = "";
 let currentStrokeStyle = "";
-let pendingAnimationFrame: FrameRequestCallback | null = null;
+let pendingAnimationFrames: Array<{ id: number; callback: FrameRequestCallback }> = [];
+let animationFrameId = 0;
 const canvasContext = {
   get globalAlpha() { return currentAlpha; },
   set globalAlpha(value: number) { currentAlpha = value; alphaValues.push(value); renderOperations.push(`alpha:${value}`); },
@@ -85,9 +86,12 @@ function firePointer(canvas: HTMLCanvasElement, type: "pointerdown" | "pointermo
 }
 
 function renderPendingFrame(): void {
-  const callback = pendingAnimationFrame;
-  pendingAnimationFrame = null;
-  callback?.(0);
+  // 真实的一帧会执行该帧注册的全部回调，因此这里必须整批执行。
+  // 只保留单个槽位时，画布重绘会与同时排队的外部动画（antd 弹层等）争抢槽位，
+  // 重放的是"最后排队的那一个"而非画布回调，表现为随机失败。
+  const callbacks = pendingAnimationFrames;
+  pendingAnimationFrames = [];
+  for (const { callback } of callbacks) callback(0);
 }
 
 describe("图片编辑画布", () => {
@@ -105,9 +109,14 @@ describe("图片编辑画布", () => {
       return (this.dataset.tool ? canvasContext : offscreenCanvasContext) as unknown as CanvasRenderingContext2D;
     });
     vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/png;base64,mock");
-    pendingAnimationFrame = null;
-    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { pendingAnimationFrame = callback; return 1; });
-    vi.stubGlobal("cancelAnimationFrame", () => {});
+    pendingAnimationFrames = [];
+    animationFrameId = 0;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      const id = ++animationFrameId;
+      pendingAnimationFrames.push({ id, callback });
+      return id;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => { pendingAnimationFrames = pendingAnimationFrames.filter((frame) => frame.id !== id); });
     HTMLCanvasElement.prototype.setPointerCapture = vi.fn();
     HTMLCanvasElement.prototype.releasePointerCapture = vi.fn();
     HTMLCanvasElement.prototype.hasPointerCapture = vi.fn(() => true);

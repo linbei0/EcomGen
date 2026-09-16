@@ -30,10 +30,12 @@ EcomGen 是面向个人卖家的电商 AI 生成套图工具。当前后端优�
 ```bash
 pnpm install
 pnpm build
+pnpm build:affected
 pnpm dev:api
 pnpm dev:worker
 pnpm dev:web
 pnpm test
+pnpm test:affected
 pnpm test:e2e:mock
 pnpm lint:openapi
 pnpm gen:openapi
@@ -75,10 +77,38 @@ docker compose up -d --build
 
 ## 测试要求
 
-- 修改领域逻辑或持久化：补充对应 package 的 Vitest 测试。
-- 修改 API 契约：只编辑 `packages/contracts/src` 中对应 schema，运行 `pnpm gen:openapi`、`pnpm gen:check` 和 `pnpm lint:openapi`。
-- 修改任务编排、Provider 或导出：运行 `pnpm test:e2e:mock`。
-- 提交前至少运行 `pnpm build`、`pnpm test`、`pnpm lint:openapi`；涉及完整链路时额外运行 Mock E2E。
+### 验证范围按影响面决定，不按改动行数
+
+改动一个前端适配器和改动一个共享契约字段，行数可能只差几行，影响面差一个数量级。默认使用范围化验证，只跑改动能到达的包：
+
+```bash
+pnpm test:affected    # 改动包 + 依赖方（测试要验证调用方没被打破）
+pnpm build:affected   # 改动包 + 上游依赖（构建要先有上游 dist）
+```
+
+- 基线默认 `origin/main`，按 `ECOMGEN_BASE_REF` → `origin/main` → `main` 依次探测；基线不可达时显式失败，不静默改变范围。
+- 只改测试文件时不牵连依赖方；`*.md` 与 `docs/` 不计入改动集合。
+- 改动根级共享配置（`pnpm-lock.yaml`、`pnpm-workspace.yaml`、根 `package.json`、`tsconfig.base.json`、`scripts/`、`Dockerfile`、`docker-compose.yml`、`openapi*`）会自动升级为全量，因为这些文件的影响面无法从依赖图推导。
+- `pnpm test` 与 `pnpm build` 保留为全量入口，用于合并前和根级共享配置改动。
+- 选中集合为空但仍有工作区文件改动时 `scripts/affected.mjs` 报错退出：过滤结果不可信比没跑测试更危险。作用域策略只能通过命令行 flag 传入，已实测 pnpm 11.19.0 会静默忽略配置文件里的同名字段。
+
+### 验证层级
+
+| 改动 | 必须运行 |
+| --- | --- |
+| 任意改动 | `pnpm test:affected` |
+| 领域逻辑或持久化 | 对应 package 的用例，由 `test:affected` 覆盖 |
+| `packages/contracts/src` | `pnpm gen:openapi && pnpm gen:check && pnpm lint:openapi` |
+| 任务编排、Provider 或导出 | `pnpm test:e2e:mock` |
+| 合并前 / 推送前 | `pnpm build && pnpm test` |
+
+契约对账（`gen:check`、`lint:openapi`）只在 contracts 或 `openapi.yaml` 真正改动时才有意义，不作为无关改动的固定步骤。
+
+### 失败与偶发
+
+- 测试失败先定级：同一提交独立重跑以区分回归与偶发。偶发不要用重试配置掩盖，也不要吞错；真实竞态必须修根因。
+- 已知偶发用例必须记录成因（时序、竞态、共享状态）并限期修复，不得长期依赖重跑通过。
+- 全量套件只在机器高负载时出现的失败，不构成改动引入回归的证据；先在隔离环境用范围化验证确认。
 - 测试失败时修复根因，不通过吞错、伪造成功状态或静默降级隐藏失败。
 
 ### 测试价值与 TDD 边界

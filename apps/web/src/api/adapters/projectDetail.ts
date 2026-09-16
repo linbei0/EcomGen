@@ -1,3 +1,5 @@
+import { isSegmentationProtocol } from "@ecomgen/contracts";
+
 import { assetPreviewUrl, outputPreviewUrl } from "../../lib/assetUrl";
 import { API_BASE_URL } from "../../config/env";
 import type { components } from "../schema.d.ts";
@@ -53,7 +55,6 @@ const TARGET_MARKETS = new Set<Exclude<TargetMarket, null>>([
 ]);
 const ASPECTS = new Set<ImageAspectRatio>(["AUTO", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]);
 const SHOT_ROLES = new Set<StoryboardShotRole>(["HERO", "PAIN_POINT", "COMPARISON", "SCENE", "DETAIL", "TRUST", "VARIANT", "CTA"]);
-const SEGMENTATION_PROTOCOLS = new Set<string>(["fal", "grounded_sam", "seedream_layerize"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -335,8 +336,8 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
     imageProviderId,
     imageModelId,
     segmentationModel:
-      segmentationProviderId && segmentationModelId && segmentationProtocol && SEGMENTATION_PROTOCOLS.has(segmentationProtocol)
-        ? { providerId: segmentationProviderId, modelId: segmentationModelId, protocol: segmentationProtocol as NonNullable<Project["segmentationModel"]>["protocol"] }
+      segmentationProviderId && segmentationModelId && isSegmentationProtocol(segmentationProtocol)
+        ? { providerId: segmentationProviderId, modelId: segmentationModelId, protocol: segmentationProtocol }
         : null,
     defaultMode,
     imageResolution: RESOLUTIONS.has(resolution as ImageResolution) ? (resolution as ImageResolution) : "1K",
