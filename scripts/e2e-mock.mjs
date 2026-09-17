@@ -53,6 +53,9 @@ const forgeSuite = () => ({
 });
 const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "", layerPlanPrompt: "", suiteForgePrompt: "", samRequests: [], groundedRequests: [], layerizeRequests: [], giteeRequests: [] };
 const children = [];
+// 与 apps/worker 的启动日志配对；改动任一侧都要同步，否则这里会退化成启动超时。
+const WORKER_READY_LINE = "ecomgen worker ready";
+let workerReady = false;
 let mock;
 
 try {
@@ -197,6 +200,9 @@ try {
   children.push(start("apps/api/dist/server.js", environment));
   await waitFor(async () => (await fetch(`http://127.0.0.1:${apiPort}/health`)).ok);
   children.push(start("apps/worker/dist/worker.js", environment));
+  // Worker 未就绪时提交的任务只会停在队列里，直到下一个 waitJob 超时；这里等它自己报告已连接，
+  // 把启动竞态暴露成明确的启动失败，而不是误导性的任务超时。
+  await waitFor(() => workerReady, 15_000, "worker readiness");
   const base = `http://127.0.0.1:${apiPort}/api/v1`;
   const provider = await requestJson(`${base}/providers`, "POST", {
     name: "Mock OpenAI provider",
@@ -482,7 +488,7 @@ try {
   try { rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* A prior crashed child can leave a Windows file handle briefly. */ }
 }
 
-function start(script, env) { const child = spawn(process.execPath, [script], { cwd: root, env, stdio: "pipe" }); child.stderr.on("data", (data) => process.stderr.write(`[${script}] ${data}`)); return child; }
+function start(script, env) { const child = spawn(process.execPath, [script], { cwd: root, env, stdio: "pipe" }); child.stderr.on("data", (data) => process.stderr.write(`[${script}] ${data}`)); child.stdout.on("data", (data) => { if (data.toString("utf8").includes(WORKER_READY_LINE)) workerReady = true; }); return child; }
 function pngChunk(type, data) { const length = Buffer.alloc(4); length.writeUInt32BE(data.length); const typeBuffer = Buffer.from(type, "ascii"); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])) >>> 0); return Buffer.concat([length, typeBuffer, data, crc]); }
 function solidPng(red, green, blue) {
   const header = Buffer.alloc(13); header.writeUInt32BE(1, 0); header.writeUInt32BE(1, 4); header[8] = 8; header[9] = 6;
@@ -512,7 +518,7 @@ function multipartFields(body, boundary) {
 function listen(server) { return new Promise((resolvePort, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", () => resolvePort(server.address().port)); }); }
 async function freePort() { const server = createServer(); const port = await listen(server); await new Promise((resolveClose) => server.close(resolveClose)); return port; }
 async function requestJson(url, method, body) { const response = await fetch(url, { method, headers: body === undefined ? undefined : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); const text = await response.text(); assert.ok(response.ok, `${method} ${url} failed (${response.status}): ${text}`); return text ? JSON.parse(text) : undefined; }
-async function waitFor(predicate, timeoutMs = 15_000) { const end = Date.now() + timeoutMs; let lastError; while (Date.now() < end) { try { if (await predicate()) return; } catch (error) { lastError = error; } await delay(100); } throw lastError ?? new Error("Timed out waiting for condition"); }
+async function waitFor(predicate, timeoutMs = 15_000, label = "condition") { const end = Date.now() + timeoutMs; let lastError; while (Date.now() < end) { try { if (await predicate()) return; } catch (error) { lastError = error; } await delay(100); } throw lastError ?? new Error(`Timed out waiting for ${label}`); }
 async function waitJob(base, id) { let final; await waitFor(async () => { final = await requestJson(`${base}/jobs/${id}`, "GET"); return ["SUCCEEDED", "FAILED", "CANCELLED"].includes(final.status); }); return final; }
 async function waitForJob(base, projectId, type) { let found; await waitFor(async () => { const detail = await requestJson(`${base}/projects/${projectId}`, "GET"); found = detail.jobs.find((job) => job.type === type); return Boolean(found && ["SUCCEEDED", "FAILED", "CANCELLED"].includes(found.status)); }); return found; }
 function delay(ms) { return new Promise((resolveDelay) => setTimeout(resolveDelay, ms)); }

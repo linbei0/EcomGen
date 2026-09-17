@@ -35,8 +35,10 @@ vi.mock("@earendil-works/pi-ai/api/openai-completions.lazy", () => ({
 }));
 
 import { ECOM_SUITES } from "@ecomgen/ecom-suite";
+import { COMPOSITE_POLICIES, EDIT_EXECUTION_MODES, EDIT_OPERATIONS } from "@ecomgen/contracts";
 
 import { planImageEdit, planStoryboard, reviseImagePrompt, type EditPlannerInput, type PlannerInput } from "./planner.js";
+import { EDIT_PLAN_OUTPUT_SCHEMA } from "./structured-output.js";
 
 const input: PlannerInput = {
   model: {
@@ -295,6 +297,15 @@ const editInput: EditPlannerInput = {
 };
 
 describe("planImageEdit", () => {
+  // 给模型的 JSON schema 是 Record<string, unknown>，TypeScript 无法约束它与契约枚举同步；
+  // 手抄一份时新增操作会静默失配（校验层认、模型层不认，或反之）。
+  it("输出 schema 的枚举与契约枚举同源", () => {
+    const properties = EDIT_PLAN_OUTPUT_SCHEMA.schema.properties as Record<string, { enum?: string[] }>;
+    expect(properties.operation?.enum).toEqual([...EDIT_OPERATIONS]);
+    expect(properties.executionMode?.enum).toEqual([...EDIT_EXECUTION_MODES]);
+    expect(properties.compositePolicy?.enum).toEqual([...COMPOSITE_POLICIES]);
+  });
+
   it("无蒙版且目标明确时选择模型自行判断范围", async () => {
     captured.errorMessage = undefined;
     captured.editResponse = { operation: "NATURAL_FUSION", executionMode: "MODEL_DIRECTED", userSummary: "调整目标对象外观", prompt: "edit", targetAnnotationIds: [], targetDescription: "主要商品", targetConfidence: 0.9, clarification: null, requiresConfirmation: false, compositePolicy: "PROVIDER_RESULT", memoryPatch: {} };

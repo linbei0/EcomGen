@@ -1,4 +1,5 @@
 import type { Model } from "@earendil-works/pi-ai";
+import { COMPOSITE_POLICIES, EDIT_EXECUTION_MODES, EDIT_OPERATIONS } from "@ecomgen/contracts";
 
 export interface StructuredOutputSchema {
   name: string;
@@ -72,8 +73,8 @@ export const EDIT_PLAN_OUTPUT_SCHEMA: StructuredOutputSchema = {
     type: "object",
     ...noAdditionalProperties,
     properties: {
-      operation: { type: "string", enum: ["PRECISE_INPAINT", "PRODUCT_REPLACE", "SCENE_ADJUST", "OUTPAINT", "NATURAL_FUSION"] },
-      executionMode: { type: "string", enum: ["MODEL_DIRECTED", "MASKED", "OUTPAINT", "NEED_INPUT"] },
+      operation: { type: "string", enum: [...EDIT_OPERATIONS] },
+      executionMode: { type: "string", enum: [...EDIT_EXECUTION_MODES] },
       userSummary: { type: "string" },
       prompt: { type: "string" },
       targetAnnotationIds: { type: "array", items: { type: "string" } },
@@ -81,7 +82,7 @@ export const EDIT_PLAN_OUTPUT_SCHEMA: StructuredOutputSchema = {
       targetConfidence: { type: "number", minimum: 0, maximum: 1 },
       clarification: { anyOf: [{ type: "string" }, { type: "null" }] },
       requiresConfirmation: { type: "boolean" },
-      compositePolicy: { type: "string", enum: ["MASK_LOCKED", "NATURAL_BLEND", "OUTPAINT", "PROVIDER_RESULT"] },
+      compositePolicy: { type: "string", enum: [...COMPOSITE_POLICIES] },
       memoryPatch: {
         type: "object",
         ...noAdditionalProperties,

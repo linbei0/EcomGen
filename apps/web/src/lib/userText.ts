@@ -1,17 +1,10 @@
-export const EDIT_OPERATION_LABEL = {
-  PRECISE_INPAINT: "局部精确修改",
-  PRODUCT_REPLACE: "替换商品",
-  SCENE_ADJUST: "调整场景",
-  OUTPAINT: "扩展画布",
-  NATURAL_FUSION: "自然融合",
-} as const;
+import { EDIT_EXECUTION_MODE_CAPABILITIES, EDIT_OPERATION_CAPABILITIES } from "@ecomgen/contracts";
 
-export const EDIT_EXECUTION_MODE_LABEL = {
-  MODEL_DIRECTED: "模型根据图片自行判断修改范围",
-  MASKED: "仅修改已标记区域",
-  OUTPAINT: "仅生成新增画布区域",
-  NEED_INPUT: "需要补充编辑信息",
-} as const;
+// 标签从契约的能力注册表派生：这里只负责把 string 形态的接口值翻译成中文，
+// 不再维护第二份枚举清单（曾经本地名单漏项导致新渠道被静默降级）。
+export const EDIT_OPERATION_LABEL: Record<string, string> = Object.fromEntries(Object.entries(EDIT_OPERATION_CAPABILITIES).map(([operation, capability]) => [operation, capability.label]));
+
+export const EDIT_EXECUTION_MODE_LABEL: Record<string, string> = Object.fromEntries(Object.entries(EDIT_EXECUTION_MODE_CAPABILITIES).map(([mode, capability]) => [mode, capability.label]));
 
 const EDIT_ERROR_LABEL: Record<string, string> = {
   REFERENCE_ASSET_REQUIRED: "请先选择参考素材",
@@ -30,12 +23,16 @@ const ERROR_MESSAGE_LABEL: Array<[string, string]> = [
 
 export function editOperationLabel(operation: string | undefined): string {
   if (!operation) return "编辑操作";
-  return EDIT_OPERATION_LABEL[operation as keyof typeof EDIT_OPERATION_LABEL] ?? "编辑操作";
+  return EDIT_OPERATION_LABEL[operation] ?? "编辑操作";
 }
 
 export function editExecutionModeLabel(mode: string | undefined): string {
   if (!mode) return "执行方式";
-  return EDIT_EXECUTION_MODE_LABEL[mode as keyof typeof EDIT_EXECUTION_MODE_LABEL] ?? "执行方式";
+  return EDIT_EXECUTION_MODE_LABEL[mode] ?? "执行方式";
+}
+
+export function editOperationImpactHint(operation: string | undefined): string | undefined {
+  return operation ? EDIT_OPERATION_CAPABILITIES[operation as keyof typeof EDIT_OPERATION_CAPABILITIES]?.impactHint : undefined;
 }
 
 export function editErrorLabel(message: string | undefined): string {

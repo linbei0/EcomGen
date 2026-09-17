@@ -9,7 +9,7 @@ import { forgeSuite, planImageEdit, planLayerElements, planStoryboard, reviseIma
 import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
 import { compileUserTemplate, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
 import { normalizeSuiteDocument, type SuiteDocumentInput } from "@ecomgen/ecom-suite";
-import { resolveImageSize, userAssetKindForRole, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, validateEcomSuiteFile, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
+import { resolveImageSize, userAssetKindForRole, EDIT_OPERATION_CAPABILITIES, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, validateEcomSuiteFile, type CompositePolicy, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, buildReasoningModel, createSegmentationProvider, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { createPsdLayerAccumulator, extractAlpha, invertMask, multiplyAlpha, unionOfMasks } from "./layer-composite.js";
@@ -76,6 +76,10 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
 }, { connection: redis, concurrency: Number(process.env.WORKER_CONCURRENCY ?? 2) });
 
 worker.on("failed", (job, error) => { console.error(`Queue job ${job?.id ?? "unknown"} failed: ${error instanceof Error ? error.message : String(error)}`); });
+// 进程存活不等于已在消费：未连接队列时入队的任务只会静默等待。启动日志是 e2e 与运维
+// 唯一可观察的就绪信号，Mock E2E 依赖这一行判定可以开始提交任务。
+await worker.waitUntilReady();
+console.log("ecomgen worker ready");
 async function stop(): Promise<void> { clearInterval(referenceCleanupTimer); await worker.close(); await executionQueue.close(); await executionRedis.quit(); await events.close(); await redis.quit(); }
 process.once("SIGINT", () => { void stop().then(() => process.exit(0)); });
 process.once("SIGTERM", () => { void stop().then(() => process.exit(0)); });
@@ -409,7 +413,7 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
   const config = editGenerationConfigFor(project, turn);
   const session = repository.getEditSession(turn.sessionId); if (!session) throw new Error("Edit session is missing");
   const source = repository.getOutput(turn.baseOutputId); if (!source || source.projectId !== project.id) throw new Error("Edit source output is missing or belongs to another project");
-  const plan = turn.plan as { operation?: string; executionMode?: EditExecutionMode; prompt?: string; compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT"; targetDescription?: string; targetConfidence?: number; memoryPatch?: { summary?: string; constraints?: string[] } } | null;
+  const plan = turn.plan as { operation?: EditOperation; executionMode?: EditExecutionMode; prompt?: string; compositePolicy?: CompositePolicy; targetDescription?: string; targetConfidence?: number; memoryPatch?: { summary?: string; constraints?: string[] } } | null;
   if (!plan?.operation || !plan.executionMode || !plan.prompt || !plan.compositePolicy || plan.executionMode === "NEED_INPUT") throw new Error("Edit turn has no executable plan");
   if (plan.executionMode === "MASKED" && !turn.editMaskPath) throw new Error("EDIT_TARGET_REQUIRED: 局部编辑需要先标记可编辑区域");
   const outpaintExpansion = plan.compositePolicy === "OUTPAINT" ? canvasExpansionFor(turn) : null;
@@ -471,7 +475,7 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
           : await sharp(result.image).png().toBuffer();
     const stored = await storage.putOutput(project.id, composed, ".png", generationKey);
     const { width, height } = await outputDerivatives(storage, stored.hash, composed);
-    const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: config.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex, operation: plan.operation as "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "NATURAL_FUSION" | "OUTPAINT", executionMode: plan.executionMode, targetDescription: plan.targetDescription, targetConfidence: plan.targetConfidence, sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy, referenceSelections: turn.referenceSelections, referenceHashes: Object.fromEntries(turn.referenceSelections.map((selection) => { const asset = selection.source === "PROJECT" ? assets.find((candidate) => candidate.id === selection.id) : temporaryAssets.find((candidate) => candidate.id === selection.id); return [selection.id, asset?.hash ?? null]; })) }, storagePath: stored.path, hash: stored.hash, width, height, generationKey, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
+    const output = repository.createOutput({ projectId: project.id, storyboardItemId: source.storyboardItemId, jobId: job.id, candidateIndex, generationSnapshot: { providerId: provider.id, modelId: model.id, resolution: config.imageResolution, aspectRatio: project.imageAspectRatio, size: "source", candidateIndex, operation: plan.operation, executionMode: plan.executionMode, targetDescription: plan.targetDescription, targetConfidence: plan.targetConfidence, sourceOutputId: source.id, maskHash: turn.editMaskHash, protectMaskHash: turn.protectMaskHash, compositePolicy: plan.compositePolicy, referenceSelections: turn.referenceSelections, referenceHashes: Object.fromEntries(turn.referenceSelections.map((selection) => { const asset = selection.source === "PROJECT" ? assets.find((candidate) => candidate.id === selection.id) : temporaryAssets.find((candidate) => candidate.id === selection.id); return [selection.id, asset?.hash ?? null]; })) }, storagePath: stored.path, hash: stored.hash, width, height, generationKey, parentOutputId: source.id, rootOutputId: source.rootOutputId ?? source.id, editSessionId: session.id, editTurnId: turn.id });
     await updateJob(job, { providerTaskId: null });
     createdOutputs.push(output);
   }
@@ -887,7 +891,7 @@ function assertEditCapabilities(capabilities: { supportsMaskEdit: boolean; suppo
   if (executionMode === "MODEL_DIRECTED" && !capabilities.supportsUnmaskedEdit) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持无蒙版编辑");
   if (referenceCount > 1 && !capabilities.supportsMultiReference) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持多参考图编辑");
   if (operation === "OUTPAINT" && !capabilities.supportsOutpaint) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持扩展画布");
-  if (executionMode !== "MODEL_DIRECTED" && ["SCENE_ADJUST", "NATURAL_FUSION"].includes(operation) && !capabilities.supportsNaturalBlend) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持自然融合编辑");
+  if (executionMode !== "MODEL_DIRECTED" && EDIT_OPERATION_CAPABILITIES[operation].requiresNaturalBlend && !capabilities.supportsNaturalBlend) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持自然融合编辑");
 }
 async function createOutpaintCanvas(source: Buffer, expansion: { top: number; right: number; bottom: number; left: number }): Promise<{ image: Buffer; mask: Buffer; width: number; height: number; left: number; top: number }> {
   const meta = await sharp(source).metadata(); if (!meta.width || !meta.height) throw new Error("Source image dimensions are unavailable");

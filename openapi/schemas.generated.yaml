@@ -147,6 +147,13 @@ components:
         - MASKED
         - OUTPAINT
         - NEED_INPUT
+    CompositePolicy:
+      type: string
+      enum:
+        - MASK_LOCKED
+        - NATURAL_BLEND
+        - OUTPAINT
+        - PROVIDER_RESULT
     ReferenceSource:
       type: string
       enum:
@@ -973,13 +980,7 @@ components:
             - type: object
               properties:
                 operation:
-                  type: string
-                  enum:
-                    - PRECISE_INPAINT
-                    - PRODUCT_REPLACE
-                    - SCENE_ADJUST
-                    - OUTPAINT
-                    - NATURAL_FUSION
+                  $ref: "#/components/schemas/EditOperation"
                 executionMode:
                   $ref: "#/components/schemas/EditExecutionMode"
                 userSummary:
@@ -1003,12 +1004,7 @@ components:
                 requiresConfirmation:
                   type: boolean
                 compositePolicy:
-                  type: string
-                  enum:
-                    - MASK_LOCKED
-                    - NATURAL_BLEND
-                    - OUTPAINT
-                    - PROVIDER_RESULT
+                  $ref: "#/components/schemas/CompositePolicy"
                 memoryPatch:
                   type: object
                   patternProperties:

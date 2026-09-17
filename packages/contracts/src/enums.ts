@@ -1,6 +1,15 @@
 import { Type } from "@sinclair/typebox";
 import type { Static } from "@sinclair/typebox";
 
+/**
+ * 由字面量元组派生字符串枚举 schema，枚举值只在元组里维护一份。
+ * 生成的 anyOf-of-consts 与 Type.Enum 等价，经 generate-openapi 的 stableSchema
+ * 折叠后同样输出 `type: string, enum: [...]`，因此不改变已发布的契约形态。
+ */
+export function stringEnumSchema<T extends string>(values: readonly T[], id: string) {
+  return Type.Union(values.map((value) => Type.Literal(value)), { $id: id });
+}
+
 export const PLATFORM_TARGETS = ["TAOBAO", "JD", "PDD", "DOUYIN", "AMAZON", "SHOPIFY"] as const;
 export const PlatformTarget = Type.Enum({ TAOBAO: "TAOBAO", JD: "JD", PDD: "PDD", DOUYIN: "DOUYIN", AMAZON: "AMAZON", SHOPIFY: "SHOPIFY" }, { $id: "#/components/schemas/PlatformTarget" });
 export const TargetMarket = Type.Enum({ CHINA_MAINLAND: "CHINA_MAINLAND", HONG_KONG: "HONG_KONG", MACAU: "MACAU", TAIWAN: "TAIWAN", UNITED_STATES: "UNITED_STATES", UNITED_KINGDOM: "UNITED_KINGDOM", GERMANY: "GERMANY", FRANCE: "FRANCE", ITALY: "ITALY", SPAIN: "SPAIN", JAPAN: "JAPAN", SOUTH_KOREA: "SOUTH_KOREA" }, { $id: "#/components/schemas/TargetMarket" });
@@ -27,8 +36,15 @@ export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERAT
 export const JobStatus = Type.Enum({ QUEUED: "QUEUED", RUNNING: "RUNNING", SUCCEEDED: "SUCCEEDED", FAILED: "FAILED", CANCELLED: "CANCELLED" }, { $id: "#/components/schemas/JobStatus" });
 export const ReasoningProtocolProfile = Type.Enum({ OPENAI: "openai", DASHSCOPE_QWEN: "dashscope_qwen", OPENAI_RESPONSES: "openai_responses" }, { $id: "#/components/schemas/ReasoningProtocolProfile" });
 export const SearchSourceKind = Type.Enum({ BRAVE: "brave", TAVILY: "tavily", SEARXNG: "searxng" }, { $id: "#/components/schemas/SearchSourceKind" });
-export const EditOperation = Type.Enum({ PRECISE_INPAINT: "PRECISE_INPAINT", PRODUCT_REPLACE: "PRODUCT_REPLACE", SCENE_ADJUST: "SCENE_ADJUST", OUTPAINT: "OUTPAINT", NATURAL_FUSION: "NATURAL_FUSION" }, { $id: "#/components/schemas/EditOperation" });
-export const EditExecutionMode = Type.Enum({ MODEL_DIRECTED: "MODEL_DIRECTED", MASKED: "MASKED", OUTPAINT: "OUTPAINT", NEED_INPUT: "NEED_INPUT" }, { $id: "#/components/schemas/EditExecutionMode" });
+/** 编辑操作的合法取值；能力元信息见 edit-operations.ts 的注册表。 */
+export const EDIT_OPERATIONS = ["PRECISE_INPAINT", "PRODUCT_REPLACE", "SCENE_ADJUST", "OUTPAINT", "NATURAL_FUSION"] as const;
+export const EditOperation = stringEnumSchema(EDIT_OPERATIONS, "#/components/schemas/EditOperation");
+/** 编辑执行方式的合法取值；决定合成策略与是否需要人工确认。 */
+export const EDIT_EXECUTION_MODES = ["MODEL_DIRECTED", "MASKED", "OUTPAINT", "NEED_INPUT"] as const;
+export const EditExecutionMode = stringEnumSchema(EDIT_EXECUTION_MODES, "#/components/schemas/EditExecutionMode");
+/** 生成结果的合成策略，由执行方式派生（见 edit-operations.ts）。 */
+export const COMPOSITE_POLICIES = ["MASK_LOCKED", "NATURAL_BLEND", "OUTPAINT", "PROVIDER_RESULT"] as const;
+export const CompositePolicy = stringEnumSchema(COMPOSITE_POLICIES, "#/components/schemas/CompositePolicy");
 export const ReferenceSource = Type.Enum({ PROJECT: "PROJECT", TEMPORARY: "TEMPORARY" }, { $id: "#/components/schemas/ReferenceSource" });
 export const ReferencePurpose = Type.Enum({ PRODUCT_APPEARANCE: "PRODUCT_APPEARANCE", PACKAGING: "PACKAGING", LABEL: "LABEL", STYLE: "STYLE", LAYOUT: "LAYOUT" }, { $id: "#/components/schemas/ReferencePurpose" });
 export const EditTurnStatus = Type.Enum({ DRAFT: "DRAFT", PLANNING: "PLANNING", PLAN_READY: "PLAN_READY", NEED_INPUT: "NEED_INPUT", AWAITING_CONFIRMATION: "AWAITING_CONFIRMATION", GENERATING: "GENERATING", SUCCEEDED: "SUCCEEDED", FAILED: "FAILED", CANCELLED: "CANCELLED" }, { $id: "#/components/schemas/EditTurnStatus" });
@@ -54,6 +70,7 @@ export type ReasoningProtocolProfile = Static<typeof ReasoningProtocolProfile>;
 export type SearchSourceKind = Static<typeof SearchSourceKind>;
 export type EditOperation = Static<typeof EditOperation>;
 export type EditExecutionMode = Static<typeof EditExecutionMode>;
+export type CompositePolicy = Static<typeof CompositePolicy>;
 export type ReferenceSource = Static<typeof ReferenceSource>;
 export type ReferencePurpose = Static<typeof ReferencePurpose>;
 export type EditTurnStatus = Static<typeof EditTurnStatus>;

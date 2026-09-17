@@ -1,7 +1,7 @@
 import type { Agent } from "@earendil-works/pi-agent-core";
 import type { ImageContent } from "@earendil-works/pi-ai";
-import type { EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, StoryboardShotRole, TargetMarket } from "@ecomgen/contracts";
-import { DEFAULT_TARGET_IMAGE_COUNT, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT } from "@ecomgen/contracts";
+import type { CompositePolicy, EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, StoryboardShotRole, TargetMarket } from "@ecomgen/contracts";
+import { DEFAULT_TARGET_IMAGE_COUNT, EDIT_EXECUTION_MODES, EDIT_OPERATIONS, EDIT_OPERATION_CAPABILITIES, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, compositePolicyFor, requiresConfirmationFor } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplatesWithUser, type EcomTemplate } from "@ecomgen/ecom-skill";
 import type { SuiteDefinition } from "@ecomgen/ecom-suite";
 import { createPlanningTools, type WebResearchConfig } from "./tools.js";
@@ -220,7 +220,7 @@ export interface PlannedEdit {
   targetConfidence: number;
   clarification: string | null;
   requiresConfirmation: boolean;
-  compositePolicy: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT";
+  compositePolicy: CompositePolicy;
   memoryPatch: { summary?: string; constraints?: string[] };
 }
 
@@ -241,21 +241,22 @@ function annotationIdList(annotations: Record<string, unknown>): string[] {
 }
 
 function validateEditPlan(plan: PlannedEdit, input: EditPlannerInput, annotationIds: string[]): PlannedEdit {
-  const operations: EditOperation[] = ["PRECISE_INPAINT", "PRODUCT_REPLACE", "SCENE_ADJUST", "OUTPAINT", "NATURAL_FUSION"];
-  const executionModes: EditExecutionMode[] = ["MODEL_DIRECTED", "MASKED", "OUTPAINT", "NEED_INPUT"];
-  if (!plan || !operations.includes(plan.operation) || !executionModes.includes(plan.executionMode) || !plan.userSummary?.trim() || typeof plan.targetDescription !== "string" || typeof plan.targetConfidence !== "number" || !Number.isFinite(plan.targetConfidence) || plan.targetConfidence < 0 || plan.targetConfidence > 1) throw new Error("Edit planning model returned an invalid plan");
+  // 操作清单与执行方式清单来自契约枚举，规则来自能力注册表；校验顺序决定多个约束同时
+  // 被违反时报出哪一个错误码，前端按错误码给提示，因此顺序不可调整。
+  if (!plan || !EDIT_OPERATIONS.includes(plan.operation) || !EDIT_EXECUTION_MODES.includes(plan.executionMode) || !plan.userSummary?.trim() || typeof plan.targetDescription !== "string" || typeof plan.targetConfidence !== "number" || !Number.isFinite(plan.targetConfidence) || plan.targetConfidence < 0 || plan.targetConfidence > 1) throw new Error("Edit planning model returned an invalid plan");
+  const capability = EDIT_OPERATION_CAPABILITIES[plan.operation];
   const targets = Array.isArray(plan.targetAnnotationIds) ? plan.targetAnnotationIds.filter((id): id is string => typeof id === "string" && annotationIds.includes(id)) : [];
-  if (plan.operation === "PRODUCT_REPLACE" && input.referenceAssets.length === 0) throw new Error("REFERENCE_ASSET_REQUIRED");
-  if (plan.operation === "OUTPAINT" && !input.hasCanvasExpansion) throw new Error("OUTPAINT_CANVAS_REQUIRED");
+  if (capability.requiresReferenceAssets && input.referenceAssets.length === 0) throw new Error("REFERENCE_ASSET_REQUIRED");
+  if (capability.requiresCanvasExpansion && !input.hasCanvasExpansion) throw new Error("OUTPAINT_CANVAS_REQUIRED");
   if (input.hasEditMask && plan.executionMode !== "MASKED") throw new Error("EDIT_PLAN_MASK_REQUIRED");
-  if (plan.operation === "PRECISE_INPAINT" && plan.executionMode !== "MASKED") throw new Error("EDIT_PLAN_MASK_REQUIRED");
+  if (capability.requiresMaskedExecution && plan.executionMode !== "MASKED") throw new Error("EDIT_PLAN_MASK_REQUIRED");
   if (plan.executionMode === "MASKED" && !input.hasEditMask) throw new Error("EDIT_TARGET_REQUIRED");
   if (plan.executionMode === "OUTPAINT" && !input.hasCanvasExpansion) throw new Error("OUTPAINT_CANVAS_REQUIRED");
   if (plan.executionMode === "MODEL_DIRECTED" && !input.hasEditMask && !input.sourceImage) throw new Error("EDIT_VISION_REQUIRED");
   if (plan.executionMode === "NEED_INPUT" && !plan.clarification?.trim()) throw new Error("Edit planning model returned an invalid plan");
   if (plan.executionMode !== "NEED_INPUT" && !plan.prompt?.trim()) throw new Error("Edit planning model returned an invalid plan");
-  const requiresConfirmation = plan.executionMode !== "NEED_INPUT" && (plan.executionMode === "MODEL_DIRECTED" || ["PRODUCT_REPLACE", "SCENE_ADJUST", "OUTPAINT", "NATURAL_FUSION"].includes(plan.operation));
-  const compositePolicy = plan.executionMode === "MASKED" ? "MASK_LOCKED" : plan.executionMode === "OUTPAINT" ? "OUTPAINT" : "PROVIDER_RESULT";
+  const requiresConfirmation = requiresConfirmationFor(plan.operation, plan.executionMode);
+  const compositePolicy = compositePolicyFor(plan.executionMode);
   return { operation: plan.operation, executionMode: plan.executionMode, userSummary: plan.userSummary.trim(), prompt: plan.prompt?.trim() ?? "", targetAnnotationIds: targets, targetDescription: plan.targetDescription.trim(), targetConfidence: plan.targetConfidence, clarification: plan.clarification?.trim() || null, requiresConfirmation, compositePolicy, memoryPatch: plan.memoryPatch ?? {} };
 }
 

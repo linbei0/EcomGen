@@ -3,6 +3,7 @@ import type { Static } from "@sinclair/typebox";
 export * from "./enums.js";
 export * from "./ref.js";
 export * from "./segmentation.js";
+export * from "./edit-operations.js";
 import type { AssetRole, ImageAspectRatio, ImageResolution, UserAssetKind } from "./enums.js";
 
 export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;

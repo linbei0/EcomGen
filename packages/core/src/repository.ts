@@ -17,7 +17,7 @@ import type {
   StoryboardShotRole,
   TargetMarket
 } from "@ecomgen/contracts";
-import type { EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
+import type { CompositePolicy, EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
 import type { SuiteDocumentInput } from "@ecomgen/ecom-suite";
 import type { SqliteDatabase } from "./database.js";
 
@@ -261,7 +261,7 @@ export interface GenerationSnapshot {
   sourceOutputId?: string;
   maskHash?: string | null;
   protectMaskHash?: string | null;
-  compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT";
+  compositePolicy?: CompositePolicy;
   referenceSelections?: ReferenceSelection[];
   referenceHashes?: Record<string, string | null>;
 }

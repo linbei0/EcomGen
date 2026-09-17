@@ -1037,6 +1037,8 @@ export interface components {
         /** @enum {string} */
         EditExecutionMode: "MODEL_DIRECTED" | "MASKED" | "OUTPAINT" | "NEED_INPUT";
         /** @enum {string} */
+        CompositePolicy: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT";
+        /** @enum {string} */
         ReferenceSource: "PROJECT" | "TEMPORARY";
         /** @enum {string} */
         ReferencePurpose: "PRODUCT_APPEARANCE" | "PACKAGING" | "LABEL" | "STYLE" | "LAYOUT";
@@ -1336,8 +1338,7 @@ export interface components {
             referenceAssetIds: string[];
             referenceSelections: components["schemas"]["ReferenceSelection"][];
             plan?: {
-                /** @enum {string} */
-                operation?: "PRECISE_INPAINT" | "PRODUCT_REPLACE" | "SCENE_ADJUST" | "OUTPAINT" | "NATURAL_FUSION";
+                operation?: components["schemas"]["EditOperation"];
                 executionMode?: components["schemas"]["EditExecutionMode"];
                 userSummary?: string;
                 prompt?: string;
@@ -1346,8 +1347,7 @@ export interface components {
                 targetConfidence?: number;
                 clarification?: string | null;
                 requiresConfirmation?: boolean;
-                /** @enum {string} */
-                compositePolicy?: "MASK_LOCKED" | "NATURAL_BLEND" | "OUTPAINT" | "PROVIDER_RESULT";
+                compositePolicy?: components["schemas"]["CompositePolicy"];
                 memoryPatch?: {
                     [key: string]: unknown;
                 };

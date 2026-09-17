@@ -1,5 +1,5 @@
 import {
-  AssetRole, CopywritingTarget, EcomSuiteOrigin, EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus,
+  AssetRole, CompositePolicy, CopywritingTarget, EcomSuiteOrigin, EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus,
   ErrorCode, ImageAspectRatio, ImageResolution, JobStatus, JobType, PlanningMode, PlatformTarget,
   ReasoningProtocolProfile, ReferencePurpose, ReferenceSource, SearchSourceKind, StoryboardMode,
   StoryboardShotRole, TargetMarket, UserAssetKind, LibraryItemSource, LibraryItemKind
@@ -13,7 +13,7 @@ export const API_SCHEMA_REGISTRY = {
   PlatformTarget, TargetMarket, StoryboardMode, StoryboardShotRole, AssetRole, UserAssetKind, LibraryItemSource, LibraryItemKind, ImageResolution, ImageAspectRatio,
   PlanningMode, CopywritingTarget, JobType, JobStatus, ReasoningProtocolProfile, SearchSourceKind,
   EcomSuiteOrigin,
-  EditOperation, EditExecutionMode, ReferenceSource, ReferencePurpose, EditTurnStatus, EditSessionStatus,
+  EditOperation, EditExecutionMode, CompositePolicy, ReferenceSource, ReferencePurpose, EditTurnStatus, EditSessionStatus,
   ErrorCode, EventEnvelope, ModelCapabilities, ModelDefinition,
   ...api,
   ...requests,
