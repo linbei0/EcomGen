@@ -16,7 +16,7 @@ Write prompts in **English**, natural language (not keyword soup), concise. Orde
 6. **Lighting, color, material, texture** (hex; light direction; color temperature).
 7. **Style & realism level**.
 8. **Aspect ratio / platform constraint / resolution**.
-9. **In-image text handling + negative constraints**.
+9. **In-image text (suites with rendered copy only) + negative constraints**.
 
 ---
 
@@ -34,39 +34,28 @@ Write prompts in **English**, natural language (not keyword soup), concise. Orde
 ### 2.2 Product occupancy is a number
 | Shot type | Occupancy |
 |---|---|
-| 白底主图 | 35–40% |
-| 卖点副图 | 25–30% |
-| 场景氛围图 | 20–25% |
-| 信息流广告 | 40% |
-| 搜索广告 | 45% |
-| SKU 多规格 | 60–70% (overall) |
+| 白底主图 | 60–70% |
+| 卖点副图 | 50–60% |
+| 场景氛围图 | 40–50% |
+| 信息流广告 | 55–60% |
+| 搜索广告 | 65% |
+| SKU 多规格 | 70–80% (overall) |
 | 细节/微距 | 55–60% (detail fills) |
 
-### 2.3 Whitespace must be declared
-Not writing it ⇒ the model fills the frame.
-- 白底主图 / 卖点 / 广告: `留白至少 45%`
-- 场景氛围图: `留白至少 50%`
-- 详情页长图: `留白 50%+`
-
-### 2.4 Every prompt ends with a concrete negative list
+### 2.3 Every prompt ends with a concrete negative list
 Write specific bans, not "no extras":
 `Negative: no props, no hands, no watermark, no fake logo, no extra text, no decorative elements, no gradient background, no cut-off edges.`
 Add shot-specific bans (e.g. macro: `no blurry subject`; comparison: `no fabricated results`).
 
-### 2.5 Platform reserved space
-Domestic e-commerce main images must reserve:
-- `顶部中央 200×100 区域留空（平台价格叠加区）`
-- `左上角 200×100 像素区域完全留白` (logo slot, if needed)
-
-### 2.6 Three-layer in-image text
+### 2.4 Three-layer in-image text (suites with rendered copy only)
 - Core promise ≤ 15 chars (headline)
 - 2–3 key proof points (icon + short label)
 - CTA ≤ 8 chars
 
-### 2.7 Keep it simple
+### 2.5 Keep it simple
 GPT-Image-2 performs best with clear, specific, **concise** prompts — not exhaustive constraint walls. Natural language > keyword lists. Always state light **direction** and **quality**; give color temperature (e.g. `5500K`) for scene shots.
 
-### 2.8 Product-fidelity lock (verbatim, every shot)
+### 2.6 Product-fidelity lock (verbatim, every shot)
 > Preserve the exact product identity from the reference image: shape, silhouette, proportions, color, material, surface finish, label/logo placement, and visible construction details. Do not redesign the product. Do not add, remove, or relocate any product feature. Keep the label text exactly legible and unchanged; do not redraw or restyle any logo.
 
 Use image-to-image / reference-conditioned generation, never text-to-image, for a real product.
@@ -84,14 +73,14 @@ The whole-set visual contract, not a mood note. Every shot's prompt begins with 
 4. 字体系统: one family (e.g. `modern geometric sans-serif`); no mixing serif/handwritten/retro/cartoon
 5. 背景系统: consistent material/space/depth
 6. 光线系统: light direction, shadow strength, reflection quality, mood
-7. 布局系统: whitespace, corner radius, columns, labels, numbering, infographic components
+7. 布局系统: corner radius, columns, numbering, infographic components
 8. 图标/插画系统: line weight, shape, color, complexity (if used)
 9. 产品呈现规则: angle, scale, material rendering, centering stability
 10. 禁止漂移项: `no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles`
 
 **Default lock (when no brand spec):**
 ```
-Campaign Style Lock: consistent premium ecommerce visual system across the entire image set; fixed palette of clean off-white background #FFFFFF, deep charcoal text #2D2D2D, one product-matched accent color, and one soft secondary accent; neutral-cool studio lighting; modern geometric sans-serif headline placeholders only; consistent rounded rectangular info labels; consistent thin-line icon style; clean high-end product photography mixed with minimal infographic elements; stable product scale and placement; generous whitespace; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles.
+Campaign Style Lock: consistent premium ecommerce visual system across the entire image set; fixed palette of clean off-white background #FFFFFF, deep charcoal text #2D2D2D, one product-matched accent color, and one soft secondary accent; neutral-cool studio lighting; modern geometric sans-serif; consistent thin-line icon style; clean high-end product photography mixed with minimal infographic elements; stable product scale and placement; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles.
 ```
 
 **Per-shot freedom:** a shot may change only its purpose, subject action, local composition, and short copy. It may **not** change palette, temperature, typography, background system, lighting system, icon style, or label style. If one shot is regenerated, reuse the original lock.
@@ -136,7 +125,7 @@ AI defaults to front 3/4 — if you don't specify angles, the whole set looks id
 A detail-page image is **not** a multi-angle product photo — it is an e-commerce **infographic**: headline, icons, labels, comparisons, steps, trust badges. Multi-angle is how the product appears *inside* the infographic, not the goal.
 
 - Start every detail-page prompt with `E-commerce infographic [screen type]`.
-- Include: layout keyword (`two-column layout`, `timeline`, `comparison layout`), headline (`headline in #2D2D2D at 28pt reading 「…」`), labels (`label in #7A9E7E at 14pt`), infographic elements (`feature callout icons`, `numbered circles`, `trust badges`, `CTA button placeholder`).
+- Include: layout keyword (`two-column layout`, `timeline`, `comparison layout`), headline (`headline in #2D2D2D at 28pt reading 「…」`), labels (`label in #7A9E7E at 14pt`), infographic elements (`feature callout icons`, `numbered circles`, `trust badges`, `CTA button with short rendered copy`).
 - Per-screen structure: 首屏承接 → 痛点放大 → 机制解释 → 核心利益 → 使用步骤 → 场景覆盖 → 对比选择 → 信任背书 → FAQ/CTA.
 
 ---
@@ -146,7 +135,7 @@ A detail-page image is **not** a multi-angle product photo — it is an e-commer
 - Wrap Chinese in 「」 — much higher render accuracy.
 - Replace complex-stroke characters with simpler synonyms (95% accuracy is not 100%).
 - Font sizes: headline 28–48pt, subtitle 16–20pt, label 10–14pt.
-- Keep per-screen text budget ≤ ~50 chars; if the model garbles it, request `clean layout with short readable headline placeholders, no dense body text`.
+- Keep per-screen text budget ≤ ~50 chars; if the model garbles it, request `clean layout, no dense body text`.
 - For trust/credential shots: **do not** generate dense certificates or serial numbers; composite real text in post.
 
 ---
@@ -171,7 +160,7 @@ For UGC / lifestyle / 买家秀 looks, use the anti-AI kit:
 - `NOT retouched, NOT smoothed`;
 - avoid AI-signature words: `perfect`, `flawless`, `stunning`, `hyper-realistic`.
 
-**Never rely on a diffusion model to render a brand mark or precise text from memory** — leave a clean text zone and composite in post.
+**Never rely on a diffusion model to render a brand mark or precise text from memory** — keep such elements out of the frame.
 
 ---
 

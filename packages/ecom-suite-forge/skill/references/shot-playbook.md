@@ -41,24 +41,24 @@ Each recipe gives: **Purpose · Composition · Camera/机位 · 景别 · Lighti
 - **Lighting:** bright even high-key; softbox front-left + fill/bounce card on the shadow side.
 - **Shadow:** soft **contact shadow** only — it grounds the product; avoid floating.
 - **Background:** seamless pure white `#FFFFFF` (or true brand hex); no props.
-- **Occupancy:** 35–40% (35–40% is the sweet spot; Amazon-style fills ~85% — pick per platform).
-- **Whitespace:** `>=45%`.
+- **Occupancy:** 60–70% (marketplace main images may fill ~85% — pick per platform).
+- **Whitespace:** none.
 - **Text zone:** none (main image must be text-free on Amazon/Taobao).
 - **Prompt recipe:**
-  `Product photography of {product}. {product_identity_lock}. {style_lock}. Centered front 3/4 view, full product visible, eye-level. Bright even high-key studio lighting, soft front-left key with fill, soft contact shadow grounding the product. Seamless pure white background #FFFFFF. Product occupies 35-40% of frame, whitespace at least 45%. 8K, commercial e-commerce quality. Negative: no props, no hands, no watermark, no fake logo, no extra text, no decorative elements, no cut-off edges.`
+  `Product photography of {product}. {product_identity_lock}. {style_lock}. Centered front 3/4 view, full product visible, eye-level. Bright even high-key studio lighting, soft front-left key with fill, soft contact shadow grounding the product. Seamless pure white background #FFFFFF. Product occupies 60-70% of frame. 8K, commercial e-commerce quality. Negative: no props, no hands, no watermark, no fake logo, no extra text, no decorative elements, no cut-off edges.`
 - **High-CTR key:** crisp edges, clean silhouette, no distraction.
 - **Avoid:** colored/tinted background (use hex), product too small, prop clutter, in-frame shouting text.
 
 ### 2.2 HERO — 卖点图 (核心利益, visual claim)
 - **Purpose:** state the #1 reason to buy in ~1 second (**主图一秒法则**).
-- **Composition:** product dominant + generous negative space reserved for a short callout.
+- **Composition:** product dominant on a clean field.
 - **Camera:** same hero angle as 2.1 for family consistency.
 - **Lighting:** matches style lock; may add an accent light to spotlight the hero feature.
 - **Background:** brand background or a clean tinted panel (`#F5F1E8`, `#1A3A2E`…), one panel only.
-- **Occupancy:** 25–30% (leave room for copy).
-- **Whitespace:** `>=45%`.
-- **Text zone:** explicit — e.g. `顶部中央 200×100 留空（价格叠加区）`, `左侧 40% 干净留白供文案`.
-- **Prompt recipe:** add `{selling_point_1}` and `{callout_1}` placeholders. `E-commerce benefit hero on {background hex}. Top headline in #2D2D2D reading 「{callout_1}」. {product} shown {camera}, occupying 25-30%, whitespace at least 45%. [lighting]. Negative: [...]`
+- **Occupancy:** 50–60%.
+- **Whitespace:** none.
+- **Text zone:** none unless the suite carries in-image copy; then one short headline.
+- **Prompt recipe:** `E-commerce benefit hero on {background hex}. {product} shown {camera}, occupying 50-60%. [lighting]. Negative: [...]`. `{selling_point_*}`/`{callout_*}` appear in suites with in-image copy.
 - **High-CTR key:** one idea only, legible in a glance.
 - **Avoid:** multiple claims, dense paragraphs, tiny fake text.
 
@@ -69,9 +69,9 @@ Each recipe gives: **Purpose · Composition · Camera/机位 · 景别 · Lighti
 - **Lighting:** directional / lower-key to feel heavier on the problem side.
 - **Background:** relatable messy real context (do NOT clean it up).
 - **Props:** only props that embody the pain.
-- **Occupancy:** 20–25% (context is the point).
-- **Whitespace:** keep a caption strip.
-- **Text zone:** short pain label + short solution label.
+- **Occupancy:** 40–50% (context is the point).
+- **Whitespace:** none.
+- **Text zone:** none; the two visual states carry the contrast.
 - **Prompt recipe:** `E-commerce pain-point split screen. Left: {pain scene from the source set}. Right: {product} solving it. ... Negative: no extra text, no watermark.`
 - **High-CTR key:** specific, recognizable problem (mine it from reviews/客服).
 - **Avoid:** vague "feeling bad", fabricated statistics.
@@ -83,10 +83,10 @@ Each recipe gives: **Purpose · Composition · Camera/机位 · 景别 · Lighti
 - **Lighting:** natural window light or golden hour; keep direction consistent with props' shadows.
 - **Background:** real room/outdoor; **props must not cover the product**.
 - **Props:** max 2–3, relevant; add a scale anchor (e.g. a standard 12oz mug).
-- **Occupancy:** 20–25%.
-- **Whitespace:** >=50%; scene breathing room.
-- **Text zone:** usually none; optional short lower-third caption.
-- **Prompt recipe:** `Lifestyle scene: {product} in {scene from source} environment. {style_lock}. {camera}. {natural light}. On {surface}. {props}. Product occupies 20-25%, whitespace at least 50%. Negative: no hands covering product, no extra text, no watermark, no fake logo.`
+- **Occupancy:** 40–50%.
+- **Whitespace:** none.
+- **Text zone:** none.
+- **Prompt recipe:** `Lifestyle scene: {product} in {scene from source} environment. {style_lock}. {camera}. {natural light}. On {surface}. {props}. Product occupies 40-50% of the frame. Negative: no hands covering product, no extra text, no watermark, no fake logo.`
 - **High-CTR key:** aspirational yet believable; product still clearly the subject.
 - **Avoid:** cluttered scene, product lost in the frame, impossible shadows.
 
@@ -99,7 +99,7 @@ Each recipe gives: **Purpose · Composition · Camera/机位 · 景别 · Lighti
 - **Background:** neutral, uncluttered, complementary.
 - **Occupancy:** detail occupies 55–60% (or macro fill).
 - **Whitespace:** low; detail is the whole point.
-- **Text zone:** small annotation labels only.
+- **Text zone:** none unless the suite carries in-image copy.
 - **Prompt recipe:** `Extreme close-up macro of {product}, tight zoom on {specific detail}. {style_lock}. Shallow depth of field, foreground sharp. Raking side light revealing texture. Neutral {surface} background. Detail occupies 55-60%. Negative: no blurry subject, no extra text, no watermark.`
 - **High-CTR key:** visible seams, weave, hardware, finish.
 - **Avoid:** showing a detail that isn't actually the product's.
@@ -110,7 +110,7 @@ Each recipe gives: **Purpose · Composition · Camera/机位 · 景别 · Lighti
 - **Camera/lighting:** **identical** on both sides — only the subject state differs.
 - **Background:** same on both sides, or clean two-panel.
 - **Occupancy:** balanced across both panels.
-- **Text zone:** two clear labels (before/after, ordinary/ours).
+- **Text zone:** none; the two states read as before/after on their own.
 - **Prompt recipe:** `E-commerce before-and-after comparison, two matched panels with identical framing and lighting. Left: {before}. Right: {after with product}. ... Negative: no fabricated results, no extra text, no watermark.`
 - **High-CTR key:** honest, visible, specific delta.
 - **Avoid:** fake or exaggerated results; misaligned framing.
@@ -121,7 +121,7 @@ Each recipe gives: **Purpose · Composition · Camera/机位 · 景别 · Lighti
 - **Camera:** hero angle or overhead depending on product.
 - **Lighting:** even, flat, readable.
 - **Background:** clean light (`#FAF7F2`/`#FFFFFF`).
-- **Text zone:** dimension lines and 2–4 short labels.
+- **Text zone:** dimension lines and 2–4 short labels, for suites with in-image copy; otherwise a scale anchor carries the size.
 - **Prompt recipe:** `E-commerce size spec screen on {background hex}. {product} shown {camera} with dimension callouts in #2D2D2D. Labels reading 「{callout_1}」… Product occupies 45-50%. Clean structured layout. Negative: no dense body text, no watermark.`
 - **High-CTR key:** overlay cm/in, hand or common object as scale anchor.
 - **Avoid:** unreadable tiny text; missing units.
@@ -132,7 +132,7 @@ Each recipe gives: **Purpose · Composition · Camera/机位 · 景别 · Lighti
 - **Camera:** flat/overhead for packaging; straight-on for badges.
 - **Lighting:** even high-key; clean.
 - **Background:** white or light neutral.
-- **Text zone:** short trust labels.
+- **Text zone:** none unless the suite carries in-image copy.
 - **Prompt recipe:** `E-commerce trust screen. {product} with clean trust badges and short labels 「{callout_1}」. {background hex}. Even studio light. Negative: do NOT invent certifications, awards, ratings, or test data; no fake logos, no watermark.`
 - **High-CTR key:** ratings, certs, real UGC — **only if real**; otherwise use `proof placeholder`.
 - **Avoid:** fabricated authority. This is a hard rule.
@@ -149,11 +149,11 @@ Each recipe gives: **Purpose · Composition · Camera/机位 · 景别 · Lighti
 
 ### 2.10 CTA — 促销 / 收口
 - **Purpose:** close with offer + action.
-- **Composition:** product + offer burst / CTA button placeholder.
+- **Composition:** product + offer burst with rendered short CTA copy.
 - **Lighting:** brand-consistent, slightly punchier.
 - **Background:** brand key color.
-- **Text zone:** headline + CTA button placeholder.
-- **Prompt recipe:** `E-commerce promo close. {product} with a CTA button placeholder and short headline 「{callout_1}」. {brand hex} background. {lighting}. Negative: no invented discounts or claims, no watermark.`
+- **Text zone:** short headline and CTA button, for suites with in-image copy.
+- **Prompt recipe:** `E-commerce promo close. {product} with a CTA button reading 「{callout_1}」. {brand hex} background. {lighting}. Negative: no invented discounts or claims, no watermark.`
 - **High-CTR key:** urgency with a real offer only.
 - **Avoid:** fake countdowns, fabricated discounts.
 

@@ -20,7 +20,7 @@ Gate the suite before output. **All P0 must pass.** P1 should pass; P2 is option
 **Prompt contract**
 - [ ] Every prompt: English, concise, natural language.
 - [ ] Colors are hex; no color adjectives ("white"/"gold").
-- [ ] Product occupancy is numeric; whitespace is declared.
+- [ ] Product occupancy is numeric and matches the shot type's band; textZone is `none` unless the suite carries in-image copy.
 - [ ] Every prompt ends with a concrete negative list.
 - [ ] The product-fidelity lock clause is present in every shot.
 - [ ] Same `styleLock.lockText` verbatim in every shot (no paraphrase).

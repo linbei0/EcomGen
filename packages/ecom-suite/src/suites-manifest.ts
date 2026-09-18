@@ -1,11 +1,11 @@
 // 自动生成文件：由 scripts/generate-suite-manifest.mjs 从 src/suites/ 生成，请勿手改。
 // 重新生成：pnpm --filter @ecomgen/ecom-suite gen:suites
 export default {
-  "totalHash": "1236fcdfa88854b99f0ab19c3cd45eb2ca821f58c3a1b2aee30a97bdab8089d9",
+  "totalHash": "c582a173b5480af77bcccd8db631b9c406b343c0f477857510cadc3c84bfa0f9",
   "suites": [
     {
       "file": "01-skincare-cleanser.suite.json",
-      "hash": "4309f02819002c1334dfeac335cb9052a72c1d10d3a78bec91eac1c791bc48b2",
+      "hash": "900065b9f1bb662cd25bdeea6df6c6092e28fc584d0c843206ebb9f63570f1d3",
       "data": {
         "schemaVersion": 1,
         "kind": "ecomgen.suite",
@@ -49,7 +49,7 @@ export default {
           "backgroundSystem": "clean white #FFFFFF for packshots, soft blush-beige #F6EFEA for info and scene shots",
           "lightingSystem": "bright soft studio lighting, front-left key with fill, soft contact shadows, no harsh speculars",
           "surfaceSystem": "matte light-stone counter #E7E2DC and neutral matte board #EFE9E1",
-          "typography": "modern geometric sans-serif headline placeholders only",
+          "typography": "modern geometric sans-serif",
           "iconSystem": "thin-line icons only, single accent color",
           "presentationRules": "stable slight 3/4 hero angle and scale for the product across the set",
           "noDrift": [
@@ -59,7 +59,7 @@ export default {
             "no inconsistent lighting",
             "no mismatched icon styles"
           ],
-          "lockText": "Campaign Style Lock: consistent clean gentle skincare visual system across the entire image set; fixed palette of clean white background #FFFFFF, soft blush-beige #F6EFEA, charcoal text #33383D and one teal accent #7FA7A0; bright soft studio lighting with front-left key and soft contact shadows; modern geometric sans-serif headline placeholders only; consistent rounded info labels; consistent thin-line icon style; clean high-end skincare photography mixed with minimal infographic elements; stable slight 3/4 hero product angle and scale; generous whitespace; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+          "lockText": "Campaign Style Lock: consistent clean gentle skincare visual system across the entire image set; fixed palette of clean white background #FFFFFF, soft blush-beige #F6EFEA, charcoal text #33383D and one teal accent #7FA7A0; bright soft studio lighting with front-left key and soft contact shadows; modern geometric sans-serif; consistent thin-line icon style; clean high-end skincare photography mixed with minimal infographic elements; stable slight 3/4 hero product angle and scale; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
         },
         "shots": [
           {
@@ -76,10 +76,10 @@ export default {
             "lighting": "bright even high-key studio lighting, front key with soft fill",
             "background": "seamless pure white #FFFFFF",
             "props": "none",
-            "productOccupancy": "35-40%",
-            "whitespace": ">=45%",
+            "productOccupancy": "60-70%",
+            "whitespace": "none",
             "textZone": "none",
-            "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. The bottle standing upright, straight-on eye-level view, full product visible. Bright even high-key studio lighting with a front key and soft fill, a soft contact shadow grounding the product. Seamless pure white background #FFFFFF. The product occupies 35-40% of the frame, whitespace at least 45%. 8K, commercial beauty e-commerce quality. Negative: no props, no hands, no watermark, no fake logo, no extra text, no cut-off edges.",
+            "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. The bottle standing upright, straight-on eye-level view, full product visible. Bright even high-key studio lighting with a front key and soft fill, a soft contact shadow grounding the product. Seamless pure white background #FFFFFF. The product occupies 60-70% of the frame. 8K, commercial beauty e-commerce quality. Negative: no props, no hands, no watermark, no fake logo, no extra text, no cut-off edges.",
             "supportsImageReference": true
           },
           {
@@ -96,10 +96,10 @@ export default {
             "lighting": "soft front-left key light, soft contact shadow",
             "background": "soft blush-beige #F6EFEA",
             "props": "one thin-line icon",
-            "productOccupancy": "25-30%",
-            "whitespace": ">=45%",
-            "textZone": "right side clean negative space for one short headline placeholder 「{callout_1}」 in #33383D",
-            "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. The product shown at a slight 3/4 hero angle on the left, occupying 25-30%. Right side clean negative space carrying one short headline placeholder 「{callout_1}」 in #33383D and one thin-line icon in {accent_color}. Background soft blush-beige #F6EFEA, soft front-left key light, soft contact shadow. Whitespace at least 45%. Negative: no dense body text, no more than one claim, no invented efficacy claims, no watermark, no fake logo, no props covering the product.",
+            "productOccupancy": "50-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. The product shown at a slight 3/4 hero angle on the left, occupying 50-60% of the frame, with one thin-line icon in {accent_color} floating beside it as a quiet graphic accent. Background soft blush-beige #F6EFEA, soft front-left key light, soft contact shadow. Negative: no dense body text, no invented efficacy claims, no watermark, no fake logo, no props covering the product.",
             "supportsImageReference": true
           },
           {
@@ -116,10 +116,10 @@ export default {
             "lighting": "left panel harsh and drying; right panel soft and gentle",
             "background": "soft blush-beige #F6EFEA on both panels",
             "props": "none",
-            "productOccupancy": "25-30% per panel",
-            "whitespace": ">=40%",
-            "textZone": "one short label per panel 「{callout_1}」 / 「{callout_2}」",
-            "promptTemplate": "E-commerce pain-point split screen, two matched panels with identical camera and framing. Left panel: an abstract patch of tight, dull, irritated skin under harsh flat light, conveying post-cleanse tightness without showing a real face. Right panel: {product} in soft gentle light conveying comfort. {product_identity_lock}. {style_lock}. Background soft blush-beige #F6EFEA on both panels, soft top light. Each panel carries one short label placeholder 「{callout_1}」 and 「{callout_2}」. The product occupies 25-30% per panel. Negative: no real model face, no fabricated claims or statistics, no extra text, no watermark, no fake logo.",
+            "productOccupancy": "50-60% per panel",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "E-commerce pain-point split screen, two matched panels with identical camera and framing. Left panel: an abstract patch of tight, dull, irritated skin under harsh flat light, conveying post-cleanse tightness without showing a real face. Right panel: {product} in soft gentle light conveying comfort. {product_identity_lock}. {style_lock}. Background soft blush-beige #F6EFEA on both panels, soft top light. The product occupies 50-60% per panel, the two visual states carrying the contrast on their own. Negative: no real model face, no fabricated claims or statistics, no extra text, no watermark, no fake logo.",
             "supportsImageReference": true
           },
           {
@@ -136,10 +136,10 @@ export default {
             "lighting": "soft morning window light from the left, 5500K, gentle mist, soft contact shadow",
             "background": "matte light-stone bathroom counter #E7E2DC with soft mist",
             "props": "a folded towel and a small tray, not covering the product",
-            "productOccupancy": "20-25%",
-            "whitespace": ">=50%",
+            "productOccupancy": "40-50%",
+            "whitespace": "none",
             "textZone": "none",
-            "promptTemplate": "Lifestyle scene: {product} resting on a matte light-stone bathroom counter #E7E2DC with a soft morning mist around it. {product_identity_lock}. {style_lock}. Photographed at a slight 3/4 eye-level with a candid handheld feel. Soft morning window light from the left, 5500K, gentle mist, soft contact shadow. Props: a folded towel and a small tray, not covering the product. The product occupies 20-25% of the frame, whitespace at least 50%. Negative: no visible face, no hands covering the product, no extra text, no watermark, no fake logo, no messy clutter.",
+            "promptTemplate": "Lifestyle scene: {product} resting on a matte light-stone bathroom counter #E7E2DC with a soft morning mist around it. {product_identity_lock}. {style_lock}. Photographed at a slight 3/4 eye-level with a candid handheld feel. Soft morning window light from the left, 5500K, gentle mist, soft contact shadow. Props: a folded towel and a small tray, not covering the product. The product occupies 40-50% of the frame. Negative: no visible face, no hands covering the product, no extra text, no watermark, no fake logo, no messy clutter.",
             "supportsImageReference": true
           },
           {
@@ -175,11 +175,11 @@ export default {
             "camera": "flat lay, top-down 90-degree, product upright in frame",
             "lighting": "even high-key flat lighting, no dramatic shadow",
             "background": "soft blush-beige #F6EFEA",
-            "props": "a few empty rounded label areas as info placeholders",
-            "productOccupancy": "40-45%",
-            "whitespace": ">=35%",
-            "textZone": "stacked information areas: core promise 「{callout_1}」, 2-3 evidence lines, capacity badge",
-            "promptTemplate": "E-commerce infographic layout for {product}, flat lay shot from a top-down 90-degree angle with the product upright. {product_identity_lock}. {style_lock}. Even high-key flat lighting, no dramatic shadow. Background soft blush-beige #F6EFEA. A few empty rounded label areas left blank as info placeholders: a core promise 「{callout_1}」 in #33383D, two or three short evidence lines, and a capacity badge. The product occupies 40-45%, whitespace at least 35%. Negative: no tiny unreadable text, no fabricated ingredient claims, no watermark, no fake logo.",
+            "props": "a few rounded cards in soft white #FFFFFF beside the product",
+            "productOccupancy": "60-70%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "E-commerce infographic layout for {product}, flat lay shot from a top-down 90-degree angle with the product upright. {product_identity_lock}. {style_lock}. Even high-key flat lighting, no dramatic shadow. Background soft blush-beige #F6EFEA. A few rounded cards in soft white #FFFFFF arranged beside the product, each carrying a single thin-line icon or a simple ingredient illustration in {accent_color}. The product occupies 60-70% of the frame. Negative: no tiny unreadable text, no fabricated ingredient claims, no watermark, no fake logo.",
             "supportsImageReference": true
           },
           {
@@ -192,14 +192,14 @@ export default {
             "mode": "CREATIVE",
             "aspectRatio": "1:1",
             "resolution": "2K",
-            "camera": "clean 3/4 product angle beside a badge area",
+            "camera": "clean centered 3/4 product angle",
             "lighting": "even clean studio light",
             "background": "pure white #FFFFFF",
-            "props": "one empty seal-shaped badge area as a proof placeholder",
-            "productOccupancy": "30-35%",
-            "whitespace": ">=40%",
-            "textZone": "two short trust labels 「{callout_1}」 and 「{callout_2}」 in #33383D",
-            "promptTemplate": "E-commerce trust screen for {product}. {product_identity_lock}. {style_lock}. The product shown clean at a 3/4 angle beside one empty seal-shaped badge area left blank as a proof placeholder, with two short trust labels 「{callout_1}」 and 「{callout_2}」 in #33383D. Background pure white #FFFFFF, even clean studio light. The product occupies 30-35%, whitespace at least 40%. Negative: do NOT invent certifications, awards, ratings or test data; no fabricated badges, no watermark, no fake logo.",
+            "props": "none",
+            "productOccupancy": "50-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "E-commerce trust screen for {product}. {product_identity_lock}. {style_lock}. The product shown clean at a centered 3/4 angle. Background pure white #FFFFFF, even clean studio light. The product occupies 50-60% of the frame. Negative: do NOT invent certifications, awards, ratings or test data; no fabricated badges, no watermark, no fake logo.",
             "supportsImageReference": true
           },
           {
@@ -217,9 +217,9 @@ export default {
             "background": "soft blush-beige #F6EFEA",
             "props": "none",
             "productOccupancy": "55-60% overall",
-            "whitespace": ">=30%",
-            "textZone": "one short CTA placeholder 「{callout_1}」 and an empty price/set badge area",
-            "promptTemplate": "E-commerce closing CTA shot of {product}, a group 3/4 view with a second unit beside it to suggest a set. {product_identity_lock}. {style_lock}. Even soft studio light with soft contact shadows. Background soft blush-beige #F6EFEA. The group occupies 55-60% overall, whitespace at least 30%. A short CTA placeholder 「{callout_1}」 and an empty price/set badge area. Negative: no real discount numbers, no watermark, no fake logo, no invented claims.",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "E-commerce closing CTA shot of {product}, a group 3/4 view with a second unit beside it to suggest a set. {product_identity_lock}. {style_lock}. Even soft studio light with soft contact shadows. Background soft blush-beige #F6EFEA. The group occupies 55-60% of the frame. Negative: no real discount numbers, no watermark, no fake logo, no invented claims.",
             "supportsImageReference": true
           }
         ],
@@ -233,7 +233,7 @@ export default {
     },
     {
       "file": "02-instant-coffee.suite.json",
-      "hash": "195099bf3b3d2d9c6f0913594afbbfb38479d7dcc379dab737fd9d5c6246296e",
+      "hash": "685e5644c61ef48e51eb62ae6dede3a9576b8fde6dd44f8ad65041d7990c3883",
       "data": {
         "schemaVersion": 1,
         "kind": "ecomgen.suite",
@@ -305,10 +305,10 @@ export default {
             "lighting": "high-key soft key from upper-left, clean fill",
             "background": "pure #FFFFFF seamless",
             "props": "none",
-            "productOccupancy": "35-40%",
-            "whitespace": "at least 45%",
-            "textZone": "top center 200x100 reserved, empty",
-            "promptTemplate": "{product_identity_lock} Product packshot of {product} on a pure #FFFFFF seamless background, centered eye-level front view, the glass jar occupying 35-40% of the frame with generous clean whitespace. Soft high-key studio key light from the upper-left at 45 degrees with even fill and a real faint contact shadow. Sharp reflection-free glass and legible label. {style_lock} No text, no logo overlay, no props, no watermark, no extra objects.",
+            "productOccupancy": "60-70%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Product packshot of {product} on a pure #FFFFFF seamless background, centered eye-level front view, the glass jar occupying 60-70% of the frame. Soft high-key studio key light from the upper-left at 45 degrees with even fill and a real faint contact shadow. Sharp reflection-free glass and legible label. {style_lock} No text, no logo overlay, no props, no watermark, no extra objects.",
             "supportsImageReference": true
           },
           {
@@ -324,10 +324,10 @@ export default {
             "lighting": "soft key from upper-left, warm rim on the crema",
             "background": "soft white to light warm gradient",
             "props": "one white ceramic cup",
-            "productOccupancy": "25-30%",
-            "whitespace": "at least 45% on the copy side",
-            "textZone": "left vertical band reserved, empty",
-            "promptTemplate": "{product_identity_lock} Product of {product} beside a white ceramic cup filled with freshly brewed black coffee showing a rich golden crema, slight 3/4 high angle. The jar occupies 25-30% of the frame, the cup is the secondary hero. Soft key light from the upper-left reveals the crema texture and casts a natural contact shadow. Leave a clean empty vertical band on the left for a headline. {style_lock} No text, no letters, no logo, no watermark.",
+            "productOccupancy": "50-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Product of {product} beside a white ceramic cup filled with freshly brewed black coffee showing a rich golden crema, slight 3/4 high angle. The jar occupies 50-60% of the frame, the cup is the secondary hero. Soft key light from the upper-left reveals the crema texture and casts a natural contact shadow. {style_lock} No text, no letters, no logo, no watermark.",
             "supportsImageReference": true
           },
           {
@@ -343,10 +343,10 @@ export default {
             "lighting": "raking side light to reveal granule facets",
             "background": "matte dark espresso surface",
             "props": "a small ceramic spoon",
-            "productOccupancy": "40-45%",
-            "whitespace": "at least 35%",
-            "textZone": "bottom strip reserved, empty",
-            "promptTemplate": "{product_identity_lock} Extreme macro of freeze-dried black coffee granules from {product} piled on a matte dark espresso surface with a small ceramic spoon, top-down view, shallow depth of field. Raking side light reveals crisp facets and slight sheen of the granules; authentic powder texture with no plastic look. Leave a clean empty strip at the bottom. {style_lock} No text, no logo, no watermark.",
+            "productOccupancy": "60-70%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Extreme macro of freeze-dried black coffee granules from {product} piled on a matte dark espresso surface with a small ceramic spoon, top-down view, shallow depth of field. Raking side light reveals crisp facets and slight sheen of the granules; authentic powder texture with no plastic look. {style_lock} No text, no logo, no watermark.",
             "supportsImageReference": true
           },
           {
@@ -362,10 +362,10 @@ export default {
             "lighting": "natural window light from the left, soft",
             "background": "bright modern desk with a laptop, plant and notebook",
             "props": "laptop, notebook, small plant",
-            "productOccupancy": "20-25%",
-            "whitespace": "at least 50%",
-            "textZone": "upper left reserved, empty",
-            "promptTemplate": "{product_identity_lock} Lifestyle scene of {product} on a bright modern desk in the morning, a filled black coffee cup beside it, a laptop, a notebook and a small plant softly out of focus. Eye-level 3/4 framing, natural window light from the left with realistic soft shadows. The product occupies 20-25% of the frame and stays the sharpest element. Props must not overlap or hide the product. Leave clean space at the upper left. {style_lock} No text, no logos, no watermark.",
+            "productOccupancy": "40-50%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Lifestyle scene of {product} on a bright modern desk in the morning, a filled black coffee cup beside it, a laptop, a notebook and a small plant softly out of focus. Eye-level 3/4 framing, natural window light from the left with realistic soft shadows. The product occupies 40-50% of the frame and stays the sharpest element. Props must not overlap or hide the product. {style_lock} No text, no logos, no watermark.",
             "supportsImageReference": true
           },
           {
@@ -381,10 +381,10 @@ export default {
             "lighting": "even soft light, identical on both halves",
             "background": "clean white with a subtle center divider",
             "props": "a few sugar cubes on the left half",
-            "productOccupancy": "35-40%",
-            "whitespace": "at least 35%",
-            "textZone": "top of each half reserved, empty",
-            "promptTemplate": "{product_identity_lock} Top-down split comparison on a clean white surface: on one side {product} with a small pile of sugar cubes crossed out by an empty clean zone, on the other side a plain unsweetened black coffee. Identical soft lighting and framing on both halves so the only difference reads as sugar. Product occupies 35-40%. Leave clean label zones at the top of each half. {style_lock} No text, no letters, no logo, no watermark.",
+            "productOccupancy": "55-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Top-down split comparison on a clean white surface: on one side {product} with a small pile of sugar cubes pushed aside, on the other side a plain unsweetened black coffee. Identical soft lighting and framing on both halves so the only difference reads as sugar. Product occupies 55-60% of each half. {style_lock} No text, no letters, no logo, no watermark.",
             "supportsImageReference": true
           },
           {
@@ -399,11 +399,11 @@ export default {
             "camera": "flat-lay top-down",
             "lighting": "even high-key soft light",
             "background": "matte warm neutral surface",
-            "props": "scattered roasted coffee beans and a clean card blank",
-            "productOccupancy": "30-35%",
-            "whitespace": "at least 45%",
-            "textZone": "right card area reserved, empty",
-            "promptTemplate": "{product_identity_lock} Flat-lay trust composition of {product} on a matte warm neutral surface, surrounded by a few scattered roasted coffee beans and one blank clean card area reserved for a certificate graphic. Even high-key soft lighting, honest natural materials, no glossy plastic. The product occupies 30-35% and stays the sharpest subject. Leave the right side clean and empty. {style_lock} No text, no logo, no watermark, do not invent certifications or awards.",
+            "props": "scattered roasted coffee beans",
+            "productOccupancy": "50-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Flat-lay trust composition of {product} on a matte warm neutral surface, surrounded by a few scattered roasted coffee beans. Even high-key soft lighting, honest natural materials, no glossy plastic. The product occupies 50-60% of the frame and stays the sharpest subject. {style_lock} No text, no logo, no watermark, do not invent certifications or awards.",
             "supportsImageReference": true
           },
           {
@@ -411,7 +411,7 @@ export default {
             "order": 7,
             "shotRole": "CTA",
             "displayName": "囤货促销行动图",
-            "intent": "用组合陈列与促销区促成加购",
+            "intent": "用组合陈列促成加购",
             "mode": "CREATIVE",
             "aspectRatio": "1:1",
             "resolution": "2K",
@@ -419,10 +419,10 @@ export default {
             "lighting": "bright soft key with warm accent",
             "background": "clean white with a warm accent band",
             "props": "two additional jars arranged as a bundle",
-            "productOccupancy": "40-45%",
-            "whitespace": "at least 40%",
-            "textZone": "top banner and bottom banner reserved, empty",
-            "promptTemplate": "{product_identity_lock} Promotional grouping of {product} shown as a multi-jar bundle on a clean white surface with a warm #C9A66B accent band, slight low-angle hero framing. Bright soft key light with a subtle warm accent and real contact shadows. Products occupy 40-45% and stay sharply separated. Leave clean empty banner zones at the top and bottom for offer copy. {style_lock} No text, no numbers, no logo, no watermark.",
+            "productOccupancy": "55-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Promotional grouping of {product} shown as a multi-jar bundle on a clean white surface with a warm #C9A66B accent band, slight low-angle hero framing. Bright soft key light with a subtle warm accent and real contact shadows. Products occupy 55-60% of the frame and stay sharply separated. {style_lock} No text, no numbers, no logo, no watermark.",
             "supportsImageReference": true
           }
         ],
@@ -436,7 +436,7 @@ export default {
     },
     {
       "file": "03-daily-nuts.suite.json",
-      "hash": "5dd548d32a365d7ab6fe273c7541769a5bdb442ec572348bda07e3d8bc618d68",
+      "hash": "d7a0fdbdb4b4dd28a6b329d43c1da9a693474187b9bd53c1c917e90f2ca65758",
       "data": {
         "schemaVersion": 1,
         "kind": "ecomgen.suite",
@@ -508,10 +508,10 @@ export default {
             "lighting": "high-key soft key from upper-left, even fill",
             "background": "pure #FFFFFF seamless",
             "props": "none",
-            "productOccupancy": "35-40%",
-            "whitespace": "at least 45%",
-            "textZone": "top center reserved, empty",
-            "promptTemplate": "{product_identity_lock} Product packshot of {product}, a stand-up pouch centered on a pure #FFFFFF seamless background, eye-level slight 3/4 view. The pouch occupies 35-40% of the frame with generous clean whitespace and a faint real contact shadow. Soft high-key key light from the upper-left at 45 degrees with even fill; matte film with legible label and no glare. {style_lock} No text, no logo overlay, no props, no watermark.",
+            "productOccupancy": "60-70%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Product packshot of {product}, a stand-up pouch centered on a pure #FFFFFF seamless background, eye-level slight 3/4 view. The pouch occupies 60-70% of the frame with a faint real contact shadow. Soft high-key key light from the upper-left at 45 degrees with even fill; matte film with legible label and no glare. {style_lock} No text, no logo overlay, no props, no watermark.",
             "supportsImageReference": true
           },
           {
@@ -527,10 +527,10 @@ export default {
             "lighting": "soft even key from the upper-left",
             "background": "clean white paper",
             "props": "one opened small pack spilling a few nuts",
-            "productOccupancy": "30-35%",
-            "whitespace": "at least 45%",
-            "textZone": "left vertical band reserved, empty",
-            "promptTemplate": "{product_identity_lock} Top-down flat lay of {product}: the main pouch beside one opened 30g single-serve pack with a few nuts and dried fruit spilling out naturally on clean white paper. Soft even key light from the upper-left with real contact shadows; nuts look fresh with natural texture, not oily. Product and pack occupy 30-35%. Leave a clean empty vertical band on the left. {style_lock} No text, no letters, no logo, no watermark.",
+            "productOccupancy": "50-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Top-down flat lay of {product}: the main pouch beside one opened 30g single-serve pack with a few nuts and dried fruit spilling out naturally on clean white paper. Soft even key light from the upper-left with real contact shadows; nuts look fresh with natural texture, not oily. Product and pack occupy 50-60% of the frame. {style_lock} No text, no letters, no logo, no watermark.",
             "supportsImageReference": true
           },
           {
@@ -546,10 +546,10 @@ export default {
             "lighting": "raking side light to reveal texture",
             "background": "matte light oak",
             "props": "a few whole almonds, walnuts and cranberries",
-            "productOccupancy": "40-45%",
-            "whitespace": "at least 35%",
-            "textZone": "bottom strip reserved, empty",
-            "promptTemplate": "{product_identity_lock} Extreme macro of a mix of whole almonds, walnut halves and dried cranberries from {product} arranged on a matte light oak surface, top-down, shallow depth of field. Raking side light reveals natural ridges, skins and fruit texture; honest matte look with no oil or syrup sheen. Leave a clean empty strip at the bottom. {style_lock} No text, no logo, no watermark.",
+            "productOccupancy": "60-70%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Extreme macro of a mix of whole almonds, walnut halves and dried cranberries from {product} arranged on a matte light oak surface, top-down, shallow depth of field. Raking side light reveals natural ridges, skins and fruit texture; honest matte look with no oil or syrup sheen. {style_lock} No text, no logo, no watermark.",
             "supportsImageReference": true
           },
           {
@@ -565,10 +565,10 @@ export default {
             "lighting": "natural window light from the left",
             "background": "bright desk with a notebook, mug and small plant",
             "props": "notebook, mug, small plant",
-            "productOccupancy": "20-25%",
-            "whitespace": "at least 50%",
-            "textZone": "upper left reserved, empty",
-            "promptTemplate": "{product_identity_lock} Lifestyle scene of {product} on a bright desk during an afternoon break, the pouch and one opened pack beside a notebook, a mug and a small plant softly out of focus. Eye-level 3/4 framing, natural window light from the left with realistic soft shadows. Product occupies 20-25% and stays the sharpest element; props must not cover it. Leave clean space at the upper left. {style_lock} No text, no logos, no watermark.",
+            "productOccupancy": "40-50%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Lifestyle scene of {product} on a bright desk during an afternoon break, the pouch and one opened pack beside a notebook, a mug and a small plant softly out of focus. Eye-level 3/4 framing, natural window light from the left with realistic soft shadows. Product occupies 40-50% of the frame and stays the sharpest element; props must not cover it. {style_lock} No text, no logos, no watermark.",
             "supportsImageReference": true
           },
           {
@@ -584,10 +584,10 @@ export default {
             "lighting": "even soft light identical on both halves",
             "background": "clean white with a subtle center divider",
             "props": "a small pile of fried chips on the left half",
-            "productOccupancy": "35-40%",
-            "whitespace": "at least 35%",
-            "textZone": "top of each half reserved, empty",
-            "promptTemplate": "{product_identity_lock} Top-down split comparison on clean white: on one side {product} with nuts and dried fruit, on the other side a small pile of fried chips. Identical soft lighting and framing so the difference reads as baked-nuts versus fried-snack. Product occupies 35-40%. Leave clean label zones at the top of each half. {style_lock} No text, no letters, no logo, no watermark.",
+            "productOccupancy": "55-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Top-down split comparison on clean white: on one side {product} with nuts and dried fruit, on the other side a small pile of fried chips. Identical soft lighting and framing so the difference reads as baked-nuts versus fried-snack. Product occupies 55-60% of each half. {style_lock} No text, no letters, no logo, no watermark.",
             "supportsImageReference": true
           },
           {
@@ -602,11 +602,11 @@ export default {
             "camera": "flat-lay top-down",
             "lighting": "even high-key soft light",
             "background": "natural linen on light oak",
-            "props": "scattered raw nuts and a blank clean card",
-            "productOccupancy": "30-35%",
-            "whitespace": "at least 45%",
-            "textZone": "right card area reserved, empty",
-            "promptTemplate": "{product_identity_lock} Flat-lay trust composition of {product} on natural linen over light oak, surrounded by a few scattered raw nuts and one blank clean card area reserved for a fact graphic. Even high-key soft lighting, honest natural materials. Product occupies 30-35% and stays the sharpest subject. Leave the right side clean and empty. {style_lock} No text, no logo, no watermark, do not invent certifications or health claims.",
+            "props": "scattered raw nuts",
+            "productOccupancy": "50-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Flat-lay trust composition of {product} on natural linen over light oak, surrounded by a few scattered raw nuts. Even high-key soft lighting, honest natural materials. Product occupies 50-60% of the frame and stays the sharpest subject. {style_lock} No text, no logo, no watermark, do not invent certifications or health claims.",
             "supportsImageReference": true
           },
           {
@@ -614,7 +614,7 @@ export default {
             "order": 7,
             "shotRole": "CTA",
             "displayName": "大包装囤货行动图",
-            "intent": "用多袋组合与促销区促成加购",
+            "intent": "用多袋组合陈列促成加购",
             "mode": "CREATIVE",
             "aspectRatio": "1:1",
             "resolution": "2K",
@@ -622,10 +622,10 @@ export default {
             "lighting": "bright soft key with a warm accent",
             "background": "clean white with a #3B7A57 accent band",
             "props": "three pouches arranged as a bundle",
-            "productOccupancy": "40-45%",
-            "whitespace": "at least 40%",
-            "textZone": "top and bottom banner reserved, empty",
-            "promptTemplate": "{product_identity_lock} Promotional grouping of {product} shown as a three-pouch bundle on a clean white surface with a thin #3B7A57 accent band, slight low-angle hero framing. Bright soft key light with a subtle warm accent and real contact shadows. Pouches occupy 40-45% and stay sharply separated. Leave clean empty banner zones at the top and bottom for offer copy. {style_lock} No text, no numbers, no logo, no watermark.",
+            "productOccupancy": "55-60%",
+            "whitespace": "none",
+            "textZone": "none",
+            "promptTemplate": "{product_identity_lock} Promotional grouping of {product} shown as a three-pouch bundle on a clean white surface with a thin #3B7A57 accent band, slight low-angle hero framing. Bright soft key light with a subtle warm accent and real contact shadows. Pouches occupy 55-60% of the frame and stay sharply separated. {style_lock} No text, no numbers, no logo, no watermark.",
             "supportsImageReference": true
           }
         ],

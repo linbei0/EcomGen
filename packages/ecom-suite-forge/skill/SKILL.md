@@ -43,8 +43,8 @@ If the user gives only a single image, say so and ask for the **whole set** — 
 1. **One suite = one main product.** Classify by the main product. If the set is genuinely mixed (e.g. tent + mug + watch), tell the user it is impure and recommend splitting into two suites.
 2. **Detach from the source.** Extract only reusable visual grammar. Never let source brand, logo, model identity/face, source on-image copy, unique typography, or model-specific features into the template. See `references/de-identification.md`.
 3. **Order is a conversion funnel, not a pile of images.** Sequence shots so they convince: click → benefit → pain → proof → scene → detail → trust → variant → close.
-4. **Every shot is fully specified.** A shot without 机位/景别/光位/背景/台面/道具/产品占比/留白/文字区 is incomplete.
-5. **Prompt contract.** English, natural language, concise. Hex colors (never color words). Numeric product occupancy. Explicit whitespace. A negative list on every prompt. Chinese in-image text wrapped in 「」. Full rules in `references/prompt-contract.md`.
+4. **Every shot is fully specified.** A shot without 机位/景别/光位/背景/台面/道具/产品占比 is incomplete.
+5. **Prompt contract.** English, natural language, concise. Hex colors (never color words). Numeric product occupancy. A negative list on every prompt. Chinese in-image text wrapped in 「」, only for suites that explicitly ask for rendered in-image copy. Full rules in `references/prompt-contract.md`.
 6. **Whole-set consistency.** Build one **Campaign Style Lock** and reuse it verbatim in every shot; vary angle/background/shot purpose so the set does not look like one photo repeated. See `references/prompt-contract.md`.
 7. **No invented facts.** Never write certifications, lab numbers, ratings, sales counts, or efficacy claims that are not verifiable from the images or the user. Use `proof placeholder` instead. EcomGen forbids fabricated success.
 8. **Category comes from the built-in list.** `L1` and `L2` must be exact strings from `references/category-taxonomy.md`. `leaf` is your own free-text product name.
@@ -71,7 +71,7 @@ For each source image, fill the worksheet in `assets/analysis-worksheet.md`:
 - light direction & quality, shadow type;
 - background / surface material & hex;
 - props & placement;
-- product occupancy, whitespace, text-zone position;
+- product occupancy, text-zone position (for suites with in-image copy);
 - color system (dominant + accent hex);
 - **"source-specific elements to strip"** list (brand, face, exact copy, unique layout).
 Merge duplicate roles, and drop images that carry no information (pure decoration, near-identical duplicates).
@@ -81,9 +81,9 @@ Summarize the set into one visual contract: palette (2–3 base + 1 accent, as h
 
 ### Phase 4 — Write each shot's `promptTemplate`
 Use the fixed order from `references/prompt-contract.md`:
-`[shot type] of {product}. {product_identity_lock}. {style_lock}. [composition/机位/景别]. [light/shadow]. [background/surface hex]. [props]. [occupancy/whitespace]. [text zone / copy placeholder]. [quality]. Negative: [...]`
+`[shot type] of {product}. {product_identity_lock}. {style_lock}. [composition/机位/景别]. [light/shadow]. [background/surface hex]. [props]. [occupancy]. [text zone, for suites with in-image copy]. [quality]. Negative: [...]`
 
-Use only these placeholders: `{product}`, `{product_identity_lock}`, `{style_lock}`, `{selling_point_1..n}`, `{callout_1..n}`, `{accent_color}`. Nothing else may be source-specific.
+Use only these placeholders: `{product}`, `{product_identity_lock}`, `{style_lock}`, `{selling_point_1..n}`, `{callout_1..n}`, `{accent_color}`. Nothing else may be source-specific. `{selling_point_*}`/`{callout_*}` only appear in suites that carry in-image copy.
 
 ### Phase 5 — Assemble the suite JSON
 Follow `references/suite-schema.md` exactly. Assign `shotId`, `assetType`, `order`, `shotRole`, `displayName`, `intent`, `aspectRatio`, `resolution`, and the per-shot visual fields.
@@ -149,7 +149,7 @@ Rules:
     { "shotId": "shot-01", "order": 1, "shotRole": "HERO", "displayName": "...", "intent": "...",
       "assetType": "suite-...::shot-01", "aspectRatio": "1:1", "resolution": "2K",
       "camera": "...", "lighting": "...", "background": "...", "props": "...",
-      "productOccupancy": "35-40%", "whitespace": ">=45%", "textZone": "...",
+      "productOccupancy": "60-70%", "whitespace": "none", "textZone": "none",
       "promptTemplate": "..." }
   ],
   "provenance": { "sourceKind": "viral-reference-set", "sourceImageCount": 8, "detached": true, "notes": "..." }

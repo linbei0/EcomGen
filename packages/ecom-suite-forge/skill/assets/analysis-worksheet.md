@@ -14,8 +14,8 @@ Fill one block per source image during Phase 2. Copy the block for each image. T
 - Background & surface (material + hex):
 - Props & placement:
 - Product occupancy:
-- Whitespace:
-- Text zone (positional) + text meaning (not the words):
+- Whitespace (compositional margin, usually none):
+- Text zone (for suites with in-image copy) + text meaning (not the words):
 - Color system (dominant + accent hex):
 - Mood / aesthetic:
 - SOURCE-SPECIFIC ELEMENTS TO STRIP:   (brand, logo, model face, exact copy, unique typography, proprietary layout, etc.)

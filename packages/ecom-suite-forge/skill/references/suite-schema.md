@@ -63,9 +63,9 @@ The Campaign Style Lock (see `references/prompt-contract.md`).
 | `lighting` | string | yes | direction + quality (+ color temp) |
 | `background` | string | yes | material + hex |
 | `props` | string | yes | list or `none` |
-| `productOccupancy` | string | yes | e.g. `35-40%` |
-| `whitespace` | string | yes | e.g. `>=45%` |
-| `textZone` | string | yes | positional description or `none` |
+| `productOccupancy` | string | yes | e.g. `60-70%` |
+| `whitespace` | string | yes | compositional margin, usually `none` |
+| `textZone` | string | yes | in-image copy position for suites with rendered text, otherwise `none` |
 | `promptTemplate` | string | yes | English prompt with placeholders; see `references/prompt-contract.md` |
 | `supportsImageReference` | boolean | yes | whether the shot expects a product reference (usually `true`) |
 
@@ -113,7 +113,7 @@ This skill does **not** modify EcomGen. The schema is designed so integration is
   "productFamily": "beauty",
   "styleLock": { "direction": "clean gentle skincare commerce", "palette": [{ "name": "底白", "hex": "#FFFFFF" }, { "name": "天青强调", "hex": "#7FA7A0" }], "temperature": "neutral", "backgroundSystem": "clean white + soft blush-beige", "lightingSystem": "bright soft studio light, front-left key, soft contact shadow", "surfaceSystem": "matte light-stone counter", "typography": "modern geometric sans-serif", "iconSystem": "none", "presentationRules": "stable 3/4 hero angle", "noDrift": ["no palette changes", "no mixed fonts", "no inconsistent lighting"], "lockText": "Campaign Style Lock: ..." },
   "shots": [
-    { "shotId": "shot-01", "order": 1, "shotRole": "HERO", "displayName": "白底洁面乳主图", "intent": "搜索一眼点击", "assetType": "suite-hufugehu-jiemianru::shot-01", "mode": "CREATIVE", "aspectRatio": "1:1", "resolution": "2K", "camera": "straight-on, eye-level, bottle upright", "lighting": "bright high-key front key with soft fill", "background": "#FFFFFF", "props": "none", "productOccupancy": "35-40%", "whitespace": ">=45%", "textZone": "none", "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. ...", "supportsImageReference": true }
+    { "shotId": "shot-01", "order": 1, "shotRole": "HERO", "displayName": "白底洁面乳主图", "intent": "搜索一眼点击", "assetType": "suite-hufugehu-jiemianru::shot-01", "mode": "CREATIVE", "aspectRatio": "1:1", "resolution": "2K", "camera": "straight-on, eye-level, bottle upright", "lighting": "bright high-key front key with soft fill", "background": "#FFFFFF", "props": "none", "productOccupancy": "60-70%", "whitespace": "none", "textZone": "none", "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. ...", "supportsImageReference": true }
   ],
   "provenance": { "sourceKind": "viral-reference-set", "sourceImageCount": 8, "detached": true, "notes": "8 张参考图提炼；已剥离品牌字与模特" }
 }
