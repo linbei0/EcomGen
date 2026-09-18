@@ -10,9 +10,38 @@ import {
   type SuiteDocumentInput,
   type SuiteShotDefinition
 } from "@ecomgen/ecom-suite";
-import type { EcomRepository } from "./repository.js";
+import type { EcomRepository, UserSuiteRecord } from "./repository.js";
 
 const SUITE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
+
+export const SUITE_PAGE_SIZE_DEFAULT = 40;
+export const SUITE_PAGE_SIZE_MAX = 100;
+
+export interface SuiteListQuery {
+  /** 大小写不敏感的子串匹配，字段与前端历史行为一致：name + leaf + l2 + l1 + description。 */
+  q?: string;
+  l1?: string;
+  l2?: string;
+  /** 精确 ID 查询；存在时忽略 q/l1/l2/cursor/limit，按目录顺序返回命中的套图。 */
+  ids?: readonly string[];
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface SuiteSummaryPage {
+  items: ReturnType<typeof suiteSummary>[];
+  nextCursor: string | null;
+  /** 全库总数，与查询条件无关，供“全部”计数使用。 */
+  total: number;
+  /** 全库各级品类计数，与查询条件无关，供品类导航使用。 */
+  l1Counts: Record<string, number>;
+}
+
+interface CatalogIndex {
+  ordered: SuiteDefinition[];
+  total: number;
+  l1Counts: Record<string, number>;
+}
 
 export interface SuiteCatalogOptions {
   dataDir: string;
@@ -25,9 +54,12 @@ export interface SuiteCatalogOptions {
 /**
  * 合并三类套图来源：内置 manifest、用户目录投放（<dataDir>/suites/*.suite.json）与 SQLite 用户套图。
  * 全部在内存中索引，每次 refresh 做一次目录扫描；无效或重复 ID 的条目跳过并记录，不阻断启动。
+ * 单份写入走 upsertUserSuite/removeUserSuite 增量更新，避免每次导入都全量重扫。
  */
 export class SuiteCatalog {
   private byId = new Map<string, SuiteDefinition>();
+  /** 排序后的全量视图与计数，懒构建；任何写入或 refresh 置空。 */
+  private index: CatalogIndex | null = null;
   private readonly suitesDir: string;
   private readonly repository: EcomRepository;
   private readonly logger: (message: string) => void;
@@ -89,14 +121,66 @@ export class SuiteCatalog {
     }
 
     this.byId = next;
+    this.index = null;
+  }
+
+  /** 增量写入单份用户套图：ID 冲突规则与 refresh 一致，内置 ID 不可被覆盖。 */
+  public upsertUserSuite(record: UserSuiteRecord): SuiteDefinition | undefined {
+    let suite: SuiteDefinition;
+    try {
+      suite = normalizeSuiteDocument(record.payload, "user", { id: record.id, createdAt: record.createdAt, updatedAt: record.updatedAt });
+    } catch (error) {
+      this.logger(`[suites] skip invalid user suite ${record.id}: ${errorMessage(error)}`);
+      return undefined;
+    }
+    const existing = this.byId.get(suite.id);
+    if (existing && existing.origin === "builtin") {
+      this.logger(`[suites] skip user suite ${suite.id}: id already in use`);
+      return undefined;
+    }
+    this.byId.set(suite.id, suite);
+    this.index = null;
+    return suite;
+  }
+
+  /** 增量删除用户套图；同名投放目录文件要等下一次 refresh 才会重新出现。 */
+  public removeUserSuite(suiteId: string): boolean {
+    const existing = this.byId.get(suiteId);
+    if (!existing || existing.origin !== "user") return false;
+    this.byId.delete(suiteId);
+    this.index = null;
+    return true;
   }
 
   public listSuites(): SuiteDefinition[] {
-    return [...this.byId.values()];
+    return this.catalogIndex().ordered;
   }
 
-  public listSummaries(): ReturnType<typeof suiteSummary>[] {
-    return this.listSuites().map((suite) => suiteSummary(suite));
+  /**
+   * 列表接口的唯一数据源：过滤 + 游标分页，只对当前页做摘要投影。
+   * total/l1Counts 始终是全库统计，与 q/l1/l2/ids 无关。
+   */
+  public pageSummaries(query: SuiteListQuery = {}): SuiteSummaryPage {
+    const index = this.catalogIndex();
+    const meta = { total: index.total, l1Counts: index.l1Counts };
+    const limit = Math.min(Math.max(Math.trunc(query.limit ?? SUITE_PAGE_SIZE_DEFAULT), 1), SUITE_PAGE_SIZE_MAX);
+
+    if (query.ids?.length) {
+      const wanted = new Set(query.ids);
+      return { items: index.ordered.filter((suite) => wanted.has(suite.id)).map(suiteSummary), nextCursor: null, ...meta };
+    }
+
+    const keyword = query.q?.trim().toLowerCase() ?? "";
+    const matched = index.ordered.filter((suite) => {
+      if (query.l1 && suite.category.l1 !== query.l1) return false;
+      if (query.l2 && suite.category.l2 !== query.l2) return false;
+      return keyword ? suiteSearchText(suite).includes(keyword) : true;
+    });
+
+    const startIndex = cursorStartIndex(matched, query.cursor);
+    const page = matched.slice(startIndex, startIndex + limit);
+    const nextCursor = startIndex + page.length < matched.length && page.length > 0 ? encodeSuiteCursor(page[page.length - 1].id) : null;
+    return { items: page.map(suiteSummary), nextCursor, ...meta };
   }
 
   public getSuite(suiteId: string): SuiteDefinition | undefined {
@@ -112,6 +196,16 @@ export class SuiteCatalog {
     return suite && shot ? { suite, shot } : undefined;
   }
 
+  private catalogIndex(): CatalogIndex {
+    if (!this.index) {
+      const ordered = [...this.byId.values()].sort(compareSuites);
+      const l1Counts: Record<string, number> = {};
+      for (const suite of ordered) l1Counts[suite.category.l1] = (l1Counts[suite.category.l1] ?? 0) + 1;
+      this.index = { ordered, total: ordered.length, l1Counts };
+    }
+    return this.index;
+  }
+
   private async directoryFiles(): Promise<string[]> {
     try {
       return (await readdir(this.suitesDir)).filter((name) => name.endsWith(".suite.json")).sort();
@@ -119,6 +213,39 @@ export class SuiteCatalog {
       return [];
     }
   }
+}
+
+/** 目录顺序不依赖写入路径：内置按 manifest 顺序稳定保留，其次按导入时间，最后是无时间戳的投放文件。 */
+function compareSuites(left: SuiteDefinition, right: SuiteDefinition): number {
+  const leftWeight = sourceWeight(left);
+  const rightWeight = sourceWeight(right);
+  if (leftWeight !== rightWeight) return leftWeight - rightWeight;
+  // 权重相同时内置套图保持 Map 插入顺序（manifest 顺序），交给稳定排序；
+  // 其余按 createdAt 再按 id，保证增量 upsert 后位置可预期。
+  if (leftWeight === 0) return 0;
+  return (left.createdAt ?? "").localeCompare(right.createdAt ?? "") || left.id.localeCompare(right.id);
+}
+
+function sourceWeight(suite: SuiteDefinition): number {
+  if (suite.origin === "builtin") return 0;
+  return suite.createdAt ? 1 : 2;
+}
+
+/** 与前端历史过滤行为逐字对齐：字符串拼接后整体小写做子串匹配。 */
+function suiteSearchText(suite: SuiteDefinition): string {
+  return [suite.name, suite.category.leaf, suite.category.l2, suite.category.l1, suite.description ?? ""].join(" ").toLowerCase();
+}
+
+function encodeSuiteCursor(suiteId: string): string {
+  return Buffer.from(suiteId, "utf8").toString("base64url");
+}
+
+function cursorStartIndex(matched: readonly SuiteDefinition[], cursor: string | null | undefined): number {
+  if (!cursor) return 0;
+  const suiteId = Buffer.from(cursor, "base64url").toString("utf8");
+  const position = matched.findIndex((suite) => suite.id === suiteId);
+  // 游标指向的套图已被删除或不再匹配时按“已到底”处理：宁可少一页，也不要重复或死循环。
+  return position < 0 ? matched.length : position + 1;
 }
 
 function errorMessage(error: unknown): string {

@@ -1,10 +1,11 @@
 import { MAX_REQUESTED_SUITE_SHOTS } from "@ecomgen/contracts";
 import { App, Button, Input, Modal, Popconfirm, Skeleton, Tag, Tooltip } from "antd";
 import { Check, FileJson, Layers, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Virtuoso } from "react-virtuoso";
 
 import type { SuiteSummary } from "../../api/adapters/suites";
-import { useCreateUserSuite, useDeleteUserSuite, useRefreshSuites, useSuiteCategories, useSuites } from "../../api/hooks/useSuites";
+import { useCreateUserSuite, useDeleteUserSuite, useRefreshSuites, useSuiteCategories, useSuitePage } from "../../api/hooks/useSuites";
 import { errorText } from "../../lib/errorText";
 import { SHOT_ROLE_LABEL, SHOT_ROLE_ORDER } from "../../lib/roles";
 import styles from "./SuitePickerDialog.module.css";
@@ -33,13 +34,16 @@ interface SuiteCardProps {
   selected: Set<string>;
   atCap: boolean;
   onToggleShot: (assetType: string) => void;
-  onToggleAll: (suiteId: string, shotIds: string[]) => void;
+  onToggleAll: (suiteId: string, shotIds: readonly string[]) => void;
   onDelete: (suiteId: string) => void;
   deleting: boolean;
 }
 
-/** 单张套图卡片：卡片整体不承担点击，逐个分镜才是选择单位，避免误选整卷。 */
-function SuiteCard({ suite, selected, atCap, onToggleShot, onToggleAll, onDelete, deleting }: SuiteCardProps) {
+/**
+ * 单张套图卡片：卡片整体不承担点击，逐个分镜才是选择单位，避免误选整卷。
+ * memo 只挡住无关的父级重渲染；勾选时 selected 引用变化仍会让已挂载的卡片重渲染，但虚拟化后同时挂载的卡片只有十几张。
+ */
+const SuiteCard = memo(function SuiteCard({ suite, selected, atCap, onToggleShot, onToggleAll, onDelete, deleting }: SuiteCardProps) {
   const assetTypes = suite.shots.map((shot) => shotAssetType(suite.id, shot.shotId));
   const selectedCount = assetTypes.filter((assetType) => selected.has(assetType)).length;
   const everySelected = selectedCount === assetTypes.length;
@@ -104,6 +108,15 @@ function SuiteCard({ suite, selected, atCap, onToggleShot, onToggleAll, onDelete
       </div>
     </article>
   );
+});
+
+/** 列表底部状态：沿用资产库文案，让“到底”与“还在加载”可区分。 */
+function SuiteListFooter({ context }: { context: { isFetchingNextPage: boolean; hasNextPage: boolean } }) {
+  return (
+    <div className={styles.more}>
+      {context.isFetchingNextPage ? "正在加载更多…" : context.hasNextPage ? "向下滚动加载更多" : "已经到底了"}
+    </div>
+  );
 }
 
 /** 套图分镜选择弹窗：左品类导航 + 右侧套图卡片，就地挑选分镜，不跳转整页以免抢占工作台焦点。 */
@@ -116,32 +129,26 @@ export function SuitePickerDialog({ open, value, onChange, onClose }: SuitePicke
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
 
-  const suites = useSuites();
+  const filters = useMemo(() => ({ q: query, l1: activeL1, l2: activeL2 }), [query, activeL1, activeL2]);
+  // placeholderData 让切换品类/关键词时保留上一批结果与计数，避免整屏闪成骨架屏；真正的检索由服务端完成。
+  const suites = useSuitePage(filters, open);
+  const pages = suites.data?.pages;
+  const loaded = useMemo(() => pages?.flatMap((page) => page.items) ?? [], [pages]);
+  const firstPage = pages?.[0];
   const categories = useSuiteCategories();
   const refresh = useRefreshSuites();
   const create = useCreateUserSuite();
   const remove = useDeleteUserSuite();
+  const removeAsync = remove.mutateAsync;
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery(search.trim()), 250);
     return () => clearTimeout(timer);
   }, [search]);
 
-  const items = suites.data ?? [];
   const selected = useMemo(() => new Set(value), [value]);
   const l1List = categories.data?.l1 ?? [];
   const l2List = useMemo(() => (activeL1 && categories.data ? categories.data.l2[activeL1] ?? [] : []), [activeL1, categories.data]);
-
-  const filtered = useMemo(() => {
-    const keyword = query.toLowerCase();
-    return items.filter((suite) => {
-      if (activeL1 && suite.category.l1 !== activeL1) return false;
-      if (activeL2 && suite.category.l2 !== activeL2) return false;
-      if (!keyword) return true;
-      return [suite.name, suite.category.leaf, suite.category.l2, suite.category.l1, suite.description ?? ""]
-        .join(" ").toLowerCase().includes(keyword);
-    });
-  }, [items, activeL1, activeL2, query]);
 
   useEffect(() => {
     if (activeL1 && !l1List.includes(activeL1)) setActiveL1(undefined);
@@ -153,31 +160,33 @@ export function SuitePickerDialog({ open, value, onChange, onClose }: SuitePicke
     [value],
   );
 
-  const commit = (next: string[]) => {
+  const commit = useCallback((next: string[]) => {
     if (next.length > MAX_REQUESTED_SUITE_SHOTS) {
       notification.warning({ title: `最多选择 ${MAX_REQUESTED_SUITE_SHOTS} 个分镜`, description: "请先取消一些分镜再继续选择。" });
       return;
     }
     onChange(next);
-  };
+  }, [notification, onChange]);
 
-  const toggleShot = (assetType: string) => commit(selected.has(assetType) ? value.filter((item) => item !== assetType) : [...value, assetType]);
+  const toggleShot = useCallback((assetType: string) => {
+    commit(value.includes(assetType) ? value.filter((item) => item !== assetType) : [...value, assetType]);
+  }, [commit, value]);
 
-  const toggleAll = (suiteId: string, shotIds: string[]) => {
+  const toggleAll = useCallback((suiteId: string, shotIds: readonly string[]) => {
     const all = shotIds.map((shotId) => shotAssetType(suiteId, shotId));
-    const everySelected = all.every((assetType) => selected.has(assetType));
+    const everySelected = all.every((assetType) => value.includes(assetType));
     commit(everySelected ? value.filter((assetType) => !all.includes(assetType)) : [...new Set([...value, ...all])]);
-  };
+  }, [commit, value]);
 
-  const deleteSuite = async (suiteId: string) => {
+  const deleteSuite = useCallback(async (suiteId: string) => {
     try {
-      await remove.mutateAsync(suiteId);
+      await removeAsync(suiteId);
       onChange(value.filter((assetType) => !assetType.startsWith(`${suiteId}::`)));
       notification.success({ title: "套图已删除" });
     } catch (error: unknown) {
       notification.error({ title: "删除失败", description: errorText(error) });
     }
-  };
+  }, [notification, onChange, removeAsync, value]);
 
   const importSuite = async () => {
     let parsed: unknown;
@@ -197,6 +206,16 @@ export function SuitePickerDialog({ open, value, onChange, onClose }: SuitePicke
     }
   };
 
+  const fetchNextPage = suites.fetchNextPage;
+  const hasNextPage = suites.hasNextPage;
+  const isFetchingNextPage = suites.isFetchingNextPage;
+  const isPlaceholderData = suites.isPlaceholderData;
+  const handleEndReached = useCallback(() => {
+    // 占位数据属于上一组筛选条件，此时翻页会拿着旧游标请求新结果集，跳过这一帧。
+    if (isPlaceholderData || !hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isPlaceholderData]);
+
   const body = (
     <div className={styles.shell}>
       <aside className={styles.rail}>
@@ -207,10 +226,10 @@ export function SuitePickerDialog({ open, value, onChange, onClose }: SuitePicke
         <nav className={styles.railList} aria-label="一级品类">
           <button type="button" className={styles.railItem} data-on={activeL1 === undefined} onClick={() => { setActiveL1(undefined); setActiveL2(undefined); }}>
             <span>全部</span>
-            <em>{items.length}</em>
+            <em>{firstPage?.total ?? 0}</em>
           </button>
           {l1List.map((l1) => {
-            const count = items.filter((suite) => suite.category.l1 === l1).length;
+            const count = firstPage?.l1Counts[l1] ?? 0;
             return (
               <button
                 key={l1}
@@ -255,32 +274,47 @@ export function SuitePickerDialog({ open, value, onChange, onClose }: SuitePicke
 
         <div className={styles.cards}>
           {suites.isLoading ? (
-            Array.from({ length: 3 }).map((_, index) => <Skeleton.Node key={index} active style={{ width: "100%", height: 168 }} />)
+            <div className={styles.cardsFallback}>
+              {Array.from({ length: 3 }).map((_, index) => <Skeleton.Node key={index} active style={{ width: "100%", height: 168 }} />)}
+            </div>
           ) : suites.isError ? (
             <div className={styles.state}>
               <p>套图库加载失败</p>
               <p className={styles.stateHint}>{errorText(suites.error)}</p>
               <Button onClick={() => void suites.refetch()}>重试</Button>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : loaded.length === 0 ? (
             <div className={styles.state}>
               <Sparkles size={30} strokeWidth={1.25} aria-hidden />
               <p>{query || activeL1 ? "没有匹配的套图" : "套图库还是空的"}</p>
               <p className={styles.stateHint}>用 ecom-suite-forge 从爆款套图生成 .suite.json，或点右上角「导入」。</p>
             </div>
           ) : (
-            filtered.map((suite) => (
-              <SuiteCard
-                key={suite.id}
-                suite={suite}
-                selected={selected}
-                atCap={atCap}
-                onToggleShot={toggleShot}
-                onToggleAll={toggleAll}
-                onDelete={(id) => void deleteSuite(id)}
-                deleting={remove.isPending && remove.variables === suite.id}
-              />
-            ))
+            <Virtuoso
+              key={`${query}|${activeL1 ?? ""}|${activeL2 ?? ""}`}
+              className={styles.cardsScroller}
+              style={{ position: "absolute", inset: 0 }}
+              data={loaded}
+              computeItemKey={(_, suite) => suite.id}
+              defaultItemHeight={260}
+              increaseViewportBy={400}
+              context={{ isFetchingNextPage, hasNextPage }}
+              components={{ Header: () => <div className={styles.cardsTop} />, Footer: SuiteListFooter }}
+              endReached={handleEndReached}
+              itemContent={(_, suite) => (
+                <div className={styles.cardSlot}>
+                  <SuiteCard
+                    suite={suite}
+                    selected={selected}
+                    atCap={atCap}
+                    onToggleShot={toggleShot}
+                    onToggleAll={toggleAll}
+                    onDelete={deleteSuite}
+                    deleting={remove.isPending && remove.variables === suite.id}
+                  />
+                </div>
+              )}
+            />
           )}
         </div>
       </section>

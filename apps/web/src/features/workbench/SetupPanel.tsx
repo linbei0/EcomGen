@@ -1,7 +1,7 @@
 import { App, AutoComplete, Button, Input, Popover, Select, Switch, Tooltip } from "antd";
 import { ChevronDown, Globe2, History, Images, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store, WandSparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { useSuites } from "../../api/hooks/useSuites";
+import { useSuiteSummaries } from "../../api/hooks/useSuites";
 import { loadSuiteShots, saveSuiteShots } from "../../lib/suiteSelection";
 
 import type { ProjectDetail, TargetMarket, UpdateProjectInput } from "../../api/adapters/projectDetail";
@@ -68,8 +68,6 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const templates = useTemplates();
   const userTemplatesQuery = useUserTemplates();
   const userTemplates = userTemplatesQuery.data ?? [];
-  const suitesQuery = useSuites();
-  const suiteCatalog = suitesQuery.data ?? [];
   const createPlan = useCreatePlanningJob(detail.id);
   const planningSnapshots = usePlanningConfigSnapshots(detail.id);
   const applyPlanningSnapshot = useApplyPlanningConfigSnapshot(detail.id);
@@ -255,11 +253,19 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   };
 
   // 套图分镜选择：按套图分组展示，避免不同模板的分镜混在一起；组内可全部清空。
+  // 只回读已选分镜所属的套图（工作台不再拉全量目录），未选择时不发请求。
+  const selectedSuiteIds = useMemo(
+    () => [...new Set(selectedSuiteShots.map((assetType) => assetType.split("::")[0] ?? assetType))],
+    [selectedSuiteShots],
+  );
+  const selectedSuitesQuery = useSuiteSummaries(selectedSuiteIds);
+  const selectedSuites = selectedSuitesQuery.data ?? [];
+
   const selectedShotGroups = useMemo(() => {
     const groups: Array<{ suiteId: string; suiteName: string; shots: Array<{ assetType: string; label: string }> }> = [];
     for (const assetType of selectedSuiteShots) {
       const suiteId = assetType.split("::")[0] ?? assetType;
-      const suite = suiteCatalog.find((item) => item.id === suiteId);
+      const suite = selectedSuites.find((item) => item.id === suiteId);
       let group = groups.find((item) => item.suiteId === suiteId);
       if (!group) {
         group = { suiteId, suiteName: suite?.name ?? suiteId, shots: [] };
@@ -269,7 +275,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       group.shots.push({ assetType, label: shot?.displayName ?? assetType });
     }
     return groups;
-  }, [selectedSuiteShots, suiteCatalog]);
+  }, [selectedSuiteShots, selectedSuites]);
 
   const startCopywriting = async (target: CopywritingTarget) => {
     if (copywritingUnavailableReason) {

@@ -1281,6 +1281,14 @@ export interface components {
         };
         EcomSuitesResponse: {
             items: components["schemas"]["EcomSuiteSummary"][];
+            /** @description Keyset cursor for the next page; null when the query is exhausted or no pagination applies. */
+            nextCursor: string | null;
+            /** @description Suite count of the whole catalog, independent of query filters. */
+            total: number;
+            /** @description Per-L1 suite counts over the whole catalog, independent of query filters. */
+            l1Counts: {
+                [key: string]: number;
+            };
         };
         EditReferenceAsset: {
             /** Format: uuid */
@@ -2269,7 +2277,19 @@ export interface operations {
     };
     listSuites: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Case-insensitive substring match over name, category l1/l2/leaf and description. */
+                q?: string;
+                /** @description Exact category L1 filter. */
+                l1?: string;
+                /** @description Exact category L2 filter, applied on top of l1. */
+                l2?: string;
+                /** @description Comma-separated suite IDs; when present the response returns exactly those suites and ignores q/l1/l2/cursor/limit. */
+                ids?: string;
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Page size, clamped to 1..100. */
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;

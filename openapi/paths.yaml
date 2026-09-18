@@ -78,6 +78,40 @@ paths:
   /suites:
     get:
       operationId: listSuites
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive substring match over name, category l1/l2/leaf and description.
+          schema:
+            type: string
+        - name: l1
+          in: query
+          required: false
+          description: Exact category L1 filter.
+          schema:
+            type: string
+        - name: l2
+          in: query
+          required: false
+          description: Exact category L2 filter, applied on top of l1.
+          schema:
+            type: string
+        - name: ids
+          in: query
+          required: false
+          description: Comma-separated suite IDs; when present the response returns exactly those suites and ignores q/l1/l2/cursor/limit.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          required: false
+          description: Page size, clamped to 1..100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
       responses:
         "200":
           description: Available e-commerce image suites (built-in, drop-in directory, and user-imported).

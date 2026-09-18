@@ -5,7 +5,7 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type UserTemplateRecord } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type SuiteListQuery, type UserTemplateRecord, SUITE_PAGE_SIZE_DEFAULT, SUITE_PAGE_SIZE_MAX } from "@ecomgen/core";
 import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
 import { SUITE_TAXONOMY } from "@ecomgen/ecom-suite";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
@@ -78,9 +78,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     repository.deleteUserTemplate(id);
     return reply.code(204).send();
   });
-  app.get("/api/v1/suites", async () => ({ items: suiteCatalog.listSummaries() }));
+  app.get("/api/v1/suites", async (request) => suiteCatalog.pageSummaries(parseSuiteListQuery(request.query)));
   app.get("/api/v1/suite-categories", async () => ({ l1: [...SUITE_TAXONOMY.l1], l2: SUITE_TAXONOMY.l2 }));
-  app.post("/api/v1/suites/refresh", async () => { await suiteCatalog.refresh(); return { items: suiteCatalog.listSummaries() }; });
+  app.post("/api/v1/suites/refresh", async () => { await suiteCatalog.refresh(); return suiteCatalog.pageSummaries(); });
   app.get("/api/v1/suites/:suiteId", async (request) => {
     const id = parameter(request, "suiteId"); const suite = suiteCatalog.getSuite(id); if (!suite) missing("suite", id);
     return suite;
@@ -89,17 +89,17 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const body = parseBody(EcomSuiteFile, request.body);
     assertValidSuiteDocument(body);
     const id = suiteIdForImport(body.id, suiteCatalog);
-    repository.saveUserSuite({ id, name: body.name, l1: body.category.l1, l2: body.category.l2, leaf: body.category.leaf, productFamily: body.productFamily ?? null, payload: { ...body, id } });
-    await suiteCatalog.refresh();
-    const suite = suiteCatalog.getSuite(id); if (!suite) throw new ApiError(500, "INTERNAL_ERROR", "Suite was saved but could not be reloaded");
+    const record = repository.saveUserSuite({ id, name: body.name, l1: body.category.l1, l2: body.category.l2, leaf: body.category.leaf, productFamily: body.productFamily ?? null, payload: { ...body, id } });
+    suiteCatalog.upsertUserSuite(record);
+    const suite = suiteCatalog.getSuite(id); if (!suite) throw new ApiError(500, "INTERNAL_ERROR", "Suite was saved but could not be indexed");
     return reply.code(201).send(suite);
   });
   app.patch("/api/v1/suites/:suiteId", async (request) => {
     const id = parameter(request, "suiteId"); if (!repository.getUserSuite(id)) missing("user suite", id);
     const body = parseBody(EcomSuiteFile, request.body);
     assertValidSuiteDocument(body);
-    repository.saveUserSuite({ id, name: body.name, l1: body.category.l1, l2: body.category.l2, leaf: body.category.leaf, productFamily: body.productFamily ?? null, payload: { ...body, id } });
-    await suiteCatalog.refresh();
+    const record = repository.saveUserSuite({ id, name: body.name, l1: body.category.l1, l2: body.category.l2, leaf: body.category.leaf, productFamily: body.productFamily ?? null, payload: { ...body, id } });
+    suiteCatalog.upsertUserSuite(record);
     const suite = suiteCatalog.getSuite(id); if (!suite) missing("suite", id);
     return suite;
   });
@@ -108,7 +108,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     // 内置套图与目录投放套图不落库，只有导入套图可删；引用它的旧分镜在生成期显式报错，不做静默降级
     if (!repository.getUserSuite(id)) throw new ApiError(409, "CONFLICT", "Only user-imported suites can be deleted");
     repository.deleteUserSuite(id);
-    await suiteCatalog.refresh();
+    suiteCatalog.removeUserSuite(id);
     return reply.code(204).send();
   });
   // 套图工坊：把一组爆款整图反推为可复用套图模板。任务不绑定项目，源图以 multipart 随请求上传，
@@ -157,8 +157,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     assertValidSuiteDocument(record.payload);
     const requested = record.payload.id;
     const id = requested && requested.startsWith("custom-suite-") && !suiteCatalog.getSuite(requested) ? requested : suiteIdForImport(undefined, suiteCatalog);
-    repository.saveUserSuite({ id, name: record.payload.name, l1: record.payload.category.l1, l2: record.payload.category.l2, leaf: record.payload.category.leaf, productFamily: record.payload.productFamily ?? null, payload: { ...record.payload, id } });
-    await suiteCatalog.refresh();
+    const saved = repository.saveUserSuite({ id, name: record.payload.name, l1: record.payload.category.l1, l2: record.payload.category.l2, leaf: record.payload.category.leaf, productFamily: record.payload.productFamily ?? null, payload: { ...record.payload, id } });
+    suiteCatalog.upsertUserSuite(saved);
     const committed = repository.commitSuiteForgeResult(jobId, id) ?? record;
     return publicSuiteForgeResult(committed);
   });
@@ -841,6 +841,8 @@ function assertValidSuiteDocument(value: unknown): void {
   if (!result.ok) throw new ApiError(400, "VALIDATION_ERROR", "Invalid suite document", result.errors.map((reason) => ({ path: "/", reason })));
 }
 const MAX_SUITE_FORGE_SOURCES = 12;
+/** ids 回读只服务“已选分镜所属套图”，上限按单次选择的量级留一倍余量。 */
+const MAX_SUITE_IDS_QUERY = 24;
 function publicSuiteForgeResult(record: SuiteForgeResultRecord): object { return { jobId: record.jobId, status: record.status, suite: record.payload, suiteId: record.suiteId ?? null, createdAt: record.createdAt, updatedAt: record.updatedAt }; }
 /** multipart 字段全部是字符串，这里按反推约束逐项解析；targetShotCount 与契约一致限定 5–12。 */
 function suiteForgeHints(fields: Record<string, string>): Record<string, unknown> {
@@ -876,6 +878,24 @@ function resolveRequestedSuiteShots(requested: unknown, catalog: SuiteCatalog): 
     if (!resolved.includes(assetType)) resolved.push(assetType);
   }
   return resolved;
+}
+/** 套图列表查询参数：ids 是“精确回读已选分镜所属套图”的旁路，存在时不再走分页。 */
+function parseSuiteListQuery(query: unknown): SuiteListQuery {
+  const source = (query ?? {}) as Record<string, unknown>;
+  const text = (value: unknown): string | undefined => (typeof value === "string" && value.trim() ? value.trim() : undefined);
+  const rawLimit = text(source.limit);
+  const parsedLimit = rawLimit === undefined ? undefined : Number.parseInt(rawLimit, 10);
+  if (rawLimit !== undefined && !Number.isFinite(parsedLimit)) throw new ApiError(400, "VALIDATION_ERROR", "limit must be an integer");
+  const ids = text(source.ids)?.split(",").map((item) => item.trim()).filter(Boolean) ?? [];
+  if (ids.length > MAX_SUITE_IDS_QUERY) throw new ApiError(400, "VALIDATION_ERROR", `ids supports at most ${MAX_SUITE_IDS_QUERY} suite IDs`);
+  return {
+    q: text(source.q),
+    l1: text(source.l1),
+    l2: text(source.l2),
+    ids: ids.length ? [...new Set(ids)] : undefined,
+    cursor: text(source.cursor) ?? null,
+    limit: parsedLimit === undefined ? SUITE_PAGE_SIZE_DEFAULT : Math.min(Math.max(parsedLimit, 1), SUITE_PAGE_SIZE_MAX)
+  };
 }
 function publicReferenceAsset(value: AssetRecord | EditReferenceAssetRecord): object {
   const temporary = "sessionId" in value;

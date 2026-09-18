@@ -272,3 +272,29 @@ export function projectDetailPayload(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+/** 套图夹具：默认 1 张卡 2 个分镜，够验证分页、计数与名称回读，不引入真实套图内容。 */
+export function suiteFixtures(count: number): Array<{
+  id: string;
+  name: string;
+  category: { l1: string; l2: string; leaf: string };
+  shotCount: number;
+  shots: Array<{ shotId: string; order: number; shotRole: "HERO" | "DETAIL"; displayName: string }>;
+  origin: "builtin" | "user";
+}> {
+  return Array.from({ length: count }, (_, index) => {
+    const ordinal = String(index + 1).padStart(3, "0");
+    const l1 = index % 2 === 0 ? "护肤个护" : "食品饮料";
+    return {
+      id: `suite-fixture-${ordinal}`,
+      name: `夹具套图 ${ordinal}`,
+      category: { l1, l2: "面部护理", leaf: `叶子 ${ordinal}` },
+      shotCount: 2,
+      shots: [
+        { shotId: "shot-01", order: 1, shotRole: "HERO", displayName: `主图 ${ordinal}` },
+        { shotId: "shot-02", order: 2, shotRole: "DETAIL", displayName: `细节 ${ordinal}` },
+      ],
+      origin: "user" as const,
+    };
+  });
+}

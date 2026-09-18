@@ -393,6 +393,113 @@ describe("layer plan & layer exports", () => {
   });
 });
 
+describe("GET /api/v1/suites 分页与筛选", () => {
+  const importedSuite = {
+    name: "接口导入套图",
+    category: { l1: "测试专用品类", l2: "接口护理", leaf: "接口洁面乳" },
+    styleLock: { lockText: "柔光白底，暖米色台面，左上主光" },
+    shots: [{ shotId: "shot-1", order: 1, shotRole: "HERO" as const, displayName: "主图", promptTemplate: "hero {product}" }]
+  };
+
+  it("返回 items/nextCursor/total/l1Counts，且 l1Counts 合计等于 total", async () => {
+    const response = await app.inject({ method: "GET", url: "/api/v1/suites" });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: Array<{ id: string }>; nextCursor: string | null; total: number; l1Counts: Record<string, number> }>();
+    expect(body.items.length).toBeGreaterThan(0);
+    expect(body.total).toBeGreaterThanOrEqual(body.items.length);
+    expect(Object.values(body.l1Counts).reduce((sum, count) => sum + count, 0)).toBe(body.total);
+  });
+
+  it("limit + cursor 逐页取完全部套图且不重复", async () => {
+    const first = await app.inject({ method: "GET", url: "/api/v1/suites?limit=1" });
+    const firstBody = first.json<{ items: Array<{ id: string }>; nextCursor: string | null; total: number }>();
+    expect(firstBody.items).toHaveLength(1);
+
+    const seen = [firstBody.items[0].id];
+    let cursor = firstBody.nextCursor;
+    while (cursor) {
+      const page = await app.inject({ method: "GET", url: `/api/v1/suites?limit=1&cursor=${encodeURIComponent(cursor)}` });
+      const body = page.json<{ items: Array<{ id: string }>; nextCursor: string | null }>();
+      seen.push(...body.items.map((item) => item.id));
+      expect(seen.length).toBeLessThanOrEqual(firstBody.total);
+      cursor = body.nextCursor;
+    }
+    expect(new Set(seen).size).toBe(firstBody.total);
+  });
+
+  it("q/l1 过滤只改变返回项，total 与 l1Counts 保持全库口径", async () => {
+    const all = (await app.inject({ method: "GET", url: "/api/v1/suites" }))
+      .json<{ items: Array<{ id: string; name: string; category: { l1: string } }>; total: number; l1Counts: Record<string, number> }>();
+    const target = all.items[0];
+
+    const byL1 = (await app.inject({ method: "GET", url: `/api/v1/suites?l1=${encodeURIComponent(target.category.l1)}` }))
+      .json<{ items: Array<{ category: { l1: string } }>; total: number; l1Counts: Record<string, number> }>();
+    expect(byL1.items.length).toBe(all.l1Counts[target.category.l1]);
+    expect(byL1.items.every((item) => item.category.l1 === target.category.l1)).toBe(true);
+    expect(byL1.total).toBe(all.total);
+    expect(byL1.l1Counts).toEqual(all.l1Counts);
+
+    const byKeyword = (await app.inject({ method: "GET", url: `/api/v1/suites?q=${encodeURIComponent(target.name.slice(1, 4))}` }))
+      .json<{ items: Array<{ id: string }>; total: number }>();
+    expect(byKeyword.items.map((item) => item.id)).toContain(target.id);
+    expect(byKeyword.total).toBe(all.total);
+  });
+
+  it("ids 精确回读忽略未知 ID 并绕过分页", async () => {
+    const all = (await app.inject({ method: "GET", url: "/api/v1/suites" })).json<{ items: Array<{ id: string }> }>();
+    const [first, second] = all.items;
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/v1/suites?ids=${encodeURIComponent(`${second.id},${first.id},suite-ghost`)}&limit=1`
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: Array<{ id: string }>; nextCursor: string | null }>();
+    expect(body.items.map((item) => item.id).sort()).toEqual([first.id, second.id].sort());
+    expect(body.nextCursor).toBeNull();
+
+    const tooMany = await app.inject({ method: "GET", url: `/api/v1/suites?ids=${Array.from({ length: 25 }, (_, index) => `suite-${index}`).join(",")}` });
+    expect(tooMany.statusCode).toBe(400);
+  });
+
+  it("导入与删除立即反映到列表，不需要额外 refresh", async () => {
+    const before = (await app.inject({ method: "GET", url: "/api/v1/suites" })).json<{ total: number }>();
+
+    const created = await app.inject({ method: "POST", url: "/api/v1/suites", payload: importedSuite });
+    expect(created.statusCode).toBe(201);
+    const suiteId = created.json<{ id: string }>().id;
+
+    const afterInsert = (await app.inject({ method: "GET", url: "/api/v1/suites" }))
+      .json<{ items: Array<{ id: string }>; total: number; l1Counts: Record<string, number> }>();
+    expect(afterInsert.total).toBe(before.total + 1);
+    expect(afterInsert.l1Counts["测试专用品类"]).toBe(1);
+    expect(afterInsert.items.some((item) => item.id === suiteId)).toBe(true);
+
+    const deleted = await app.inject({ method: "DELETE", url: `/api/v1/suites/${suiteId}` });
+    expect(deleted.statusCode).toBe(204);
+    const afterDelete = (await app.inject({ method: "GET", url: "/api/v1/suites" }))
+      .json<{ items: Array<{ id: string }>; total: number; l1Counts: Record<string, number> }>();
+    expect(afterDelete.total).toBe(before.total);
+    expect(afterDelete.l1Counts["测试专用品类"]).toBeUndefined();
+    expect(afterDelete.items.some((item) => item.id === suiteId)).toBe(false);
+
+    // 已删除的游标按“已到底”处理：宁可少一页，也不要重复或死循环
+    const stale = await app.inject({ method: "GET", url: `/api/v1/suites?limit=1&cursor=${Buffer.from(suiteId, "utf8").toString("base64url")}` });
+    expect(stale.statusCode).toBe(200);
+    expect(stale.json<{ items: unknown[]; nextCursor: string | null }>()).toMatchObject({ items: [], nextCursor: null });
+
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/suites/${suiteId}` })).statusCode).toBe(409);
+  });
+
+  it("POST /suites/refresh 返回首页且形状与列表一致", async () => {
+    const response = await app.inject({ method: "POST", url: "/api/v1/suites/refresh" });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: unknown[]; nextCursor: string | null; total: number; l1Counts: Record<string, number> }>();
+    expect(body.items.length).toBeGreaterThan(0);
+    expect(body.total).toBeGreaterThanOrEqual(body.items.length);
+    expect(Object.values(body.l1Counts).reduce((sum, count) => sum + count, 0)).toBe(body.total);
+  });
+});
+
 describe("segmentation model declarations & refs", () => {
   function seedSegmentationProvider() {
     const provider = repository.saveProvider({

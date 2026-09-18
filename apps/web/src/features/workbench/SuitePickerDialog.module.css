@@ -151,14 +151,41 @@
   flex: 1;
 }
 
+/* 列表区只负责给虚拟滚动容器一个确定高度，滚动与行间距交给 Virtuoso 和行容器 */
 .cards {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.cardsScroller {
+  scrollbar-gutter: stable;
+}
+
+.cardsTop {
+  height: 14px;
+}
+
+.cardSlot {
+  padding: 0 18px 12px;
+}
+
+.more {
+  padding: 2px 18px 16px;
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: center;
+}
+
+/* 骨架屏/空态/错误态走普通流，不参与虚拟化测量 */
+.cardsFallback {
   display: flex;
   flex-direction: column;
   gap: 12px;
   flex: 1;
-  overflow-y: auto;
   padding: 14px 18px 18px;
-  scrollbar-gutter: stable;
 }
 
 /* 套图卡片 */

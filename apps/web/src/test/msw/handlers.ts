@@ -15,6 +15,7 @@ import {
   USER_TEMPLATE_FIXTURE,
   projectDetailPayload,
   storyboardPayload,
+  suiteFixtures,
 } from "./fixtures";
 
 /** 与 config/env.ts 的默认 API_BASE_URL 保持一致；测试只拦截该源。 */
@@ -22,6 +23,40 @@ export const BASE = "http://127.0.0.1:8787/api/v1";
 
 /** 自定义模板内存态：同文件内多次增删改测试共享，模拟真实 CRUD。 */
 export const userTemplateStore: typeof USER_TEMPLATE_FIXTURE[] = [{ ...USER_TEMPLATE_FIXTURE }];
+
+/** 套图内存态：用例按需填充（清空由用例自己负责），默认空库与改动前的行为一致。 */
+export const suiteStore: ReturnType<typeof suiteFixtures> = [];
+
+/** 套图列表的游标语义与后端一致：游标是上一页最后一张套图的 ID，找不到即视为已到底。 */
+export function suitesResponse(query: URLSearchParams) {
+  const l1Counts: Record<string, number> = {};
+  for (const suite of suiteStore) l1Counts[suite.category.l1] = (l1Counts[suite.category.l1] ?? 0) + 1;
+  const meta = { total: suiteStore.length, l1Counts };
+
+  const ids = query.get("ids");
+  if (ids) {
+    const wanted = new Set(ids.split(","));
+    return { items: suiteStore.filter((suite) => wanted.has(suite.id)), nextCursor: null, ...meta };
+  }
+
+  const l1 = query.get("l1");
+  const l2 = query.get("l2");
+  const keyword = (query.get("q") ?? "").trim().toLowerCase();
+  const matched = suiteStore.filter((suite) => {
+    if (l1 && suite.category.l1 !== l1) return false;
+    if (l2 && suite.category.l2 !== l2) return false;
+    if (!keyword) return true;
+    return [suite.name, suite.category.leaf, suite.category.l2, suite.category.l1].join(" ").toLowerCase().includes(keyword);
+  });
+
+  const limit = Math.min(Math.max(Number.parseInt(query.get("limit") ?? "40", 10) || 40, 1), 100);
+  const cursor = query.get("cursor");
+  const start = cursor ? matched.findIndex((suite) => suite.id === cursor) + 1 : 0;
+  const page = start < 0 ? [] : matched.slice(start, start + limit);
+  const last = page[page.length - 1];
+  const nextCursor = last && start + page.length < matched.length ? last.id : null;
+  return { items: page, nextCursor, ...meta };
+}
 
 export const PROVIDER_FIXTURE = {
   id: "7d0b0d1e-4b1c-4c2d-9a3e-2f5b6c7d8e9f",
@@ -134,7 +169,7 @@ export const handlers = [
   }),
 
     http.get(`${BASE}/ecom-templates`, () => HttpResponse.json(TEMPLATE_FIXTURES)),
-    http.get(`${BASE}/suites`, () => HttpResponse.json({ items: [] })),
+    http.get(`${BASE}/suites`, ({ request }) => HttpResponse.json(suitesResponse(new URL(request.url).searchParams))),
     http.get(`${BASE}/suite-categories`, () => HttpResponse.json({ l1: [], l2: {} })),
 
 

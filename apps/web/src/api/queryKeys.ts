@@ -5,7 +5,11 @@ export const qk = {
   userTemplates: ["user-templates"] as const,
   suites: ["suites"] as const,
   suiteCategories: ["suite-categories"] as const,
-  suite: (id: string) => ["suites", id] as const,
+  /** 套图列表分页查询：筛选条件进 key，游标由服务端游标链维护。 */
+  suitePages: (filters: { q: string; l1?: string; l2?: string }) => ["suites", "page", filters] as const,
+  /** 已选分镜所属套图的精确回读，用于解析名称而不拉全库。 */
+  suiteSummaries: (idsKey: string) => ["suites", "summary", idsKey] as const,
+  suite: (id: string) => ["suites", "detail", id] as const,
   suiteForgeJob: (id: string) => ["suite-forge-jobs", id] as const,
   suiteForgeResult: (id: string) => ["suite-forge-jobs", id, "result"] as const,
   providers: ["providers"] as const,
