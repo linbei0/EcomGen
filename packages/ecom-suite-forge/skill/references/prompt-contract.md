@@ -166,4 +166,4 @@ For UGC / lifestyle / 买家秀 looks, use the anti-AI kit:
 
 ## 8. No-invented-facts rule
 
-Never write certifications, lab numbers, ratings, sales counts, awards, efficacy, or reviews that aren't verifiable. Use `proof placeholder` instead. EcomGen must not mask missing inputs or provider failures with fabricated success.
+Never write certifications, lab numbers, ratings, sales counts, awards, efficacy, or reviews that aren't verifiable. EcomGen must not mask missing inputs or provider failures with fabricated success.

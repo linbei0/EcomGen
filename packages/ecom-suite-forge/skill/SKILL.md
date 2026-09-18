@@ -46,7 +46,7 @@ If the user gives only a single image, say so and ask for the **whole set** — 
 4. **Every shot is fully specified.** A shot without 机位/景别/光位/背景/台面/道具/产品占比 is incomplete.
 5. **Prompt contract.** English, natural language, concise. Hex colors (never color words). Numeric product occupancy. A negative list on every prompt. Chinese in-image text wrapped in 「」, only for suites that explicitly ask for rendered in-image copy. Full rules in `references/prompt-contract.md`.
 6. **Whole-set consistency.** Build one **Campaign Style Lock** and reuse it verbatim in every shot; vary angle/background/shot purpose so the set does not look like one photo repeated. See `references/prompt-contract.md`.
-7. **No invented facts.** Never write certifications, lab numbers, ratings, sales counts, or efficacy claims that are not verifiable from the images or the user. Use `proof placeholder` instead. EcomGen forbids fabricated success.
+7. **No invented facts.** Never write certifications, lab numbers, ratings, sales counts, or efficacy claims that are not verifiable from the images or the user — carry trust with verifiable visual details instead (material close-ups, craftsmanship, real contents). EcomGen forbids fabricated success.
 8. **Category comes from the built-in list.** `L1` and `L2` must be exact strings from `references/category-taxonomy.md`. `leaf` is your own free-text product name.
 
 ---

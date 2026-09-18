@@ -134,7 +134,7 @@ Each recipe gives: **Purpose · Composition · Camera/机位 · 景别 · Lighti
 - **Background:** white or light neutral.
 - **Text zone:** none unless the suite carries in-image copy.
 - **Prompt recipe:** `E-commerce trust screen. {product} with clean trust badges and short labels 「{callout_1}」. {background hex}. Even studio light. Negative: do NOT invent certifications, awards, ratings, or test data; no fake logos, no watermark.`
-- **High-CTR key:** ratings, certs, real UGC — **only if real**; otherwise use `proof placeholder`.
+- **High-CTR key:** ratings, certs, real UGC — **only if real**; otherwise leave them out entirely.
 - **Avoid:** fabricated authority. This is a hard rule.
 
 ### 2.9 VARIANT — 多规格 / 多色 / 套装

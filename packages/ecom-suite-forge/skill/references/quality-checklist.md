@@ -27,7 +27,6 @@ Gate the suite before output. **All P0 must pass.** P1 should pass; P2 is option
 
 **Facts**
 - [ ] No invented certifications, ratings, sales, awards, efficacy, or reviews.
-- [ ] Missing proof is labeled `proof placeholder`.
 
 **Set rhythm**
 - [ ] ≥3 distinct camera angles; at least one close-up/macro.
