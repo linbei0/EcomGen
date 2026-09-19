@@ -7,27 +7,6 @@
   overflow: hidden;
 }
 
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
-  display: grid;
-  grid-template-columns: minmax(200px, 264px) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--line-1);
-  background: color-mix(in srgb, var(--bg-0) 90%, transparent);
-  backdrop-filter: blur(10px);
-}
-
-.topLeft {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
 .brandLink,
 .homeLink {
   display: inline-flex;
@@ -76,12 +55,6 @@
 .panelToggle:focus-visible {
   outline: 2px solid var(--accent-hover);
   outline-offset: 1px;
-}
-
-.topActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .shell {

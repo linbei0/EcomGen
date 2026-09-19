@@ -1,17 +1,16 @@
 import { App, Button, Drawer } from "antd";
-import { Aperture, Archive, Images, LibraryBig, Plus, Settings2, Sparkles, Trash2 } from "lucide-react";
+import { Archive, Images, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { useArchiveProject, useCreateProject, useDeleteProject, useProjects } from "../../api/hooks/useProjects";
 import { useProviders } from "../../api/hooks/useProviders";
-import { HealthBadge } from "../../components/HealthBadge";
+import { AppTopbar } from "../../components/AppTopbar";
 import { fadeUp, staggerContainer } from "../../design/motion";
 import { errorText } from "../../lib/errorText";
 import { pickDefaultModels } from "../../lib/modelOptions";
 import { ProjectCard } from "../projects/ProjectCard";
-import { SettingsDrawer } from "../providers/SettingsDrawer";
 import styles from "./HomePage.module.css";
 
 export function HomePage() {
@@ -87,24 +86,7 @@ export function HomePage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.topbar}>
-        <div className={styles.brand}>
-          <Aperture size={20} strokeWidth={1.75} aria-hidden />
-          <span className={styles.brandName}>EcomGen</span>
-        </div>
-        <div className={styles.topActions}>
-          <HealthBadge />
-          <Button icon={<Sparkles size={16} strokeWidth={1.75} />} onClick={() => void navigate("/suite-forge")}>
-            套图工坊
-          </Button>
-          <Button icon={<LibraryBig size={16} strokeWidth={1.75} />} onClick={() => void navigate("/library")}>
-            资产库
-          </Button>
-          <Button icon={<Settings2 size={16} strokeWidth={1.75} />} onClick={() => setSettingsOpen(true)}>
-            设置
-          </Button>
-        </div>
-      </header>
+      <AppTopbar current="home" settingsOpen={settingsOpen} onSettingsOpenChange={setSettingsOpen} />
 
       <motion.main className={styles.main} variants={staggerContainer} initial="hidden" animate="visible">
         <motion.section className={styles.hero} variants={fadeUp}>
@@ -167,7 +149,6 @@ export function HomePage() {
         </motion.section>
       </motion.main>
 
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <Drawer
         title="已归档项目"
         placement="right"

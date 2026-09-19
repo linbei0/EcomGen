@@ -1,6 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { AssetRole, EditTurnStatus, ImageAspectRatio, ImageResolution, PlanningMode, PlatformTarget, ReferencePurpose, UserAssetKind } from "./enums.js";
+import { AssetRole, EditTurnStatus, ImageAspectRatio, ImageResolution, JobStatus, PlanningMode, PlatformTarget, ReferencePurpose, UserAssetKind } from "./enums.js";
 import { EcomSuiteFile, EditReferenceAsset, EditTurn, Job, LayerBbox, ModelRef, PlanningConfigSnapshot, Project, ReferenceSelection } from "./api-schemas.js";
+import { MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MIN_SUITE_FORGE_SHOTS } from "./limits.js";
 import { schemaRef } from "./ref.js";
 
 export const TestProviderInput = Type.Object({ modelId: Type.String({ minLength: 1 }), kind: Type.Optional(Type.Union([Type.Literal("reasoning"), Type.Literal("image"), Type.Literal("segmentation")], { description: "segmentation probes the declared segmentation API with zero cost." })) }, { $id: "#/components/schemas/TestProviderInput" });
@@ -76,14 +77,14 @@ export type CreateLayerExportInput = Static<typeof CreateLayerExportInput>;
 export const CreateSuiteForgeJobInput = Type.Object({
   providerId: Type.String({ format: "uuid" }),
   modelId: Type.String({ minLength: 1 }),
-  files: Type.Array(Type.String({ format: "binary" }), { minItems: 1, maxItems: 12, description: "爆款套图源图，5–12 张为佳。" }),
-  name: Type.Optional(Type.String({ minLength: 1, maxLength: 60 })),
+  files: Type.Array(Type.String({ format: "binary" }), { minItems: 1, maxItems: MAX_SUITE_FORGE_SOURCES, description: "爆款套图源图，5–12 张为佳。" }),
+  name: Type.Optional(Type.String({ minLength: 1, maxLength: MAX_SUITE_FORGE_NAME_LENGTH })),
   l1: Type.Optional(Type.String({ minLength: 1 })),
   l2: Type.Optional(Type.String({ minLength: 1 })),
   leaf: Type.Optional(Type.String({ minLength: 1 })),
   productFamily: Type.Optional(Type.String()),
-  targetShotCount: Type.Optional(Type.Integer({ minimum: 5, maximum: 12 })),
-  userInstruction: Type.Optional(Type.String({ maxLength: 4000, description: "额外反推要求，例如只保留某个卖点结构。" })),
+  targetShotCount: Type.Optional(Type.Integer({ minimum: MIN_SUITE_FORGE_SHOTS, maximum: MAX_SUITE_FORGE_SHOTS })),
+  userInstruction: Type.Optional(Type.String({ maxLength: MAX_SUITE_FORGE_INSTRUCTION_LENGTH, description: "额外反推要求，例如只保留某个卖点结构。" })),
   idempotencyKey: Type.Optional(Type.String({ minLength: 1 })),
 }, { $id: "#/components/schemas/CreateSuiteForgeJobInput" });
 export type CreateSuiteForgeJobInput = Static<typeof CreateSuiteForgeJobInput>;
@@ -98,3 +99,37 @@ export const SuiteForgeResult = Type.Object({
   updatedAt: Type.Optional(Type.String({ format: "date-time" })),
 }, { $id: "#/components/schemas/SuiteForgeResult" });
 export type SuiteForgeResult = Static<typeof SuiteForgeResult>;
+
+// commit 请求体直接复用 EcomSuiteFile（与 POST /suites、PATCH /suites/:suiteId 一致）：
+// 前端把预览面板里编辑后的整份套图回传，服务端校验通过后覆盖草稿并写入 user_suites。
+// id 由服务端裁决，客户端传入的 id 仅在未被占用时沿用。
+
+// 已产出草稿的摘要。跑完但未入库的套图只存在于 suite_forge_results，
+// 没有这个列表前端就无从回到历史反推结果。
+export const SuiteForgeDraftSummary = Type.Object({
+  name: Type.String(),
+  l1: Type.String(),
+  l2: Type.String(),
+  leaf: Type.String(),
+  shotCount: Type.Integer({ minimum: 0 }),
+  suiteId: Type.Union([Type.String(), Type.Null()], { description: "已入库的套图 ID；仍为草稿时为 null。" }),
+}, { $id: "#/components/schemas/SuiteForgeDraftSummary" });
+export type SuiteForgeDraftSummary = Static<typeof SuiteForgeDraftSummary>;
+
+// 最近反推任务：包含运行中与失败的任务，因此不等同于草稿列表。
+export const SuiteForgeJobSummary = Type.Object({
+  jobId: Type.String({ format: "uuid" }),
+  status: schemaRef(JobStatus),
+  progress: Type.Integer({ minimum: 0, maximum: 100 }),
+  cancelRequested: Type.Boolean(),
+  error: Type.Union([Type.Record(Type.String(), Type.Unknown()), Type.Null()]),
+  createdAt: Type.String({ format: "date-time" }),
+  updatedAt: Type.String({ format: "date-time" }),
+  draft: Type.Union([schemaRef(SuiteForgeDraftSummary), Type.Null()], { description: "反推成功后的草稿摘要；未产出时为 null。" }),
+}, { $id: "#/components/schemas/SuiteForgeJobSummary" });
+export type SuiteForgeJobSummary = Static<typeof SuiteForgeJobSummary>;
+
+export const SuiteForgeJobList = Type.Object({
+  items: Type.Array(schemaRef(SuiteForgeJobSummary)),
+}, { $id: "#/components/schemas/SuiteForgeJobList" });
+export type SuiteForgeJobList = Static<typeof SuiteForgeJobList>;

@@ -6,6 +6,9 @@ import type { components } from "../schema.d.ts";
 
 export type SuiteForgeJob = components["schemas"]["Job"];
 export type SuiteForgeResult = components["schemas"]["SuiteForgeResult"];
+export type SuiteForgeJobSummary = components["schemas"]["SuiteForgeJobSummary"];
+/** commit 请求体就是整份套图文档，与 POST /suites 保持同一形状。 */
+export type CommitSuiteBody = components["schemas"]["EcomSuiteFile"];
 
 export interface CreateSuiteForgeInput {
   files: File[];
@@ -93,10 +96,40 @@ export function useSuiteForgeResult(jobId: string | undefined, enabled: boolean)
 export function useCommitSuiteForge() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (jobId: string) =>
-      unwrap(api.POST("/suite-forge-jobs/{jobId}/commit", { params: { path: { jobId } } })),
-    onSuccess: () => {
+    // 整份套图随请求回传：预览面板里的编辑既覆盖服务端草稿，也直接写入套图库。
+    mutationFn: ({ jobId, suite }: { jobId: string; suite: CommitSuiteBody }) =>
+      unwrap(api.POST("/suite-forge-jobs/{jobId}/commit", { params: { path: { jobId } }, body: suite })),
+    onSuccess: (_result, { jobId }) => {
       void queryClient.invalidateQueries({ queryKey: qk.suites });
+      void queryClient.invalidateQueries({ queryKey: qk.suiteForgeJobList });
+      // 结果本身也变了（status 转 COMMITTED），否则刷新回本页时还会显示「待入库」。
+      void queryClient.invalidateQueries({ queryKey: qk.suiteForgeResult(jobId) });
+    },
+  });
+}
+
+/** 最近反推列表：含运行中与失败的任务，用于刷新或跳转后回到历史反推。 */
+export function useSuiteForgeJobList() {
+  return useQuery({
+    queryKey: qk.suiteForgeJobList,
+    queryFn: async () => unwrap(api.GET("/suite-forge-jobs", { params: { query: {} } })),
+  });
+}
+
+/**
+ * 取消反推任务。
+ *
+ * 与工作台的 useCancelJob 分开：那个 hook 绑定项目并失效项目缓存，而 forge 任务不绑定项目。
+ * 后端只有在任务尚未被消费时才能直接移除，运行中只置 cancelRequested，
+ * 由 worker 在阶段边界收敛，因此取消后仍需保持轮询直到状态落地。
+ */
+export function useCancelSuiteForgeJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => unwrap(api.POST("/jobs/{jobId}/cancel", { params: { path: { jobId } } })),
+    onSuccess: (_result, jobId) => {
+      void queryClient.invalidateQueries({ queryKey: qk.suiteForgeJob(jobId) });
+      void queryClient.invalidateQueries({ queryKey: qk.suiteForgeJobList });
     },
   });
 }

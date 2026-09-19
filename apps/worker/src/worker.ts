@@ -190,12 +190,15 @@ async function executeSuiteForge(job: JobRecord): Promise<void> {
   }
   await updateJob(job, { progress: 40 });
   throwIfCancelled(job);
+  const shots = createShotProgressPublisher(job, (input.hints ?? {}) as SuiteForgeHints);
   const forged = await forgeSuite({
     model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking, supportsStructuredOutput: model.supportsStructuredOutput }),
     apiKey: secrets.decrypt(provider.encryptedApiKey),
     images,
-    hints: (input.hints ?? undefined) as SuiteForgeHints | undefined
+    hints: (input.hints ?? undefined) as SuiteForgeHints | undefined,
+    onShotProgress: shots.publish
   });
+  await shots.settled();
   throwIfCancelled(job);
   // 模型产出先过契约校验，再归一化派生 assetType=<id>::<shotId>；worker 预先分配最终 ID，使草稿预览与确认入库一致。
   const validation = validateEcomSuiteFile(forged);
@@ -826,6 +829,32 @@ async function reviseGenerationPrompt(project: ProjectRecord, prompt: string, re
   });
 }
 async function updateJob(job: JobRecord, patch: Parameters<EcomRepository["updateJob"]>[1]): Promise<void> { const updated = repository.updateJob(job.id, patch); if (updated && job.projectId) await events.publish(job.projectId, "job.updated", updated); }
+
+/**
+ * 套图反推的过程计数落库器。
+ *
+ * 回调在 agent 的订阅链上被同步调用（pi-agent-core 会 await 监听器），在其中写库会把
+ * SQLite 往返时间反压到 token 流上、直接拖慢这次反推。所以回调只把写入排进串行链，
+ * 反推结束后再统一 await，保证明细不会晚于结果落库，也不会与流争抢。
+ *
+ * 计数是观察值而非任务状态：写失败只影响这一行提示，不该让一次已经成功且已计费的
+ * 反推判为失败，因此这里保留首个错误用于诊断而不上抛。
+ */
+function createShotProgressPublisher(job: JobRecord, hints: SuiteForgeHints): { publish: (shotsGenerated: number) => void; settled: () => Promise<void> } {
+  const shotsTarget = typeof hints.targetShotCount === "number" ? hints.targetShotCount : null;
+  let chain: Promise<unknown> = Promise.resolve();
+  let firstError: unknown = null;
+  return {
+    // agent 侧只在计数变化时回调，写入次数天然被分镜数（与重试轮数）封顶，无需再节流。
+    publish: (shotsGenerated: number) => {
+      chain = chain.then(() => repository.updateJob(job.id, { progressDetail: { shotsGenerated, shotsTarget } })).catch((error: unknown) => { firstError ??= error; });
+    },
+    settled: async () => {
+      await chain;
+      if (firstError) console.warn(`Suite forge progress detail write failed: ${firstError instanceof Error ? firstError.message : String(firstError)}`);
+    }
+  };
+}
 function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "PLAN") return "plan";
   if (type === "COPYWRITE") return "copywrite";

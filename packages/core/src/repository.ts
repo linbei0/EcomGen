@@ -208,6 +208,8 @@ export interface JobRecord {
   cancelRequested: boolean;
   providerTaskId: string | null;
   error: Record<string, unknown> | null;
+  /** 运行中任务的进度明细；套图反推用它回报流式观察到的分镜数。 */
+  progressDetail: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -837,16 +839,16 @@ export class EcomRepository {
     write(); return this.getStoryboard(projectId);
   }
 
-  public createJob(input: Omit<JobRecord, "createdAt" | "updatedAt" | "progress" | "status" | "retryable" | "providerTaskId" | "error" | "requestFingerprint" | "providerId" | "modelId" | "estimatedCost" | "actualCost" | "cancelRequested"> & Partial<Pick<JobRecord, "status" | "progress" | "retryable" | "providerTaskId" | "error" | "requestFingerprint" | "providerId" | "modelId" | "estimatedCost" | "actualCost" | "cancelRequested">>): JobRecord {
-    const record: JobRecord = { ...input, status: input.status ?? "QUEUED", progress: input.progress ?? 0, retryable: input.retryable ?? true, requestFingerprint: input.requestFingerprint ?? null, providerId: input.providerId ?? null, modelId: input.modelId ?? null, estimatedCost: input.estimatedCost ?? null, actualCost: input.actualCost ?? null, cancelRequested: input.cancelRequested ?? false, providerTaskId: input.providerTaskId ?? null, error: input.error ?? null, createdAt: now(), updatedAt: now() };
+  public createJob(input: Omit<JobRecord, "createdAt" | "updatedAt" | "progress" | "status" | "retryable" | "providerTaskId" | "error" | "requestFingerprint" | "providerId" | "modelId" | "estimatedCost" | "actualCost" | "cancelRequested" | "progressDetail"> & Partial<Pick<JobRecord, "status" | "progress" | "retryable" | "providerTaskId" | "error" | "requestFingerprint" | "providerId" | "modelId" | "estimatedCost" | "actualCost" | "cancelRequested" | "progressDetail">>): JobRecord {
+    const record: JobRecord = { ...input, status: input.status ?? "QUEUED", progress: input.progress ?? 0, retryable: input.retryable ?? true, requestFingerprint: input.requestFingerprint ?? null, providerId: input.providerId ?? null, modelId: input.modelId ?? null, estimatedCost: input.estimatedCost ?? null, actualCost: input.actualCost ?? null, cancelRequested: input.cancelRequested ?? false, providerTaskId: input.providerTaskId ?? null, error: input.error ?? null, progressDetail: input.progressDetail ?? null, createdAt: now(), updatedAt: now() };
     this.db.prepare(`INSERT INTO jobs (id,project_id,storyboard_item_id,type,status,progress,retryable,input_json,request_fingerprint,provider_id,model_id,estimated_cost_json,actual_cost_json,cancel_requested,provider_task_id,error_json,created_at,updated_at)
       VALUES (@id,@projectId,@storyboardItemId,@type,@status,@progress,@retryable,@input,@requestFingerprint,@providerId,@modelId,@estimatedCost,@actualCost,@cancelRequested,@providerTaskId,@error,@createdAt,@updatedAt)`).run({ ...record, retryable: record.retryable ? 1 : 0, cancelRequested: record.cancelRequested ? 1 : 0, input: json(record.input), estimatedCost: record.estimatedCost ? json(record.estimatedCost) : null, actualCost: record.actualCost ? json(record.actualCost) : null, error: record.error ? json(record.error) : null }); return record;
   }
   public getJob(id: string): JobRecord | undefined { const row = this.db.prepare("SELECT * FROM jobs WHERE id=?").get(id); return row ? mapJob(row as Row) : undefined; }
-  public updateJob(id: string, patch: Partial<Pick<JobRecord, "status" | "progress" | "providerTaskId" | "error" | "retryable" | "actualCost" | "cancelRequested">>): JobRecord | undefined {
+  public updateJob(id: string, patch: Partial<Pick<JobRecord, "status" | "progress" | "providerTaskId" | "error" | "retryable" | "actualCost" | "cancelRequested" | "progressDetail">>): JobRecord | undefined {
     const current = this.getJob(id); if (!current) return undefined; const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE jobs SET status=@status,progress=@progress,retryable=@retryable,provider_task_id=@providerTaskId,error_json=@error,actual_cost_json=@actualCost,cancel_requested=@cancelRequested,updated_at=@updatedAt WHERE id=@id")
-      .run({ ...next, retryable: next.retryable ? 1 : 0, cancelRequested: next.cancelRequested ? 1 : 0, actualCost: next.actualCost ? json(next.actualCost) : null, error: next.error ? json(next.error) : null }); return next;
+    this.db.prepare("UPDATE jobs SET status=@status,progress=@progress,retryable=@retryable,provider_task_id=@providerTaskId,error_json=@error,actual_cost_json=@actualCost,cancel_requested=@cancelRequested,progress_detail_json=@progressDetail,updated_at=@updatedAt WHERE id=@id")
+      .run({ ...next, retryable: next.retryable ? 1 : 0, cancelRequested: next.cancelRequested ? 1 : 0, actualCost: next.actualCost ? json(next.actualCost) : null, error: next.error ? json(next.error) : null, progressDetail: next.progressDetail ? json(next.progressDetail) : null }); return next;
   }
   /** 指纹去重同时覆盖项目任务与全局任务：projectId 为 null 时按 project_id IS NULL 匹配。 */
   public findJobByFingerprint(projectId: string | null, fingerprint: string): JobRecord | undefined { const row = this.db.prepare("SELECT * FROM jobs WHERE project_id IS ? AND request_fingerprint=? AND status IN ('QUEUED','RUNNING','SUCCEEDED') ORDER BY created_at DESC LIMIT 1").get(projectId, fingerprint); return row ? mapJob(row as Row) : undefined; }
@@ -857,7 +859,7 @@ export class EcomRepository {
     const updatedAt = now();
     const unknownMessage = JSON.stringify({ message: "外部图像请求结果未知，已停止自动重试以避免重复计费" });
     const write = this.db.transaction(() => {
-      this.db.prepare("UPDATE jobs SET status='QUEUED',progress=0,cancel_requested=0,updated_at=? WHERE status='RUNNING' AND (provider_task_id IS NULL OR provider_task_id<>?)").run(updatedAt, EXTERNAL_REQUEST_STARTED);
+      this.db.prepare("UPDATE jobs SET status='QUEUED',progress=0,cancel_requested=0,progress_detail_json=NULL,updated_at=? WHERE status='RUNNING' AND (provider_task_id IS NULL OR provider_task_id<>?)").run(updatedAt, EXTERNAL_REQUEST_STARTED);
       this.db.prepare("UPDATE jobs SET status='FAILED',progress=100,retryable=0,error_json=?,updated_at=? WHERE status='RUNNING' AND provider_task_id=?")
         .run(unknownMessage, updatedAt, EXTERNAL_REQUEST_STARTED);
       // 分层记录必须与 Job 同步进入终态，否则前端会一直看到 QUEUED/RUNNING 而任务其实已被重启或终止。
@@ -875,6 +877,8 @@ export class EcomRepository {
     return recovered.map((row) => mapJob({ ...row, status: "QUEUED", progress: 0, cancel_requested: 0 }));
   }
   public listJobs(projectId: string): JobRecord[] { return (this.db.prepare("SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapJob); }
+  /** 全局套图反推任务不绑定项目，无法走 listJobs；按 type 倒序取最近若干条供「最近反推」列表使用。 */
+  public listJobsByType(type: JobType, limit: number): JobRecord[] { return (this.db.prepare("SELECT * FROM jobs WHERE type=? ORDER BY created_at DESC LIMIT ?").all(type, limit) as Row[]).map(mapJob); }
   public saveCopywritingResult(input: Omit<CopywritingResultRecord, "createdAt">): CopywritingResultRecord {
     const record: CopywritingResultRecord = { ...input, createdAt: now() };
     this.db.prepare("INSERT OR REPLACE INTO copywriting_results (job_id,project_id,target,content,created_at) VALUES (@jobId,@projectId,@target,@content,@createdAt)").run(record);
@@ -1140,7 +1144,7 @@ function mapStoryboardItem(row: Row): StoryboardItemRecord {
     updatedAt: String(row.updated_at)
   };
 }
-function mapJob(row: Row): JobRecord { return { id: String(row.id), projectId: row.project_id == null ? null : String(row.project_id), storyboardItemId: row.storyboard_item_id ? String(row.storyboard_item_id) : null, type: row.type as JobType, status: row.status as JobStatus, progress: Number(row.progress), retryable: Boolean(row.retryable), input: parse(row.input_json), requestFingerprint: row.request_fingerprint ? String(row.request_fingerprint) : null, providerId: row.provider_id ? String(row.provider_id) : null, modelId: row.model_id ? String(row.model_id) : null, estimatedCost: row.estimated_cost_json ? parse(row.estimated_cost_json) : null, actualCost: row.actual_cost_json ? parse(row.actual_cost_json) : null, cancelRequested: Boolean(row.cancel_requested), providerTaskId: row.provider_task_id ? String(row.provider_task_id) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapJob(row: Row): JobRecord { return { id: String(row.id), projectId: row.project_id == null ? null : String(row.project_id), storyboardItemId: row.storyboard_item_id ? String(row.storyboard_item_id) : null, type: row.type as JobType, status: row.status as JobStatus, progress: Number(row.progress), retryable: Boolean(row.retryable), input: parse(row.input_json), requestFingerprint: row.request_fingerprint ? String(row.request_fingerprint) : null, providerId: row.provider_id ? String(row.provider_id) : null, modelId: row.model_id ? String(row.model_id) : null, estimatedCost: row.estimated_cost_json ? parse(row.estimated_cost_json) : null, actualCost: row.actual_cost_json ? parse(row.actual_cost_json) : null, cancelRequested: Boolean(row.cancel_requested), providerTaskId: row.provider_task_id ? String(row.provider_task_id) : null, error: row.error_json ? parse(row.error_json) : null, progressDetail: row.progress_detail_json ? parse(row.progress_detail_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapCopywritingResult(row: Row): CopywritingResultRecord { return { jobId: String(row.job_id), projectId: String(row.project_id), target: row.target as CopywritingTarget, content: String(row.content), createdAt: String(row.created_at) }; }
 function mapWebResearchAudit(row: Row): WebResearchAuditRecord { return { jobId: String(row.job_id), availability: row.availability as WebResearchAvailability, invocationCount: Number(row.invocation_count), successfulAttemptCount: Number(row.successful_attempt_count), failedAttemptCount: Number(row.failed_attempt_count), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapWebResearchAttempt(row: Row): WebResearchAttemptRecord { return { id: String(row.id), jobId: String(row.job_id), query: String(row.query), sourceId: String(row.source_id), sourceName: String(row.source_name), sourceKind: String(row.source_kind), status: row.status as WebResearchAttemptStatus, resultCount: Number(row.result_count), errorMessage: row.error_message ? String(row.error_message) : null, createdAt: String(row.created_at) }; }

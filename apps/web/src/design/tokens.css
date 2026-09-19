@@ -35,6 +35,9 @@
   --radius-l: 14px;
   --shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.5);
 
+  /* 共享顶栏高度：首页的 sticky hero 与套图工坊左栏的吸附位置都按它计算 */
+  --topbar-h: 53px;
+
   /* 字体栈：展示字体自托管（见 public/fonts/README.md），缺文件时回退系统中文字体 */
   --font-display: "Smiley Sans", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-body:

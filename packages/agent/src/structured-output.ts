@@ -1,5 +1,5 @@
 import type { Model } from "@earendil-works/pi-ai";
-import { COMPOSITE_POLICIES, EDIT_EXECUTION_MODES, EDIT_OPERATIONS } from "@ecomgen/contracts";
+import { COMPOSITE_POLICIES, EDIT_EXECUTION_MODES, EDIT_OPERATIONS, MAX_SUITE_FORGE_SHOTS, MIN_SUITE_FORGE_SHOTS } from "@ecomgen/contracts";
 
 export interface StructuredOutputSchema {
   name: string;
@@ -197,7 +197,7 @@ export const SUITE_FORGE_OUTPUT_SCHEMA: StructuredOutputSchema = {
         },
         required: ["direction", "palette", "temperature", "backgroundSystem", "lightingSystem", "surfaceSystem", "typography", "iconSystem", "presentationRules", "noDrift", "lockText"],
       },
-      shots: { type: "array", minItems: 5, maxItems: 12, items: SUITE_SHOT_SCHEMA },
+      shots: { type: "array", minItems: MIN_SUITE_FORGE_SHOTS, maxItems: MAX_SUITE_FORGE_SHOTS, items: SUITE_SHOT_SCHEMA },
       provenance: {
         type: "object",
         ...noAdditionalProperties,

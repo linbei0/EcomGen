@@ -2,6 +2,7 @@ import type { Static } from "@sinclair/typebox";
 
 export * from "./enums.js";
 export * from "./ref.js";
+export * from "./limits.js";
 export * from "./segmentation.js";
 export * from "./edit-operations.js";
 import type { AssetRole, ImageAspectRatio, ImageResolution, UserAssetKind } from "./enums.js";

@@ -6,44 +6,6 @@
   min-height: 100vh;
 }
 
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 28px;
-  border-bottom: 1px solid var(--line-1);
-  background: color-mix(in srgb, var(--bg-0) 86%, transparent);
-  backdrop-filter: blur(10px);
-}
-
-.brand {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  color: var(--accent);
-}
-
-.brandName {
-  font-family: var(--font-display);
-  font-size: 17px;
-  color: var(--text-1);
-}
-
-.brandSub {
-  font-size: 12px;
-  color: var(--text-3);
-  letter-spacing: 0.08em;
-}
-
-.topActions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .main {
   flex: 1;
   display: grid;
@@ -52,11 +14,11 @@
 }
 
 .hero {
-  /* 与顶栏保持一致：sticky 固定左侧，右侧画廊独立滚动 */
+  /* 与顶栏保持一致：sticky 固定左侧，右侧画廊独立滚动。顶栏高度由 AppTopbar 的 token 决定 */
   position: sticky;
-  top: 53px;
+  top: var(--topbar-h);
   align-self: start;
-  height: calc(100vh - 53px);
+  height: calc(100vh - var(--topbar-h));
   display: flex;
   flex-direction: column;
   justify-content: center;

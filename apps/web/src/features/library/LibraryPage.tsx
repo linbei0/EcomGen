@@ -1,17 +1,15 @@
 import { App, Button, Empty, Image, Input, Segmented, Select, Skeleton } from "antd";
-import { Aperture, Check, Download, LibraryBig, RefreshCw, Search, Settings2, Sparkles } from "lucide-react";
+import { Check, Download, LibraryBig, RefreshCw, Search } from "lucide-react";
 import { motion } from "motion/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
 
 import { LIBRARY_KIND_OPTIONS, type LibraryItem, type LibraryKindFilter } from "../../api/adapters/library";
 import { useCopyLibraryAssetToProject, useLibraryItems } from "../../api/hooks/useLibrary";
 import { useProjects } from "../../api/hooks/useProjects";
-import { HealthBadge } from "../../components/HealthBadge";
+import { AppTopbar } from "../../components/AppTopbar";
 import { fadeUp, staggerContainer } from "../../design/motion";
 import { errorText } from "../../lib/errorText";
 import { formatShortDate } from "../../lib/format";
-import { SettingsDrawer } from "../providers/SettingsDrawer";
 import styles from "./LibraryPage.module.css";
 
 function badgeLabel(source: string, kind: string): string {
@@ -67,7 +65,6 @@ const LibraryCard = memo(function LibraryCard({ item, selected, onToggle }: Libr
 
 export function LibraryPage() {
   const { notification } = App.useApp();
-  const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [kind, setKind] = useState<LibraryKindFilter>("ALL");
   const [search, setSearch] = useState("");
@@ -155,21 +152,7 @@ export function LibraryPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.topbar}>
-        <Link to="/" className={styles.brand}>
-          <Aperture size={20} strokeWidth={1.75} aria-hidden />
-          <span className={styles.brandName}>EcomGen</span>
-        </Link>
-        <div className={styles.topActions}>
-          <HealthBadge />
-          <Button icon={<Sparkles size={16} strokeWidth={1.75} />} onClick={() => void navigate("/suite-forge")}>
-            套图工坊
-          </Button>
-          <Button icon={<Settings2 size={16} strokeWidth={1.75} />} onClick={() => setSettingsOpen(true)}>
-            设置
-          </Button>
-        </div>
-      </header>
+      <AppTopbar current="library" settingsOpen={settingsOpen} onSettingsOpenChange={setSettingsOpen} />
 
       <motion.main className={styles.main} variants={staggerContainer} initial="hidden" animate="visible">
         <motion.div className={styles.head} variants={fadeUp}>
@@ -258,8 +241,6 @@ export function LibraryPage() {
           </Button>
         </div>
       ) : null}
-
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

@@ -77,6 +77,13 @@ function addStoryboardItemShotRole(database: SqliteDatabase): void {
   database.exec("ALTER TABLE storyboard_items ADD COLUMN shot_role TEXT");
 }
 
+/** 旧库补齐 jobs.progress_detail_json 列；历史行保持 NULL，由上层按"没有进度明细"处理。 */
+function addJobProgressDetail(database: SqliteDatabase): void {
+  const tables = tableNames(database);
+  if (!tables.has("jobs") || columnNames(database, "jobs").has("progress_detail_json")) return;
+  database.exec("ALTER TABLE jobs ADD COLUMN progress_detail_json TEXT");
+}
+
 /** Provider 可随时删除：旧库的 projects.provider 引用列为 NOT NULL，重建表放宽为可空（删除 Provider 时级联置空）。 */
 function makeProjectProviderReferencesNullable(database: SqliteDatabase): void {
   const columns = database.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string; notnull: number }>;
@@ -224,6 +231,7 @@ function migrate(database: SqliteDatabase): void {
   makeLayerExportPlanReferenceNullable(database);
   makeJobsProjectNullable(database);
   addStoryboardItemShotRole(database);
+  addJobProgressDetail(database);
   database.exec(`
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
@@ -341,6 +349,7 @@ function migrate(database: SqliteDatabase): void {
       cancel_requested INTEGER NOT NULL DEFAULT 0,
       provider_task_id TEXT,
       error_json TEXT,
+      progress_detail_json TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,

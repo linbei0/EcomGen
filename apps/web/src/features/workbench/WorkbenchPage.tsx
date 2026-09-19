@@ -1,16 +1,15 @@
 import { Button, Result, Skeleton, Tooltip } from "antd";
-import { Aperture, LibraryBig, PanelLeftClose, PanelLeftOpen, Settings2 } from "lucide-react";
+import { Aperture, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { useProjectEvents } from "../../api/hooks/useProjectEvents";
 import { useProject } from "../../api/hooks/useProjects";
-import { HealthBadge } from "../../components/HealthBadge";
+import { AppTopbar } from "../../components/AppTopbar";
 import { StageBar } from "../../components/StageBar";
 import { completedViews, deriveView, parseView, type WorkbenchView } from "../../lib/stages";
 import { errorText } from "../../lib/errorText";
 import { loadSidebarCollapsed, saveSidebarCollapsed } from "../../lib/panelState";
-import { SettingsDrawer } from "../providers/SettingsDrawer";
 import { ResultsWorkspace } from "./ResultsWorkspace";
 import { AssetsStage } from "./AssetsStage";
 import { SetupPanel } from "./SetupPanel";
@@ -76,12 +75,15 @@ export function WorkbenchPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.topbar}>
-        <div className={styles.topLeft}>
+      <AppTopbar
+        current="workbench"
+        brand={
           <Link to="/" className={styles.brandLink}>
-            <Aperture size={18} strokeWidth={1.75} aria-hidden />
+            <Aperture size={20} strokeWidth={1.75} aria-hidden />
             <span className={styles.projectName}>{detail.name}</span>
           </Link>
+        }
+        leftExtra={
           <Tooltip title={sidebarToggleLabel}>
             <button
               type="button"
@@ -96,18 +98,11 @@ export function WorkbenchPage() {
                 : <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden />}
             </button>
           </Tooltip>
-        </div>
-        <StageBar current={view} completed={done} onChange={setView} />
-        <div className={styles.topActions}>
-          <HealthBadge />
-          <Button icon={<LibraryBig size={16} strokeWidth={1.75} />} onClick={() => void navigate("/library")}>
-            资产库
-          </Button>
-          <Button icon={<Settings2 size={16} strokeWidth={1.75} />} onClick={() => setSettingsOpen(true)}>
-            设置
-          </Button>
-        </div>
-      </header>
+        }
+        center={<StageBar current={view} completed={done} onChange={setView} />}
+        settingsOpen={settingsOpen}
+        onSettingsOpenChange={setSettingsOpen}
+      />
 
       <div className={styles.shell} data-collapsed={sidebarCollapsed}>
         <aside id="config-sidebar" className={styles.left} data-collapsed={sidebarCollapsed}>
@@ -141,8 +136,6 @@ export function WorkbenchPage() {
           {view === "results" ? <ResultsWorkspace detail={detail} /> : null}
         </main>
       </div>
-
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

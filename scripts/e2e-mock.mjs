@@ -460,11 +460,22 @@ try {
   assert.equal(forgeJob.projectId, null);
   const forgeDone = await waitJob(base, forgeJob.id);
   assert.equal(forgeDone.status, "SUCCEEDED");
+  // 反推的流式分镜计数要从 agent 一路落到 job 记录：mock Provider 把整份 JSON 放在一个
+  // SSE chunk 里，因此这里断言的是"单块也能数全"，而不是中间值。
+  assert.equal(forgeDone.progressDetail.shotsGenerated, 5);
+  assert.equal(forgeDone.progressDetail.shotsTarget, 5);
   assert.match(observed.suiteForgePrompt, /ECOMGEN OUTPUT CONTRACT/);
   const forgeResult = await requestJson(`${base}/suite-forge-jobs/${forgeJob.id}/result`, "GET");
   assert.equal(forgeResult.status, "DRAFT");
   assert.equal(forgeResult.suite.name, "净透氨基酸洁面套图");
   assert.equal(forgeResult.suite.shots.length, 5);
+  // 最近反推列表是刷新后找回任务的唯一入口，必须带上草稿摘要
+  const forgeList = await requestJson(`${base}/suite-forge-jobs`, "GET");
+  const listedForgeJob = forgeList.items.find((item) => item.jobId === forgeJob.id);
+  assert.ok(listedForgeJob, "recent forge jobs should include the current job");
+  assert.equal(listedForgeJob.status, "SUCCEEDED");
+  assert.equal(listedForgeJob.draft.shotCount, 5);
+  assert.equal(listedForgeJob.draft.suiteId, null);
   // 同源图重复提交命中请求指纹，复用同一任务而不重复计费
   const duplicateForgeForm = new FormData();
   duplicateForgeForm.append("providerId", provider.id);
@@ -476,11 +487,16 @@ try {
   duplicateForgeForm.append("files", new Blob([Buffer.from(onePixelReferencePng, "base64")], { type: "image/png" }), "viral-2.png");
   const duplicateForge = await fetch(`${base}/suite-forge-jobs`, { method: "POST", body: duplicateForgeForm });
   assert.equal((await duplicateForge.json()).id, forgeJob.id);
-  const committedForge = await requestJson(`${base}/suite-forge-jobs/${forgeJob.id}/commit`, "POST");
+  // commit 接受整份套图：预览面板的编辑随请求回传并覆盖草稿，所以这里改名后提交并校验落库内容
+  const editedForgeSuite = { ...forgeResult.suite, name: "净透氨基酸洁面套图（已编辑）" };
+  const committedForge = await requestJson(`${base}/suite-forge-jobs/${forgeJob.id}/commit`, "POST", editedForgeSuite);
   assert.equal(committedForge.status, "COMMITTED");
+  assert.equal(committedForge.suite.name, editedForgeSuite.name);
   assert.match(committedForge.suiteId, /^custom-suite-/);
   const suites = await requestJson(`${base}/suites`, "GET");
-  assert.ok(suites.items.some((suite) => suite.id === committedForge.suiteId), "committed suite should be listed");
+  const committedSuiteSummary = suites.items.find((suite) => suite.id === committedForge.suiteId);
+  assert.ok(committedSuiteSummary, "committed suite should be listed");
+  assert.equal(committedSuiteSummary.name, editedForgeSuite.name);
   console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge");
 } finally {
   await Promise.all(children.map(stop));

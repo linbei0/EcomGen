@@ -1,0 +1,64 @@
+/* 顶栏高度用 token 固定：HomePage 的 sticky hero 与套图工坊左栏的吸附位置都按它计算。 */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  /* 三列网格与工作台原顶栏一致：中列拿到全部剩余宽度，阶段切换条铺满整列，
+     而不是缩成一个居中的小框、两侧空出大片背景。 */
+  display: grid;
+  grid-template-columns: minmax(200px, 264px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  height: var(--topbar-h);
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line-1);
+  background: color-mix(in srgb, var(--bg-0) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.brandName {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 中列是整个剩余宽度：工作台的阶段切换条在这里铺满。 */
+.center {
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    padding: 0 16px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .center {
+    display: none;
+  }
+}

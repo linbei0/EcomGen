@@ -12,6 +12,8 @@ export const qk = {
   suite: (id: string) => ["suites", "detail", id] as const,
   suiteForgeJob: (id: string) => ["suite-forge-jobs", id] as const,
   suiteForgeResult: (id: string) => ["suite-forge-jobs", id, "result"] as const,
+  /** 「最近反推」列表刻意独立于单任务 key，避免按前缀失效时把列表和详情混在一起。 */
+  suiteForgeJobList: ["suite-forge-job-list"] as const,
   providers: ["providers"] as const,
   searchSources: ["search-sources"] as const,
   projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,

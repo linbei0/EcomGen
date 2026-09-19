@@ -4,56 +4,27 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  /* 主区上内边距 28 + 页头 71（eyebrow 23 + 标题 30 + 下外边距 18）。
+     左栏按它扣减可用高度，保证停在页面顶部时整块参数面板已经在视口内，
+     而不是先被视口截掉一截、要滚动一下才看得到。改页头尺寸需同步这里。 */
+  --forge-head-h: 99px;
 }
 
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 28px;
-  border-bottom: 1px solid var(--line-1);
-  background: color-mix(in srgb, var(--bg-0) 86%, transparent);
-  backdrop-filter: blur(10px);
-}
-
-.brand {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.brandName {
-  font-family: var(--font-display);
-  font-size: 17px;
-  color: var(--text-1);
-}
-
-.topActions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
+/* 页头占多高，左栏就少多高的可视区，所以这里的留白压到主区上边距的下限。 */
 .main {
   flex: 1;
   width: 100%;
   max-width: 1320px;
   margin: 0 auto;
-  padding: 48px 40px 72px;
+  padding: 28px 40px 56px;
 }
 
 .hero {
-  max-width: 760px;
-  margin-bottom: 28px;
+  margin-bottom: 18px;
 }
 
 .eyebrow {
-  margin: 0 0 14px;
+  margin: 0 0 8px;
   font-size: 12px;
   letter-spacing: 0.18em;
   color: var(--accent);
@@ -62,24 +33,16 @@
 .headline {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(24px, 2.6vw, 32px);
+  font-size: clamp(20px, 1.8vw, 24px);
   font-weight: 400;
   line-height: 1.25;
   color: var(--text-1);
 }
 
-.lede {
-  margin: 12px 0 0;
-  max-width: 58ch;
-  color: var(--text-2);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
-  gap: 24px;
+  gap: 20px;
   align-items: start;
 }
 
@@ -87,11 +50,14 @@
 
 .composer {
   position: sticky;
-  top: 88px;
+  top: calc(var(--topbar-h) + 20px);
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 24px;
+  gap: 14px;
+  /* 面板本身可滚动：内容高于视口时底部「开始反推」仍然够得到，而不是被 sticky 钉出屏幕。 */
+  max-height: calc(100vh - var(--topbar-h) - var(--forge-head-h) - 20px);
+  overflow-y: auto;
+  padding: 20px;
   border: 1px solid var(--line-1);
   border-radius: var(--radius-l);
   background: var(--bg-1);
@@ -101,48 +67,66 @@
 .block {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .block + .block {
-  padding-top: 18px;
+  padding-top: 14px;
   border-top: 1px solid var(--line-1);
 }
 
 .blockHead {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  gap: 10px;
+  align-items: center;
 }
 
 .blockIndex {
   flex-shrink: 0;
   font-family: var(--font-mono);
   font-size: 11px;
-  line-height: 22px;
+  line-height: 20px;
   letter-spacing: 0.08em;
   color: var(--accent);
   opacity: 0.7;
 }
 
 .blockTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
   font-size: 14px;
   color: var(--text-1);
 }
 
-.blockHint {
-  margin: 4px 0 0;
-  font-size: 12px;
+/* 说明按需展开：常显的图标很轻，但保留了每条参数解释的可达性。 */
+.blockInfo {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
   color: var(--text-3);
+  cursor: help;
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+
+.blockInfo:hover,
+.blockInfo:focus-visible {
+  color: var(--accent);
+  background: var(--accent-subtle);
 }
 
 .dropzone {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 28px 20px;
+  gap: 4px;
+  padding: 18px 16px;
   border: 1px dashed var(--line-2);
   border-radius: var(--radius-m);
   background: var(--bg-0);
@@ -161,7 +145,7 @@
 }
 
 .dropTitle {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   font-size: 13px;
   color: var(--text-1);
 }
@@ -174,7 +158,7 @@
 
 .thumbs {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
   gap: 8px;
 }
 
@@ -186,6 +170,16 @@
   border-radius: var(--radius-s);
   overflow: hidden;
   background: var(--bg-0);
+  cursor: grab;
+}
+
+.thumb[data-over="true"] {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.thumb[data-dragging="true"] {
+  opacity: 0.4;
 }
 
 .thumb img {
@@ -194,14 +188,31 @@
   object-fit: cover;
 }
 
+/* 顺序是反推的实际输入顺序（首图影响主图分镜），所以序号常显而不是只在 hover 时出现。 */
+.thumbIndex {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--bg-0) 76%, transparent);
+}
+
+.thumbIndex[data-first="true"] {
+  color: var(--accent);
+}
+
 .thumbRemove {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 2px;
+  right: 2px;
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -212,15 +223,59 @@
   transition: opacity 0.16s ease;
 }
 
+.thumbOrder {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: color-mix(in srgb, var(--bg-0) 82%, transparent);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.thumbOrder button {
+  display: grid;
+  place-items: center;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.thumbOrder button:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.thumbOrder button:disabled {
+  color: var(--text-3);
+  opacity: 0.4;
+  cursor: default;
+}
+
 .thumb:hover .thumbRemove,
-.thumbRemove:focus-visible {
+.thumb:hover .thumbOrder,
+.thumb:focus-within .thumbRemove,
+.thumb:focus-within .thumbOrder {
   opacity: 1;
+}
+
+/* 触屏没有 hover：排序与移除按钮常显，否则这两个操作完全不可达。 */
+@media (hover: none) {
+  .thumbRemove,
+  .thumbOrder {
+    opacity: 1;
+  }
 }
 
 .fieldGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .field {
@@ -265,11 +320,41 @@
   }
 }
 
+/* 运行前摘要：让人在付钱之前看到这次会发出多少张源图、用哪个模型。 */
+.runSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding-top: 4px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.runSummary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.runSummary svg {
+  color: var(--accent);
+}
+
+/* 面板可滚动后「开始反推」会落到视口外：把按钮行钉在面板底部，让主操作始终可达。
+   负外边距抵消 .composer 的 padding，使色带铺满面板宽度而不露出两侧内容。 */
 .runRow {
+  position: sticky;
+  bottom: -20px;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-top: 6px;
+  margin: 0 -20px -20px;
+  padding: 12px 20px 30px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line-1);
+  border-bottom-left-radius: var(--radius-l);
+  border-bottom-right-radius: var(--radius-l);
 }
 
 .runRow :global(.ant-btn-primary) {
@@ -280,13 +365,22 @@
 
 .stage {
   min-height: 460px;
-  padding: 24px;
+  padding: 20px;
   border: 1px solid var(--line-1);
   border-radius: var(--radius-l);
   background:
     linear-gradient(var(--line-1) 1px, transparent 1px) 0 0 / 100% 25%,
     linear-gradient(90deg, var(--line-1) 1px, transparent 1px) 0 0 / 25% 100%,
     var(--bg-1);
+}
+
+/* compose 阶段内容比空态多：改为顶部对齐，避免整块被垂直居中后与下方列表挤压。 */
+.stageIntro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
 }
 
 .stageEmpty {
@@ -300,7 +394,38 @@
 }
 
 .stageEmpty[data-tone="error"] {
-  gap: 16px;
+  gap: 12px;
+}
+
+.failureIcon {
+  color: var(--danger);
+}
+
+.failureDetail {
+  width: 100%;
+  max-width: 46ch;
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: left;
+}
+
+.failureDetail summary {
+  cursor: pointer;
+}
+
+.failureDetail pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: var(--radius-s);
+  background: var(--bg-0);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .stageEmptyIcon {
@@ -322,33 +447,152 @@
   color: var(--text-3);
 }
 
-.promiseList {
+/* 空态骨架：只示意单张分镜的构成（角色 / 意图 / Prompt），不暗示固定的分镜结构。 */
+.skeletonRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.skeletonCard {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px 18px;
-  margin: 20px 0 0;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-2);
+  text-align: left;
+}
+
+.skeletonChip,
+.skeletonLine,
+.skeletonBlock {
+  display: block;
+  border-radius: 3px;
+  background: var(--bg-3);
+}
+
+.skeletonChip {
+  width: 34px;
+  height: 12px;
+}
+
+.skeletonLine {
+  height: 8px;
+}
+
+.skeletonLine[data-short="true"] {
+  width: 58%;
+}
+
+.skeletonBlock {
+  height: 46px;
+  margin-top: 3px;
+  opacity: 0.6;
+}
+
+/* ---------- 最近反推 ---------- */
+
+.recent {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-1);
+}
+
+.recentHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.recentCount {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.recentList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 12px;
-  color: var(--text-2);
 }
 
-.promiseList li {
+.recentRow {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
 }
 
-.promiseList svg {
-  color: var(--accent);
+.recentRow:hover {
+  border-color: var(--line-1);
+  background: var(--bg-2);
 }
+
+.recentRow[data-active="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-subtle);
+}
+
+.recentMain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.recentName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.recentMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.recentStatus {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--text-3);
+}
+
+.recentStatus[data-tone="run"] { color: var(--accent); border-color: var(--accent-line); }
+.recentStatus[data-tone="ok"] { color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, transparent); }
+.recentStatus[data-tone="warn"] { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 40%, transparent); }
+.recentStatus[data-tone="bad"] { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
 
 .running {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  padding: 12px 4px;
+  gap: 16px;
+  padding: 8px 2px;
 }
 
 .runningHead {
@@ -371,6 +615,12 @@
   color: var(--text-3);
 }
 
+.runningMeta {
+  margin: -8px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
 .stepList {
   display: flex;
   flex-direction: column;
@@ -384,7 +634,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 4px;
+  padding: 9px 4px;
   font-size: 13px;
   color: var(--text-3);
   border-bottom: 1px solid var(--line-1);
@@ -419,8 +669,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  min-height: 380px;
+  gap: 8px;
+  min-height: 320px;
   text-align: center;
 }
 
@@ -443,9 +693,7 @@
 
 .doneHint {
   margin: 0;
-  max-width: 44ch;
   font-size: 13px;
-  line-height: 1.8;
   color: var(--text-2);
 }
 
@@ -460,7 +708,7 @@
 .review {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 
 .reviewHead {
@@ -470,32 +718,22 @@
   gap: 16px;
 }
 
+.reviewHeadMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.reviewNameInput {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
 .reviewTags {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
-}
-
-.reviewCategory {
-  font-size: 12px;
-  color: var(--text-3);
-}
-
-.reviewName {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 400;
-  color: var(--text-1);
-}
-
-.reviewDesc {
-  margin: 8px 0 0;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--text-2);
+  margin-bottom: 8px;
 }
 
 .reviewCount {
@@ -511,32 +749,53 @@
 }
 
 .reviewLock {
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-m);
   background: var(--accent-subtle);
 }
 
-.reviewLockHead {
+.reviewLockDetails summary {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
   letter-spacing: 0.04em;
   color: var(--accent);
+  cursor: pointer;
+  list-style: none;
+}
+
+.reviewLockDetails summary::-webkit-details-marker {
+  display: none;
+}
+
+.reviewLockDetails summary:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.reviewLockChevron {
+  margin-left: auto;
+  transition: transform 0.16s ease;
+}
+
+.reviewLockDetails[open] .reviewLockChevron {
+  transform: rotate(180deg);
 }
 
 .reviewLockText {
   margin: 10px 0 0;
-  font-size: 13px;
-  line-height: 1.75;
-  color: var(--text-1);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-2);
 }
 
 .palette {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .swatch {
@@ -584,49 +843,72 @@
 .shotRole[data-role="6"] { color: #c9a06b; border-color: #c9a06b44; }
 .shotRole[data-role="7"] { color: #d67f9b; border-color: #d67f9b44; }
 
-.shotName {
+/* 名称占满剩余宽度：分镜名、比例标签与三个操作按钮同排，不收敛宽度会把按钮挤出行外。 */
+.shotNameInput {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  color: var(--text-1);
 }
 
-.shotIntent {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: var(--text-2);
+.shotActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
-.shotPrompt {
-  margin: 10px 0 0;
-  padding: 10px 12px;
-  max-height: 132px;
-  overflow: auto;
-  border-radius: var(--radius-s);
-  background: var(--bg-0);
+.intentField {
+  margin-top: 10px;
+}
+
+/* Prompt 是逐字编辑的文本：等宽字体让小改动（括号、逗号）更容易看清。 */
+.promptField {
+  margin-top: 8px;
+}
+
+.promptField textarea {
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.6;
-  color: var(--text-2);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
+/* 十张分镜逐个编辑会让面板长到数千像素：入库按钮同样钉底，避免每次都要滚到底。 */
 .reviewFoot {
+  position: sticky;
+  bottom: -20px;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-top: 14px;
+  margin: 0 -20px -20px;
+  padding: 12px 20px 30px;
+  background: var(--bg-1);
   border-top: 1px solid var(--line-1);
+  border-bottom-left-radius: var(--radius-l);
+  border-bottom-right-radius: var(--radius-l);
 }
 
-.reviewFootHint {
+.reviewFootMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.reviewFootActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.problemList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-size: 12px;
-  color: var(--text-3);
+  color: var(--danger);
 }
 
 @media (max-width: 1080px) {
@@ -636,6 +918,8 @@
 
   .composer {
     position: static;
+    max-height: none;
+    overflow: visible;
   }
 }
 
@@ -646,5 +930,14 @@
 
   .fieldGrid {
     grid-template-columns: 1fr;
+  }
+
+  .skeletonRow {
+    grid-template-columns: 1fr;
+  }
+
+  .reviewFoot {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

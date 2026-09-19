@@ -143,7 +143,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["listSuiteForgeJobResults"];
         put?: never;
         post: operations["createSuiteForgeJob"];
         delete?: never;
@@ -1426,10 +1426,17 @@ export interface components {
             error?: {
                 [key: string]: unknown;
             } | null;
+            progressDetail?: components["schemas"]["JobProgressDetail"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        JobProgressDetail: {
+            /** @description 流式观察到的已生成分镜数（模型可能回填或重试，不保证单调）。 */
+            shotsGenerated: number;
+            /** @description 建单时指定的目标分镜数；未指定时为 null，此时只有分子没有分母。 */
+            shotsTarget: number | null;
         };
         /** @description Normalized bounding box relative to the output image. */
         LayerBbox: {
@@ -2023,6 +2030,34 @@ export interface components {
             /** Format: uuid */
             outputId: string;
         };
+        SuiteForgeDraftSummary: {
+            name: string;
+            l1: string;
+            l2: string;
+            leaf: string;
+            shotCount: number;
+            /** @description 已入库的套图 ID；仍为草稿时为 null。 */
+            suiteId: string | null;
+        };
+        SuiteForgeJobList: {
+            items: components["schemas"]["SuiteForgeJobSummary"][];
+        };
+        SuiteForgeJobSummary: {
+            /** Format: uuid */
+            jobId: string;
+            status: components["schemas"]["JobStatus"];
+            progress: number;
+            cancelRequested: boolean;
+            error: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description 反推成功后的草稿摘要；未产出时为 null。 */
+            draft: components["schemas"]["SuiteForgeDraftSummary"] | null;
+        };
         SuiteForgeResult: {
             /** Format: uuid */
             jobId: string;
@@ -2446,6 +2481,29 @@ export interface operations {
             };
         };
     };
+    listSuiteForgeJobResults: {
+        parameters: {
+            query?: {
+                /** @description Maximum number of recent forge jobs to return, clamped to 1..50. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent suite forge jobs, including running and failed ones, each with its draft summary when the run produced one. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuiteForgeJobList"];
+                };
+            };
+        };
+    };
     createSuiteForgeJob: {
         parameters: {
             query?: never;
@@ -2504,7 +2562,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EcomSuiteFile"];
+            };
+        };
         responses: {
             /** @description Forged suite imported into the user suite catalog. */
             200: {

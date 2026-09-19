@@ -7,10 +7,10 @@ import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type SuiteListQuery, type UserTemplateRecord, SUITE_PAGE_SIZE_DEFAULT, SUITE_PAGE_SIZE_MAX } from "@ecomgen/core";
 import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
-import { SUITE_TAXONOMY } from "@ecomgen/ecom-suite";
+import { SUITE_TAXONOMY, type SuiteDocumentInput } from "@ecomgen/ecom-suite";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
+import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, createSegmentationProvider, probeReasoning, type PromptSegmentationProtocol } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -33,7 +33,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   const queue = createJobQueue(redis);
   const events = new RedisProjectEventBus(redis.duplicate(), redis.duplicate());
   await app.register(cors, { origin: true });
-  await app.register(multipart, { limits: { fileSize: 30 * 1024 * 1024, files: 12 } });
+  // 全局 multipart 上限作用于所有上传路由；files 取套图源图上限，因为它是唯一的批量多文件入口。
+  await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_FILE_BYTES, files: MAX_SUITE_FORGE_SOURCES } });
   await app.register(fastifySSE, { heartbeatInterval: 20_000 });
   app.addHook("onClose", async () => { await events.close(); await queue.close(); database.close(); });
   app.setErrorHandler((error, request, reply) => {
@@ -145,19 +146,46 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     await enqueue(queue, { jobId: job.id, kind: "suite_forge" });
     return reply.code(202).send(job);
   });
+  // 最近反推：草稿只落在 suite_forge_results，没有这个列表前端就无法回到历史反推结果 ——
+  // 刷新页面即等于丢失 jobId，而已入库或待入库的产出其实一直都在。列表含运行中与失败的任务，
+  // 因此以 jobs 为主体、草稿摘要为附属，而非直接查草稿表。
+  app.get("/api/v1/suite-forge-jobs", async (request) => {
+    const items = repository.listJobsByType("SUITE_FORGE", suiteForgeListLimit(request.query)).map((job) => {
+      const draft = repository.getSuiteForgeResult(job.id);
+      return {
+        jobId: job.id,
+        status: job.status,
+        progress: job.progress,
+        cancelRequested: job.cancelRequested,
+        error: job.error,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+        draft: draft
+          ? { name: draft.payload.name, l1: draft.payload.category.l1, l2: draft.payload.category.l2, leaf: draft.payload.category.leaf, shotCount: draft.payload.shots.length, suiteId: draft.suiteId }
+          : null
+      };
+    });
+    return { items };
+  });
   app.get("/api/v1/suite-forge-jobs/:jobId/result", async (request) => {
     const jobId = parameter(request, "jobId");
     const record = repository.getSuiteForgeResult(jobId); if (!record) missing("suite forge result", jobId);
     return publicSuiteForgeResult(record);
   });
+  // 请求体是预览面板里编辑后的整份套图；校验通过后既覆盖草稿也写入 user_suites。
+  // 有编辑入口后，用户不必为了改一处文案而整体重跑（重跑要重新消耗模型额度）。
   app.post("/api/v1/suite-forge-jobs/:jobId/commit", async (request) => {
     const jobId = parameter(request, "jobId");
     const record = repository.getSuiteForgeResult(jobId); if (!record) missing("suite forge result", jobId);
     if (record.status === "COMMITTED" && record.suiteId) return publicSuiteForgeResult(record);
-    assertValidSuiteDocument(record.payload);
-    const requested = record.payload.id;
+    const body = parseBody(EcomSuiteFile, request.body ?? {});
+    // id 由服务端裁决：沿用 worker 预分配的 custom-suite- 前缀，仅在已被占用时重新分配。
+    const requested = typeof body.id === "string" && body.id ? body.id : record.payload.id;
     const id = requested && requested.startsWith("custom-suite-") && !suiteCatalog.getSuite(requested) ? requested : suiteIdForImport(undefined, suiteCatalog);
-    const saved = repository.saveUserSuite({ id, name: record.payload.name, l1: record.payload.category.l1, l2: record.payload.category.l2, leaf: record.payload.category.leaf, productFamily: record.payload.productFamily ?? null, payload: { ...record.payload, id } });
+    // 草稿已由 worker 归一化，这里只做契约校验后原样落库，不再重复派生 assetType。
+    const edited = { ...body, id } as unknown as SuiteDocumentInput;
+    repository.saveSuiteForgeResult({ jobId, payload: edited });
+    const saved = repository.saveUserSuite({ id, name: edited.name, l1: edited.category.l1, l2: edited.category.l2, leaf: edited.category.leaf, productFamily: edited.productFamily ?? null, payload: edited });
     suiteCatalog.upsertUserSuite(saved);
     const committed = repository.commitSuiteForgeResult(jobId, id) ?? record;
     return publicSuiteForgeResult(committed);
@@ -840,14 +868,24 @@ function assertValidSuiteDocument(value: unknown): void {
   const result = validateEcomSuiteFile(value);
   if (!result.ok) throw new ApiError(400, "VALIDATION_ERROR", "Invalid suite document", result.errors.map((reason) => ({ path: "/", reason })));
 }
-const MAX_SUITE_FORGE_SOURCES = 12;
+/** 「最近反推」列表规模：默认 20 条，上限 50 条，与 paths.yaml 的 limit 声明保持一致。 */
+const SUITE_FORGE_LIST_DEFAULT = 20;
+const SUITE_FORGE_LIST_MAX = 50;
 /** ids 回读只服务“已选分镜所属套图”，上限按单次选择的量级留一倍余量。 */
 const MAX_SUITE_IDS_QUERY = 24;
 function publicSuiteForgeResult(record: SuiteForgeResultRecord): object { return { jobId: record.jobId, status: record.status, suite: record.payload, suiteId: record.suiteId ?? null, createdAt: record.createdAt, updatedAt: record.updatedAt }; }
-/** multipart 字段全部是字符串，这里按反推约束逐项解析；targetShotCount 与契约一致限定 5–12。 */
+function suiteForgeListLimit(query: unknown): number {
+  const raw = (query as Record<string, unknown> | null | undefined)?.limit;
+  const text = typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
+  if (text === undefined) return SUITE_FORGE_LIST_DEFAULT;
+  const parsed = Number.parseInt(text, 10);
+  if (!Number.isFinite(parsed)) throw new ApiError(400, "VALIDATION_ERROR", "limit must be an integer");
+  return Math.min(Math.max(parsed, 1), SUITE_FORGE_LIST_MAX);
+}
+/** multipart 字段全部是字符串，这里按反推约束逐项解析；长度与取值范围必须与 CreateSuiteForgeJobInput 一致。 */
 function suiteForgeHints(fields: Record<string, string>): Record<string, unknown> {
   const hints: Record<string, unknown> = {};
-  const name = readOptionalText(fields.name); if (name) hints.name = name;
+  const name = readOptionalText(fields.name); if (name) hints.name = boundedText(name, MAX_SUITE_FORGE_NAME_LENGTH, "name");
   const l1 = readOptionalText(fields.l1); if (l1) hints.l1 = l1;
   const l2 = readOptionalText(fields.l2); if (l2) hints.l2 = l2;
   const leaf = readOptionalText(fields.leaf); if (leaf) hints.leaf = leaf;
@@ -855,11 +893,15 @@ function suiteForgeHints(fields: Record<string, string>): Record<string, unknown
   const targetShotCount = readOptionalText(fields.targetShotCount);
   if (targetShotCount) {
     const count = Number(targetShotCount);
-    if (!Number.isInteger(count) || count < 5 || count > 12) throw new ApiError(400, "VALIDATION_ERROR", "targetShotCount must be an integer between 5 and 12");
+    if (!Number.isInteger(count) || count < MIN_SUITE_FORGE_SHOTS || count > MAX_SUITE_FORGE_SHOTS) throw new ApiError(400, "VALIDATION_ERROR", `targetShotCount must be an integer between ${MIN_SUITE_FORGE_SHOTS} and ${MAX_SUITE_FORGE_SHOTS}`);
     hints.targetShotCount = count;
   }
-  const userInstruction = readOptionalText(fields.userInstruction); if (userInstruction) hints.userInstruction = userInstruction;
+  const userInstruction = readOptionalText(fields.userInstruction); if (userInstruction) hints.userInstruction = boundedText(userInstruction, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, "userInstruction");
   return hints;
+}
+function boundedText(value: string, maxLength: number, field: string): string {
+  if (value.length > maxLength) throw new ApiError(400, "VALIDATION_ERROR", `${field} must be at most ${maxLength} characters`);
+  return value;
 }
 function verifyVisionModel(repository: EcomRepository, providerId: string, modelId: string): void {
   const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId);

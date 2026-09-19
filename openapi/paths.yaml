@@ -201,6 +201,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/EcomSuiteCategoriesResponse"
   /suite-forge-jobs:
+    get:
+      operationId: listSuiteForgeJobResults
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of recent forge jobs to return, clamped to 1..50.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Recent suite forge jobs, including running and failed ones, each with its draft summary when the run produced one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuiteForgeJobList"
     post:
       operationId: createSuiteForgeJob
       requestBody:
@@ -239,6 +257,12 @@ paths:
       - $ref: "#/components/parameters/JobId"
     post:
       operationId: commitSuiteForgeResult
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EcomSuiteFile"
       responses:
         "200":
           description: Forged suite imported into the user suite catalog.
