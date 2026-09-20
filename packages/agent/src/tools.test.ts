@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ECOM_SUITES } from "@ecomgen/ecom-suite";
+import { getBuiltinSuite } from "@ecomgen/ecom-suite";
 import { createPlanningTools } from "./tools.js";
 
 const taobaoContext = { platformTargets: ["TAOBAO"] as const, targetMarket: null, copyLanguage: null, productCategory: "服装" };
@@ -89,7 +89,7 @@ describe("Pi planning business tools", () => {
   });
 
   it("exposes requested suite shot definitions and rejects unknown suites", async () => {
-    const suite = ECOM_SUITES[0]!;
+    const suite = getBuiltinSuite("suite-neiyijiajufu-banbeiyi")!;
     const tools = createPlanningTools(taobaoContext, undefined, [], [suite]);
     expect(tools).toHaveLength(3);
     const readSuite = tools[2]!;

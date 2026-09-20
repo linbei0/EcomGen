@@ -468,7 +468,8 @@ describe("GET /api/v1/suites 分页与筛选", () => {
     expect(created.statusCode).toBe(201);
     const suiteId = created.json<{ id: string }>().id;
 
-    const afterInsert = (await app.inject({ method: "GET", url: "/api/v1/suites" }))
+    // 内置套图数量远超单页，用导入套图的专用品类过滤定位，不依赖默认首页位置。
+    const afterInsert = (await app.inject({ method: "GET", url: "/api/v1/suites", query: { l1: "测试专用品类" } }))
       .json<{ items: Array<{ id: string }>; total: number; l1Counts: Record<string, number> }>();
     expect(afterInsert.total).toBe(before.total + 1);
     expect(afterInsert.l1Counts["测试专用品类"]).toBe(1);
@@ -476,7 +477,7 @@ describe("GET /api/v1/suites 分页与筛选", () => {
 
     const deleted = await app.inject({ method: "DELETE", url: `/api/v1/suites/${suiteId}` });
     expect(deleted.statusCode).toBe(204);
-    const afterDelete = (await app.inject({ method: "GET", url: "/api/v1/suites" }))
+    const afterDelete = (await app.inject({ method: "GET", url: "/api/v1/suites", query: { l1: "测试专用品类" } }))
       .json<{ items: Array<{ id: string }>; total: number; l1Counts: Record<string, number> }>();
     expect(afterDelete.total).toBe(before.total);
     expect(afterDelete.l1Counts["测试专用品类"]).toBeUndefined();

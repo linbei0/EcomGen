@@ -493,7 +493,8 @@ try {
   assert.equal(committedForge.status, "COMMITTED");
   assert.equal(committedForge.suite.name, editedForgeSuite.name);
   assert.match(committedForge.suiteId, /^custom-suite-/);
-  const suites = await requestJson(`${base}/suites`, "GET");
+  // 内置套图数量远超单页，用 ids 精确回读校验落库套图，不依赖默认首页位置。
+  const suites = await requestJson(`${base}/suites?ids=${committedForge.suiteId}`, "GET");
   const committedSuiteSummary = suites.items.find((suite) => suite.id === committedForge.suiteId);
   assert.ok(committedSuiteSummary, "committed suite should be listed");
   assert.equal(committedSuiteSummary.name, editedForgeSuite.name);

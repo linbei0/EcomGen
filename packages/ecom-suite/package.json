@@ -6,9 +6,14 @@
   "exports": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "node scripts/generate-suite-manifest.mjs && tsc -p tsconfig.json",
-    "gen:suites": "node scripts/generate-suite-manifest.mjs",
-    "gen:suites:check": "node scripts/generate-suite-manifest.mjs --check",
+    "build": "tsx scripts/generate-builtin-suites-db.ts && tsc -p tsconfig.json",
+    "gen:suites": "tsx scripts/generate-builtin-suites-db.ts",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13"
   }
 }

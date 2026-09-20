@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ECOM_SUITES, getBuiltinSuite, normalizeSuiteDocument, parseSuiteAssetType, suiteSummary, type SuiteDocumentInput } from "./suite-catalog.js";
+import { getBuiltinSuite, getBuiltinSuitesHash, listBuiltinSuiteIndex, normalizeSuiteDocument, parseSuiteAssetType, suiteSummary, type SuiteDocumentInput } from "./suite-catalog.js";
 
 const validDocument: SuiteDocumentInput = {
   name: "测试套图",
@@ -12,12 +12,27 @@ const validDocument: SuiteDocumentInput = {
 };
 
 describe("suite catalog", () => {
-  it("loads built-in suites and derives asset types", () => {
-    expect(ECOM_SUITES.length).toBeGreaterThanOrEqual(3);
+  it("loads the built-in suite library from SQLite and derives asset types", () => {
+    expect(listBuiltinSuiteIndex()).toHaveLength(953);
     const suite = getBuiltinSuite("suite-hufugehu-jiemianru");
     expect(suite).toBeDefined();
     expect(suite?.origin).toBe("builtin");
     expect(suite?.shots[0]?.assetType).toBe("suite-hufugehu-jiemianru::shot-01");
+    expect(getBuiltinSuite("suite-does-not-exist")).toBeUndefined();
+  });
+
+  it("keeps index summary columns consistent with the full definition", () => {
+    const index = listBuiltinSuiteIndex().find((entry) => entry.id === "suite-hufugehu-jiemianru");
+    const suite = getBuiltinSuite("suite-hufugehu-jiemianru");
+    expect(index).toBeDefined();
+    expect(index?.name).toBe(suite?.name);
+    expect(index?.l1).toBe(suite?.category.l1);
+    expect(index?.l2).toBe(suite?.category.l2);
+    expect(index?.leaf).toBe(suite?.category.leaf);
+  });
+
+  it("exposes the content hash from the meta table", () => {
+    expect(getBuiltinSuitesHash()).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("parses suite asset types", () => {

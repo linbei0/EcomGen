@@ -1,4 +1,5 @@
-import suitesManifest from "./suites-manifest.js";
+import { fileURLToPath } from "node:url";
+import Database from "better-sqlite3";
 
 /** 与 packages/contracts 的 StoryboardShotRole 保持一致；此处独立声明以避免 ecom-skill 依赖 contracts。 */
 export const SUITE_SHOT_ROLES = ["HERO", "PAIN_POINT", "COMPARISON", "SCENE", "DETAIL", "TRUST", "VARIANT", "CTA"] as const;
@@ -85,15 +86,45 @@ export interface SuiteDocumentInput {
   provenance?: Record<string, unknown>;
 }
 
-interface ManifestSuiteEntry {
-  file: string;
+/** 内置套图索引行：只含列表、过滤与排序所需摘要列，不触发 data 反序列化。 */
+export interface BuiltinSuiteIndexEntry {
+  id: string;
+  name: string;
+  l1: string;
+  l2: string;
+  leaf: string;
+  description?: string;
   hash: string;
-  data: SuiteDocumentInput;
 }
 
-const manifest = suitesManifest as unknown as { totalHash: string; suites: ManifestSuiteEntry[] };
+// src 与 dist 中的本模块都位于包根下一级，统一解析到包的 dist/builtin-suites.db：
+// vitest 从 src 直跑与运行时从 dist 加载（Node 解析 symlink 后取真实路径）指向同一份文件。
+const BUILTIN_SUITES_DB_PATH = fileURLToPath(new URL("../dist/builtin-suites.db", import.meta.url));
 
-export const ECOM_SUITES_HASH: string = manifest.totalHash;
+interface BuiltinSuitesConnection {
+  selectData: Database.Statement;
+  selectIndex: Database.Statement;
+  selectTotalHash: Database.Statement;
+}
+
+let connection: BuiltinSuitesConnection | undefined;
+
+/** 首次访问才打开内置库并预编译语句；readonly 打开不产生 journal 副本文件。 */
+function builtinSuites(): BuiltinSuitesConnection {
+  if (connection) return connection;
+  let db: Database.Database;
+  try {
+    db = new Database(BUILTIN_SUITES_DB_PATH, { readonly: true, fileMustExist: true });
+  } catch (error) {
+    throw new Error(`内置套图库 ${BUILTIN_SUITES_DB_PATH} 不存在或无法打开，请先运行 pnpm --filter @ecomgen/ecom-suite build`, { cause: error });
+  }
+  connection = {
+    selectData: db.prepare("SELECT data FROM suites WHERE id = ?"),
+    selectIndex: db.prepare("SELECT id, name, l1, l2, leaf, description, hash FROM suites ORDER BY file"),
+    selectTotalHash: db.prepare("SELECT value FROM meta WHERE key = 'totalHash'")
+  };
+  return connection;
+}
 
 /**
  * 把原始套图文档规范化为运行时结构：补全 assetType、mode、supportsImageReference 与默认值。
@@ -158,14 +189,23 @@ export function normalizeSuiteDocument(input: SuiteDocumentInput, origin: SuiteO
   };
 }
 
-/** 内置套图（随仓库发布，构建期固化进 manifest）。 */
-export const ECOM_SUITES: readonly SuiteDefinition[] = Object.freeze(
-  manifest.suites.map((entry) => normalizeSuiteDocument(entry.data, "builtin"))
-);
-
-/** 按精确 ID 查找内置套图。 */
+/** 按精确 ID 查找内置套图；命中时才反序列化并规范化 data 列。 */
 export function getBuiltinSuite(suiteId: string): SuiteDefinition | undefined {
-  return ECOM_SUITES.find((suite) => suite.id === suiteId);
+  const row = builtinSuites().selectData.get(suiteId) as { data: string } | undefined;
+  if (!row) return undefined;
+  return normalizeSuiteDocument(JSON.parse(row.data) as SuiteDocumentInput, "builtin");
+}
+
+/** 内置套图摘要索引，按套图文件名顺序返回（与历史 manifest 顺序一致）。 */
+export function listBuiltinSuiteIndex(): readonly BuiltinSuiteIndexEntry[] {
+  return builtinSuites().selectIndex.all() as BuiltinSuiteIndexEntry[];
+}
+
+/** 内置套图库整体内容指纹，构建期写入 meta 表。 */
+export function getBuiltinSuitesHash(): string {
+  const row = builtinSuites().selectTotalHash.get() as { value: string } | undefined;
+  if (!row) throw new Error("内置套图库缺少 meta.totalHash，请重新运行 pnpm --filter @ecomgen/ecom-suite build");
+  return row.value;
 }
 
 /** 解析 <suiteId>::<shotId> 形式的 assetType。 */

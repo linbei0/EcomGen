@@ -153,7 +153,8 @@ describe("SuiteCatalog 分页与增量写入", () => {
     const before = catalog.pageSummaries();
 
     catalog.upsertUserSuite(userSuite("custom-suite-inc1", before.items[0].category.l1));
-    const afterInsert = catalog.pageSummaries();
+    // 内置套图数量远超单页，改用唯一名称搜索验证增量写入立即可见，不依赖首页位置。
+    const afterInsert = catalog.pageSummaries({ q: "custom-suite-inc1" });
     expect(afterInsert.items.some((item) => item.id === "custom-suite-inc1")).toBe(true);
     expect(afterInsert.total).toBe(before.total + 1);
     expect(catalog.resolveShot("custom-suite-inc1::shot-1")?.shot.displayName).toBe("主图");
