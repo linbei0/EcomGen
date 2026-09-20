@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-hufugehu-qujiaozhi-shuangshui-b071914ggl",
+  "name": "极简清透质感去角质爽肤水款",
+  "category": {
+    "l1": "护肤个护",
+    "l2": "面部护理",
+    "leaf": "去角质爽肤水",
+    "leafKeywords": [
+      "爽肤水",
+      "化妆水",
+      "去角质",
+      "二次清洁",
+      "清透液体质地",
+      "面部护理"
+    ]
+  },
+  "description": "白底裸瓶硬投影，液面气泡微距与留白信息图位承接肤况与结构主张",
+  "productFamily": "beauty",
+  "styleLock": {
+    "direction": "clinical-minimal skincare commerce",
+    "palette": [
+      {
+        "name": "纯净底白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "暖米灰版面",
+        "hex": "#F2F0ED"
+      },
+      {
+        "name": "银灰渐变台",
+        "hex": "#C9C7C5"
+      },
+      {
+        "name": "香槟液色强调",
+        "hex": "#E2BE88"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless pure white #FFFFFF for packshots, warm off-white #F2F0ED for infographic and selector panels, soft silver-grey gradient sweep #C9C7C5 for the closing set shot",
+    "lightingSystem": "bright neutral high-key studio light, one hard directional key from the upper left, crisp defined cast shadow to the lower right, tight specular streaks on glass and fluid, 5600K",
+    "surfaceSystem": "glossy white acrylic sheet #FFFFFF and matte warm off-white board #F2F0ED, shallow clear glass dish as the only lab surface prop",
+    "typography": "modern geometric sans-serif with generous letter spacing, sparse label rows, every claim kept as an empty placeholder slot",
+    "iconSystem": "thin single-weight circular line icons in #1F1F1F, one icon stacked above one label row",
+    "presentationRules": "product stays upright at a consistent eye-level scale across the set; clear-fluid swatches echo the texture without replacing the product; hard shadow direction never flips",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting or flipped shadow direction",
+      "no mismatched icon weights",
+      "no rendered marketing copy instead of placeholder slots"
+    ],
+    "lockText": "Campaign Style Lock: consistent clinical-minimal skincare visual system across the entire image set; fixed palette of pure white #FFFFFF, warm off-white #F2F0ED, silver-grey sweep #C9C7C5 and one champagne fluid accent #E2BE88; neutral high-key studio lighting with one hard directional key from the upper left and crisp defined cast shadows; modern geometric sans-serif with generous letter spacing; thin single-weight circular line icons only; clean high-end skincare packshots mixed with sparse infographic labelling; every claim carried only as an empty placeholder slot; stable upright eye-level product scale; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no rendered marketing copy."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底裸瓶硬投影主图",
+      "intent": "搜索列表一眼点击：裸瓶立于圆形液面盘前，硬投影建立实验室式极简质感",
+      "assetType": "suite-hufugehu-qujiaozhi-shuangshui-b071914ggl::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, bottle upright, full product visible and centred",
+      "lighting": "bright high-key with one hard directional key from the upper left, crisp defined cast shadow to the lower right, soft contact shadow at the base",
+      "background": "seamless pure white #FFFFFF over a glossy white acrylic sheet #FFFFFF",
+      "props": "one shallow circular disc of clear fluid standing edge-on behind the bottle",
+      "productOccupancy": "60-70%",
+      "whitespace": "no extra whitespace around the product silhouette",
+      "textZone": "none",
+      "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. The bottle stands upright, photographed straight-on at eye level with the full product visible and nothing clipped. Bright high-key studio lighting with one hard directional key from the upper left, a crisp defined cast shadow falling to the lower right and a soft contact shadow grounding the base. One shallow circular disc of clear fluid stands edge-on behind the bottle as a texture echo. Seamless pure white background #FFFFFF over a glossy white acrylic sheet #FFFFFF. The product occupies 60-70% of the frame with no extra whitespace around its silhouette. 8K commercial beauty e-commerce quality. Negative: no brand wordmark, no invented label artwork, no hands, no watermark, no additional props, no in-image copy, no softbox reflection banding, no floating product without a contact shadow, no cut-off cap or base.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "气泡液面三行卖点图",
+      "intent": "主图一秒法则：用倒出的清透液面气泡微距承载三条核心利益位",
+      "assetType": "suite-hufugehu-qujiaozhi-shuangshui-b071914ggl::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "extreme close-up macro photographed from directly above at a 90-degree overhead angle, shallow depth of field, foreground sharp",
+      "lighting": "bright high-key with a skimming side light from the right lifting every bubble rim, faint shadow only in the lower corner",
+      "background": "warm ivory fluid field #F4F1EC with pale champagne highlights #E2BE88",
+      "props": "three thin-line circular icons stacked in the left column",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "generous negative space across the left 40% for the icon and label column",
+      "textZone": "left column, three stacked label rows beneath circular icons",
+      "promptTemplate": "E-commerce benefit hero built from an extreme close-up macro of the clear fluid poured from {product}, photographed from directly above at a 90-degree overhead angle with shallow depth of field and the foreground bubbles razor sharp. {product_identity_lock}. {style_lock}. Bright high-key lighting with a skimming side light from the right that lifts every bubble rim, faint shadow only in the lower frame corner. Warm ivory fluid field #F4F1EC with pale champagne highlights #E2BE88. A vertical stack of three thin-line circular icons sits in the left column, each above one blank label row reading 「{selling_point_1}」, 「{selling_point_2}」 and 「{selling_point_3}」. The macro detail fills 55-60% of the frame, with generous negative space across the left 40% reserved for copy. Negative: no invented efficacy wording, no dense body text, no garbled lettering, no cloned bubble clusters, no chart or data graphics, no hands, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "COMPARISON",
+      "displayName": "肤况双栏圈选对照",
+      "intent": "用同机位同光的双栏肤面特写放大肤色不均问题并留结果主张空位",
+      "assetType": "suite-hufugehu-qujiaozhi-shuangshui-b071914ggl::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "two matched extreme close-up panels, straight-on eye-level macro, identical framing and magnification on both sides",
+      "lighting": "even bright high-key from the upper left, identical on both panels, real pore texture preserved",
+      "background": "warm off-white panel field #F2F0ED framing both halves",
+      "props": "one thin open circle outline marker placed identically in each panel",
+      "productOccupancy": "the two panels together fill 55-60%",
+      "whitespace": "clean headline band across the top 20% of the frame",
+      "textZone": "top headline band plus one label above each panel",
+      "promptTemplate": "E-commerce comparison screen with two matched extreme close-up panels of one anonymous adult cheek and brow region, eye closed, tightly cropped so no identity and no full face reads, both panels photographed straight-on at eye level with identical framing, magnification and light. The left panel holds the untreated skin state; the right panel holds the same state with a soft blurred edge of {product} entering the lower frame corner. {product_identity_lock}. {style_lock}. Even bright high-key light from the upper left with real pore texture preserved and no beauty retouch. Warm off-white panel field #F2F0ED frames both halves, one thin open circle outline in #FFFFFF marking the same zone in each panel. The two panels together fill 55-60% of the frame with a clean headline band across the top 20%. The headline and the two panel labels carry only 「{callout_1}」 and 「{callout_2}」. Negative: no fabricated results, no timelines or test counts, no recognizable face, no plastic smoothed skin, no exposure mismatch between panels, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "玻璃皿引线空标注",
+      "intent": "以实验器皿与引线结构承接质地与配方说明，标签全部留空不写成分数字",
+      "assetType": "suite-hufugehu-qujiaozhi-shuangshui-b071914ggl::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "high 45-degree angle looking down onto a shallow clear glass dish pushed to the right third",
+      "lighting": "bright high-key from the upper left with a thin refracted caustic line and tight glass rim highlights",
+      "background": "seamless pure white #FFFFFF",
+      "props": "shallow round clear glass dish of fluid, two leader lines ending in small open circles",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space across the left 45% for the label blocks",
+      "textZone": "left column, two label blocks each with one empty sub-line",
+      "promptTemplate": "E-commerce detail infographic of {product}, photographed from a high 45-degree angle looking down onto a shallow round clear glass dish filled with the product's fluid, the dish pushed to the right third of the frame. {product_identity_lock}. {style_lock}. Bright high-key light from the upper left with a thin refracted caustic line on the surface and tight glass rim highlights. Seamless pure white background #FFFFFF. Two horizontal leader lines in #1F1F1F run from blank label blocks on the left to small open circles inside the dish, and the label blocks read only 「{callout_3}」 and 「{callout_4}」 with one empty sub-line beneath each. The dish and fluid occupy 50-60% of the frame with generous negative space across the left 45% for copy. Negative: no ingredient names, no percentages or concentrations, no invented composition facts, no tiny unreadable type, no dense body copy, no certification artwork, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "VARIANT",
+      "displayName": "双支选购对照栏",
+      "intent": "并列两支可选方案帮买家自择，要点行全部留空避免真实竞品对比",
+      "assetType": "suite-hufugehu-qujiaozhi-shuangshui-b071914ggl::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level pair of upright bottles, identical scale on both",
+      "lighting": "high-key from the upper left, one crisp defined shadow to the right of each bottle, identical on both",
+      "background": "warm off-white board #F2F0ED",
+      "props": "one plain unlabeled companion bottle silhouette beside {product}, two blank title blocks with empty bullet rows",
+      "productOccupancy": "the pair occupies 60-70% overall",
+      "whitespace": "balanced whitespace along the top band for the headline",
+      "textZone": "one title block plus three empty bullet rows under each bottle",
+      "promptTemplate": "E-commerce variant selector screen, two upright bottles standing side by side photographed straight-on at eye level with identical scale and identical hard directional light, one of them {product} and the other a plain unlabeled companion routine bottle in a matte frosted silhouette. {product_identity_lock}. {style_lock}. High-key studio light from the upper left casting one crisp defined shadow to the right of each bottle. Warm off-white board #F2F0ED. Beneath each bottle sits one blank title block reading 「{callout_5}」 and 「{callout_6}」 above three empty bullet rows with small #1F1F1F dot markers. The pair occupies 60-70% of the frame overall with balanced whitespace along the top band for the headline. Negative: no competitor marks or real brand comparison, no invented claims inside the bullet rows, no mixed lighting between the two units, no mismatched bottle scale, no garbled lettering, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "双瓶低角度组合收口",
+      "intent": "仰拍双瓶组合收口，留出行动条空位引导下单而不写任何优惠数字",
+      "assetType": "suite-hufugehu-qujiaozhi-shuangshui-b071914ggl::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "very low angle looking slightly upward at the upright bottle, second unit leaning in behind at a tilt",
+      "lighting": "bright high-key with one hard directional key from the upper left, crisp cast shadows and a clean specular streak down the glass",
+      "background": "soft silver-grey gradient sweep #C9C7C5 over a curved white shelf edge #FFFFFF",
+      "props": "none",
+      "productOccupancy": "the pair occupies 55-60% overall",
+      "whitespace": "generous negative space across the upper third for the closing line",
+      "textZone": "one blank pill-shaped action slot at the lower centre",
+      "promptTemplate": "Product photography of {product} for the closing frame, photographed from a very low angle looking slightly upward at the upright bottle while a second identical unit leans in behind it at a tilt. {product_identity_lock}. {style_lock}. Bright high-key studio light with one hard directional key from the upper left, crisp cast shadows and a clean specular streak down the glass. Soft silver-grey gradient sweep #C9C7C5 behind a curved white shelf edge #FFFFFF in the foreground. The pair occupies 55-60% of the frame overall, with generous negative space across the upper third for the closing line and one blank pill-shaped action slot at the lower centre reading 「{callout_7}」. Negative: no invented discount figures, no countdown or price tags, no leaning unit without a contact shadow, no duplicated bottle artefacts, no extra text, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "逐图事实：1 裸瓶直立于圆形透明液面盘前，白底硬投影；2 双栏肤面特写（闭眼、仅颊部与眉下裁切）配细线圈选区、顶部主张行与底部注释行；3 清透液体气泡微距，左列三枚细线圆形图标各带一行主张；4 圆形玻璃皿液体高位俯拍，左侧两段引线连至小圈端点与说明文字；5 双支同框，一直立一倾斜靠后，银灰渐变棚拍白弧台；6 两支并列选购对照栏，各带标题与要点行。品类判定以图为准：透明液体+滴嘴瓶型+肤面示意+选购对照，属护理清洁类而非着色彩妆，故判 护肤个护/面部护理（源类目路径仅作线索，未采信）。已剥离：品牌字标与系列名、成分名与浓度数字、酸碱度数值、测试人数与周期、全部功效断言原句与图内英文文案原句、模特身份（仅保留无身份肤面特写）；所有具体主张改为 {selling_point}／{callout} 空位，产品一律以 {product} 占位。"
+  }
+}

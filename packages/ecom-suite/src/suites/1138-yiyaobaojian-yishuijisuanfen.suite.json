@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-yiyaobaojian-yishuijisuanfen",
+  "name": "钴蓝撞色罐装营养补剂款",
+  "category": {
+    "l1": "医药保健",
+    "l2": "营养补充",
+    "leaf": "一水肌酸粉",
+    "leafKeywords": [
+      "肌酸粉",
+      "一水肌酸",
+      "运动营养补剂",
+      "罐装粉剂",
+      "无味冲调",
+      "营养成分表"
+    ]
+  },
+  "description": "钴蓝斜切撞色罐装补剂套图，白底主图加空白参数表与空印章墙",
+  "productFamily": "food",
+  "styleLock": {
+    "direction": "clinical sports-nutrition ecommerce",
+    "palette": [
+      {
+        "name": "亮键底",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "浅灰场",
+        "hex": "#F2F5F7"
+      },
+      {
+        "name": "饱和品牌场",
+        "hex": "#0C5DA6"
+      },
+      {
+        "name": "深墨线",
+        "hex": "#101820"
+      }
+    ],
+    "temperature": "cool",
+    "backgroundSystem": "alternating bright key field #FFFFFF, cool light field #F2F5F7 and one saturated brand field #0C5DA6, every frame split by a hard diagonal colour wedge edged in deep ink #101820",
+    "lightingSystem": "bright even high-key studio light, frontal key with a soft fill card on the shadow side, one soft contact shadow grounding the container, no harsh speculars, macro shots lit by a single skimming light",
+    "surfaceSystem": "glossy seamless studio sweep #FFFFFF and matte board #F2F5F7, container always sitting flush with a real contact shadow",
+    "typography": "modern geometric sans-serif with heavy condensed display weights and hairline rules; all printed areas are carried as blank bars and empty ruled rows, never as legible characters",
+    "iconSystem": "thin single-weight circular seal frames with two short blank bars inside, outlined in deep ink #101820 on a bright interior #FFFFFF, no filled pictograms and no real certification marks",
+    "presentationRules": "the wide-mouth tub stays upright at stable scale with its label face toward camera across the set; angle, size and cap position must not drift between shots",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no mismatched icon styles",
+      "no legible words, digits or barcodes inside blank panels"
+    ],
+    "lockText": "Campaign Style Lock: consistent clinical sports-nutrition ecommerce visual system across the entire image set; fixed palette of a bright key field #FFFFFF, a cool light field #F2F5F7, one saturated brand field #0C5DA6 and deep ink #101820 for outlines and rules; cool studio tone held across the set; every frame split by a hard diagonal colour wedge; modern geometric sans-serif with heavy condensed display weights and hairline rules; consistent thin single-weight circular seal frames and blank label bars; bright even high-key lighting with a frontal key, soft fill card and one soft contact shadow; the wide-mouth container always upright at stable scale with its label face toward camera; all printed areas rendered as flat blank panels, empty ruled rows and empty seal frames, never as legible characters; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底罐装正面主图",
+      "intent": "在搜索列表里一眼夺点击，用纯背景合规主图立住罐型轮廓。",
+      "assetType": "suite-yiyaobaojian-yishuijisuanfen::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, tub standing upright dead centre, lid line parallel to the top edge, full product visible",
+      "lighting": "bright even high-key studio light, frontal key with a soft fill card on the shadow side, soft contact shadow under the base",
+      "background": "seamless bright key field #FFFFFF with one hard diagonal wedge of saturated brand field #0C5DA6 entering the lower-right corner and a hairline of deep ink #101820 along its edge",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "generous even margin on all four sides, no copy zone",
+      "textZone": "none",
+      "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. The upright wide-mouth tub standing dead centre in a straight-on eye-level view, lid line parallel to the top edge, full product visible with nothing cropped. Bright even high-key studio light from the front with a soft fill card on the shadow side, no harsh speculars and no warped straight lines, one soft contact shadow under the base. Seamless bright key field #FFFFFF with one hard diagonal wedge of saturated brand field #0C5DA6 entering the lower-right corner and a hairline of deep ink #101820 along its edge; every printed area stays a flat blank panel. The product occupies 60-70% of the frame with generous even margin on all four sides. Square marketplace main-image crop at 2K. Negative: no props, no hands, no watermark, no fake logo, no barcode, no legible words, no digits, no gradient background, no cut-off edges, no floating product, no plastic-looking food, no insects or contamination, no unrealistic portion size, no mould.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "撞色三格卖点图",
+      "intent": "主图一秒法则：斜切撞色加三格留空参数位，把核心主张压在一屏内。",
+      "assetType": "suite-yiyaobaojian-yishuijisuanfen::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle from camera left, tub pushed into the right half, framed from shoulder to base",
+      "lighting": "even high-key frontal key with soft fill, single soft contact shadow",
+      "background": "flat saturated brand field #0C5DA6 across the upper two thirds stepping down to a bright key panel #FFFFFF along the lower band, split by a hard diagonal wedge edged in deep ink #101820",
+      "props": "three empty rounded-corner stat cells separated by hairline vertical rules on the lower band",
+      "productOccupancy": "50-60%",
+      "whitespace": "clean negative space across the top third reserved for a headline slot",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. The tub shown at a slight 3/4 angle from camera left and pushed into the right half of the frame, framed from shoulder to base. Flat saturated brand field #0C5DA6 across the upper two thirds stepping down to a bright key panel #FFFFFF along the lower band, the two divided by a hard diagonal wedge edged in deep ink #101820. Even high-key frontal key light with a soft fill card and one soft contact shadow under the base. Three empty rounded-corner stat cells sit on the lower band, separated by hairline vertical rules and left completely blank. The product occupies 50-60% of the frame, with generous clean negative space across the top third reserved for a headline slot. Square 2K ecommerce frame. Negative: no legible words or digits inside the stat cells, no more than one visual idea, no invented efficacy claims, no fake logo, no watermark, no props covering the product, no plastic-looking food, no insects or contamination, no unrealistic portion size, no mould.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "空白参数表规格图",
+      "intent": "用一张留空参数表承接成分与规格疑虑，所有数值行一律空着由后期填。",
+      "assetType": "suite-yiyaobaojian-yishuijisuanfen::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed from a high 45-degree angle looking down, tub at the left and a squared blank facts card upright at the right",
+      "lighting": "flat even high-key light, minimal shadow, one soft contact shadow under the base",
+      "background": "cool light field #F2F5F7 with a squared bright card inset #FFFFFF carrying the empty table frame",
+      "props": "one rectangular table frame with empty ruled parameter rows and an empty right-hand value column, no glyphs",
+      "productOccupancy": "50-60%",
+      "whitespace": "wide internal margins kept inside the card, no additional copy zone",
+      "textZone": "none",
+      "promptTemplate": "E-commerce infographic spec screen of {product}. {product_identity_lock}. {style_lock}. Photographed from a high 45-degree angle looking down over the shoulder of the tub at the left while a squared blank facts card stands upright at the right. Cool light field #F2F5F7 with a bright card inset #FFFFFF carrying one rectangular table frame of empty ruled parameter rows and an empty right-hand value column. Flat even high-key light with minimal shadow and one soft contact shadow grounding the base. The product occupies 50-60% of the frame, and wide internal margins are kept inside the card with no additional copy zone. Square 2K ecommerce layout. Negative: no digits, no legible letters or words, no fabricated ingredient amounts, no percentages, no barcode, no dense body text, no warped table lines, no plastic-looking food, no insects or contamination, no unrealistic portion size, no mould.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "TRUST",
+      "displayName": "环形空印章信任墙",
+      "intent": "用一圈留白印章框承接资质背书，具体认证字样一律不落地以消除风险。",
+      "assetType": "suite-yiyaobaojian-yishuijisuanfen::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "strictly symmetrical straight-on eye-level view, six empty circular seal frames ringed around the small centred tub",
+      "lighting": "even clean frontal studio light, soft contact shadow under the container",
+      "background": "flat saturated brand field #0C5DA6 with faint faceted planes in a deeper tint of the same hue behind",
+      "props": "six blank circular seal frames outlined in deep ink #101820 with bright interiors #FFFFFF and two short blank bars inside each",
+      "productOccupancy": "50-60%",
+      "whitespace": "even radial margins left between the seal frames",
+      "textZone": "none",
+      "promptTemplate": "E-commerce trust screen of {product}. {product_identity_lock}. {style_lock}. A strictly symmetrical straight-on eye-level composition: the tub sits small and centred in the lower middle while six empty circular seal frames ring around it, each outlined in deep ink #101820 with a bright interior #FFFFFF and two short blank bars inside. Flat saturated brand field #0C5DA6 with faint faceted planes in a deeper tint of the same hue behind. Even clean frontal studio light and one soft contact shadow grounding the tub. The product occupies 50-60% of the frame with even radial margins left between the seal frames. Square 2K ecommerce layout. Negative: do NOT invent certifications, awards, ratings, lab results or test data; no legible badge text, no digits, no real certification marks, no watermark, no fake logo, no duplicated seal shapes, no plastic-looking food, no insects or contamination, no unrealistic portion size, no mould.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "罐口螺纹密封微距",
+      "intent": "以封口与罐口螺纹的微距做工证明密封与卫生，替掉原背标的所有文字主张。",
+      "assetType": "suite-yiyaobaojian-yishuijisuanfen::shot-05",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "4:5",
+      "resolution": "2K",
+      "camera": "extreme close-up macro, tight zoom on the screw-thread collar, cap seam and label edge, shot from a low side angle looking slightly upward",
+      "lighting": "a single skimming light from the upper left sweeping across the moulded threads, controlled highlight, deep falloff at the frame edges",
+      "background": "the container's own collar and cap edge filling the frame into deep ink #101820 with a sliver of saturated brand field #0C5DA6 at the far edge",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the detail itself is the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on the screw-thread collar, the seal seam under the cap and the outer edge of the label. {product_identity_lock}. {style_lock}. Shot from a low side angle looking slightly upward, shallow depth of field with the foreground thread kept sharp. A single skimming light from the upper left sweeps across the moulded threads to reveal texture, with a controlled highlight and deep falloff at the frame edges. The surrounding surface reads as deep ink #101820 with a sliver of saturated brand field #0C5DA6 at the far edge. The detail fills 55-60% of the frame and whitespace stays minimal because the detail is the subject. Vertical 4:5 macro at 2K. Negative: no blurry subject, no duplicated threads or doubled label edges, no warped straight lines, no legible words, no digits, no barcode, no watermark, no fingers, no plastic-looking food, no insects or contamination, no unrealistic portion size, no mould.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "双罐组合收口图",
+      "intent": "收口促单：双罐并排暗示组合装，下方空横幅只留给优惠信息但不落任何数字。",
+      "assetType": "suite-yiyaobaojian-yishuijisuanfen::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level group view of two identical units side by side, both fully visible and matched in scale",
+      "lighting": "even soft high-key studio light with matched soft contact shadows under both bases",
+      "background": "flat saturated brand field #0C5DA6 with a blank rounded band #FFFFFF across the lower third edged in a hairline of deep ink #101820",
+      "props": "one empty rounded banner shape with no glyphs inside",
+      "productOccupancy": "55-60% overall",
+      "whitespace": "the lower band stays clear as an offer slot, no other text zone",
+      "textZone": "none",
+      "promptTemplate": "E-commerce promo close of {product}. {product_identity_lock}. {style_lock}. A straight-on eye-level group view of two identical units standing side by side, both fully visible and matched in scale. Flat saturated brand field #0C5DA6 with a blank rounded band #FFFFFF floating across the lower third as an empty offer slot, edged with a hairline of deep ink #101820. Even soft high-key studio light with matched contact shadows grounding both bases. The pair occupies 55-60% of the frame overall and the lower band stays clear for copy while no other text zone is used. Square 2K ecommerce frame. Negative: no invented discounts, no price tags, no countdown timers, no digits, no legible words, no marketplace badges or star ratings, no watermark, no fake logo, no mismatched scale between the two units, no plastic-looking food, no insects or contamination, no unrealistic portion size, no mould.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：图一为纯背景罐装正面主图，右下角斜切色块、肩部级三格参数条与两枚圆形印章；图二为深场底营养成分表信息图，标题条＋两行规格＋一条空参数行＋脚注框，底部另置三格参数条；图三为深场底环形印章信任墙，中心为字标、外圈六枚圆形认证印章；图四为罐背标签视角，含建议用量说明框、三行条目化主张、警示段、储存说明段、方框背书条与条码区；图五为罐侧后视角，蓝色标签面上置营养成分表、中部免责框、底边一排小印章。品类判定依据：源类目路径仅作提示，按图判为口服粉剂类营养补充，故归医药保健/营养补充；不落食品饮料/冲调（无冲饮场景与食用呈现），也不落护肤个护（无外用质地表达）。已剥离内容：品牌字标、系列名与原平台店铺字样、三格参数条与表内全部数值及成分含量、工艺与纯度类主张、认证与检测类字样、免责原句、条码、原图英文文案与圆形印章内的具体资质文字，全部改为空白参数行、空表格单元、空印章框与留空横幅；产品一律以 {product} 占位，末镜收口沿用同套斜切撞色结构（源套图无促销帧，仅复用撞色版式）。"
+  }
+}

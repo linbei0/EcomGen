@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-hufugehu-huacui-zirun-muyulu",
+  "name": "花萃滋润淡香沐浴露款",
+  "category": {
+    "l1": "护肤个护",
+    "l2": "身体清洁",
+    "leaf": "花萃滋润沐浴露",
+    "leafKeywords": ["沐浴露", "沐浴乳", "滋润", "花香", "身体清洁", "泵瓶"]
+  },
+  "description": "玫瑰粉调花境沐浴露套图：花境主图、痛点四格、质地微距、浴室场景与收口",
+  "productFamily": "beauty",
+  "styleLock": {
+    "direction": "soft floral body-cleansing ecommerce",
+    "palette": [
+      {
+        "name": "玫瑰粉",
+        "hex": "#F6E3E7"
+      },
+      {
+        "name": "胭脂玫红",
+        "hex": "#C2417B"
+      },
+      {
+        "name": "象牙白",
+        "hex": "#FBF6F1"
+      },
+      {
+        "name": "深酒红",
+        "hex": "#6E2440"
+      }
+    ],
+    "temperature": "warm",
+    "backgroundSystem": "draped blush rose-pink silk #F6E3E7 for the hero, clean ivory #FBF6F1 for info shots, deep wine-red #6E2440 stage for the closing shot",
+    "lightingSystem": "bright soft studio lighting with a gentle front-left key, soft contact shadows, delicate warm glow, no harsh speculars",
+    "surfaceSystem": "matte warm stone shelf #EDE4DA and silk drape, scattered fresh rose petals",
+    "typography": "modern geometric sans-serif",
+    "iconSystem": "thin-line icons and empty circular badge frames only, single accent color",
+    "presentationRules": "stable upright pump-bottle presentation at a consistent scale, centered hero placement",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no mismatched icon styles"
+    ],
+    "lockText": "Campaign Style Lock: consistent soft floral body-cleansing ecommerce visual system across the entire image set; fixed palette of blush rose-pink #F6E3E7, ivory white #FBF6F1, magenta-rose accent #C2417B and deep wine-red #6E2440; bright soft studio lighting with a gentle front-left key, soft contact shadows and delicate petal-strewn styling; modern geometric sans-serif; consistent thin-line icon style; clean high-end skincare photography mixed with minimal infographic elements; stable upright pump-bottle presentation at a consistent scale; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "玫瑰花境泵瓶主图",
+      "intent": "首屏以花境与干净瓶身赢得点击，顶部留出标题位",
+      "assetType": "suite-hufugehu-huacui-zirun-muyulu::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level view, upright pump bottle fully visible",
+      "lighting": "bright soft studio light from the front left, gentle contact shadow",
+      "background": "draped blush rose-pink silk #F6E3E7",
+      "props": "scattered fresh rose petals and one soft cream swirl at the base",
+      "productOccupancy": "60-70%",
+      "whitespace": "generous negative space across the top quarter for headline copy",
+      "textZone": "none",
+      "promptTemplate": "Product hero photography of {product}. {product_identity_lock}. {style_lock}. The upright pump bottle centered on a draped blush rose-pink silk backdrop #F6E3E7, photographed straight-on at eye level with the full bottle visible, scattered fresh rose petals and one soft cream swirl at the base, four empty circular badge frames floating near the upper corners left completely blank. Bright soft studio light from the front left, a gentle contact shadow grounding the bottle. The product occupies 60-70% of the frame with generous negative space across the top quarter for headline copy. 2K commercial beauty quality. Negative: no brand wordmarks or logos, no readable text, no model face, no QR code, no watermark, no invented ingredient or efficacy claims, no cut-off edges.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "PAIN_POINT",
+      "displayName": "干燥粗糙肌肤四格痛点",
+      "intent": "用四格真实质感放大干燥粗糙暗哑的沐浴痛点，引出产品",
+      "assetType": "suite-hufugehu-huacui-zirun-muyulu::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "straight-on frontal framing of a two-by-two documentary grid",
+      "lighting": "even flat documentary light on the grid, softer warm glow on the product side",
+      "background": "clean ivory #FBF6F1",
+      "props": "thin magenta-rose border frames #C2417B with small blank label plates under each crop",
+      "productOccupancy": "40-50%",
+      "whitespace": "clear headline band of negative space across the top",
+      "textZone": "none",
+      "promptTemplate": "E-commerce pain-point infographic of {product}. {product_identity_lock}. {style_lock}. A straight-on frontal two-by-two grid of four documentary close-up crops showing abstract dry, rough, dull and flaky skin textures on arms and shoulders only, each crop framed by a thin magenta-rose border #C2417B with a small blank label plate below, the upright bottle standing at the lower right in softer clean light as the resolution. Even flat documentary lighting across the grid, a softer warm glow on the product. Background clean ivory #FBF6F1. The four crops and the bottle together occupy 40-50% of the frame with a clear headline band of negative space across the top. Negative: no real model face, no wounds or diseased skin, no fabricated statistics or percentages, no readable text, no watermark, no third-party brand logos, no clutter.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "花萃乳质地微距",
+      "intent": "以微距乳液质地与花瓣证明滋润亲肤的质感",
+      "assetType": "suite-hufugehu-huacui-zirun-muyulu::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "90-degree overhead top-down macro, tight zoom",
+      "lighting": "skimming soft side light revealing creamy texture, tiny pearl highlights",
+      "background": "deep wine-red rose petal field #6E2440",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the texture detail is the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}. {product_identity_lock}. {style_lock}. A tight zoom on a slow-running swirl of pearly lotion beading on a fresh rose petal, photographed directly from above at a 90-degree overhead angle, shallow depth of field with the droplet edge razor sharp. Skimming soft side light from the right revealing the creamy texture with tiny pearl highlights. Background of deep wine-red rose petals #6E2440 filling the frame. The texture detail fills 55-60% of the frame with minimal whitespace, the detail is the subject. Negative: no blurry subject, no plastic-looking liquid, no fabricated ingredient percentages, no readable text, no watermark, no duplicated petals, no floating droplets.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "晨间浴室背影场景",
+      "intent": "背影使用场景代入真实沐浴时刻，产品仍是主角",
+      "assetType": "suite-hufugehu-huacui-zirun-muyulu::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight 3/4 eye-level candid view",
+      "lighting": "soft warm morning window light from the left around 5000K, gentle steam glow, soft contact shadow",
+      "background": "warm stone shower niche tiles #EDE4DA with light steam",
+      "props": "a folded towel on the stone shelf, not covering the product",
+      "productOccupancy": "40-50%",
+      "whitespace": "no extra whitespace",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle shower scene featuring {product}. {product_identity_lock}. {style_lock}. A woman seen only from behind, bare shoulders and back, reaching toward the upright bottle standing on a warm stone shower niche shelf, gentle steam in the air, photographed at a slight 3/4 eye-level with a candid feel. Soft warm morning window light from the left around 5000K, gentle steam glow, a soft contact shadow under the bottle. Background warm stone tiles #EDE4DA with a folded towel nearby, props not covering the product. The product occupies 40-50% of the frame, no extra whitespace. Negative: no recognizable face, no frontal face crop, no hands covering the product label, no readable text, no watermark, no fake logo, no cluttered bathroom mess.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "CTA",
+      "displayName": "玫红光晕收口",
+      "intent": "深玫红收口氛围配空白按钮位，促成下单动作",
+      "assetType": "suite-hufugehu-huacui-zirun-muyulu::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slightly low angle from below for a gentle heroic close",
+      "lighting": "warm punchy key light with a soft rim from the right, gentle floor reflection",
+      "background": "deep wine-red gradient stage #6E2440 with a soft blush halo",
+      "props": "drifting rose petals and one empty rounded button plate beside the base",
+      "productOccupancy": "55-60%",
+      "whitespace": "generous negative space on the right 40% for closing copy",
+      "textZone": "none",
+      "promptTemplate": "E-commerce closing promo of {product}. {product_identity_lock}. {style_lock}. The bottle centered on a deep wine-red gradient stage #6E2440 with drifting rose petals and a soft blush halo behind it, photographed from a slightly low angle from below to give the bottle quiet presence, one empty rounded button plate and two blank petal-shaped tag plates resting beside the base. Warm punchy key light with a soft rim from the right, a gentle floor reflection, soft contact shadow. The product occupies 55-60% of the frame with generous negative space on the right 40% for closing copy. Negative: no invented discounts, prices or countdowns, no membership badges, no QR code, no readable text, no fake logo, no watermark, no third-party product bottles.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐屏事实：屏1为玫瑰花境卖点主图，泵瓶居中、四枚圆形卖点徽章环绕、花瓣与乳霜装饰，下方并列沐浴乳与身体乳两件套及参数行；屏2为参数行（品名玫瑰滋养丝滑沐浴乳、规格250ml、成分突厥蔷薇/玫瑰花/松茸/海藻）加四格肌肤状态痛点（干燥粗糙、暗哑无光、毛孔堵塞、死皮老皮，均为手臂背部局部无面容）与配套场景；屏3为环形成分轮盘（玫瑰、松茸、海藻、牛油果）与肌肤横截面对比示意图及线稿使用步骤；屏4为沐浴乳与身体乳使用步骤图（温水湿身、涂抹全身轻柔按摩、清水冲净）与产品实拍；屏5为产品实拍、跨品推荐网格与入会二维码会员角标。品类判定：参数区品名为沐浴乳，使用步骤为身体清洁流程（温水湿身、涂全身、冲净），用于身体而非面部，故判护肤个护/身体清洁，源夹名「洗护」与本判定一致；历史上洗护夹有改判先例，本件以参数区品名与使用部位硬证据定类。已剥离：品牌字标与瓶身花体标贴、原文案原句、功效断言（如紧致修护、补水保湿、丝滑滋养等一律不作为事实写入）、规格250ml等数值改占位、第三方品牌推荐网格、入会二维码与会员角标、促销字样；原文数值与功效均改为空白占位或删除。"
+  }
+}

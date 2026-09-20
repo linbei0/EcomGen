@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-neiyijiajufu-nanshi-duojianzhuang-pingjiaoku-b086ksdtq4",
+  "name": "男士平角内裤多件装堆叠款",
+  "category": {
+    "l1": "内衣家居服",
+    "l2": "男士内衣",
+    "leaf": "男士平角内裤多件装",
+    "leafKeywords": [
+      "男士内裤",
+      "平角内裤",
+      "四角裤",
+      "多件装",
+      "贴身衣物",
+      "腰头舒适"
+    ]
+  },
+  "description": "多件装平角内裤，堆叠主图、面料微距与腰头标注逐镜拆解",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "premium menswear basics ecommerce",
+    "palette": [
+      {
+        "name": "底白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "中性浅灰",
+        "hex": "#E9E9EA"
+      },
+      {
+        "name": "暖燕麦麻",
+        "hex": "#EFE7DA"
+      },
+      {
+        "name": "强调石墨",
+        "hex": "#3A4550"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless clean white #FFFFFF for packshots, smooth neutral grey board #E9E9EA for infographic screens, warm oat linen #EFE7DA for the lifestyle rail scene",
+    "lightingSystem": "large soft front key around 5500K with bounce fill, gentle contact shadows, no harsh speculars, skimming light only for fabric texture",
+    "surfaceSystem": "matte warm oat linen #EFE7DA and smooth neutral grey board #E9E9EA",
+    "typography": "modern geometric sans-serif, copy carried only as blank placeholder baselines",
+    "iconSystem": "thin single-weight line icons on a dark disc, one accent colour only",
+    "presentationRules": "garments shown only as flat lay, hanging, or cropped waist-down unidentifiable partial views with no face and no legible waistband lettering; stable garment scale across the set",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no brand lettering on waistbands"
+    ],
+    "lockText": "Campaign Style Lock: consistent premium menswear basics visual system across the entire image set; fixed palette of clean white #FFFFFF, neutral light grey #E9E9EA, warm oat linen #EFE7DA and one graphite accent #3A4550; neutral studio lighting around 5500K with a large soft front key, bounce fill and gentle contact shadows; modern geometric sans-serif with copy only as blank placeholder baselines; thin single-weight line icons; clean high-end apparel product photography mixed with minimal infographic structure; garments presented only as flat lay, hanging, or cropped waist-down unidentifiable partial views with no face and no legible waistband lettering; stable garment scale and placement; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no brand logos."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "多件装堆叠白底主图",
+      "intent": "搜索结果页一眼看清件数与双色组合，抢到点击",
+      "assetType": "suite-neiyijiajufu-nanshi-duojianzhuang-pingjiaoku-b086ksdtq4::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "straight-on eye-level view, pieces in two cascading rows of three facing the lens",
+      "lighting": "bright even high-key studio light, large soft front key with bounce fill, soft contact shadows",
+      "background": "seamless clean white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "even clean margin on all four sides, no extra whitespace inside the arrangement",
+      "textZone": "none",
+      "promptTemplate": "E-commerce hero packshot of {product}. {product_identity_lock}. {style_lock}. Photographed straight-on at eye level with the pieces arranged in two cascading rows of three, front facades square to the lens. Bright even high-key studio light with a large soft front key and a bounce card, soft contact shadows grounding each piece. Seamless clean white background #FFFFFF. The set occupies 60-70% of the frame with an even margin on all four sides and no extra whitespace inside. 8K commercial apparel e-commerce quality. Negative: no model, no hands, no face, no legible lettering on the waistband, no watermark, no star ratings or platform badges, no text, no cut-off edges, no garments floating without contact shadow.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "面料核心卖点标注图",
+      "intent": "一秒传达贴身舒适的核心主张，承接首图点击",
+      "assetType": "suite-neiyijiajufu-nanshi-duojianzhuang-pingjiaoku-b086ksdtq4::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle on an invisible ghost mannequin, placed at the left of frame",
+      "lighting": "soft front-left key with even fill, gentle contact shadow, 5500K",
+      "background": "smooth neutral grey board #E9E9EA with graphite #3A4550 bands top and bottom",
+      "props": "one thin-line icon disc badge on the right",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space on the right 35% for the badge and copy",
+      "textZone": "右侧圆形徽章位与上下横条留白",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. Shown on an invisible ghost mannequin at a slight 3/4 angle, sitting on the left side of the frame. Soft front-left key light with even fill at 5500K and a gentle contact shadow. Smooth neutral grey background #E9E9EA with a graphite #3A4550 reserved band along the top edge and the bottom edge. One thin-line icon disc floats on the right above generous negative space taking the right 35% of the frame for copy, with the headline left as the blank placeholder 「{selling_point_1}」 and one short label 「{callout_1}」 on an empty baseline. The product occupies 50-60% of the frame. Negative: no model face, no identifiable person, no brand lettering, no readable composition percentages or test figures, no more than one claim, no dense body text, no watermark, no fake badge seals.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "卧室挂杆晨间场景",
+      "intent": "用挂装与叠放交代日常穿着与收纳，让买者自我代入",
+      "assetType": "suite-neiyijiajufu-nanshi-duojianzhuang-pingjiaoku-b086ksdtq4::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "high 45-degree angle looking down onto the bedding with the rail behind",
+      "lighting": "soft window daylight from the left around 5500K, gentle directional shadow to the right",
+      "background": "warm oat linen bedding #EFE7DA",
+      "props": "one slim wooden hanger on a low rail and a second folded piece, never covering the product",
+      "productOccupancy": "40-50%",
+      "whitespace": "breathing negative space across the upper left third for copy",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene of {product} hanging on a slim wooden hanger from a low rail above warm oat linen bedding #EFE7DA, with a second piece neatly folded beneath it. {product_identity_lock}. {style_lock}. Photographed from a high 45-degree angle looking down, candid and unposed. Soft window daylight from the left around 5500K with one consistent shadow direction falling to the right. No person in frame, the garment is styled on the hanger so it keeps its worn shape. Props limited to the hanger and the folded piece. The product occupies 40-50% of the frame with breathing negative space across the upper left third for copy. Negative: no model, no hands, no face, no skin, no brand lettering, no bedroom clutter, no extra text, no watermark, no contradictory light directions, no floating hanger without shadow.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "针织织纹微距特写",
+      "intent": "用织纹与缝线本身证明面料与做工",
+      "assetType": "suite-neiyijiajufu-nanshi-duojianzhuang-pingjiaoku-b086ksdtq4::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "extreme close-up macro with the lens parallel to the draped fabric surface, tight zoom on the weave",
+      "lighting": "skimming side light from the upper left sweeping across the ribbed weave, controlled highlight",
+      "background": "the same cloth in deep charcoal #1D1D1B filling the frame",
+      "props": "none",
+      "productOccupancy": "55-60%",
+      "whitespace": "minimal, the weave fills the frame",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of the knit cloth of {product}, tight zoom on the ribbed weave and the flat seam line. {product_identity_lock}. {style_lock}. Lens held parallel to the gently draped surface, shallow depth of field with the nearest stitches sharp and the far edge softening. Skimming side light from the upper left sweeping across the weave to reveal texture without blown highlights. The cloth fills the frame in deep charcoal #1D1D1B with a cool graphite #3A4550 shadow side. The detail fills 55-60% of the frame, minimal whitespace since the weave is the subject. Two thin-line icons sit above blank label baselines near the bottom edge with no rendered words. Negative: no blurry subject, no plastic-looking or vinyl fabric, no visible brand lettering, no legible text, no duplicated weave artifacts, no watermark, no added props.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "侧身腰头三点标注",
+      "intent": "以侧身结构讲清腰头、侧缝与裤脚，消除版型疑虑",
+      "assetType": "suite-neiyijiajufu-nanshi-duojianzhuang-pingjiaoku-b086ksdtq4::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "clean 90-degree side profile of a waist-down partial view, head and chest fully outside the frame",
+      "lighting": "even soft wraparound studio light at 5500K, low contrast, faint contact shadow",
+      "background": "smooth neutral grey board #E9E9EA",
+      "props": "none",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space on the right 40% for three callout rules",
+      "textZone": "右侧 40% 三条分隔线标签区",
+      "promptTemplate": "E-commerce structure detail of {product} styled as a generic unidentifiable waist-down partial view with the head, chest and face fully cropped outside the frame. {product_identity_lock}. {style_lock}. Photographed from a clean 90-degree side profile so the waistband, the side seam and the leg opening read in one continuous line. Even soft wraparound studio light at 5500K, low contrast, a faint contact shadow at the hem. Smooth neutral grey background #E9E9EA. The garment occupies 50-60% of the frame on the left with generous negative space on the right 40% for three thin callout rules and labels left as the blank placeholders 「{callout_1}」, 「{callout_2}」 and 「{callout_3}」. No numbers, no unit marks, no measurements anywhere. Negative: no face, no identifiable person, no anatomy emphasis, no legible waistband lettering, no invented dimension figures, no dense body text, no watermark, no arrows pointing at real competitor parts.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "平铺全家福空印章位",
+      "intent": "以平铺全家福交代件数与配色并留出空白取证位，收口降风险",
+      "assetType": "suite-neiyijiajufu-nanshi-duojianzhuang-pingjiaoku-b086ksdtq4::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "flat lay, photographed directly from above at a 90-degree overhead angle",
+      "lighting": "even high-key flat lighting, almost no shadow, no harsh speculars",
+      "background": "seamless clean white #FFFFFF",
+      "props": "three blank parameter rows and two empty seal frames",
+      "productOccupancy": "35-40%",
+      "whitespace": "generous even margin on all four sides for copy",
+      "textZone": "底部三条空白参数行与右侧空印章框",
+      "promptTemplate": "E-commerce trust flat lay of {product}, pieces arranged in a tidy overlapping row with one folded stack at the side, photographed directly from above at a 90-degree overhead angle. {product_identity_lock}. {style_lock}. Even high-key flat lighting with almost no shadow so every silhouette reads cleanly on a seamless clean white background #FFFFFF. Two colourways shown, a heather grey #A7A9AC and a solid charcoal #1D1D1B, with identical placement and light for each. Proof is carried by empty placeholders only: three blank parameter rows and two empty seal frames with no marks, plus one baseline reading 「{callout_1}」. The set occupies 35-40% of the frame with a generous even margin on all four sides for copy. Negative: no certifications, no awards, no ratings, no lab figures, no filled-in seal stamps or checkmarks, no brand lettering, no model, no watermark, no duplicated garments, no cut-off edges.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "源图 5 张事实：001 双色多件装在纯白底以两行各三件堆叠的正面主图；002 真人坐姿场景加三格腰部以下细节拼图（含腰圈字母特写）；003 躯干裁切局部配圆形图标徽章与上下色块的卖点图；004 深色针织面料微距加两枚细线图标；005 侧身腰部以下局部配右侧三条标注线。品类判定：画面主体为男士贴身平角裤多件装，故归「内衣家居服／男士内衣」，leaf 取男士平角内裤多件装，源类目提示仅作检索线索。已剥离：原品牌字标与腰圈字母、原红色品牌色块（改用强调石墨 #3A4550）、模特面部与身份（一律改写为平铺、挂装或腰部以下无身份局部，场景镜改挂装无人）、原图英文标语与成分百分比及裤长数字（改为 {selling_point_1}／{callout_1} 等占位或空白参数行、空印章框）。"
+  }
+}

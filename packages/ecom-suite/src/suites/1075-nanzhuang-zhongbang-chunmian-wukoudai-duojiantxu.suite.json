@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-nanzhuang-zhongbang-chunmian-wukoudai-duojiantxu",
+  "name": "重磅纯棉素色无口袋多件基础款",
+  "category": {
+    "l1": "男装",
+    "l2": "上衣",
+    "leaf": "重磅纯棉素色无口袋圆领短袖T恤多件装",
+    "leafKeywords": [
+      "重磅纯棉T恤",
+      "无口袋基础款",
+      "圆领短袖上衣",
+      "素色多件装",
+      "经典版型打底衫",
+      "男士纯色T恤"
+    ]
+  },
+  "description": "重磅纯棉素色圆领短袖，无口袋干净前片，多件叠装一色一选",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "clean basic-apparel ecommerce, plain unadorned front panel, catalogue-grade packshot grammar",
+    "palette": [
+      {
+        "name": "底白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "藕粉场景色",
+        "hex": "#E9C4BC"
+      },
+      {
+        "name": "暖浅灰信息底",
+        "hex": "#F1F1F1"
+      },
+      {
+        "name": "炭灰文字线",
+        "hex": "#2D2D2D"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless pure white #FFFFFF for packshots and fit panels, matte dusty rose #E9C4BC for colour line-up and overhead close, warm light grey #F1F1F1 for texture macro, one real pegboard wall scene as the only environment shot",
+    "lightingSystem": "bright soft neutral studio light around 5500K, front or upper-left key with fill, gentle contact shadows that always ground the fabric, no harsh speculars, identical light on every unit of a group",
+    "surfaceSystem": "matte seamless paper for studio frames; fabric itself is the only surface texture, folds crisp and natural, no wrinkle mess",
+    "typography": "modern geometric sans-serif reserved for post-production only; in-image words stay as blank chips and empty leader lines, no rendered copy",
+    "iconSystem": "thin single-weight #2D2D2D leader lines, small dots and empty rounded label chips only, no arrows that crown one option, no badge artwork",
+    "presentationRules": "garment always shown flat or hung square to camera with the front panel empty; identical scale and identical collar height across every unit in a group; colourways reproduced exactly from the reference image, never re-tinted",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting between units of the same group",
+      "no mismatched icon styles",
+      "no added pocket, print, embroidery or logo on the front panel"
+    ],
+    "lockText": "Campaign Style Lock: consistent clean basic-apparel ecommerce visual system across the entire image set; fixed palette of seamless white #FFFFFF, matte dusty rose #E9C4BC, warm light grey #F1F1F1 and charcoal line and text colour #2D2D2D; bright soft neutral 5500K studio lighting with an upper-left key, fill and believable contact shadows, identical light on every unit inside one frame; modern geometric sans-serif kept out of the render, so all in-image words stay as blank label chips and empty leader lines; consistent thin single-weight line icon style; clean high-end apparel packshot photography mixed with minimal infographic elements; stable square-to-camera garment angle, empty front panel and locked scale across the set; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底素色圆领上衣主图",
+      "intent": "搜索列表里一眼点进：干净平铺的素色圆领短袖，前片无任何装饰，符合平台白底主图规则。",
+      "assetType": "suite-nanzhuang-zhongbang-chunmian-wukoudai-duojiantxu::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, garment laid flat square to camera, full silhouette visible",
+      "lighting": "bright even high-key neutral 5500K studio light, front key with fill card on the shadow side, soft contact shadow only",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "none, even margin only",
+      "textZone": "none",
+      "promptTemplate": "Packshot of {product} laid flat and square to the camera, straight-on eye-level view with the full silhouette visible and the front panel completely empty. {product_identity_lock}. {style_lock}. The job is the search-result click, so the silhouette must read in under a second. Bright even high-key neutral 5500K studio light with a front key and a fill card on the shadow side, soft contact shadow only so the fabric stays grounded. Seamless pure white background #FFFFFF. No props. The product occupies 60-70% of the frame, centred, no extra whitespace and no reserved copy area. Square 1:1 framing, 2K, commercial apparel catalogue quality. Negative: no added chest patch pocket, no printed graphic or lettering, no fake brand logo, no hanger, no model or mannequin, no hands, no watermark, no in-image text, no badge or ribbon sticker, no gradient background, no cut-off sleeves or hem, no stiff cardboard-looking fabric.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "VARIANT",
+      "displayName": "多色纯色阵列选色图",
+      "intent": "把整套色系一次摊开，买家不必逐个点开变体就能定色，缩短决策路径。",
+      "assetType": "suite-nanzhuang-zhongbang-chunmian-wukoudai-duojiantxu::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "high 45-degree angle looking down over a fanned row of folded-flat units, outer two units lightly cropped by the frame edge",
+      "lighting": "soft neutral key from the upper left with even fill, identical light on every unit, gentle contact shadows under each fold",
+      "background": "matte dusty rose field #E9C4BC",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "even breathing margin top and bottom, no reserved copy area",
+      "textZone": "none",
+      "promptTemplate": "E-commerce colour line-up of {product}, several solid-colour units of the same garment fanned in one row, colourways taken exactly from the reference image and never re-tinted, photographed from a high 45-degree angle looking down so every collar band and sleeve reads in one glance. {product_identity_lock}. {style_lock}. Purpose: let the buyer settle on a colour without opening the variant menu. Soft neutral 5500K key from the upper left with even fill, the same exposure on every unit, gentle contact shadows under each fold. Matte dusty rose background field #E9C4BC, seamless. No props. The line-up occupies 60-70% of the frame with the outer two units lightly cropped by the frame edge, even breathing margin top and bottom, no reserved copy area. Square 1:1, 2K. Negative: no mixed lighting between units, no duplicated collar or sleeve parts, no colour drift away from the reference colourways, no gradient background, no printed graphics or text on any unit, no fake logo, no watermark, no in-image text, no hangers, no model.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "洞洞板挂装日常场景",
+      "intent": "把基础款放进真实墙面收纳场景，暗示常备多件、随取随穿的日常用法。",
+      "assetType": "suite-nanzhuang-zhongbang-chunmian-wukoudai-duojiantxu::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 eye-level with a candid handheld feel, framing each hung garment from collar line to just below the hem",
+      "lighting": "soft neutral daylight key from the left around 5000K with gentle falloff, believable shadows cast onto the board",
+      "background": "warm honey-oak pegboard wall #C89B66 with a strip of soft neutral wall at the edge",
+      "props": "two or three plain wooden pegs and empty board holes only, no tools, no containers, no signage",
+      "productOccupancy": "40-50%",
+      "whitespace": "generous room on the right third for the board texture, no reserved copy area",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle hanging scene: {product} hung on plain wooden pegs against a warm honey-oak pegboard wall #C89B66, photographed at a slight 3/4 eye-level angle with a candid handheld feel, framing each garment from the collar line to just below the hem. {product_identity_lock}. {style_lock}. Purpose: place the plain tee in a real everyday wardrobe or workshop wall so the buyer pictures keeping several on hand. Soft neutral daylight key from the left around 5000K with gentle falloff and believable shadows falling onto the board. Props: two or three plain wooden pegs and empty board holes only, no tools, no containers, no other product. The product occupies 40-50% of the frame with generous room on the right third for the board texture, no reserved copy area. Square 1:1, 2K. Negative: no legible letters or words on the board, no brand plate or price tag, no clutter covering the garment, no model or face, no floating garment without a cast shadow, no contradictory light direction, no watermark, no in-image text.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "领口罗纹走线微距",
+      "intent": "用领口与肩缝的真实织纹和走线做质量证据，替代任何口头面料承诺。",
+      "assetType": "suite-nanzhuang-zhongbang-chunmian-wukoudai-duojiantxu::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "extreme close-up macro, tight zoom on the ribbed collar band and shoulder-to-sleeve seam, very low 20-degree angle skimming along the fabric",
+      "lighting": "soft skimming light from the right revealing the knit loop texture, controlled highlight, gentle shadow inside the collar rib",
+      "background": "warm light grey #F1F1F1",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the fabric texture is the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on the ribbed collar band and the shoulder-to-sleeve seam line, photographed from a very low 20-degree angle skimming along the fabric, shallow depth of field with the front stitch row sharp and the body falling softly out of focus. {product_identity_lock}. {style_lock}. Purpose: let the weave and the stitch rows carry the quality proof instead of any wording. Soft skimming light from the right revealing the cotton loop texture without blown highlights, gentle shadow inside the collar rib. Warm light grey background #F1F1F1. No props. The detail fills 55-60% of the frame, the remainder kept clean with no reserved copy area. Square 1:1, 2K. Negative: no blurry subject, no plastic-looking fabric, no over-smoothed airbrushed weave, no seam that is not in the reference image, no added pocket, no care label or logo text, no hands, no watermark, no in-image text, no duplicated stitch rows.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "COMPARISON",
+      "displayName": "三档版型轮廓对照",
+      "intent": "同一件衣服三种穿长并排，用轮廓差消除选码疑虑，标签位留空不写主张。",
+      "assetType": "suite-nanzhuang-zhongbang-chunmian-wukoudai-duojiantxu::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level medium shot, three matched units side by side at identical scale, each framed from shoulder line to just below the hem",
+      "lighting": "even high-key neutral 5500K studio light from the front-left, identical on all three units, soft contact shadows only",
+      "background": "seamless pure white #FFFFFF",
+      "props": "three empty rounded label chips on thin #2D2D2D leader lines, blank, no legible words",
+      "productOccupancy": "50-60%",
+      "whitespace": "even gaps between the three units, no reserved copy area",
+      "textZone": "none",
+      "promptTemplate": "E-commerce fit comparison of {product}: three units of the same garment laid side by side at identical scale, straight-on eye-level medium shot framing each from the shoulder line to just below the hem so the differences in body length and width read instantly. {product_identity_lock}. {style_lock}. Purpose: settle the which-cut-do-I-pick doubt before the buyer ever opens the size chart. Even high-key neutral 5500K studio light from the front-left, the same light on all three units, soft contact shadows only. Seamless pure white background #FFFFFF. Props: three empty rounded label chips on thin #2D2D2D leader lines above the units, left blank. The three units occupy 50-60% of the frame with even gaps between them, no reserved copy area. Square 1:1, 2K. Negative: no real competitor garment or branding, no size numbers or measurement figures, no fabricated fit claims, no tick or cross graphics crowning one unit, no words inside the chips, no model, no fake logo, no watermark, no extra text.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "整叠多件装收口图",
+      "intent": "收口镜：一整叠折好的同色系列出量感，把多件常备的购买理由收在最后一眼。",
+      "assetType": "suite-nanzhuang-zhongbang-chunmian-wukoudai-duojiantxu::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed directly from above at a 90-degree overhead angle, wide flat-lay panorama with the folded stack left of centre and one opened unit beside it",
+      "lighting": "bright soft neutral top light with even fill, crisp but believable fold shadows, no blown speculars",
+      "background": "matte dusty rose field #E9C4BC",
+      "props": "one blank rounded offer chip with no numbers or words",
+      "productOccupancy": "35-40%",
+      "whitespace": "generous even negative space all around the stack, no reserved copy area",
+      "textZone": "none",
+      "promptTemplate": "Overhead flat lay close for {product}: a neat stack of folded units with one unit opened flat beside it, colourways exactly as in the reference image, photographed directly from above at a 90-degree overhead angle in a wide flat-lay panorama with the stack sitting left of centre. {product_identity_lock}. {style_lock}. Purpose: close the set on the keep-several-on-hand quantity feeling. Bright soft neutral 5500K top light with even fill, crisp fold shadows that stay believable, no blown speculars. Matte dusty rose background #E9C4BC, seamless. Props: one blank rounded offer chip, no numbers and no words. The folded group occupies 35-40% of the frame with generous even negative space all around it, no reserved copy area. Square 1:1, 2K. Negative: no discount percentage or pack-count number, no countdown or urgency badge, no platform award ribbon, no fake logo, no watermark, no in-image text, no floating unit without a contact shadow, no crushed or wrinkled fabric, no duplicated stack.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "逐图事实：01 多件素色圆领短袖平列成阵（六色）；02 单件平铺纯白底正视图；03 单件平铺于藕粉底色，右上角另有品牌字标与英文品名；04 与 06 为同一构图（近重复）——右侧挂装单件＋左侧整叠折叠件，叠加件数角标、三档版型（偏长／标准／偏小）对照文字与领口、袖口引线标注；05 四件挂于木质洞洞板墙面的生活化场景。品类判定依据：图内为可外穿的素色圆领短袖上衣，前片干净无口袋，标注含加长版型档，属贴身汗衫以外的外穿款，故判男装/上衣；源类目路径挂在女装上衣，与图不符，按图改判。leaf 与 slug 强调无口袋素色基础多件装，以区别库内已有的左胸贴袋工装款（源图未见任何口袋）。已剥离：源品牌字标与系列名、件数角标、平台徽标与星级评价、原价与售价字样、英文品名与三档版型原句（一律改为空白标签位与空引线）、以及一切面料克重与尺寸数值；产品全程以 {product} 占位，色名不做 hex 硬编码，由参考图注入。"
+  }
+}

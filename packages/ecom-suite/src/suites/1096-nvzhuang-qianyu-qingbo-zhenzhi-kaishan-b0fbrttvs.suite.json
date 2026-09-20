@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-nvzhuang-qianyu-qingbo-zhenzhi-kaishan-b0fbrttvs",
+  "name": "女式浅芋轻薄针织开衫垂坠款",
+  "category": {
+    "l1": "女装",
+    "l2": "上衣",
+    "leaf": "女式轻薄长版针织开衫",
+    "leafKeywords": [
+      "针织开衫",
+      "轻薄开衫",
+      "长版开襟",
+      "落肩两穿",
+      "贴袋",
+      "垂坠廓形",
+      "女装针织"
+    ]
+  },
+  "description": "长版开襟薄针织，正身垂坠与落肩两穿，贴袋织纹细节",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "premium lilac-mist women's lightweight knit ecommerce",
+    "palette": [
+      {
+        "name": "冷雪无缝白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "云米白",
+        "hex": "#FAF6EE"
+      },
+      {
+        "name": "雾芋紫",
+        "hex": "#C7B9DF"
+      },
+      {
+        "name": "灰紫墨",
+        "hex": "#443E50"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "cool seamless studio white #FFFFFF for the packshot, pale lilac mist #ECE6F4 plaster for scene and closing screens, warm cream #FAF6EE for the benefit hero, one misty taro #C7B9DF panel for the back-view and macro screens; flat matte fields only, no gradient, no wood, no sand tones",
+    "lightingSystem": "bright neutral high-key studio light from a large frontal source with a left fill card, low skimming side light only where the knit face, the front edge and the pocket mouth must read, soft contact shadows, no harsh speculars, no coloured gels",
+    "surfaceSystem": "matte seamless paper and pale plaster in matching lilac-grey tones, warm cream #FAF6EE panels carrying the flat layouts, deep aubergine #443E50 board behind the macro screen, no wood, no stone, no foliage",
+    "typography": "modern geometric sans-serif in one family with wide tracking, any lettering left as empty reserved plates and pills, no serif, script or hand lettering",
+    "iconSystem": "single-weight thin line icons and dotted leader lines in misty taro #C7B9DF, unlettered rounded callout pills and empty stamp frames, no filled glyphs, no badges, no stars",
+    "presentationRules": "on-body garment kept at a stable straight-on or slight 3/4 angle with an identical crop line, front edges and side pockets always readable, garment never re-proportioned between screens, model always generic with the face cropped below the chin or turned away, no mannequin and no floating garment",
+    "noDrift": [
+      "no colour palette changes away from #FFFFFF, #FAF6EE, #ECE6F4, #C7B9DF and #443E50",
+      "no mixed fonts, serif or handwritten type",
+      "no random backgrounds, warm wood, sand or foliage surfaces, no gradient backdrops",
+      "no inconsistent lighting, coloured gels or warm cast between screens",
+      "no filled icons, badges, stars or certification seals",
+      "no identifiable model face, brand wordmark or hangtag lettering"
+    ],
+    "lockText": "Campaign Style Lock: consistent premium lilac-mist women's lightweight knit visual system across the entire image set; fixed palette of cool seamless studio white #FFFFFF, warm cream #FAF6EE, pale lilac mist #ECE6F4, one misty taro accent #C7B9DF and aubergine ink #443E50; bright neutral high-key studio light from a large frontal source with a left fill card, low skimming side light only where the knit face, the front edge and the pocket mouth must read, soft contact shadows and no harsh speculars; modern geometric sans-serif with wide tracking in a single family; single-weight thin-line icon style with unlettered rounded callout pills and empty stamp frames; matte seamless paper and pale plaster surfaces, no wood, no sand, no gradient; clean high-end apparel photography mixed with minimal infographic elements; stable straight-on or slight 3/4 on-body garment angle with an identical crop line, drape and scale, model always generic with the face cropped below the chin or turned away; no colour palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "冷雪底开衫正身主图",
+      "intent": "在搜索列表里一眼拿下点击，用冷白上身底交代长版开襟与垂坠廓形。",
+      "assetType": "suite-nvzhuang-qianyu-qingbo-zhenzhi-kaishan-b0fbrttvs::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on eye-level on-body framing, cropped from the collarbone to mid-thigh, front edges running unbroken down the vertical centre",
+      "lighting": "bright neutral high-key light from a large frontal source with a left fill card, low skimming side light on the knit face, soft hem contact shadow",
+      "background": "matte seamless cool studio white #FFFFFF",
+      "props": "none, plain inner layer in warm cream #FAF6EE and plain bottoms in pale stone #E4E1E7",
+      "productOccupancy": "60-70%",
+      "whitespace": "none, the figure fills the frame",
+      "textZone": "none",
+      "promptTemplate": "E-commerce on-body packshot of {product}. {product_identity_lock}. {style_lock}. The piece worn open at the front and photographed straight-on at eye level, framed from the collarbone to mid-thigh so the two front edges run unbroken and both side pockets read, the head cropped above the collarbone. Bright neutral high-key light from a large frontal source with a left fill card, low skimming side light only where the knit face needs relief, one soft contact shadow where the hem meets the body line. Matte seamless paper backdrop in cool studio white #FFFFFF. Plain inner layer in warm cream #FAF6EE and plain bottoms in pale stone #E4E1E7, nothing branded. The product occupies 60-70% of the frame with no extra whitespace. 8K commercial apparel quality. Negative: no recognisable face, no shoulder bag or hand-held cup, no hangtag or wordmark lettering, no jewellery catching a specular highlight, no gradient or tinted background, no cut-off sleeve or hem, no floating garment without a contact shadow.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "SCENE",
+      "displayName": "雾芋墙前垂坠场景",
+      "intent": "用衣帽间出街场景完成代入，证明薄针织可作日常外搭层。",
+      "assetType": "suite-nvzhuang-qianyu-qingbo-zhenzhi-kaishan-b0fbrttvs::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle from camera left at eye level, figure framed from collarbone to just below the knee",
+      "lighting": "soft neutral daylight at 5600K entering from camera right, gentle falloff, faint floor contact shadow",
+      "background": "matte plaster wall in pale lilac mist #ECE6F4",
+      "props": "two or three unbranded wide-brim hats hung on small hooks behind the figure, out of focus, never covering the garment",
+      "productOccupancy": "40-50%",
+      "whitespace": "even margin of wall above the shoulder line, no reserved copy zone",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene: {product} worn in a bright walk-in wardrobe corner. {product_identity_lock}. {style_lock}. Photographed at a slight 3/4 angle from camera left at eye level, the figure framed from the collarbone to just below the knee with one hand resting inside a side pocket. Soft neutral daylight at 5600K entering from camera right with a gentle falloff and a faint contact shadow on the floor. Matte plaster wall in pale lilac mist #ECE6F4 with two or three unbranded wide-brim hats hung on small hooks behind the figure, out of focus. Props limited to the hung hats in misty taro #C7B9DF and pale stone #E4E1E7, never covering the garment. The product occupies 40-50% of the frame, leaving an even margin of wall above the shoulder line and no reserved copy zone. Negative: no recognisable face, no readable hat branding, no hand blocking the front edge, no cluttered shelf items, no duplicated hat silhouettes, no warm wood or sand tones, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "HERO",
+      "displayName": "落肩两穿垂坠卖点",
+      "intent": "一秒给出核心利益：同一件可正穿也可落肩，主图一秒法则。",
+      "assetType": "suite-nvzhuang-qianyu-qingbo-zhenzhi-kaishan-b0fbrttvs::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight low angle looking gently upward at the draped shoulder, framed from the chest to mid-thigh",
+      "lighting": "bright frontal soft key with a low skimming sweep from camera right lifting the knit face, no specular blowout",
+      "background": "seamless matte field in warm cream #FAF6EE",
+      "props": "one empty unlettered rounded callout pill floating clear of the silhouette",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space on the upper right 35%, no reserved copy zone",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. The piece shown draped off both shoulders with the sleeves still worn, photographed from a slight low angle looking gently upward so the fall of the front panels and the hem line read, framed from the chest to mid-thigh with the head cropped out of frame. Bright frontal soft key with a low skimming sweep from camera right that lifts the knit face without any specular blowout. Seamless matte field in warm cream #FAF6EE. One empty unlettered rounded callout pill in misty taro #C7B9DF floats clear of the silhouette. The product occupies 50-60% of the frame, leaving generous negative space on the upper right 35% and no reserved copy zone. Negative: no lettering rendered inside the callout pill, no more than one idea in frame, no invented fabric weight or thermal rating, no face, no arm shortened or twisted by the low vantage, no palette drift, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "后片肩线背视版型",
+      "intent": "补上后背信息，消除肩线、后片长度与廓形疑虑。",
+      "assetType": "suite-nvzhuang-qianyu-qingbo-zhenzhi-kaishan-b0fbrttvs::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "photographed from behind at a 45-degree rear angle at eye level, figure cropped at the nape",
+      "lighting": "bright neutral key from the front left with a soft rim skimming the shoulder seam and an open fill on the shadow side",
+      "background": "matte seamless panel in misty taro #C7B9DF",
+      "props": "none",
+      "productOccupancy": "50-60%",
+      "whitespace": "even negative space along the right 25%, no reserved copy zone",
+      "textZone": "none",
+      "promptTemplate": "E-commerce structure detail of {product}, back view. {product_identity_lock}. {style_lock}. Photographed from behind at a 45-degree rear angle at eye level, the figure cropped at the nape so only hair and collar show, the full back panel, shoulder line and hem sweep visible in one unbroken frame. Bright neutral key from the front left with a soft rim skimming the shoulder seam and an open fill keeping the shadow side legible, one soft contact shadow at the hem. Matte seamless panel in misty taro #C7B9DF. No props. The garment occupies 50-60% of the frame with even negative space along the right 25% and no reserved copy zone. Negative: no face or profile turned toward camera, no invented back seams or darts, no twisted hair drawn across the shoulder line, no gradient background, no sizing or fit claim lettering, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "贴袋织纹微距",
+      "intent": "微距特写纱线织面与贴袋收边，用可见做工替代空口品质话术。",
+      "assetType": "suite-nvzhuang-qianyu-qingbo-zhenzhi-kaishan-b0fbrttvs::shot-05",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "4K",
+      "camera": "extreme close-up macro at a low side angle, lens skimming just above the surface, tight zoom on the side patch pocket where the cuff overlaps the pocket mouth",
+      "lighting": "low skimming side light from camera right modelling the yarn face and the pocket edge, no specular blowout",
+      "background": "deep aubergine ink matte field #443E50 falling out of focus behind the focal point",
+      "props": "one fingertip resting at the pocket opening, hand otherwise out of frame",
+      "productOccupancy": "55-60%",
+      "whitespace": "minimal, the texture is the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on the side patch pocket where the ribbed cuff overlaps the pocket mouth. {product_identity_lock}. {style_lock}. The lens skims just above the surface in an extreme close-up macro stance at a low side angle, shallow depth of field with the nearest stitch line sharp and the fabric falling away behind it. Low skimming side light from camera right modelling the yarn face and the pocket edge without any specular blowout. Deep aubergine ink matte field #443E50 out of focus behind the focal point. One fingertip rests at the pocket opening with the rest of the hand outside the frame. The macro detail occupies 55-60% of the frame and the remainder is defocused fabric, so there is no extra whitespace. Negative: no blurry subject at the focal point, no extra or fused fingers, no plastic-looking synthetic sheen, no repeated or tiled knit pattern, no pilling or loose threads presented as the subject, no label lettering, no invented hardware, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "平整叠装做工信任",
+      "intent": "以叠装平整度与领口袖口收边收口，用空白证明位降低下单风险。",
+      "assetType": "suite-nvzhuang-qianyu-qingbo-zhenzhi-kaishan-b0fbrttvs::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "photographed directly from above at a 90-degree overhead flat lay angle",
+      "lighting": "even neutral high-key light from a large overhead source with a low skimming fill, soft contact shadows only, no hotspot",
+      "background": "pale lilac mist surface #ECE6F4 carrying warm cream #FAF6EE panels under the pieces",
+      "props": "one second folded piece behind the hero, one rolled band of the same knit, two empty rounded label plates and one empty stamp frame in misty taro #C7B9DF",
+      "productOccupancy": "35-40%",
+      "whitespace": "clean negative space around the folded stack and the empty plates",
+      "textZone": "none",
+      "promptTemplate": "E-commerce trust screen laid out flat. {product}. {product_identity_lock}. {style_lock}. Photographed directly from above at a 90-degree overhead flat lay angle: the piece folded front-up with the collar and one front edge deliberately left showing, a second folded piece behind it, one small rolled band of the same knit along the lower edge, and two empty rounded label plates plus one empty stamp frame in misty taro #C7B9DF spaced down the right side. Even neutral high-key light from a large overhead source with a low skimming fill so the knit relief and the hem finish read, soft contact shadows only and no hotspot. Pale lilac mist surface #ECE6F4 carrying warm cream #FAF6EE panels under the pieces. The folded group occupies 35-40% of the frame with clean negative space around the empty plates. Negative: no readable lettering inside the plates or the stamp frame, no invented certifications, lab marks, ratings or price numerals, no hangtag wordmark, no fabric dust or stray fibres, no overlapping hard shadows, no warm wood tone, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "源 5 张逐图事实：01 冷白无缝底正身偏 3/4，衣门全开、一手插入侧贴袋，肩挎深色包并手持外带杯；02 明亮衣帽间角落，浅灰白墙面挂数顶宽檐帽，模特颈下裁切、系浅色腰带；03 同款落肩披挂穿法，双手在腰前交叠；04 背面视角，后片平整无装饰、后领翻折；05 侧贴袋微距，手指插在袋口、可见麻灰纱线织面与袖口。品类判定：五张同为同一件同色的多角度分镜（正身/场景/落肩/背面/贴袋微距），非同一构图仅换色换码的色卡陈列，也无混合套装拼凑，故不构成变体画廊，正常转化；据图判定 L1 女装，源类目提示为毛衣针织一类、本库 L2 表内无该项，长版开襟薄针织衫按库内毛衫与针织衫先例归入 L2 上衣，leaf 取女式轻薄长版针织开衫。分镜结构：源套图无任何图内文案与角标，故六镜 textZone 全为 none，卖点与信任改由空白胶囊与空白标签版承载；末镜为库内标准信任收口，由 04 后片与 05 收边语言延展而来，源图未提供平铺信任屏。已剥离：源品牌字标与系列名、原平台店铺字样、模特面容与身份（一律改为颈下裁切或背向）、包袋与外带杯等源专属道具、任何评分角标与平台徽章；产品一律以 {product} 占位。色板另建为冷雪白-云米白-雾芋紫-灰紫墨的浅芋雾系棚场系统，与本库既有暖白燕麦与冷灰蓝女装模版区分。"
+  }
+}

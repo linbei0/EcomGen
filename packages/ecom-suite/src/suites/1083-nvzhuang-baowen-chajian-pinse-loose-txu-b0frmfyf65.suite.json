@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-nvzhuang-baowen-chajian-pinse-loose-txu-b0frmfyf65",
+  "name": "豹纹插肩拼色宽松短袖款",
+  "category": {
+    "l1": "女装",
+    "l2": "上衣",
+    "leaf": "女式豹纹插肩拼色宽松短袖T恤",
+    "leafKeywords": [
+      "插肩袖T恤",
+      "豹纹拼接",
+      "宽松短袖",
+      "夏季上衣",
+      "度假穿搭",
+      "遮肉版型"
+    ]
+  },
+  "description": "墨黑身片配豹纹插肩袖，白墙庭院度假叙事承载宽松版型",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "easy resort-day raglan tee commerce with animal-print accent sleeves",
+    "palette": [
+      {
+        "name": "墨黑身片",
+        "hex": "#1A1A1E"
+      },
+      {
+        "name": "豹纹奶油",
+        "hex": "#E9DCC8"
+      },
+      {
+        "name": "琥珀斑纹",
+        "hex": "#B9834F"
+      },
+      {
+        "name": "水洗牛仔",
+        "hex": "#8FA3B5"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless soft white #FFFFFF sweep for the studio frames, sunlit white stucco courtyard with olive greenery and a black lantern arm as the recurring resort stage, pale sand tile floor beneath, no dark studio floors",
+    "lightingSystem": "bright diffused daylight near 5500K, open shadowless fill in studio frames, dappled warm sun through leaves in courtyard frames, one soft rim along the shoulder seam, never moody low-key",
+    "surfaceSystem": "matte white wall, pale sand stone tiles, washed denim shorts hem, suede clutch texture as the only prop surface, no marble, no gym equipment",
+    "typography": "no rendered copy in any frame; if a text slot is added it stays an empty placeholder rail",
+    "iconSystem": "none; the set carries no icon language, structure comes from the raglan seam lines only",
+    "presentationRules": "the body panel stays solid ink black while only the raglan sleeves carry the leopard print, model cropped from the chin down in every frame, tee always worn loose and untucked over washed denim, hands relaxed mid-gesture never covering the sleeve seam",
+    "noDrift": [
+      "no color palette changes",
+      "no face or identity of the model",
+      "no leopard on the body panel",
+      "no cool grey studio floors",
+      "no random backgrounds",
+      "no inconsistent lighting"
+    ],
+    "lockText": "Campaign Style Lock: consistent easy resort-day raglan tee ecommerce visual system across the entire image set; fixed palette of ink black body #1A1A1E, leopard cream #E9DCC8, amber rosette #B9834F and washed denim #8FA3B5; bright diffused daylight near 5500K, shadowless in studio frames and dappled warm sun through leaves in courtyard frames with one soft rim along the shoulder seam; seamless white sweep plus a sunlit white stucco courtyard with olive greenery, a black lantern arm and pale sand tiles, no dark studio floors, no marble; model always cropped from the chin down, body panel solid ink black with leopard confined to the raglan sleeves, tee worn loose and untucked over washed denim; no rendered copy, no icon language; no color palette changes, no mixed placements of the print, no random backgrounds, no inconsistent lighting."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底插肩袖正身主图",
+      "intent": "在搜索结果缩略图里一眼赢下点击，交代黑身豹纹袖的拼色记忆点。",
+      "assetType": "suite-nvzhuang-baowen-chajian-pinse-loose-txu-b0frmfyf65::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on eye-level axis, torso centred from collar to hip, frame cropped from the chin down",
+      "lighting": "bright diffused daylight near 5500K, open shadowless fill, one soft rim tracing the raglan seam over each shoulder",
+      "background": "seamless soft white #FFFFFF sweep",
+      "props": "thin gold-tone pendant necklace as anonymous styling, washed denim waistband at the lower edge",
+      "productOccupancy": "60-70%",
+      "whitespace": "none, the top fills the frame with even clean margins",
+      "textZone": "none",
+      "promptTemplate": "E-commerce hero shot of {product}. {product_identity_lock}. {style_lock}. The loose raglan tee is shown front on a straight-on eye-level axis, torso centred from crew collar to hip with the frame cropped from the chin down, the solid ink black body panel reading flat while both raglan sleeves carry the leopard print in cream #E9DCC8 and amber #B9834F rosettes. Bright diffused daylight near 5500K stays shadowless with one soft rim tracing the raglan seam over each shoulder. Seamless soft white background #FFFFFF. A thin gold-tone pendant and the washed denim waistband are the only extras. The top occupies 60-70% of the frame with even margins. Negative: no identifiable face, no model likeness, no brand tag, no readable lettering, no logo jewellery, no extra people, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "斜侧提包通勤卖点",
+      "intent": "一秒说清百搭通勤属性，用夹包姿态把上衣放进出门场景。",
+      "assetType": "suite-nvzhuang-baowen-chajian-pinse-loose-txu-b0frmfyf65::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle at chest height, body turned a few degrees, one forearm tucked under a suede clutch, cropped from the chin down",
+      "lighting": "bright diffused daylight near 5500K with gentle directional softness from the left, fine shadow under the clutch edge",
+      "background": "seamless soft white #FFFFFF sweep warming to pale grey #EFEDEA at the right edge",
+      "props": "one taupe suede clutch under the forearm, stacked wood-tone bead bracelets, thin layered necklaces",
+      "productOccupancy": "55-60%",
+      "whitespace": "clean right third kept open as an airy margin",
+      "textZone": "none",
+      "promptTemplate": "Commute benefit hero of {product}. {product_identity_lock}. {style_lock}. At a slight 3/4 angle set at chest height the body turns a few degrees while one forearm tucks a taupe suede clutch against the hip, the figure cropped from the chin down. Bright diffused daylight near 5500K comes with gentle directional softness from the left and drops a fine shadow under the clutch edge. Background is a seamless soft white sweep #FFFFFF warming into a pale grey edge #EFEDEA, the right third kept as an airy open margin. Stacked wood-tone bead bracelets and thin layered necklaces stay anonymous styling. The top occupies 55-60% of the frame. Negative: no identifiable face, no brand plate on the clutch, no readable lettering, no deformed fingers, no fused hands, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "白墙庭院全身度假",
+      "intent": "把上衣放进度假小院的真实光线里，让买家代入夏日出行穿搭。",
+      "assetType": "suite-nvzhuang-baowen-chajian-pinse-loose-txu-b0frmfyf65::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on full-body framing from a slightly low position at knee height, cropped from the chin down, one hand raised mid-gesture",
+      "lighting": "dappled warm sunlight through olive leaves, bright but broken highlights, soft shadow play across the wall",
+      "background": "sunlit white stucco courtyard #F3EAD9 with an olive tree at the left and a black lantern arm upper right",
+      "props": "frayed washed denim shorts, wood bead bracelets, thin gold necklace, pale sand tile floor",
+      "productOccupancy": "40-50%",
+      "whitespace": "upper wall area kept clean as sunlit negative space",
+      "textZone": "none",
+      "promptTemplate": "Resort courtyard scene of {product}. {product_identity_lock}. {style_lock}. A straight-on full-body framing from a slightly low position at knee height shows the loose tee over frayed washed denim shorts, one hand raised mid-gesture, the figure cropped from the chin down. Dappled warm sunlight filters through olive leaves, breaking into bright spots and laying a soft shadow play on the sunlit white stucco courtyard wall #F3EAD9, with an olive tree at the left and a black lantern arm at the upper right. Pale sand tiles underfoot, the upper wall kept as clean sunlit negative space. The outfit occupies 40-50% of the frame. Negative: no identifiable face, no model likeness, no readable signage, no brand marks, no other people, no busy garden clutter, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "袖缝斑纹微距特写",
+      "intent": "用插肩斜缝与豹纹纱面微距证明拼接做工，替代口头品质承诺。",
+      "assetType": "suite-nvzhuang-baowen-chajian-pinse-loose-txu-b0frmfyf65::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "4K",
+      "camera": "extreme close-up macro along the shoulder, tight zoom on the diagonal raglan seam where the ink black body meets the leopard sleeve, shallow depth of field",
+      "lighting": "warm side light skimming across the stitch line, each thread ridge catching a fine highlight, falloff into soft shade on the black panel",
+      "background": "the garment fills the frame, cream sleeve edge fading to white #FFFFFF at the far margin",
+      "props": "a relaxed collarbone line and pendant chain blurred out of focus at the top edge",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the seam is the subject with a thin clean margin along the cuff side",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on the diagonal raglan seam where the solid ink black body panel meets the leopard sleeve, stitch line running clean from collar to cuff. {product_identity_lock}. {style_lock}. The camera sits along the shoulder at a low side angle so warm side light skims across the stitch line, each thread ridge catching a fine highlight while the black panel falls into soft shade. The garment fills the frame, the cream and amber leopard fading to a clean white margin #FFFFFF at the cuff side; a relaxed collarbone line and pendant chain stay blurred out of focus at the top edge. The seam detail fills 55-60%. Negative: no blurry subject, no puckered or skipped stitches, no print bleeding across the seam, no brand stamp, no lint, no identifiable face, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "背片垂坠落肩版型",
+      "intent": "用整片后背与落肩垂坠证明宽松不挑人，消除尺码疑虑。",
+      "assetType": "suite-nvzhuang-baowen-chajian-pinse-loose-txu-b0frmfyf65::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "behind view at shoulder height, back panel squared to frame with both raglan sleeves visible, head turned away and cropped at the jaw",
+      "lighting": "bright courtyard daylight near 5500K, even and airy, a soft leaf shadow grazing the wall beside the figure",
+      "background": "sunlit white stucco wall #F3EAD9 with a tall white-framed glass door at the left",
+      "props": "woven gold-tone statement earring glinting at the cropped jaw, frayed denim hem below, wood bracelets at one wrist",
+      "productOccupancy": "60-70%",
+      "whitespace": "balanced wall margins both sides, door frame kept partial",
+      "textZone": "none",
+      "promptTemplate": "Back view detail of {product}. {product_identity_lock}. {style_lock}. A behind view at shoulder height squares the full back panel to the frame, the loose ink black body falling straight past the hip while both leopard raglan sleeves read clearly from the same angle, the head turned away and cropped at the jaw so only a woven gold-tone statement earring glints at the edge. Bright courtyard daylight near 5500K stays even and airy, grazing a soft leaf shadow on the sunlit white stucco wall #F3EAD9 beside the figure, a tall white-framed glass door held partial at the left. Frayed denim hem and wood bracelets finish the look. The back panel occupies 60-70% with balanced wall margins. Negative: no identifiable face, no visible neck branding, no tag, no hunch posture, no fabric pilling, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "平铺搭配收口图",
+      "intent": "收口促单，用一眼可读的整套平铺搭配给出直接下单的穿搭答案。",
+      "assetType": "suite-nvzhuang-baowen-chajian-pinse-loose-txu-b0frmfyf65::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "flat lay photographed directly from above at a 90-degree overhead angle, tee folded square at the centre with companions laid in a tidy grid",
+      "lighting": "even high-key daylight near 5500K, shadowless board, hairline soft shadows under each folded edge",
+      "background": "pale sand linen surface #EDE4D4",
+      "props": "folded tee centred, washed denim shorts rolled beside, suede clutch, straw hat corner, thin gold necklace coiled on a blank card",
+      "productOccupancy": "35-40%",
+      "whitespace": "structured even gutters between items, one clear corner kept open as an empty closing rail",
+      "textZone": "none",
+      "promptTemplate": "E-commerce closing outfit flat lay of {product}. {product_identity_lock}. {style_lock}. Photographed directly from above at a 90-degree overhead angle on a pale sand linen surface #EDE4D4, the folded raglan tee sits square at the centre with the leopard sleeves turned up so the print reads, companions laid in a tidy grid beside it: rolled washed denim shorts, the taupe suede clutch, a straw hat corner and a thin gold necklace coiled on one blank card. Even high-key daylight near 5500K keeps the board shadowless apart from hairline soft shadows under each folded edge. The arrangement occupies 35-40% with structured gutters and one open corner held as an empty closing rail. Negative: no filled text on the card, no brand labels, no readable lettering, no price tags, no crushed fabric, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：001 白底正身胸口以下裁切，黑色圆领身片+豹纹插肩短袖，金坠项链、木珠手链、浅牛仔腰头；002 白底微侧，腋下夹灰色麂皮手拿包，叠戴项链与串珠；003 白墙庭院全身，橄榄树与黑色壁灯臂，毛边牛仔短裤，一手抬起（唇部入镜，已按无身份口径处理）；004 庭院斜侧，手拉下摆展示垂坠与长度；005 背侧 3/4，整片黑背+两侧豹纹袖，草编大耳环（侧脸轮廓入镜）。品类判定依据：主体为女式豹纹插肩拼色宽松短袖T恤，L1 女装、L2 上衣，leaf 记豹纹插肩拼色宽松短袖T恤，与提示类目一致；五图为同款不同角度/搭配分工（正/侧/背/场景），非色卡变体，正常转化。已剥离内容：品牌 WIHOLL 字样、模特面容与身份（一律下巴以下或侧脸回避裁切）、首饰不写品牌、原图无任何文案故全套 textZone=none。与同品牌库内横向拼块套头衫（藏青+明黄、平挂看板结构）区隔：本套以白墙庭院度假光+平铺收口为骨架，无拼块分割线镜。源图 5 张，001/002 拆为白底双主图、003 扩为全身场景与袖缝微距两镜，按转化漏斗排为 6 镜。"
+  }
+}

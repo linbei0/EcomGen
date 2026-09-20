@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-shipinyinliao-xigaoguan-baitao-qipao-yinliao",
+  "name": "白桃风味气泡细高罐装饮料款",
+  "category": {
+    "l1": "食品饮料",
+    "l2": "饮料",
+    "leaf": "白桃风味气泡饮料细高罐",
+    "leafKeywords": [
+      "白桃气泡饮料",
+      "细高罐饮料",
+      "果味汽水",
+      "整箱装饮料",
+      "冰镇气泡饮"
+    ]
+  },
+  "description": "白底棚拍细高罐气泡饮：三面回转、冰镇微距、整箱陈列、空白信任墙收口",
+  "productFamily": "food",
+  "styleLock": {
+    "direction": "clean chilled beverage ecommerce",
+    "palette": [
+      {
+        "name": "冷白场",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "雾灰底",
+        "hex": "#EEF2F3"
+      },
+      {
+        "name": "炭灰墨",
+        "hex": "#2E3236"
+      },
+      {
+        "name": "蜜桃强调",
+        "hex": "#E0507A"
+      }
+    ],
+    "temperature": "cool",
+    "backgroundSystem": "seamless studio sweep alternating between pure white #FFFFFF and cool mist grey #EEF2F3, no environmental context, no lifestyle set",
+    "lightingSystem": "cool high-key studio light, large front-left softbox key with white bounce fill, crisp specular roll-off travelling along the aluminium shoulder, soft contact shadow only",
+    "surfaceSystem": "glossy white tabletop #FFFFFF with a faint mirror falloff, no props, no splashes",
+    "typography": "modern geometric sans-serif; every piece of label wording is reduced to blank placeholder bands and unprinted rows so the layout survives without copy",
+    "iconSystem": "thin single-weight line marks inside blank rounded seal frames, outline only in accent #E0507A",
+    "presentationRules": "one slim tall upright can kept at identical scale and centred placement across the set; only rotation changes, the product body is never restyled",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no invented label wording",
+      "no environmental lifestyle props"
+    ],
+    "lockText": "Campaign Style Lock: consistent chilled beverage ecommerce visual system across the entire image set; fixed palette of clean white field #FFFFFF, cool mist grey #EEF2F3, charcoal label ink #2E3236 and one peach accent #E0507A; cool high-key studio lighting with a large front-left softbox key, white bounce fill, crisp specular roll-off along the aluminium shoulder and a soft contact shadow only; seamless studio sweep alternating between #FFFFFF and #EEF2F3 with no environmental context; glossy white tabletop surface; modern geometric sans-serif with all label wording reduced to blank placeholder bands and unprinted rows; consistent thin single-weight line icon style inside blank seal frames; one slim tall upright can held at identical scale and centred placement across the set; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no invented label wording."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底细高罐主图",
+      "intent": "搜索列表一眼点击：单罐直立、全形入镜、纯白无干扰，拿下合规主图位",
+      "assetType": "suite-shipinyinliao-xigaoguan-baitao-qipao-yinliao::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, can standing perfectly upright, full body visible from lid to base",
+      "lighting": "bright even high-key cool studio light, front-left softbox key with white bounce fill, soft contact shadow under the base",
+      "background": "seamless pure white studio sweep #FFFFFF",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "even margin all around the can, no extra whitespace inside the silhouette",
+      "textZone": "none",
+      "promptTemplate": "Product packshot photography of {product}. {product_identity_lock}. {style_lock}. The can stands perfectly upright in a straight-on eye-level view with the full body visible from lid to base and nothing cropped by the frame. Bright even high-key cool studio light from a front-left softbox with white bounce fill, a crisp specular roll-off down the aluminium shoulder and a soft contact shadow grounding the base. Seamless pure white studio sweep #FFFFFF. The product occupies 60-70% of the frame, with an even margin all around and no extra whitespace inside the silhouette. 8K commercial beverage e-commerce quality. Negative: no props, no hands, no people, no watermark, no readable label wording, no invented brand mark, no gradient background, no floating product without a contact shadow, no cut-off edges, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "仰视金属参数带卖点",
+      "intent": "主图一秒法则：用仰视拉高罐型、用金属带上的三条空主张位承接核心卖点",
+      "assetType": "suite-shipinyinliao-xigaoguan-baitao-qipao-yinliao::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed from a very low angle looking upward, can upright, tall vertical silhouette emphasised",
+      "lighting": "cool soft key from the upper left with a low fill, one clean specular sweep travelling down the body, soft contact shadow",
+      "background": "flat cool mist grey panel #EEF2F3",
+      "props": "one brushed metal band wrapping the lower third of the body",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space across the upper half of the frame",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. Photographed from a very low angle looking upward so the slim upright silhouette reads tall against a flat cool mist grey panel #EEF2F3. Cool soft key from the upper left with a low fill, one clean specular sweep travelling down the aluminium body, soft contact shadow at the base. A brushed metal band #B9BEC2 wraps the lower third and carries three blank unprinted label lines kept as empty proof placeholders. The product occupies 50-60% of the frame with generous negative space across the upper half. Negative: no rendered words or letters, no numerals, no single claim beyond the three blank lines, no invented efficacy claims, no props, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "三面回转装潢细节",
+      "intent": "证明怎么装：同款三面并排回转，一次看清正面、侧面与背面的装潢排布结构",
+      "assetType": "suite-shipinyinliao-xigaoguan-baitao-qipao-yinliao::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "three matched upright units in one row at straight-on eye-level: front facade, clean 90-degree side profile, rear panel",
+      "lighting": "cool even high-key light, front-left key with bounce fill, identical on all three units, soft contact shadows under each base",
+      "background": "seamless pure white studio sweep #FFFFFF",
+      "props": "none",
+      "productOccupancy": "55-60%",
+      "whitespace": "even spacing between the three units, no extra whitespace band",
+      "textZone": "none",
+      "promptTemplate": "E-commerce detail screen showing three identical upright units of {product} standing in one row at straight-on eye-level: the left unit turned to its front facade, the centre unit in a clean 90-degree side profile, the right unit showing its rear panel. {product_identity_lock}. {style_lock}. Identical crop, identical scale and identical cool even high-key front-left lighting on all three units so only the rotation differs, each grounded by its own soft contact shadow. Seamless pure white studio sweep #FFFFFF. The row occupies 55-60% of the frame with even spacing and no extra whitespace band. Negative: no readable label wording, no barcode, no QR code, no store or social handle, no size mismatch between units, no mixed lighting between units, no duplicated artwork within one unit, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "冰镇凝露微距质感",
+      "intent": "证明冷藏后的饮欲感：罐身凝露水珠微距，把冰镇口感用材质细节交代清楚",
+      "assetType": "suite-shipinyinliao-xigaoguan-baitao-qipao-yinliao::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "extreme close-up macro, tight zoom on the upper body at a slight 3/4 wrap-around angle, shallow depth of field",
+      "lighting": "cool skimming light from the right sweeping across the droplets, crisp specular beads, gentle falloff into a soft shadow on the left",
+      "background": "seamless cool mist grey field #EEF2F3",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal surrounding margin, the detail is the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on the chilled upper body covered in fine condensation droplets, filmed at a slight 3/4 wrap-around angle with shallow depth of field and the nearest surface kept sharp. {product_identity_lock}. {style_lock}. Cool skimming light from the right sweeping across the droplets for crisp specular beads, gentle falloff into a soft shadow on the left, seamless cool mist grey field #EEF2F3 behind. The detail fills 55-60% of the frame with a minimal surrounding margin. Negative: no blurry subject, no painted-on or smeared droplets, no freeze fog swallowing the whole body, no readable label wording, no props, no extra text, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "VARIANT",
+      "displayName": "整箱手提陈列规格",
+      "intent": "让买家选规格：单罐在前、开口手提纸箱整排在后，交代可囤的整箱购买方式",
+      "assetType": "suite-shipinyinliao-xigaoguan-baitao-qipao-yinliao::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed from a high 45-degree angle looking down, one upright unit in front of an open carrier carton with a neat row behind",
+      "lighting": "cool even high-key light from the upper left with bounce fill, soft contact shadows under every base",
+      "background": "seamless pure white studio sweep #FFFFFF",
+      "props": "one plain unprinted carrier carton with an open top and a die-cut handle",
+      "productOccupancy": "60-70%",
+      "whitespace": "clean negative space across the left third of the frame",
+      "textZone": "none",
+      "promptTemplate": "E-commerce variant and pack screen of {product}: one upright unit standing in front of an open plain carrier carton holding a neat row of matched units, photographed from a high 45-degree angle looking down so the depth of the row reads clearly. {product_identity_lock}. {style_lock}. Cool even high-key studio light from the upper left with bounce fill, soft contact shadows under every base, seamless pure white studio sweep #FFFFFF. The carton faces stay as blank unprinted panel shapes. The group occupies 60-70% of the frame with clean negative space across the left third. Negative: no printed case graphics, no count numerals, no legible wording anywhere, no mismatched unit sizes, no floating or tipped-over units, no hands, no price or discount tags, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "空白印章信任收口",
+      "intent": "收口降风险：五枚空印章框加三行勾选位与空参数行的信任墙版式，主张由下游填充",
+      "assetType": "suite-shipinyinliao-xigaoguan-baitao-qipao-yinliao::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level flat graphic plane, one upright unit at the lower left, proof panel filling the right two thirds",
+      "lighting": "cool even high-key light, front-left key with soft bounce fill, soft contact shadow under the unit",
+      "background": "seamless cool mist grey field #EEF2F3",
+      "props": "five blank rounded seal frames and three stacked check-mark rows drawn as thin line placeholders",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space across the right two thirds of the frame",
+      "textZone": "none",
+      "promptTemplate": "E-commerce trust screen for {product}. {product_identity_lock}. {style_lock}. One upright can standing at the lower left in a straight-on eye-level view, with a flat graphic proof panel filling the right two thirds of a seamless cool mist grey field #EEF2F3. Cool even high-key lighting with a front-left key and soft bounce fill, a soft contact shadow under the unit. The panel carries five blank rounded seal frames in one even row and three stacked check-mark rows of empty unprinted label lines, all held as empty placeholders drawn in charcoal ink #2E3236 with thin accent outlines #E0507A. The product occupies 50-60% of the frame with generous negative space across the right two thirds. Negative: do NOT invent certifications, awards, ratings, lab results or test data; no legible wording, no seal lettering, no check-list text, no badge marks, no numerals, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：001 白场棚拍，右侧一只细高罐直立放大、左侧一只开口手提纸箱整排多罐陈列；002 白场同款三罐并排，作正面/侧面/背面三面回转装潢展示，背面含整版参数表、条码与方格码；003 白场单罐靠左、右侧一整版参数表与配料文字块；004 纯平面信息版式，顶部一行口味字、中部五枚徽章排、下方三行勾选清单、底部一行编号声明；005 白场单罐近摄，罐身满布冷凝水珠。品类判定依据：画面为罐充即饮气泡饮料，非粉剂冲调、非营养补充剂、非含酒精饮品，故 L1 逐字取「食品饮料」、L2 逐字取「饮料」，与源类目提示一致，无改判。成镜说明：5 张源图角色互不重复（主图/三面细节/参数/信任墙/凝露微距/整箱陈列），未出现换色换口味色卡式重复构图，亦有单一主产品，故非变体画廊亦非混合套装，拆并为 6 镜漏斗。已剥离：原品牌字标与系列名、字母图形标识、植物叶片与网点渐变装潢、口味字样、参数表全部数值与配料原文、五枚认证徽章图形及其名称、条码与方格码、原平台店铺字样与社交账号、以及全部功效性主张（涉及代谢、燃脂、糖分与维生素含量的表述一律不入稿，改为空白印章框、空参数行、空表格单元与留空指示条占位）。罐型仅按通用细高罐几何描述，具体身份交由 {product_identity_lock} 接管；产品一律以 {product} 占位。"
+  }
+}

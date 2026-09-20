@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-tushuwenju-youji-xitou-jihaobi",
+  "name": "油性细头多材质记号笔款",
+  "category": {
+    "l1": "图书文具",
+    "l2": "文具",
+    "leaf": "油性细头记号笔",
+    "leafKeywords": [
+      "记号笔",
+      "油性笔",
+      "细头笔",
+      "多材质书写",
+      "标记笔",
+      "办公文具",
+      "手绘线稿"
+    ]
+  },
+  "description": "单一深绯红底色版＋真实材质样板，一眼读懂书写卖点款",
+  "productFamily": "home",
+  "styleLock": {
+    "direction": "bold flat-colour writing-instrument commerce",
+    "palette": [
+      {
+        "name": "底白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "深绯红",
+        "hex": "#B3161C"
+      },
+      {
+        "name": "暖纸米",
+        "hex": "#F5F1E8"
+      },
+      {
+        "name": "墨黑",
+        "hex": "#1A1A1C"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "one flat colour field per frame: seamless white #FFFFFF for the packshot, deep crimson #B3161C for the graphic benefit and scene screens, warm paper off-white #F5F1E8 for macro and flat-lay boards; never a scenery gradient",
+    "lightingSystem": "bright neutral high-key studio light, soft front-left key with a bounce fill, controlled narrow speculars on glossy barrels, soft contact shadows grounding every unit",
+    "surfaceSystem": "uncoated card stock and matte paper board, plus small real-material sample tiles (white-washed board, brushed metal, tinted acrylic, open-grain timber)",
+    "typography": "modern geometric sans-serif, all-caps headline weight, generous reserved headline whitespace; the template itself renders no copy",
+    "iconSystem": "thin single-weight line icons and one solid circular magnifier disc in #FFFFFF only, no shaded or three-dimensional icons",
+    "presentationRules": "consistent product scale across the set; units shown capped in tidy staggered rows or held at a 30-45 degree writing angle; retail carton always shown face-on with its own artwork untouched",
+    "noDrift": [
+      "no colour palette changes",
+      "no mixed fonts",
+      "no random scenery or gradient backgrounds",
+      "no inconsistent lighting direction",
+      "no mismatched icon styles",
+      "no added badges, stickers or platform corner marks"
+    ],
+    "lockText": "Campaign Style Lock: consistent bold flat-colour writing-instrument commerce system across the entire image set; fixed palette of clean white #FFFFFF field, deep crimson #B3161C graphic backdrop, warm paper off-white #F5F1E8 board and charcoal ink tone #1A1A1C; bright neutral high-key studio lighting with a soft front-left key, bounce fill, controlled narrow speculars on glossy barrels and soft contact shadows; one flat colour field per frame, never a scenery gradient; modern geometric sans-serif with generous reserved headline whitespace; thin single-weight line icons and solid circular magnifier discs only; stable product scale, capped units in tidy staggered rows and a 30-45 degree writing angle; no colour palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no added badges or platform corner marks."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底整盒排布主图",
+      "intent": "在搜索列表里一眼看清包装与整排笔身，抢到首次点击。",
+      "assetType": "suite-tushuwenju-youji-xitou-jihaobi::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "straight-on eye-level, carton face-on, full set visible and nothing clipped",
+      "lighting": "bright even high-key studio light, soft front-left key with bounce fill, soft contact shadows",
+      "background": "seamless pure white #FFFFFF",
+      "props": "the product's own retail carton and one arcing stroke on the surface",
+      "productOccupancy": "60-70%",
+      "whitespace": "even margin all round, no reserved copy space",
+      "textZone": "none",
+      "promptTemplate": "E-commerce white-background packshot of {product}. {product_identity_lock}. {style_lock}. Purpose: win the search click with a clean quantity read. The retail carton standing upright face-on at the left, two staggered fanned rows of capped units rising at the right, and one uncapped unit drawing a single bold arcing stroke low across the foreground. Straight-on eye-level view, the whole group visible with nothing clipped. Bright even high-key studio light from the front-left with a bounce card on the shadow side, soft contact shadows grounding every barrel. Seamless pure white background #FFFFFF. No props beyond the carton and the drawn stroke. The group occupies 60-70% of the frame. Even margin all round with no extra whitespace reserved for copy. Negative: no added logo, badge, sticker or watermark, no scattered loose units, no duplicated barrels from copy-paste, no floating markers without a contact shadow, no cut-off caps, no tinted or gradient background.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "多材质样板一笔贯通",
+      "intent": "一秒讲清核心利益：同一种墨能连续写在多种材质上。",
+      "assetType": "suite-tushuwenju-youji-xitou-jihaobi::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "high 45-degree angle looking down onto the tile band while the backdrop stays a flat vertical field",
+      "lighting": "soft front-left key, one narrow specular streak along each barrel, gentle contact shadows on the tiles",
+      "background": "flat deep crimson field #B3161C behind a warm paper off-white #F5F1E8 tile band",
+      "props": "four edge-to-edge real-material sample tiles",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space across the upper-left 45% of the crimson field for copy",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. Purpose: state the single reason to buy in one glance. One unit enters diagonally from the upper right, its writing end crossing a band of four real-material sample tiles laid edge to edge along the lower third: white-washed board #EDEAE4, brushed metal #B9BCC0, tinted acrylic #E2A03F and open-grain timber #8A5A3B, with one continuous dense stroke running unbroken across all four surfaces. Photographed from a high 45-degree angle looking down at the tiles while the backdrop remains a flat vertical colour field. Soft front-left key leaving one narrow specular streak along each barrel and gentle contact shadows on the tiles. Flat deep crimson background field #B3161C behind a warm paper off-white #F5F1E8 tile band. The tiles are the only props. The marker and tile band together occupy 50-60% of the frame, with generous negative space across the upper-left 45% of the crimson field for copy. Negative: no rendered words or letters in the frame, no painted-on fake material texture, no added brand mark on the barrel, no uneven tile heights, no harsh cast shadows, no cluttered extra props.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "笔头微距放大圈",
+      "intent": "用笔头与第一条细线的微距证明落笔精度，解释卖点机制。",
+      "assetType": "suite-tushuwenju-youji-xitou-jihaobi::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "extreme close-up macro on a low oblique angle skimming across the paper surface, shallow depth of field",
+      "lighting": "sweeping low side light from the right revealing paper tooth and ink density, gentle falloff into shadow",
+      "background": "warm paper off-white #F5F1E8 board with a solid #FFFFFF circular magnifier disc at the upper right",
+      "props": "one sheet of uncoated card and the magnifier disc",
+      "productOccupancy": "55-60%",
+      "whitespace": "minimal, the detail is the subject",
+      "textZone": "none",
+      "promptTemplate": "E-commerce extreme close-up macro of {product}, tight zoom on the writing end of one uncapped unit hovering just above a sheet of uncoated card where a fine continuous contour line is being laid down. {product_identity_lock}. {style_lock}. Photographed on a low oblique macro angle skimming across the paper surface, shallow depth of field with only the tip and the first line in focus. Sweeping low side light from the right revealing paper tooth and ink density, falloff into soft shadow behind. Background warm paper off-white #F5F1E8 board, with a solid #FFFFFF circular magnifier disc at the upper right isolating the same writing end. No props besides the card and the disc. The tip and the line fill 55-60% of the frame, with minimal whitespace since the detail is the subject. Negative: no blurry subject, no duplicated or extra tips, no hands or fingers in frame, no added brand text, no invented stroke-width measurement, no paper texture watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "湿面标牌书写场景",
+      "intent": "把产品放进带水珠的真实标牌场景，让买家代入自己的使用环境。",
+      "assetType": "suite-tushuwenju-youji-xitou-jihaobi::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 eye-level view with the tag near and the foliage falling softly out of focus",
+      "lighting": "soft directional key from the upper left with a cool fill, crisp speculars on the water beads, contact shadow under the tag",
+      "background": "flat deep crimson field #B3161C",
+      "props": "one blank plant tag, a shallow pale trough and fresh green foliage",
+      "productOccupancy": "40-50%",
+      "whitespace": "the crimson field above the foliage kept as open negative space for copy",
+      "textZone": "none",
+      "promptTemplate": "E-commerce usage scene of {product}. {product_identity_lock}. {style_lock}. Purpose: let the buyer project the product into their own labeling routine. A marker enters from the right at a natural writing angle over a blank plant tag standing in a shallow pale trough of fresh green foliage, clean water beads beading on the tag face, one bold abstract stroke already laid across it. Slight 3/4 eye-level view with the tag near and the foliage falling softly out of focus. Soft directional key from the upper left with a cool fill, crisp speculars on each water bead, a real contact shadow under the tag. Flat deep crimson background field #B3161C with the tag in clean white #FFFFFF. Props limited to the tag, the trough and the foliage, none of them covering the marker. The tag and marker occupy 40-50% of the frame, with the crimson field above the foliage kept as open negative space for copy. Negative: no readable lettering on the tag, no painted-on droplet streaks, no plastic-looking foliage, no hands in frame, no added brand mark, no muddy bokeh, no light direction that contradicts the bead highlights.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "细线与浓涂同框平铺",
+      "intent": "同一张纸上并置极细线与实心浓涂，用结果画面坐实表现力。",
+      "assetType": "suite-tushuwenju-youji-xitou-jihaobi::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "flat lay photographed directly from above at a 90-degree overhead angle",
+      "lighting": "even high-key flat lighting, narrow soft shadow under each barrel, no hotspots on the ink",
+      "background": "warm paper off-white #F5F1E8 board with a narrow #B3161C mat border",
+      "props": "one square sheet of printed card only",
+      "productOccupancy": "50-60%",
+      "whitespace": "clean margin along the top of the board for copy",
+      "textZone": "none",
+      "promptTemplate": "E-commerce infographic flat lay of {product}. {product_identity_lock}. {style_lock}. Purpose: prove the result in one frame. Photographed directly from above at a 90-degree overhead angle, a square sheet of clean white card #FFFFFF carries a dense symmetrical pattern in which hairline outlines sit beside solid filled blocks, one unit lying along the lower edge of the sheet and a second crossing in from the right. Even high-key flat lighting with a narrow soft shadow beneath each barrel and no hotspot on the ink. Background warm paper off-white #F5F1E8 board edged by a narrow #B3161C mat border. The printed card is the only prop. The card and the two markers occupy 50-60% of the frame, with a clean margin along the top for copy. Negative: no legible words inside the artwork, no moire or repeated tile pattern, no warped straight lines, no duplicated marker bodies, no harsh specular blowout, no added logo.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "整盒清点留白凭证",
+      "intent": "开箱清点加空白凭证槽位，消除到手数量与品质风险。",
+      "assetType": "suite-tushuwenju-youji-xitou-jihaobi::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, close mid-crop on the carton edge, one row of units and the placeholder panels",
+      "lighting": "even clean front light with a soft fill, gentle contact shadow under every barrel",
+      "background": "flat deep crimson field #B3161C",
+      "props": "empty rounded seal outline and a blank parameter grid panel",
+      "productOccupancy": "50-60%",
+      "whitespace": "open crimson margin at the right for copy",
+      "textZone": "none",
+      "promptTemplate": "E-commerce trust screen of {product}. {product_identity_lock}. {style_lock}. Purpose: remove the last hesitation before purchase. Straight-on eye-level, a close mid-crop on the open retail carton at the left with its own artwork untouched, one tidy row of capped units standing beside it, and to the right an empty rounded seal outline above a blank parameter grid of unprinted table cells, every proof slot deliberately left as an empty placeholder for post-production. Even clean front light with a soft fill and a gentle contact shadow under every barrel. Flat deep crimson background field #B3161C, with the units and the placeholder panels in clean white #FFFFFF and charcoal #1A1A1C line work. No extra props. The carton, the row and the placeholder panels occupy 50-60% of the frame combined, with an open crimson margin at the right for copy. Negative: do NOT invent certifications, awards, ratings, test numbers, counts or dates, no legible seal text, no fake logo, no watermark, no floating carton without a contact shadow, no mismatched barrel scale between rows.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：001 白底主图＝直立零售包装盒＋两排错列笔身＋前景一道弧线笔迹；002 深红单色版，笔尖横跨四种真实材质样板（白板／拉丝金属／有色亚克力／木纹），一条连续笔迹贯通全部样板；003 深红版上斜置线稿卡片，右上角白色圆形放大圈内单独展示笔头；004 俯视平铺白纸，密集对称墨线图案，笔身横卧纸缘、另一支斜入画面；005 深红版上白色标牌带满水珠，笔自右侧入画在标牌上落笔。品类判定依据：实物为油性书写工具（细头记号笔），属书写耗材而非美妆着色、护肤清洁或厨房用品，故 L1 逐字取「图书文具」、L2 逐字取「文具」；源平台路径偏办公书写类，与实物一致，无需改判。已剥离：原品牌字标与系列名、包装盒上的印刷图文与角标、包装数量与规格数字、全部标题式英文广告语句与材质主张（改为留白与空白占位槽）、源图上的平台角标与星条类社会证明元素；未搬用任何数值型事实，凭证位一律写成空白参数行与空印章框。产品全程以 {product} 占位，仅保留分镜结构、色板、机位与光位作为可复用语法。"
+  }
+}

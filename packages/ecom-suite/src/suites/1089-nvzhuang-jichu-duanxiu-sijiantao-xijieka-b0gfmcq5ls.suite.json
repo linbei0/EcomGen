@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-nvzhuang-jichu-duanxiu-sijiantao-xijieka-b0gfmcq5ls",
+  "name": "基础圆领短袖四件装细节卡款",
+  "category": {
+    "l1": "女装",
+    "l2": "上衣",
+    "leaf": "女式基础圆领短袖T恤四件装",
+    "leafKeywords": [
+      "基础T恤",
+      "四件装",
+      "圆领短袖",
+      "宽松落肩",
+      "多色组合",
+      "日常通勤"
+    ]
+  },
+  "description": "米白棚配森绿点缀，正反背四色列与三行细节卡讲清基础款",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "clean everyday basics multipack tee commerce",
+    "palette": [
+      {
+        "name": "米白棚",
+        "hex": "#F4F1E8"
+      },
+      {
+        "name": "森绿点缀",
+        "hex": "#3E5B4F"
+      },
+      {
+        "name": "墨黑下装",
+        "hex": "#232326"
+      },
+      {
+        "name": "浅雾灰底",
+        "hex": "#E3E5E2"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless off-white studio sweep #F4F1E8 for figure frames, pale mist grey #E3E5E2 card field for the detail strip, soft forest-green gradient band reserved for the closing stack, no outdoor scenes, no lifestyle rooms",
+    "lightingSystem": "even high-key studio daylight near 5500K, broad soft key with feathered falloff, one fine shadow under each fabric fold to keep drape readable, never dramatic contrast",
+    "surfaceSystem": "matte seamless studio paper, mist grey rounded info cards with thin drop shadows, folded cotton stacks on flat surfaces, no wood, no marble",
+    "typography": "one plain humanist sans in charcoal #232326, every feature label and headline slot kept as an empty underlined placeholder",
+    "iconSystem": "none; the set carries no icon language, information rides on blank label rails only",
+    "presentationRules": "tees always shown loose and untucked over plain black bike shorts, models generic and cropped from the chin down, the multipack reads as solid colours only with no prints, gold-tone pendant necklace as the single anonymous styling accent",
+    "noDrift": [
+      "no color palette changes",
+      "no face or identity of the models",
+      "no printed graphics on the tees",
+      "no outdoor backgrounds",
+      "no random backgrounds",
+      "no inconsistent lighting"
+    ],
+    "lockText": "Campaign Style Lock: consistent clean everyday basics multipack tee ecommerce visual system across the entire image set; fixed palette of off-white studio #F4F1E8, forest green accent #3E5B4F, ink black shorts #232326 and pale mist grey #E3E5E2; even high-key studio daylight near 5500K with a broad soft key and one fine shadow under each fabric fold; seamless studio paper, mist grey rounded info cards and folded cotton stacks only, no wood, no marble, no outdoor scenes; one plain humanist sans in charcoal kept as empty underlined placeholder rails; no icon language; tees worn loose and untucked over plain black bike shorts with models cropped from the chin down; no color palette changes, no printed graphics, no face or identity, no random backgrounds, no inconsistent lighting."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "米白棚正身黑T主图",
+      "intent": "在搜索结果缩略图里一眼赢下点击，交代宽松落肩的基础廓形。",
+      "assetType": "suite-nvzhuang-jichu-duanxiu-sijiantao-xijieka-b0gfmcq5ls::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on eye-level full-figure framing cropped from the chin down, weight relaxed on one hip, one hand lightly pinching the hem",
+      "lighting": "even high-key studio daylight near 5500K, broad soft key, feathered falloff, one fine shadow under the pinched hem fold",
+      "background": "seamless off-white studio sweep #F4F1E8",
+      "props": "plain black bike shorts, thin gold-tone pendant necklace, small gold hoop earrings at the cropped jaw line",
+      "productOccupancy": "60-70%",
+      "whitespace": "none, the figure fills the frame with even clean margins",
+      "textZone": "none",
+      "promptTemplate": "E-commerce hero shot of {product}. {product_identity_lock}. {style_lock}. A straight-on eye-level full-figure framing, cropped from the chin down, shows the loose black crew-neck tee worn untucked over plain black bike shorts, weight relaxed on one hip while one hand lightly pinches the curved hem. Even high-key studio daylight near 5500K keeps a broad soft key with feathered falloff and one fine shadow under the pinched fold. Seamless off-white studio sweep #F4F1E8. A thin gold-tone pendant and small hoops at the cropped jaw line are the only styling. The figure occupies 60-70% of the frame with even margins. Negative: no identifiable face, no brand tag, no readable lettering, no printed graphics, no extra people, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "DETAIL",
+      "displayName": "灰蓝背片垂坠版型",
+      "intent": "用整片后背与肩线垂坠证明版型平直不挑人，消除背面臆想。",
+      "assetType": "suite-nvzhuang-jichu-duanxiu-sijiantao-xijieka-b0gfmcq5ls::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "behind view at shoulder height, back panel squared to frame, head turned away and cropped at the jaw",
+      "lighting": "even high-key studio daylight near 5500K from above the shoulder line, soft shadow where the fabric leaves the waist",
+      "background": "seamless off-white studio sweep #F4F1E8",
+      "props": "plain black bike shorts below the hem, hair tied back with no accessory shine",
+      "productOccupancy": "60-70%",
+      "whitespace": "balanced margins both sides, no props",
+      "textZone": "none",
+      "promptTemplate": "Back view detail of {product}. {product_identity_lock}. {style_lock}. A behind view at shoulder height squares the full back panel of a dusty blue loose tee to the frame, the shoulder seam falling relaxed and the hem sitting straight past the waist over plain black bike shorts, the head turned away and cropped at the jaw with hair tied back. Even high-key studio daylight near 5500K from above the shoulder line leaves a soft shadow where the fabric clears the waist. Seamless off-white studio sweep #F4F1E8 with balanced empty margins. The back panel occupies 60-70%. Negative: no identifiable face, no neck tag, no brand mark, no see-through fabric, no wrinkles from sitting, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "VARIANT",
+      "displayName": "四色人阵阶梯选色",
+      "intent": "用四具身形各穿一色的阶梯人阵展示组合配色，让买家按喜好挑列。",
+      "assetType": "suite-nvzhuang-jichu-duanxiu-sijiantao-xijieka-b0gfmcq5ls::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on group framing, four generic figures in a shallow diagonal ladder from near-left to far-right, each cropped from the chin down",
+      "lighting": "even high-key studio daylight near 5500K, matched exposure across all four figures, gentle overlap shadows only at contact edges",
+      "background": "seamless off-white studio sweep #F4F1E8",
+      "props": "four solid tees in mauve, dusty blue, white and black over plain black shorts, one hand in pocket on the nearest figure",
+      "productOccupancy": "60-70%",
+      "whitespace": "clean upper band kept free above the tallest shoulder",
+      "textZone": "none",
+      "promptTemplate": "Colour line-up group shot of {product}. {product_identity_lock}. {style_lock}. Four generic figures stand in a shallow diagonal ladder from near-left to far-right in straight-on group framing, each cropped from the chin down, wearing the same loose tee in solid mauve, dusty blue, white and black over plain black shorts, one hand tucked at a pocket seam on the nearest figure. Even high-key studio daylight near 5500K keeps matched exposure across all four with gentle overlap shadows only where bodies meet. Seamless off-white studio sweep #F4F1E8 with a clean upper band above the tallest shoulder. The group occupies 60-70%. Negative: no identifiable faces, no model likeness, no brand marks, no printed graphics, no tangled limbs, no fused bodies, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "白T提袋日常瞬间",
+      "intent": "把基础白T放进提袋出门的日常瞬间，完成低门槛自我代入。",
+      "assetType": "suite-nvzhuang-jichu-duanxiu-sijiantao-xijieka-b0gfmcq5ls::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight 3/4 walking framing at hip height, cropped from the chin down, one arm swinging a canvas tote low at the side",
+      "lighting": "even high-key studio daylight near 5500K with a touch of directional softness from the left to read the stride",
+      "background": "seamless off-white studio sweep #F4F1E8",
+      "props": "one plain cream canvas tote with blank face held low, plain black shorts, thin gold pendant",
+      "productOccupancy": "50-60%",
+      "whitespace": "open leading space ahead of the stride kept clean",
+      "textZone": "none",
+      "promptTemplate": "Everyday carry scene of {product}. {product_identity_lock}. {style_lock}. A slight 3/4 walking framing at hip height, cropped from the chin down, shows the white loose tee mid-stride over plain black shorts, one arm swinging a blank-faced cream canvas tote low at the side. Even high-key studio daylight near 5500K carries a touch of directional softness from the left so the stride reads, over a seamless off-white studio sweep #F4F1E8 with open leading space ahead of the step kept clean. The figure occupies 50-60%. Negative: no identifiable face, no tote print or logo, no brand tag, no readable lettering, no deformed hands, no fused fingers, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "三行领袖摆细节卡",
+      "intent": "用领口、袖型、下摆三行圆角细节卡逐点证明做工，替代口头品质承诺。",
+      "assetType": "suite-nvzhuang-jichu-duanxiu-sijiantao-xijieka-b0gfmcq5ls::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "stacked triptych of three rounded cards, each a tight crop: crew neck at chest height, dropped sleeve at mid-upper-arm, curved hem at the hip, all at straight-on angle",
+      "lighting": "even high-key studio daylight near 5500K inside each card, fine thread-level shadow along every stitch line",
+      "background": "pale mist grey card field #E3E5E2",
+      "props": "three blank underlined label rails beside alternating cards, gold pendant blurred out of focus in the neck crop",
+      "productOccupancy": "55-60%",
+      "whitespace": "even gutters between cards, each label rail kept fully empty",
+      "textZone": "none",
+      "promptTemplate": "Three-row feature card strip for {product}. {product_identity_lock}. {style_lock}. A stacked triptych of three rounded mist grey cards #E3E5E2 holds tight zoom extreme close-up macro crops of one mauve tee: the ribbed crew neck at chest height with a blurred gold pendant, the dropped shoulder sleeve at mid-upper-arm, and the twin-stitched curved hem at the hip. Even high-key studio daylight near 5500K inside each card keeps a fine thread-level shadow along every stitch line. One blank underlined label rail sits beside each crop, alternating sides, all kept fully empty as placeholders. The crops fill 55-60% with even gutters. Negative: no feature wording, no filled rails, no brand tags, no loose threads, no blurry subject, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "四叠成组收口色阶",
+      "intent": "收口促单，用四件折叠成组的色阶堆叠把多件装价值一眼说清。",
+      "assetType": "suite-nvzhuang-jichu-duanxiu-sijiantao-xijieka-b0gfmcq5ls::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "flat lay photographed directly from above at a 90-degree overhead angle, four folded tees in a neat offset column, one card corner lifted",
+      "lighting": "even high-key studio light near 5500K, hairline soft shadows under each folded stack",
+      "background": "soft forest-green gradient band #3E5B4F meeting the off-white sweep #F4F1E8",
+      "props": "four folded solid tees in mauve, dusty blue, white and black, one empty underlined closing rail",
+      "productOccupancy": "60-70%",
+      "whitespace": "generous lower band kept open as the empty closing rail",
+      "textZone": "lower band for 「{callout_1}」",
+      "promptTemplate": "E-commerce closing multipack flat lay of {product}. {product_identity_lock}. {style_lock}. Photographed directly from above at a 90-degree overhead angle, four neatly folded solid tees in mauve, dusty blue, white and black sit in an offset column where the soft forest-green gradient band #3E5B4F meets the off-white sweep #F4F1E8, the top card corner lifted a few millimetres. Even high-key studio light near 5500K lays hairline soft shadows under each stack. A generous lower band holds one empty underlined closing rail. The column occupies 60-70%. Negative: no pack count numerals, no price, no brand marks, no filled rail text, no readable lettering, no crushed folds, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：001 白底正身黑T（面孔完整入镜），一手捏下摆展示垂感，金坠项链与金耳环；002 灰蓝T背面全身（侧脸入镜），展示平直背片与落肩；003 四模特各穿紫灰/灰蓝/白/黑一字阶梯列（四张面孔均清晰）；004 白T提米色帆袋行走（面孔入镜）；005 三行圆角细节卡：Crew Neck/Loose Sleeves/Ultra Soft 英文字注（下划线标签位）。品类判定依据：主体为女式基础圆领短袖T恤四件装，L1 女装、L2 上衣，leaf 记基础圆领短袖T恤四件装，与提示类目一致；五图为正/背/色列/场景/细节卡分工，非色卡同构变体，正常转化。已剥离内容：品牌 Kinglaman 字样、全部模特面容（一律鼻下或下颌裁切）、三行英文字注原文（改为空下划线标签轨）、耳饰与项链不写品牌。与同品牌库内三套区隔：长袖套（俯视平铺+一主三副矩阵）、修身短袖套（抬臂卖点+场景快照）、oversize 套（紧绷痛点+五色斜列）均无本套的正背全身+四色人阵+三行圆角细节卡结构；色板改米白棚+森绿点缀+雾灰卡底，避开冷雾蓝/暖芥黄/雾粉水洗黑三系。源图 5 张，003 拆出四色人阵并新增折叠收口镜，按转化漏斗排为 6 镜。"
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-nvzhuang-chukuan-niuzikou-luwen-kaishan-b0fnzzw3dj",
+  "name": "长款牛角扣罗纹针织开衫款",
+  "category": {
+    "l1": "女装",
+    "l2": "上衣",
+    "leaf": "女式长款纽扣罗纹针织开衫",
+    "leafKeywords": [
+      "针织开衫",
+      "长款开衫",
+      "罗纹毛衣",
+      "牛角扣",
+      "秋季外套",
+      "慵懒风"
+    ]
+  },
+  "description": "燕麦摩卡暖针织体系，灰泥墙与芦苇草景承载慵懒通勤感",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "cozy oatmeal long knit cardigan lifestyle commerce",
+    "palette": [
+      {
+        "name": "燕麦灰棕",
+        "hex": "#C7BCAE"
+      },
+      {
+        "name": "灰泥白墙",
+        "hex": "#F1EDE7"
+      },
+      {
+        "name": "摩卡扣色",
+        "hex": "#6B4F3A"
+      },
+      {
+        "name": "牛仔靛蓝",
+        "hex": "#5C7A99"
+      }
+    ],
+    "temperature": "warm",
+    "backgroundSystem": "seamless soft white #FFFFFF sweep for the opening packshot, textured plaster white wall #F1EDE7 with a dried pampas vase as the recurring home stage, blurred autumn street bokeh allowed only inside the single on-the-go frame",
+    "lightingSystem": "soft warm daylight near 5000K, airy diffused fill, one gentle rib-shadow rake that lets the ribbed relief read, no hard flash, no cool clinical light",
+    "surfaceSystem": "matte plaster wall, pale stone floor, dried pampas grass in a ceramic urn, warm oak café ledge inside the lifestyle frame only, no marble, no neon props",
+    "typography": "no rendered copy in any frame; if a text slot is added it stays an empty placeholder rail",
+    "iconSystem": "none; the set carries no icon language, structure comes from garment lines only",
+    "presentationRules": "the cardigan is always worn open over a plain white ribbed tank with light-wash denim, model cropped from the chin down in every frame, horn buttons stay mottled brown, hands relaxed never covering the placket",
+    "noDrift": [
+      "no color palette changes",
+      "no face or identity of the model",
+      "no mixed garment styling",
+      "no cool grey studio floors",
+      "no random backgrounds",
+      "no inconsistent lighting"
+    ],
+    "lockText": "Campaign Style Lock: consistent cozy oatmeal long knit cardigan ecommerce visual system across the entire image set; fixed palette of oatmeal taupe #C7BCAE, plaster white #F1EDE7, mocha horn-button brown #6B4F3A and light denim indigo #5C7A99; soft warm daylight near 5000K with airy diffused fill and one gentle rib-shadow rake; textured plaster wall with a dried pampas vase as the recurring stage, pure white sweep only for the opening packshot, blurred autumn street bokeh only in the single lifestyle frame, no marble, no cool grey studio floors; model always cropped from the chin down, cardigan always worn open over a plain white ribbed tank with light-wash denim; no rendered copy, no icon language; no color palette changes, no mixed garment styling, no random backgrounds, no inconsistent lighting."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "纯白底开衫正身主图",
+      "intent": "在搜索结果缩略图里一眼赢下点击，交代长款廓形与开襟比例。",
+      "assetType": "suite-nvzhuang-chukuan-niuzikou-luwen-kaishan-b0fnzzw3dj::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on eye-level axis, torso centred, frame cropped from the chin down and at mid-thigh so the full cardigan length reads",
+      "lighting": "soft warm daylight near 5000K with airy diffused fill, one gentle rake from the left that lets each rib column cast a hairline shadow",
+      "background": "seamless soft white #FFFFFF sweep",
+      "props": "one kraft coffee cup with white lid held low in one hand, other hand tucked into the patch pocket",
+      "productOccupancy": "60-70%",
+      "whitespace": "none, the garment fills the frame with even clean margins",
+      "textZone": "none",
+      "promptTemplate": "E-commerce hero shot of {product}. {product_identity_lock}. {style_lock}. The long ribbed cardigan is worn open over a plain white ribbed tank and light-wash denim, torso centred on a straight-on eye-level axis, frame cropped from the chin down and at mid-thigh so the full length reads. One hand holds a kraft coffee cup low at the hip, the other tucks into the patch pocket. Soft warm daylight near 5000K with a gentle left rake so each rib column casts a hairline shadow. Seamless soft white background #FFFFFF. The garment occupies 60-70% of the frame with even margins. Negative: no identifiable face, no model likeness, no brand tag, no readable lettering, no logo hardware, no extra people, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "DETAIL",
+      "displayName": "门襟纽扣正面细节",
+      "intent": "用整排牛角扣与 V 领门襟的正面细节讲清做工与穿脱方式。",
+      "assetType": "suite-nvzhuang-chukuan-niuzikou-luwen-kaishan-b0fnzzw3dj::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle at chest height, fingers of one hand resting on the placket at mid-button, cropped from the chin down",
+      "lighting": "soft warm daylight near 5000K from the upper right, diffused fill, fine shadow inside each rib groove",
+      "background": "textured plaster white wall #F1EDE7 with a blurred dried pampas vase at the edge",
+      "props": "thin layered gold-tone necklaces as anonymous styling, plain white tank edge visible, nothing else",
+      "productOccupancy": "55-60%",
+      "whitespace": "calm wall margin on the right third, no dense filler",
+      "textZone": "none",
+      "promptTemplate": "Front placket detail of {product}. {product_identity_lock}. {style_lock}. At a slight 3/4 angle set at chest height, the open placket with its row of mottled mocha horn buttons runs down the centre while one hand's fingertips rest lightly on the mid button, the figure cropped from the chin down. Soft warm daylight near 5000K from the upper right puts a fine shadow inside each rib groove. Background is a textured plaster white wall #F1EDE7 with a blurred dried pampas vase at one edge. Thin layered gold-tone necklaces add anonymous styling over the plain white ribbed tank. The garment detail occupies 55-60% with a calm wall margin on the right third. Negative: no identifiable face, no brand wordmark, no readable tag, no plastic buttons, no fused fingers, no deformed hands, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "侧身挎包出街场景",
+      "intent": "把开衫放进通勤出街的真实搭配里，让买家完成自我代入。",
+      "assetType": "suite-nvzhuang-chukuan-niuzikou-luwen-kaishan-b0fnzzw3dj::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "side profile three-quarter standing framing, body turned forty-five degrees, one hand on the bag strap, cropped from the chin down",
+      "lighting": "soft warm daylight near 5000K, open and airy, gentle long shadow of the hem on the pale floor",
+      "background": "textured plaster white wall #F1EDE7 meeting a pale stone floor",
+      "props": "one slouchy brown leather shoulder bag, light-wash denim, plain white tank",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous wall space ahead of the gaze line kept clean",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene of {product}. {product_identity_lock}. {style_lock}. A side profile three-quarter standing framing shows the body turned forty-five degrees, one hand resting on the strap of a slouchy brown leather shoulder bag worn across the open cardigan, the figure cropped from the chin down. Soft warm daylight near 5000K stays open and airy and drops a gentle long hem shadow on the pale stone floor. Background is the textured plaster white wall #F1EDE7 meeting the floor, with generous clean wall space ahead of the gaze line. The outfit occupies 50-60% of the frame. Negative: no identifiable face, no model likeness, no brand plate on the bag, no readable lettering, no extra people, no busy street clutter, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "背片罗纹垂感版型",
+      "intent": "用整片后背罗纹与落肩垂坠证明版型不挑人、不鼓包。",
+      "assetType": "suite-nvzhuang-chukuan-niuzikou-luwen-kaishan-b0fnzzw3dj::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "behind view at shoulder height, full back panel squared to frame, hem falling to mid-thigh, head cropped out above the neck",
+      "lighting": "soft warm daylight near 5000K from the left, even fill, rib columns reading through gentle alternating shade",
+      "background": "textured plaster white wall #F1EDE7 with a dried pampas urn low at the left",
+      "props": "small gold-tone hoop earring glint at the cropped jaw line, light-wash denim below the hem",
+      "productOccupancy": "60-70%",
+      "whitespace": "balanced wall margins on both sides, urn kept low and partial",
+      "textZone": "none",
+      "promptTemplate": "Back view detail of {product}. {product_identity_lock}. {style_lock}. A behind view at shoulder height squares the full back panel to the frame, rib columns running unbroken from dropped shoulder to mid-thigh hem, the head cropped cleanly out above the neck so only a small gold-tone hoop glints at the jaw line. Soft warm daylight near 5000K from the left keeps an even fill so each rib reads through gentle alternating shade. Background is the textured plaster white wall #F1EDE7 with a dried pampas urn held low and partial at the left edge, light-wash denim below the hem. The back panel occupies 60-70% with balanced wall margins both sides. Negative: no identifiable face, no visible neck branding, no tag, no hunch posture, no pilling or lint, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "SCENE",
+      "displayName": "秋日街拍咖啡时刻",
+      "intent": "补一个动态出街瞬间，把慵懒感从墙面场景延伸到城市日常。",
+      "assetType": "suite-nvzhuang-chukuan-niuzikou-luwen-kaishan-b0fnzzw3dj::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "candid mid-stride framing from a slight low angle at waist height, cropped from the chin down, sleeves pushed to the wrist",
+      "lighting": "soft overcast warm daylight, diffused and flat with a faint rim from a bright storefront behind",
+      "background": "blurred autumn street bokeh with warm neutral facades",
+      "props": "kraft coffee cup in one swinging hand, other hand loose at the side, light-wash denim",
+      "productOccupancy": "40-50%",
+      "whitespace": "upper third held as soft blurred negative space",
+      "textZone": "none",
+      "promptTemplate": "On-the-go lifestyle frame of {product}. {product_identity_lock}. {style_lock}. A candid mid-stride framing from a slight low angle at waist height catches the open cardigan swinging mid-step, sleeves pushed to the wrist, one hand carrying a kraft coffee cup, the figure cropped from the chin down. Soft overcast warm daylight stays diffused and flat with a faint rim from a bright storefront behind. Background is a blurred autumn street bokeh in warm neutrals #D8C8B4, the upper third held as soft negative space. The outfit occupies 40-50% of the frame. Negative: no identifiable face, no readable storefront signs, no brand marks, no traffic clutter, no deformed hands, no fused fingers, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "罗纹绒面纽扣微距",
+      "intent": "用纱线绒感与纽扣走线的微距收口，以可见做工替代口头品质承诺。",
+      "assetType": "suite-nvzhuang-chukuan-niuzikou-luwen-kaishan-b0fnzzw3dj::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "4K",
+      "camera": "extreme close-up macro at a low side angle skimming the knit surface, tight zoom on one horn button and its cross stitching with two rib columns falling out of focus",
+      "lighting": "warm low side light sweeping across the yarn relief, each fibre halo catching a fine highlight, falloff into soft shade",
+      "background": "the garment itself fills the frame, oatmeal rib fading to plaster white #F1EDE7 at the far edge",
+      "props": "one relaxed fingertip at the placket edge, no jewellery shine",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the macro relief is the subject with a thin clean margin at the top",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on one mottled mocha horn button and its cross stitching while two rib columns run past and fall softly out of focus. {product_identity_lock}. {style_lock}. The camera sits at a low side angle skimming the knit surface so warm low side light sweeps across the yarn relief and each fibre halo catches a fine highlight before falling into soft shade. The garment fills the frame, oatmeal rib fading to a plaster white edge #F1EDE7. One relaxed fingertip rests at the placket without jewellery shine. The detail fills 55-60% with a thin clean top margin. Negative: no blurry subject, no plastic sheen on yarn, no loose threads, no brand stamp on button, no lint or pilling, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：001 纯白底正身，开衫敞开内搭白罗纹背心与浅水洗牛仔，一手低持牛皮纸咖啡杯、一手插贴袋，下巴以下裁切；002 灰泥白墙前正身微侧，指尖搭在门襟中段，V 领与整排玳瑁色牛角扣清晰，左缘干芦苇瓶；003 背身整片罗纹垂坠至大腿中段，头颈裁切仅露金色小耳环；004 侧转四十五度，棕色软皮单肩包挎在开衫外，手搭肩带；005 胸口以上微距：叠戴金色项链、三枚纽扣与罗纹绒感，腕上金表。品类判定依据：主体为女式长款纽扣罗纹针织开衫，L1 女装、L2 上衣，leaf 记长款纽扣罗纹针织开衫，与提示类目一致；五图为同款不同角度/搭配分工（正/侧/背/细节），非色卡变体，正常转化。已剥离内容：品牌 AUTOMET 字样、模特面容与身份（一律下巴以下或颈部以上裁切）、手表与首饰改为匿名金色点缀不写品牌、原图无任何文案故全套 textZone=none。与库内浅芋开衫模版（冷雪底+雾芋墙、六镜两穿结构）区隔：本套走燕麦摩卡暖针织+灰泥墙芦苇瓶家庭舞台+出街咖啡叙事，机位含背面与低角步态，无叠装收口镜。源图 5 张，002 拆出门襟细节与纽扣微距两镜、004 扩为挎包场景与街拍两镜，按转化漏斗排为 6 镜。"
+  }
+}

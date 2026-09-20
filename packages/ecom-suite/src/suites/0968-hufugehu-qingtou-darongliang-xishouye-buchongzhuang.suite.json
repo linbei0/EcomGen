@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-hufugehu-qingtou-darongliang-xishouye-buchongzhuang",
+  "name": "大桶补充装温和液体洗手液款",
+  "category": {
+    "l1": "护肤个护",
+    "l2": "身体清洁",
+    "leaf": "温和液体洗手液大桶补充装",
+    "leafKeywords": [
+      "液体洗手液",
+      "大桶补充装",
+      "泵瓶续装",
+      "身体清洁",
+      "透明凝胶",
+      "家庭洗手台"
+    ]
+  },
+  "description": "大桶补充装续装家用泵瓶，透明凝胶与多肤色手部场景",
+  "productFamily": "beauty",
+  "styleLock": {
+    "direction": "clean high-volume body-care refill commerce",
+    "palette": [
+      {
+        "name": "净白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "雾霭蓝标签",
+        "hex": "#5E80A3"
+      },
+      {
+        "name": "暖砂米场景",
+        "hex": "#E3D6C4"
+      },
+      {
+        "name": "蜜橙强调",
+        "hex": "#E4762B"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless bright white #FFFFFF for packshots and graphic screens, warm sand sweep #E3D6C4 for the hand scene, cool mist panels #E9EEF1 and #DCE5EC for macro and close",
+    "lightingSystem": "bright even soft studio light, front-left key with a large bounce fill, low contrast, soft contact shadows, controlled highlight falloff, no hard speculars",
+    "surfaceSystem": "matte frosted slab #EFEAE4 for packshots and macro, matte neutral board #F3EFE9 for close crops, glossy seamless sweep for the hand scene",
+    "typography": "modern geometric sans-serif, one family only, sparse label lines kept as blank placeholder bars",
+    "iconSystem": "thin single-weight line glyphs inside solid rings, single warm accent #E4762B with pale peach disc fill #F7DCC6",
+    "presentationRules": "stable straight-on packshot angle and constant jug scale across the set; hands always cropped at the wrist and no face ever enters frame; every label panel stays as a blank field with empty bars",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no invented seals, badges or certificate artwork"
+    ],
+    "lockText": "Campaign Style Lock: consistent clean high-volume body-care refill visual system across the entire image set; fixed palette of bright white background #FFFFFF, muted slate-blue product label #5E80A3, warm sand scene sweep #E3D6C4 and one orange accent #E4762B; neutral bright even soft studio lighting with a front-left key, large bounce fill and soft contact shadows; matte frosted slab surface #EFEAE4; modern geometric sans-serif kept to sparse blank label bars; thin single-weight line icons inside solid rings on pale peach discs #F7DCC6; clean high-end personal-care product photography mixed with minimal infographic elements; stable straight-on packshot angle and constant product scale; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no invented seals or badges."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底大桶补充装主图",
+      "intent": "搜索列表里一眼给出大桶容量感与透明凝胶质地，赢下首图点击",
+      "assetType": "suite-hufugehu-qingtou-darongliang-xishouye-buchongzhuang::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level view, full jug visible and upright, cap to base unclipped",
+      "lighting": "bright even high-key studio light, front-left key with a large bounce fill, soft contact shadow under the base",
+      "background": "seamless bright white #FFFFFF over a matte frosted slab #EFEAE4",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "no extra whitespace, only an even margin around the silhouette",
+      "textZone": "none",
+      "promptTemplate": "E-commerce packshot of {product}. {product_identity_lock}. {style_lock}. Full purpose in the funnel: win the very first click in a search grid with one clean compliant frame. Photographed straight-on at eye level with the jug standing upright, full silhouette visible from cap to base and nothing clipped. Bright even high-key studio light from the front left with a large bounce fill on the shadow side, soft contact shadow grounding the base. Seamless bright white background #FFFFFF above a matte frosted slab #EFEAE4. The front panel stays a solid blank slate-blue field #5E80A3 with no legible characters, and the translucent body reads as a pale cool-tinted gel #EFEAF3. The product occupies 60-70% of the frame. No extra whitespace beyond an even margin around the silhouette. Square 1:1 crop, 2K, commercial personal-care quality. Negative: no brand mark or wordmark, no readable label text, no QR code, no barcode, no seal or star badge, no voice-assistant bubble, no hands, no props, no gradient background, no coloured background cast, no floating product, no cut-off edges, no duplicated bottle.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "SCENE",
+      "displayName": "多手型掌心洗手场景",
+      "intent": "用多手型环绕的掌心凝胶让买家代入全家共用的洗手日常",
+      "assetType": "suite-hufugehu-qingtou-darongliang-xishouye-buchongzhuang::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level studio view, four pairs of hands entering from the four edges and ringing the centre",
+      "lighting": "soft wraparound studio light from above-front, wide falloff vignette, no specular blowout",
+      "background": "seamless warm sand sweep #E3D6C4",
+      "props": "none",
+      "productOccupancy": "40-50%",
+      "whitespace": "generous negative space in the centre of the ring",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene for {product}. {product_identity_lock}. {style_lock}. Funnel job: let the shopper see this cleansing gel inside an everyday family hand-washing moment. Photographed straight-on at eye level in a studio, four pairs of generic adult hands entering from the four edges of the frame and arranged in a slow pinwheel ring around the empty centre; wrists frame the border and no face, head or body ever appears, with a range of neutral skin tones. Cupped palms carry a small pool of translucent gel poured from {product} plus a little fine white foam #FFFFFF. Soft wraparound studio light from above front with a wide falloff vignette. Seamless warm sand sweep background #E3D6C4, no props. The hands and gel occupy 40-50% of the frame, with generous negative space kept in the centre of the ring. Square 1:1 crop, 2K. Negative: no identifiable face, no celebrity likeness, no child model, no extra or fused fingers, no distorted nails, no mannequin or plastic skin, no wet clutter, no sink hardware, no bottle in frame, no text, no watermark, no invented skin condition.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "透明凝胶质地微距",
+      "intent": "微距证明凝胶清澈均一、流动性好，用可见质地替代功效话术",
+      "assetType": "suite-hufugehu-qingtou-darongliang-xishouye-buchongzhuang::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "extreme close-up macro photographed directly from above at a 90-degree overhead angle, tight zoom on the gel pool",
+      "lighting": "soft top light with a skimming sweep from the lower left through the gel, crisp edge highlight, shallow depth of field",
+      "background": "matte cool panel #E9EEF1",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal negative space, the texture fills the frame",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of the translucent cleansing gel dispensed from {product}, photographed directly from above at a 90-degree overhead angle with a tight zoom on a single slow pool. {product_identity_lock}. {style_lock}. Funnel job: prove formula clarity and texture so the benefit reads visually instead of as a claim. Shallow depth of field with the near edge of the pool crisp and the far edge melting away. Soft top light with a skimming sweep entering from the lower left through the gel, one controlled highlight travelling across the surface and a thin edge shadow that keeps the pool anchored to the plate. Matte cool panel background #E9EEF1 with a pale gel body #EFEAF3 and one tiny bead of foam #FFFFFF. The detail fills 55-60% of the frame, minimal negative space because the texture is the subject. Square 1:1 crop, 2K. Negative: no blurry subject, no slimy strings, no droplets floating off the surface, no bubbles covering the pool, no hands, no pump head, no text, no watermark, no invented before-after skin effect.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "TRUST",
+      "displayName": "三枚空白徽章信息栏",
+      "intent": "把源图信息屏与背面信息标合并成可读的信任栏结构，主张位全部留空",
+      "assetType": "suite-hufugehu-qingtou-darongliang-xishouye-buchongzhuang::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "flat graphic layout seen straight-on, product shown at a slight 3/4 angle on the left",
+      "lighting": "even flat high-key studio light, minimal shadow, one faint contact shadow under the base",
+      "background": "seamless bright white #FFFFFF",
+      "props": "three blank ring badges with empty label bars",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space on the right 45% for the badge column",
+      "textZone": "none",
+      "promptTemplate": "E-commerce infographic trust screen for {product}. {product_identity_lock}. {style_lock}. Funnel job: carry the reason-to-believe layout without borrowing any real credential. Flat graphic layout seen straight-on, with the product standing at a slight 3/4 angle on the left at 50-60% of the frame and its rotated back shown as a blank oval panel #F7F4EF marked only by soft empty text bars. On the right, a vertical column of three blank circular badge frames: solid rings in warm accent #E4762B with pale peach disc fills #F7DCC6 and generic thin-line glyphs of a feather, a droplet, and two leaves, each followed by an empty label bar with no letters. Even flat high-key studio light with minimal shadow and one faint contact shadow under the base. Seamless bright white background #FFFFFF. Generous negative space kept on the right 45% for the badge column. Square 1:1 crop, 2K. Negative: no certifications, no lab or test data, no awards, no ratings or review counts, no ingredient lists or numbers, no doctor or clinic imagery, no brand name or competitor reference, no barcode or QR code, no dense body text, no garbled characters, no misaligned badge column, no floating product.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "CTA",
+      "displayName": "泵瓶续装收口",
+      "intent": "收口给出大桶续装家用泵瓶的购买理由，空白圆牌只留主张位",
+      "assetType": "suite-hufugehu-qingtou-darongliang-xishouye-buchongzhuang::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed from a high 45-degree angle looking down, full jug with an empty pump bottle beside it",
+      "lighting": "soft directional studio light from the upper left, gentle falloff, soft contact shadows under both bases",
+      "background": "soft mist-blue panel #DCE5EC",
+      "props": "one small empty pump dispenser and one blank round callout disc",
+      "productOccupancy": "55-60% overall",
+      "whitespace": "generous negative space on the left 30%",
+      "textZone": "none",
+      "promptTemplate": "E-commerce closing shot of {product}. {product_identity_lock}. {style_lock}. Funnel job: land the value idea of refilling a small everyday pump bottle from one large container. Photographed from a high 45-degree angle looking down onto a matte frosted slab #EFEAE4, the jug standing full and unclipped with an empty generic pump dispenser standing beside it and a thin slow stream of translucent gel #EFEAF3 leaving the jug mouth into the dispenser shoulder. One blank solid round callout disc in muted slate blue #5E80A3 sits at the lower right as an empty claim placeholder carrying no letters. Soft directional studio light from the upper left with a gentle falloff and soft contact shadows under both bases. Soft mist-blue panel background #DCE5EC. The pair occupies 55-60% overall, with generous negative space held on the left 30%. Square 1:1 crop, 2K. Negative: no readable text on the callout disc, no voice-assistant bubble, no brand marks, no price or discount numbers, no shipping or subscription badges, no spilled puddle, no splashes frozen mid-air, no hands, no mismatched scale between the two bottles, no floating product, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "5 张源图逐图事实：001 大桶透明液体洗手液正面白底 packshot，圆肩大瓶配白色小螺旋盖、拱形雾蓝前标与叶形符号、底部容量行与二维码角标；002 同一瓶转背面，椭圆浅色信息标排满密集小字段落，顶部一枚深色圆形气泡、底部条码与二维码；003 纯白信息图，三枚橙色圆环线性图标竖排（羽毛/水滴十字/双叶）右侧配英文字句行；004 暖米无缝背景上四对多肤色手自四边伸入成风车环绕，掌心盛透明凝胶与少许泡沫，全画面无面部；005 与 001 同构图并在右下角叠一枚深色圆形引述气泡与小青色助手徽标。成套判定：005 为 001 的近重复、002 与 003 同属信息屏，合并后仍凑足 HERO→SCENE→DETAIL→TRUST→CTA 五镜漏斗，非色卡变体画廊、非混合套装。品类判定以图为准：贴身冲洗的液体清洁品，L1 护肤个护 / L2 身体清洁（与源类目提示一致）；非着色彩妆故不入美妆彩妆，非硬表面环境清洁剂故不入家居日用。已剥离：品牌与系列字标、原平台店铺字样与促销语气、语音助手徽标与引述气泡、二维码与条码、容量与成分与功效类主张（含皮肤科测试与配方排除两类断言）、竞品对比角标、图内全部英文字句；产品一律以 {product} 占位，信任镜与收口镜的徽章、气泡、标牌全部改为空白占位框。"
+  }
+}

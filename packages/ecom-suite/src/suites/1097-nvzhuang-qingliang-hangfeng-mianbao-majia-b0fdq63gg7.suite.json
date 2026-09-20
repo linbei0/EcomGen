@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-nvzhuang-qingliang-hangfeng-mianbao-majia-b0fdq63gg7",
+  "name": "轻量绗缝叠穿面包马甲款",
+  "category": {
+    "l1": "女装",
+    "l2": "外套",
+    "leaf": "女式轻量绗缝面包马甲",
+    "leafKeywords": [
+      "女式马甲",
+      "绗缝背心",
+      "面包马甲",
+      "轻量外搭",
+      "立领按扣",
+      "秋冬叠穿"
+    ]
+  },
+  "description": "轻量绗缝面包马甲，通勤与户外两穿的叠穿外搭款",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "cool tech-editorial women's outerwear commerce",
+    "palette": [
+      {
+        "name": "底白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "亮银灰",
+        "hex": "#E8EAED"
+      },
+      {
+        "name": "电光蓝强调",
+        "hex": "#0A84FF"
+      },
+      {
+        "name": "石墨黑",
+        "hex": "#23272E"
+      }
+    ],
+    "temperature": "cool",
+    "backgroundSystem": "seamless cool white #FFFFFF packshot field, bright silver-grey #E8EAED studio panel, desaturated cool lifestyle interiors and weather, one dark graphite #23272E craft panel for the macro screen",
+    "lightingSystem": "cool soft studio light, large front-left softbox key with a silver-grey #E8EAED bounce, skimming side accent to lift stitched relief, soft contact shadows, never a warm cast",
+    "surfaceSystem": "matte silver-grey #E8EAED studio floor, cool off-white #F4F6F8 lifestyle surfaces, dark graphite #23272E macro base, weathered cool stone and pale boucle texture for lifestyle",
+    "typography": "modern geometric sans-serif, headline and short label scale only, every rendered word supplied as a placeholder",
+    "iconSystem": "thin single-weight line icons and dotted guide circles in the electric blue accent #0A84FF",
+    "presentationRules": "garment worn or hung at a stable front-first read with consistent scale across the set, hem and armhole line fully visible, no redesign of the product",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no warm beige colour cast",
+      "no invented spec numbers or badges"
+    ],
+    "lockText": "Campaign Style Lock: consistent cool tech-editorial women's outerwear ecommerce visual system across the entire image set; fixed palette of seamless cool white #FFFFFF, bright silver-grey #E8EAED, graphite charcoal #23272E and one electric blue accent #0A84FF; cool neutral studio lighting with a large front-left softbox key, silver-grey bounce and skimming side accent, soft contact shadows and lifted stitched relief; modern geometric sans-serif; thin single-weight line icons and dotted guide circles in electric blue #0A84FF; clean high-end apparel photography mixed with minimal infographic components such as rounded panels, dotted guide circles and empty label bars; stable on-body or hung scale with a consistent front-first read of the garment; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no warm beige cast."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底上身穿型主图",
+      "intent": "搜索列表里一眼交代版型与上身效果，抢点击并满足平台白底规范",
+      "assetType": "suite-nvzhuang-qingliang-hangfeng-mianbao-majia-b0fdq63gg7::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, on-body torso cropped above the chin, garment read dead front",
+      "lighting": "bright cool high-key studio light, large front-left softbox key with a silver-grey bounce, soft contact shadow at the hem",
+      "background": "seamless cool white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "even clean margin around the torso, no reserved copy block",
+      "textZone": "none",
+      "promptTemplate": "On-body packshot hero of {product}, styled on a generic model torso framed from shoulders to hip and cropped above the chin so no face is visible. {product_identity_lock}. {style_lock}. Straight-on eye-level camera, the garment centred and read dead front with the collar open and both front edges fully inside frame. Bright cool high-key studio light from a large front-left softbox with a silver-grey #E8EAED bounce card, soft contact shadow under the hem, skimming side accent that lifts the stitched relief. Seamless cool white background #FFFFFF. The product occupies 60-70% of the frame with even clean margin around the torso and no reserved copy block. Vertical 3:4 marketplace framing. Negative: no visible face or identity, no brand wordmark or logo, no watermark, no platform badge or review stars, no on-image text, no props, no cropped hem, no warm colour cast.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "银灰棚叠穿卖点图",
+      "intent": "一秒讲清核心卖点：轻薄好叠穿、通勤直接套在针织衫外",
+      "assetType": "suite-nvzhuang-qingliang-hangfeng-mianbao-majia-b0fdq63gg7::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle at eye level, three-quarter body, figure placed left of centre",
+      "lighting": "cool soft key from front-left plus silver-grey bounce, gentle shadow falling to the right, soft contact at the feet",
+      "background": "bright silver-grey #E8EAED seamless studio panel",
+      "props": "none beyond the layered knitwear already part of the outfit",
+      "productOccupancy": "50-60%",
+      "whitespace": "clean negative space held on the right 35% of the frame",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}, layered open over a plain ribbed knit and slim denim on a generic model cropped above the chin. {product_identity_lock}. {style_lock}. Slight 3/4 angle at eye level, three-quarter body, figure placed left of centre with the front closure line clearly readable. Cool soft key light from the front-left with a silver-grey bounce, gentle shadow falling to the right, soft contact at the feet. Background bright silver-grey #E8EAED seamless studio panel. The product occupies 50-60% of the frame and generous negative space is held on the right 35% of the frame with no rendered copy. Vertical 3:4 framing. Negative: no face identity, no logo or wordmark, no watermark, no on-image text, no extra props, no competing claims, no warm beige cast.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "松林雪径露营外搭",
+      "intent": "把马甲放进寒冷郊野的真实穿着情境，让买家自我代入",
+      "assetType": "suite-nvzhuang-qingliang-hangfeng-mianbao-majia-b0fdq63gg7::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "wide full-body at a very low angle looking slightly upward",
+      "lighting": "cool overcast daylight through pine trunks, soft directional fill from camera left, muted long shadows on the ground",
+      "background": "desaturated cool pine clearing with frost patches, haze reading near #F4F6F8",
+      "props": "canvas backpack, steel bottle and plain enamel mug, none of them covering the garment",
+      "productOccupancy": "40-50%",
+      "whitespace": "none, the environment carries the frame",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene of {product} worn layered over a hooded knit by a generic outdoor model seated on a weathered grey stone, head tilted down and away so no identity reads. {product_identity_lock}. {style_lock}. Wide full-body framing from a very low angle looking slightly upward, the garment silhouette kept whole against the tree line. Cool overcast daylight filtering through pine trunks with a soft directional fill from camera left and muted long shadows on the frost-touched ground. Background of a desaturated cool pine clearing with haze reading near #F4F6F8. Props: a canvas backpack, a steel bottle and a plain enamel mug placed to one side, none of them covering the garment. The product occupies 40-50% of the frame, no reserved copy area. Negative: no readable label on the props, no watermark, no on-image text, no brand marks, no sunburnt warm cast, no deformed hands, no invented weather or performance claims.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "席地翻册居家随拍",
+      "intent": "补一个居家通勤之外的松弛穿法，扩大可穿场景数量",
+      "assetType": "suite-nvzhuang-qingliang-hangfeng-mianbao-majia-b0fdq63gg7::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "high 45-degree angle looking down at the seated figure",
+      "lighting": "cool window light from camera right, low contrast, soft pooled shadow on the rug",
+      "background": "pale silver-grey #E8EAED boucle rug against a cool off-white wall",
+      "props": "an open magazine with blank unreadable spreads and one plain cushion",
+      "productOccupancy": "40-50%",
+      "whitespace": "none, candid framing keeps the floor space",
+      "textZone": "none",
+      "promptTemplate": "Candid lifestyle shot of {product} worn over a fine ribbed turtleneck by a generic model seated cross-legged on the floor, face turned down and half out of frame so no identity reads. {product_identity_lock}. {style_lock}. High 45-degree angle looking down at the seated figure so the full front panel and hem line are readable. Cool window light from camera right, low contrast, with a soft pooled shadow on the floor. Background of a pale silver-grey #E8EAED boucle rug against a cool off-white wall. Props: an open magazine with blank unreadable spreads and one plain cushion, neither hiding the garment. The product occupies 40-50% of the frame with no reserved copy area. Negative: no legible magazine text, no watermark, no logo, no on-image text, no clutter, no distorted fingers, no warm orange interior cast.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "正背平挂细节看板",
+      "intent": "用正背双板加四枚圆形特写交代结构与做工，替买家解答版型疑虑",
+      "assetType": "suite-nvzhuang-qingliang-hangfeng-mianbao-majia-b0fdq63gg7::shot-05",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "garment hung straight-on at a 90-degree frontal angle in two matched panels, with four tight zoom macro insets beneath",
+      "lighting": "even cool high-key light with a skimming accent on each macro inset so stitching relief reads",
+      "background": "cool off-white #F4F6F8 board with two rounded silver-grey #E8EAED panels",
+      "props": "plain wooden hanger with no printed mark, dotted guide circles",
+      "productOccupancy": "35-40% overall for the hung pair",
+      "whitespace": "structured top band and one label strip under each inset left empty for copy",
+      "textZone": "顶部居中标题带与四枚圆下空标签条",
+      "promptTemplate": "E-commerce infographic board for {product}: two matched hanging panels showing the same garment front and back, hung straight-on at a 90-degree frontal angle on a plain wooden hanger, above a row of four tight zoom macro insets covering the collar edge, a pocket opening, the zip pull and the stitched channel surface. {product_identity_lock}. {style_lock}. Even cool high-key light with a skimming accent across each macro inset so the stitching relief reads. Background cool off-white #F4F6F8 board carrying two rounded silver-grey #E8EAED panels and dotted guide circles in electric blue #0A84FF. The hung pair occupies 35-40% overall, with a structured headline band across the top and one empty label strip under each inset reserved for copy, each label strip holding a single short placeholder reading 「{callout_1}」, 「{callout_2}」, 「{callout_3}」 and 「{callout_4}」. Vertical 3:4 framing. Negative: no real headline wording, no brand mark on the hanger, no measurement numbers or spec tables, no watermark, no extra labels, no blurry macro insets, no duplicated garment parts.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "走线五金微距收口",
+      "intent": "以真实做工微距收尾降风险，替代不可验证的资质主张",
+      "assetType": "suite-nvzhuang-qingliang-hangfeng-mianbao-majia-b0fdq63gg7::shot-06",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "extreme close-up macro at a 90-degree side profile across the closed front placket, shallow depth of field",
+      "lighting": "single cool skimming light from upper left with a graphite bounce, tight highlight along each stitch ridge",
+      "background": "dark graphite #23272E matte base",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the detail is the subject",
+      "textZone": "none",
+      "promptTemplate": "Closing trust screen: extreme close-up macro of {product} laid flat and photographed at a 90-degree side profile across the closed front placket, tight zoom on the row of topstitching, the metal puller and the edge binding, shallow depth of field with the nearest stitch ridge sharp. {product_identity_lock}. {style_lock}. A single cool skimming light from upper left with a graphite bounce creates a tight travelling highlight along each stitch ridge and no flare. Background dark graphite #23272E matte base. The detail fills 55-60% of the frame with no extra whitespace and no copy block. Negative: do NOT invent certifications, lab results, ratings or test data, no badge artwork, no watermark, no on-image text, no out-of-focus subject, no melted hardware, no plastic-looking fabric.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：图1 白底上身照，头部颈部以上裁切，手扶领口，露出前襟按扣与拉链、斜插袋与菱格绗缝；图2 寒冷松林营地全身坐姿，外搭连帽针织与堆堆帽，旁置帆布背包、钢瓶水壶、搪瓷杯；图3 室内暖光站立正面造型，内叠高领针织与牛仔；图4 席地坐姿翻阅画册的居家随拍；图5 平挂看板，正背双板加四枚圆形做工特写，顶部与圆下为原平台英文标题与标签字样。变体闸门判定：5 张全部为同一深棕咖色同款，无换色换码色卡陈列，构图分四种（白底穿着、户外场景、室内穿着、平挂看板），故不属变体画廊，正常转化。品类判定：图为可外穿的无袖绗缝保暖上衣，非贴身或睡衣类，故归女装/外套而非内衣家居服；leaf 取女式轻量绗缝面包马甲，源平台类目不采信。已剥离内容：品牌字标与店铺字样、模特面容与身份（一律颈部以上裁切或低头背向）、图内英文标题与标签原句（改为占位符）、原平台徽章与星级角标、暖米色原片色调（改为亮银灰加电光蓝冷调体系）；含绒量、克重、尺寸等参数一律未写入，留作空标签位。"
+  }
+}

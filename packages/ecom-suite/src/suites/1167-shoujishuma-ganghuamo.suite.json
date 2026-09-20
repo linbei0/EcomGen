@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-shoujishuma-ganghuamo",
+  "name": "高透抗刮钢化膜三片装款",
+  "category": {
+    "l1": "手机数码",
+    "l2": "手机配件",
+    "leaf": "手机钢化膜",
+    "leafKeywords": [
+      "钢化膜",
+      "手机贴膜",
+      " tempered glass",
+      "screen protector",
+      "高清防刮",
+      "防指纹",
+      "定位贴膜神器",
+      "三片装"
+    ]
+  },
+  "description": "高清高透强抗刮，定位框免对齐一贴即合，三片装安心备用",
+  "productFamily": "electronics",
+  "styleLock": {
+    "direction": "clean tech-minimal phone-accessory e-commerce: black-gold retail anchor plus light-blue studio feature demos, one benefit per frame",
+    "palette": [
+      {
+        "name": "包装黑",
+        "hex": "#0D0D0F"
+      },
+      {
+        "name": "信任金",
+        "hex": "#E9BD55"
+      },
+      {
+        "name": "棚底浅蓝",
+        "hex": "#C7D8F2"
+      },
+      {
+        "name": "工具紫",
+        "hex": "#B65AD4"
+      },
+      {
+        "name": "测试火花金",
+        "hex": "#F0C868"
+      }
+    ],
+    "temperature": "cool neutral studio light, warm gold only on retail packaging and test sparks",
+    "backgroundSystem": "seamless white #FFFFFF for retail hero and variant; soft light-blue gradient studio #BFD4EF to #C9DAF2 for feature demos; deepest dusty blue #8B95B2 to #98A2BE reserved for the install CTA frame",
+    "lightingSystem": "bright soft diffuse studio light, edge-lit glass with diagonal light streaks, faint contact shadows only, no hard shadows",
+    "surfaceSystem": "high-transparency tempered glass with white edge outline, matte black retail card, translucent alignment frame plastic",
+    "typography": "bold short sans-serif headlines in slate blue #3D6CB8 on light grounds and white #FFFFFF on dark grounds, one title plus one subline maximum",
+    "iconSystem": "thin-line rounded-square icons in single blue #3D6CB8 on light grounds, at most six per frame",
+    "presentationRules": "product occupies 55-75% in feature frames and 25-30% in packshots, one claim per frame, glass always edge-lit and tack sharp, human hand appears only in the install frame, variant frames reuse the exact hero composition",
+    "noDrift": [
+      "no warm wood or homey grounds",
+      "no red warning banners",
+      "no compatibility charts",
+      "no third-party phone brand marks or greeting wallpapers",
+      "no fabricated certification badges",
+      "no second accent color family"
+    ],
+    "lockText": "Campaign Style Lock: clean tech-minimal e-commerce suite for a tempered glass screen protector. Black-and-gold retail hero with stacked glass sheets and a translucent alignment frame on pure white #FFFFFF; feature demos sit on soft light-blue studio backdrops #BFD4EF to #C9DAF2 where floating glass is edge-lit with white outlines and diagonal light streaks; a macro corner-fit frame shows white glow arcs; a durability test fires golden sparks #F0C868; the easy-install CTA runs on the deepest dusty blue #8B95B2 with a purple alignment frame #B65AD4 and a single fingertip. Bright soft diffuse studio light, faint contact shadows, no hard shadows. Bold short sans-serif headlines in slate blue #3D6CB8 or white #FFFFFF, thin-line blue icons, one benefit per frame. The privacy variant reuses the exact hero composition with smoky-gray glass #55565A and a cyan frame #3AC4D6. Strip all brand marks; never show compatibility charts, red warning banners, third-party device logos or fabricated certificates."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "黑金包装三片定妆",
+      "intent": "第一眼建立零售形象：三片装玻璃膜与附赠定位框同框",
+      "assetType": "suite-shoujishuma-ganghuamo::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "frontal eye-level render, matte black retail card standing on the left, three glass sheets staggered diagonally to the right, translucent frame layered in front",
+      "lighting": "soft frontal studio light, glass edges self-outlined, minimal shadow",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "70-75%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "{style_lock}. Product photography of {product}. {product_identity_lock}. Frontal eye-level: a plain matte black retail card #0D0D0F stands at the left, three tempered glass sheets stagger along a diagonal to the right with crisp white edge outlines, one translucent alignment frame floats in front. Soft frontal studio light, faint base shadow only. Seamless white #FFFFFF. Product occupies 70-75%, whitespace 20-25%. No overlaid text. 2K commercial e-commerce quality. Negative: no brand logos or printed marks, no gold lettering, no hands, no watermark, no cut-off edges, no colored background.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "DETAIL",
+      "displayName": "六大特性图标栅格",
+      "intent": "一图讲清六项功能承诺，图标化降低阅读成本",
+      "assetType": "suite-shoujishuma-ganghuamo::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "frontal eye-level, smartphone standing center with a slight quarter turn, one glass sheet floating at its right front with a diagonal light streak",
+      "lighting": "soft top light plus diagonal glass reflection band, even and shadowless",
+      "background": "light blue gradient studio #BFD4EF to #C9DAF2",
+      "props": "none; six thin-line blue icons in rounded squares flank the phone, three per side",
+      "productOccupancy": "60-70%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "{style_lock}. E-commerce feature grid for {product}. {product_identity_lock}. Frontal eye-level: a generic smartphone stands center with a slight quarter turn, one tempered glass sheet floats at its right front carrying a diagonal light streak, six thin-line blue #3D6CB8 icons in rounded squares flank the composition three per side. Soft top light, even and shadowless. Light blue gradient #BFD4EF to #C9DAF2. Phone and glass occupy 35-40%. 2K commercial e-commerce quality. Negative: no device brand marks, no on-screen logos or greeting wallpapers, no dense paragraphs, no watermark, no extra icons beyond six.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "浮空透光风景验证",
+      "intent": "用透过玻璃看风景证明 HD 高透，画面即证据",
+      "assetType": "suite-shoujishuma-ganghuamo::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "frontal view, one large rounded-rectangle glass sheet tilted slightly with its top edge lifted, floating center-right over a deep blue landscape",
+      "lighting": "diffuse daylight feel, glass edge picked out by a white outline glow",
+      "background": "deep blue dune landscape #3B5EC8 with water reflections #2440A8, pale violet-blue sky fade #C7CEEB at top",
+      "props": "none; the landscape itself is the clarity test subject",
+      "productOccupancy": "55-60%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "{style_lock}. E-commerce clarity proof panel for {product}. {product_identity_lock}. Frontal view: one large rounded-rectangle glass sheet floats center-right with a subtle tilt, white edge outline glowing, the deep blue dune landscape #3B5EC8 with water #2440A8 behind it stays razor sharp seen through the glass. Diffuse daylight, pale violet-blue fade #C7CEEB at the top. Glass occupies 55-60%, top whitespace 18-20%. 2K commercial e-commerce quality. Negative: no stock-photo watermarks, no device frames, no text inside the landscape, no blurry subject, no color cast on the glass.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "曲边开孔贴合微距",
+      "intent": "微距证明开孔精度与曲面贴合，光弧勾出边缘",
+      "assetType": "suite-shoujishuma-ganghuamo::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "macro 30-45 degree overhead of a generic smartphone top corner entering from the lower right, extreme close-up on the speaker cutout and rounded edge",
+      "lighting": "soft even light with a diagonal glass reflection band, dark gradient hugging the body edge",
+      "background": "light blue studio #C8D9F2",
+      "props": "three white glow arcs along the left edge, one playful multicolor ribbon curve resting on the glass",
+      "productOccupancy": "60-65%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "{style_lock}. E-commerce precision-fit macro for {product}. {product_identity_lock}. Macro at 30-45 degrees overhead: a generic smartphone top corner with its speaker cutout enters from the lower right, the tempered glass lies perfectly aligned, three white glow arcs trace the left edge, one playful multicolor ribbon curve in #E85A4E and #F09A4A rests on the glass as a memory hook. Soft light with a diagonal reflection band. Light blue studio #C8D9F2. Corner occupies 60-65%, whitespace 25-30% upper left. 2K commercial e-commerce quality. Negative: no brand logos or camera-stud layouts, no garbled text, no dust bubbles under the glass, no watermark, no deformed edges.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "TRUST",
+      "displayName": "刀刮耐久火花测试",
+      "intent": "暴力测试可视化防刮耐久，火花成为信任记忆点",
+      "assetType": "suite-shoujishuma-ganghuamo::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "eye-level with slight downward tilt, generic dark smartphone tilted 30 degrees floating at left-center, utility knife entering horizontally from the right",
+      "lighting": "soft studio light plus self-emitting golden sparks as the only warm source, diagonal glass reflection",
+      "background": "light blue studio #C5D5F0",
+      "props": "utility knife with steel blade #B8BEC8 and dark navy handle #2A3244, golden sparks #F0C868 with white-hot core #F8ECC8 at the contact point",
+      "productOccupancy": "55-60%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "{style_lock}. E-commerce durability trust test for {product}. {product_identity_lock}. Eye-level with slight downward tilt: a generic dark smartphone tilted 30 degrees floats at left-center, a utility knife presses into the tempered glass from the right, golden sparks #F0C868 burst from the contact point as the visual focus. Soft studio light, sparks self-emitting as the only warm source. Light blue #C5D5F0 backdrop. Phone and knife occupy 55-60%, corner whitespace about 25%. 2K commercial e-commerce quality. Negative: no cracked glass, no blood or injury, no brand logos, no watermark, no invented hardness numbers, no warm color drift beyond the sparks.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "VARIANT",
+      "displayName": "防窥深灰变体定妆",
+      "intent": "同构变体展示防窥款：材质换烟灰、框换青色，一图一个 SKU",
+      "assetType": "suite-shoujishuma-ganghuamo::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "identical to the hero composition: plain black card at left, three smoky glass sheets staggered diagonally to the right, cyan translucent frame in front",
+      "lighting": "soft studio light, diagonal bright-dark boundary on the smoky glass suggesting the privacy viewing angle",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "70-75%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "{style_lock}. Variant packshot of {product} in privacy tint. {product_identity_lock}. Identical hero composition: plain matte black card #0D0D0F at the left, three smoky-gray glass sheets #55565A stagger along the diagonal to the right with a bright-dark viewing-angle boundary, one translucent cyan frame #3AC4D6 floats in front. Soft studio light, faint base shadow. Seamless white #FFFFFF. Product occupies 70-75%, whitespace 20-25%. No overlaid text. 2K commercial e-commerce quality. Negative: no brand logos or printed marks, no hands, no watermark, no extra frames, no composition drift from the hero.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-07",
+      "order": 7,
+      "shotRole": "CTA",
+      "displayName": "定位框指尖安装",
+      "intent": "行动推力收口：指尖把膜压进定位框，30 秒贴好不出泡",
+      "assetType": "suite-shoujishuma-ganghuamo::shot-07",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "30-40 degree overhead, generic smartphone lying flat at the bottom, translucent alignment frame with glass hovering above it, fingertip pressing from the upper right along a top-right to bottom-left action axis",
+      "lighting": "soft diffuse top light, frame translucent and light-passing, faint contact shadow grounding the phone",
+      "background": "dusty blue gradient #8B95B2 to #98A2BE, the deepest ground of the set",
+      "props": "translucent purple alignment frame #B65AD4 with highlight #D08AE8, one generic fingertip",
+      "productOccupancy": "60-65%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. Overhead at 30-40 degrees: a generic smartphone lies flat at the bottom, a translucent purple alignment frame #B65AD4 with the tempered glass seated in it hovers just above the screen, one generic fingertip presses the glass from the upper right. Soft diffuse top light, faint contact shadow under the phone. Dusty blue gradient #8B95B2 to #98A2BE. Phone and frame occupy 60-65%, top whitespace about 20%. White 2K commercial e-commerce quality. Negative: no deformed fingers or fingernails, no bubbles under the glass, no brand logos, no watermark, no dust, no extra hands.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 16,
+    "detached": true,
+    "notes": "源自 114 万+ 评级的钢化膜 listing 主图与 A+ 集；剥离品牌字、黑金盒印刷与图标原文、兼容性警示表、横向壁纸条、设备品牌机型特征与问候语壁纸；防窥变体并入；安装帧手部需按 generic 重生成"
+  }
+}

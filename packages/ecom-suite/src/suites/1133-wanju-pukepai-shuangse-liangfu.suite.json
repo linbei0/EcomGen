@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-wanju-pukepai-shuangse-liangfu",
+  "name": "双色两副装桌游扑克牌款",
+  "category": {
+    "l1": "玩具",
+    "l2": "益智",
+    "leaf": "桌游扑克牌两副装",
+    "leafKeywords": [
+      "扑克牌",
+      "桌游卡牌",
+      "纸牌",
+      "两副装",
+      "对称几何背纹",
+      "牌桌场景",
+      "聚会游戏"
+    ]
+  },
+  "description": "两副装双色纸牌：并列白底、开盒平铺、牌桌铺陈与背纹微距",
+  "productFamily": "home",
+  "styleLock": {
+    "direction": "clean tabletop-game commerce with printed-paper craft feel",
+    "palette": [
+      {
+        "name": "棚拍素白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "温造纸纹",
+        "hex": "#F2EEE7"
+      },
+      {
+        "name": "深靛牌桌",
+        "hex": "#1B2A4A"
+      },
+      {
+        "name": "朱漆强调",
+        "hex": "#B4282D"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless studio white #FFFFFF for packshots, warm paper off-white #F2EEE7 for colour-choice and detail screens, deep indigo-slate felt #1B2A4A for table scene and closing frame",
+    "lightingSystem": "neutral high-key studio light, large front-left softbox key with bounce fill on the shadow side, soft contact shadows that always ground the product, one skimming accent for print texture",
+    "surfaceSystem": "matte felt table plane #1B2A4A and heavy paper board #F2EEE7, visible card-stock edge and printed ink relief, no gloss plastic",
+    "typography": "modern geometric sans-serif, kept out of frame for marketplace images; in-image copy is added in post-production only",
+    "iconSystem": "thin single-weight line icons in one accent colour, used only as blank plates on infographic screens",
+    "presentationRules": "paired units always level and identical in scale, slight 3/4 hero angle reused across screens, symmetric geometric back pattern always reads as full-repeat and unbent",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting between the paired units",
+      "no mismatched icon styles",
+      "no added brand marks or legible packaging text"
+    ],
+    "lockText": "Campaign Style Lock: consistent clean tabletop-game commerce visual system across the entire image set; fixed palette of seamless studio white #FFFFFF, warm paper off-white #F2EEE7, deep indigo-slate felt #1B2A4A and one lacquer-red key accent #B4282D; neutral high-key studio lighting with a large front-left softbox key, bounce fill on the shadow side and soft contact shadows that always ground the product; matte felt and heavy paper surface language with visible card-stock edges and printed ink relief; modern geometric sans-serif kept out of frame; thin single-weight line icon style only as blank plates; paired units always level and identical in scale, stable slight 3/4 hero angle; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no added brand marks or legible packaging text."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "双副装白底斜侧主图",
+      "intent": "在搜索列表里一眼看清是两副装纸牌，拿住点击率并满足纯白底合规",
+      "assetType": "suite-wanju-pukepai-shuangse-liangfu::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle, both cartons upright side by side with the nearer one turned to show its narrow side panel, full products visible and uncropped",
+      "lighting": "bright even high-key studio light, large front-left softbox key with bounce fill on the shadow side, soft contact shadows under each carton",
+      "background": "seamless studio white #FFFFFF sweep",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "no extra whitespace, even clean margins on all four sides",
+      "textZone": "none",
+      "promptTemplate": "Packshot hero of {product}. {product_identity_lock}. {style_lock}. Two upright cartons standing side by side, photographed at a slight 3/4 angle with the nearer carton turned to reveal its narrow side panel, full products visible and uncropped. Bright even high-key studio light from a large front-left softbox with a bounce fill on the shadow side, soft contact shadows grounding each carton. Seamless studio white #FFFFFF sweep. The pair occupies 60-70% of the frame with no extra whitespace beyond even margins on all sides. Crisp printed paper edges, 8K commercial marketplace quality. Negative: no props, no hands, no people, no added lettering or numerals, no barcode, no QR code, no web address, no watermark, no fake logo, no floating cartons without contact shadow, no cut-off edges, no duplicated ghost cartons.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "VARIANT",
+      "displayName": "两色并列正面选款图",
+      "intent": "正面平视并列两副的既定配色，让买家一屏完成选款并确认成套件数",
+      "assetType": "suite-wanju-pukepai-shuangse-liangfu::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level front view, both cartons perfectly parallel and level with identical height and camera distance",
+      "lighting": "even high-key front-left key with symmetrical bounce fill, matched soft contact shadow strength on both cartons",
+      "background": "warm paper off-white #F2EEE7",
+      "props": "none",
+      "productOccupancy": "60-70% overall",
+      "whitespace": "narrow even gutter between the two cartons, no other extra whitespace",
+      "textZone": "none",
+      "promptTemplate": "E-commerce colour-choice screen of {product}. {product_identity_lock}. {style_lock}. Both cartons standing upright side by side, photographed from a straight-on eye-level front view so their edges are perfectly parallel and level. Even high-key front-left key with symmetrical bounce fill and matched soft contact shadows. Background warm paper off-white #F2EEE7. The two units together occupy 60-70% of the frame, separated only by a narrow even gutter with no other extra whitespace. The two colourways are pinned to one lacquer-red #B4282D led carton and one deep indigo #1B2A4A led carton with zero drift between frames. Negative: no third carton, no invented colourways, no mixed lighting between the two units, no size or height difference between the two units, no added text or numerals, no barcode, no watermark, no fake logo.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "TRUST",
+      "displayName": "双联开盒内位平铺图",
+      "intent": "摊开外盒交代包装结构与内含两副，消除运输与开箱预期落差",
+      "assetType": "suite-wanju-pukepai-shuangse-liangfu::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed directly from above at a 90-degree overhead angle, close overhead framing on the opened carton with both inner panels swung flat",
+      "lighting": "flat even high-key light from directly above, faint contact shadow only along the fold edges, no dramatic shading",
+      "background": "seamless studio white #FFFFFF",
+      "props": "the two inner packs nested in their compartments, nothing else",
+      "productOccupancy": "35-40%",
+      "whitespace": "generous even margin all around the laid-flat carton",
+      "textZone": "none",
+      "promptTemplate": "E-commerce packaging and trust screen for {product}, flat lay photographed directly from above at a 90-degree overhead angle: the outer carton opened with both inner panels swung flat and the two inner packs nested in their compartments. {product_identity_lock}. {style_lock}. Flat even high-key light from directly above with a faint contact shadow along the fold edges and no dramatic shading. Background seamless studio white #FFFFFF. The opened carton spans 35-40% of the frame, leaving a generous even margin all around it. Two blank rounded label plates and one blank seal frame sit inside the layout as empty proof placeholders carrying no characters. Negative: no barcode, no QR code, no web address, no app download badge, no legible characters of any kind, no invented certificates or award seals, no star ratings, no hands, no watermark, no torn board edges.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "牌桌满铺开局场景图",
+      "intent": "把两副牌放进真实开局桌面，让买家代入聚会与牌局使用情境",
+      "assetType": "suite-wanju-pukepai-shuangse-liangfu::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed from a high 45-degree angle looking down across an even overlapping card grid with one carton standing at the centre",
+      "lighting": "soft directional key sweeping in from the upper left at 5000K with a gentle cool bounce, low sheen on card stock, soft shadows grounding every card edge",
+      "background": "deep indigo-slate matte felt table surface #1B2A4A",
+      "props": "loose scattered printed cards only, no drinks, chips or dice",
+      "productOccupancy": "40-50%",
+      "whitespace": "no extra whitespace, the card field runs to all four frame edges",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle tabletop scene of {product}: one upright carton set at the centre of an even overlapping grid of printed cards on a deep indigo-slate matte felt surface #1B2A4A. {product_identity_lock}. {style_lock}. Photographed from a high 45-degree angle looking down across the spread. Soft directional key sweeping in from the upper left at 5000K with a gentle cool bounce, low sheen on the card stock, soft shadows that keep every card edge grounded. The carton and its immediate card cluster occupy 40-50% of the frame while the card field runs to all four edges with no extra whitespace. Card inks stay pinned to #B4282D and #1B2A4A over the paper base #F2EEE7. Negative: no hands, no faces, no people, no drinks, no casino chips or dice, no duplicated or melted card corners, no floating cards without contact shadow, no warped straight edges, no distorted court artwork, no added lettering, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "牌背对称几何背纹微距",
+      "intent": "用极低角度微距证明满版对称背纹套印精准、纸面挺括耐洗",
+      "assetType": "suite-wanju-pukepai-shuangse-liangfu::shot-05",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "extreme close-up macro, very low angle looking upward along the laid card surface, tight zoom on the symmetric geometric back border, shallow depth of field with the nearest printed line razor sharp",
+      "lighting": "skimming light entering from camera-left at a shallow angle to reveal ink relief and paper grain, one controlled highlight, deep falloff toward the rear",
+      "background": "warm paper off-white #F2EEE7 card stock filling the frame",
+      "props": "none beyond the cards already in frame",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the print detail is the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on the symmetric ornamental geometric card-back pattern and on the printed border fillet where ink meets paper. {product_identity_lock}. {style_lock}. Photographed from a very low angle looking upward along the laid card surface, shallow depth of field with the nearest printed line razor sharp and the rear falling out of focus. Skimming light entering from camera-left at a shallow angle reveals the ink relief and the paper grain with one controlled highlight. Surface warm paper off-white #F2EEE7 with the pattern ink pinned to deep indigo #1B2A4A. The detail fills 55-60% of the frame with minimal whitespace. Negative: no blurry subject, no broken symmetry or half-repeat in the pattern, no moire, no warped straight lines, no duplicated border elements, no plastic-looking paper sheen, no visible brand marks or legible characters, no hands, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "双副组合牌桌收口图",
+      "intent": "以两副成组的收口陈列促成加购，留出上方空位供后期放行动号召",
+      "assetType": "suite-wanju-pukepai-shuangse-liangfu::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 view, mid-shot framing on the pair of cartons with a tight three-card fan laid in the foreground, group level and fully visible",
+      "lighting": "even soft studio key from the front-left plus a gentle rim from the right, long soft contact shadows falling toward the back plane",
+      "background": "deep indigo-slate matte felt surface #1B2A4A with a warm paper off-white #F2EEE7 backdrop band behind",
+      "props": "one tight fan of three printed cards in the foreground, nothing else",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space across the upper third for a post-production callout",
+      "textZone": "none",
+      "promptTemplate": "Closing group frame of {product}: two upright cartons set behind a tight three-card fan, photographed at a slight 3/4 view in mid-shot framing with the whole group level and fully visible. {product_identity_lock}. {style_lock}. Even soft studio key from the front-left with a gentle rim from the right and long soft contact shadows falling toward the back plane. Deep indigo-slate matte felt surface #1B2A4A with a warm paper off-white #F2EEE7 backdrop band behind. The group occupies 50-60% of the frame, leaving generous negative space across the upper third for a post-production callout. Card inks stay pinned to #B4282D and #1B2A4A. Negative: no price or discount numerals, no countdown or urgency graphics, no platform badges or star ratings, no added text, no hands, no invented props, no floating products without contact shadow, no cut-off edges, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "逐图事实：001 两只牌盒并立于素白棚拍背景、近侧盒转身露出窄侧脊；002 两只牌盒正面平视并列，一只以朱红为主版色、一只以深蓝为主版色；003 双联外盒摊开两面的正上方俯拍，左格露出扇形牌张与满版对称背纹，右格为字标块与条码位；004 与 005 同一高位俯拍构图，中央立一只牌盒、四周以点数牌与人像牌满铺成格阵，中间背纹牌与中心盒互换主色；006 素白底上四张牌扇形展开（人像牌、索引牌各一，另两张为满版对称背纹）。品类判定依据：图内主体为纸牌类桌面游戏耗材，玩法与人群指向桌游卡牌；本表无桌游中类，按贴身玩法属性归入 玩具 / 益智，leaf 定为桌游扑克牌两副装，源标题与源类目字段仅作线索、未进入任何字段。已剥离内容：原品牌字标与花体字、创始年份与传承标语、牌背专有插画纹样（仅保留对称几何背纹结构描述）、人像牌原画细节、盒面全部原文案、条码与条码数字位、应用下载徽章与网址字样、原平台角标与星级；两色只是两联装的既定内含配色展示，构图各有分工且非同一构图换色，故按正常套组转化而非色卡变体画廊。"
+  }
+}

@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-muying-nantong-huizhang-shuangse-poloshan",
+  "name": "男童徽章双色polo衫款",
+  "category": {
+    "l1": "母婴",
+    "l2": "童装",
+    "leaf": "男童短袖polo衫",
+    "leafKeywords": [
+      "男童polo衫",
+      "短袖翻领上衣",
+      "童装夏季",
+      "双色polo",
+      "胸前徽章",
+      "螺纹袖口"
+    ]
+  },
+  "description": "晴空蓝黄童趣天空风，双色翻领polo，徽章与螺纹细节，户外场景收口",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "playful kids summer fashion ecommerce",
+    "palette": [
+      {
+        "name": "云朵白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "晴空蓝",
+        "hex": "#AEDCF0"
+      },
+      {
+        "name": "阳光黄",
+        "hex": "#F5C542"
+      },
+      {
+        "name": "深海蓝文字",
+        "hex": "#2E5E8C"
+      }
+    ],
+    "temperature": "warm",
+    "backgroundSystem": "clean white #FFFFFF packshots, sky blue #AEDCF0 campaign panels, warm cream #FDF6EC outdoor scenes, pale sky-blue matte board #E8F4FB detail boards",
+    "lightingSystem": "bright soft daylight-style studio lighting, front-left key with gentle fill, soft contact shadows, no harsh speculars",
+    "surfaceSystem": "matte white board and smooth sky-blue paper backdrop",
+    "typography": "rounded friendly geometric sans-serif with bold brush-style headline accents in deep-sea blue #2E5E8C",
+    "iconSystem": "flat doodle icons (clouds, paper plane, gift box) in a single accent color",
+    "presentationRules": "stable slight 3/4 hero angle for the garment, consistent scale across colorways and scenes",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no mismatched icon styles"
+    ],
+    "lockText": "Campaign Style Lock: consistent playful kids summer fashion visual system across the entire image set; fixed palette of cloud white #FFFFFF, sky blue #AEDCF0, sunny yellow #F5C542 and deep-sea blue text #2E5E8C; bright soft daylight-style lighting with a front-left key and gentle contact shadows; rounded friendly geometric sans-serif with bold brush-style headline accents; flat doodle icons in one accent color; clean garment photography mixed with minimal infographic elements; stable slight 3/4 hero garment angle and scale; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底polo衫主图",
+      "intent": "搜索列表一眼点击，干净合规的童装白底主图",
+      "assetType": "suite-muying-nantong-huizhang-shuangse-poloshan::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level view, garment on an invisible ghost-mannequin form, full silhouette visible",
+      "lighting": "bright even high-key studio lighting, front key with soft fill, soft contact shadow",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "no extra whitespace, the garment fills the frame to platform standard",
+      "textZone": "none",
+      "promptTemplate": "Product photography of {product}, a short-sleeve polo shirt. {product_identity_lock}. {style_lock}. The shirt presented on an invisible ghost-mannequin form, straight-on eye-level view, collar and placket facing the camera, full silhouette visible with nothing clipped. Bright even high-key studio lighting with a front key and soft fill, a soft contact shadow grounding the garment. Seamless pure white background #FFFFFF. The garment occupies 60-70% of the frame, with no extra whitespace so it meets marketplace main-image density. 8K commercial kids-wear quality. Negative: no child model, no hanger hooks or hard shadows, no watermark, no fake logo, no extra text, no third-party character marks or trademark graphics, no cut-off sleeves or edges.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "童趣天空卖点图",
+      "intent": "用晴空涂鸦氛围一秒传达夏日童趣穿着主张",
+      "assetType": "suite-muying-nantong-huizhang-shuangse-poloshan::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle, garment on the left third of the frame",
+      "lighting": "bright soft daylight-style light, soft front-left key, gentle contact shadow",
+      "background": "sky blue #AEDCF0 with flat cloud cutouts #FFFFFF",
+      "props": "flat white cloud cutouts #FFFFFF and one small paper-plane doodle, never covering the garment",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space across the right 40% reserved for copy",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. The shirt shown at a slight 3/4 angle on the left third, occupying 50-60% of the frame. Background sky blue #AEDCF0 with flat white cloud cutouts #FFFFFF and one small paper-plane doodle, props never covering the garment. Bright soft daylight-style lighting with a soft front-left key and a gentle contact shadow. Generous negative space across the right 40% reserved for copy. Negative: no dense body text, no invented fabric percentages or claims, no watermark, no fake logo, no third-party character marks or trademark graphics, no props overlapping the garment.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "VARIANT",
+      "displayName": "蓝黄双色polo衫",
+      "intent": "并排展示两个配色，让买家按喜好选择",
+      "assetType": "suite-muying-nantong-huizhang-shuangse-poloshan::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "both colorways at the same slight 3/4 angle, side by side with identical crop",
+      "lighting": "even soft studio lighting, identical on both colorways, soft contact shadows",
+      "background": "pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "70-80% overall",
+      "whitespace": "slim even margin around both garments, no extra whitespace",
+      "textZone": "none",
+      "promptTemplate": "E-commerce variant grid for {product} in two colorways side by side, the blue colorway #AEDCF0 tone family and the yellow colorway #F5C542 tone family, each presented on its own low white riser. {product_identity_lock}. {style_lock}. Both colorways shot at the same slight 3/4 angle with identical even soft studio lighting and consistent scale. Background pure white #FFFFFF. The pair occupies 70-80% of the frame overall with a slim even margin around both garments and no extra whitespace. Negative: no lighting drift between colorways, no invented size charts or numbers, no watermark, no fake logo, no third-party character marks or trademark graphics, no extra props.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "户外嬉戏背影场景",
+      "intent": "让家长代入孩子夏日户外玩耍的真实穿着场景",
+      "assetType": "suite-muying-nantong-huizhang-shuangse-poloshan::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "photographed from behind at a 45-degree rear angle, child seen only from the back",
+      "lighting": "warm late-afternoon sunlight from the upper left, 5200K, soft long shadows",
+      "background": "sunlit playground with soft-focus green foliage and a warm cream path #FDF6EC",
+      "props": "blurred playground slide in the background and one small ball at the frame edge, not covering the garment",
+      "productOccupancy": "40-50%",
+      "whitespace": "moderate breathing room above the child, no extra whitespace elsewhere",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene of {product} worn by a generic child model shown only from the back, photographed from behind at a 45-degree rear angle so no face is visible. {product_identity_lock}. {style_lock}. The child reaches toward blurred playground equipment, the garment sharply in focus and occupying 40-50% of the frame. Warm late-afternoon sunlight from the upper left, 5200K, soft long shadows on a warm cream path #FDF6EC, soft-focus green foliage and a blurred slide in the background, one small ball at the frame edge not covering the garment. Moderate breathing room above the child, no extra whitespace elsewhere. Negative: no recognizable child face, no frontal view of the model, no hands covering the garment, no third-party character marks or trademark graphics, no extra text, no watermark, no fake logo, no cluttered background.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "领徽袖摆细节四宫格",
+      "intent": "用翻领、徽章位、螺纹袖口与下摆微距证明做工细节",
+      "assetType": "suite-muying-nantong-huizhang-shuangse-poloshan::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "top-down 90-degree flat lay of the garment with a two-by-two grid of extreme close-up macro insets",
+      "lighting": "even high-key flat lighting plus a soft skimming side light revealing rib texture, shallow depth of field in each inset",
+      "background": "pale sky-blue matte board #E8F4FB",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "tight crops with minimal leftover whitespace, the details are the subject",
+      "textZone": "none",
+      "promptTemplate": "E-commerce detail board for {product}, a top-down 90-degree flat lay of the garment with four inset extreme close-up macro crops arranged in a two-by-two grid: the folded lapel collar, the chest emblem area, the ribbed cuff and the ribbed hem. {product_identity_lock}. {style_lock}. Even high-key flat lighting plus a soft skimming side light revealing rib texture, shallow depth of field in each inset with the foreground sharp. Background pale sky-blue matte board #E8F4FB. Details fill 55-60% of the frame with tight crops and minimal leftover whitespace. Negative: no blurry subject, no invented fabric percentages or test data, no emblem artwork or trademark graphics, no extra text, no watermark, no fake logo, no exaggerated loose threads.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "童趣礼遇收口图",
+      "intent": "以晴空主色与空白优惠位收口促单",
+      "assetType": "suite-muying-nantong-huizhang-shuangse-poloshan::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level view, garment centered, collar facing the camera",
+      "lighting": "bright punchy studio light with a soft contact shadow",
+      "background": "sky blue #AEDCF0 with a sunny yellow #F5C542 burst panel behind the garment",
+      "props": "one empty blank offer-badge frame and one empty blank CTA button shape, both with no text inside",
+      "productOccupancy": "55-60%",
+      "whitespace": "balanced margin around the garment, no extra whitespace",
+      "textZone": "none",
+      "promptTemplate": "E-commerce promo close of {product} centered, straight-on eye-level view with the collar facing the camera, occupying 55-60% of the frame. {product_identity_lock}. {style_lock}. Background sky blue #AEDCF0 with a sunny yellow #F5C542 burst panel behind the garment, plus one empty blank offer-badge frame and one empty blank CTA button shape, both left with no text inside. Bright punchy studio light with a soft contact shadow. Balanced margin around the garment, no extra whitespace. Negative: no invented discounts, prices or sales numbers, no text inside badges or buttons, no watermark, no fake logo, no third-party character marks or trademark graphics, no countdown timers.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐屏事实：P1 晴空蓝活动头图，笔刷大标题配云朵、纸飞机、礼盒涂鸦，底部转入商品信息区；P2 规格区：男童短袖翻领polo衫、2色入、身高段童装尺码（原值已剥离）、面料成分原值（已剥离改占位）、柔软/弹力/厚度/版型四项指示条、蓝色配色展示位；P3 黄色配色展示位，图位多为空白；P4 面料细节区，含舒适手感类描述文案；P5 四宫格细节：小翻领、胸前徽章点缀、螺纹袖口、螺纹下摆。品类判定：尺码为童装身高段量级，且为翻领polo外穿成衣形态，判为母婴/童装而非儿童内衣贴身品类；源图商品图位大量空白，事实以文字区为准。已剥离：原品牌字样与系列名、原平台店铺字样、年份上新与促销角标、成分与尺码原值（一律改占位符）、模特面容、徽章具体图文（仅保留结构位）、英文装饰句与各分区页签原文。"
+  }
+}

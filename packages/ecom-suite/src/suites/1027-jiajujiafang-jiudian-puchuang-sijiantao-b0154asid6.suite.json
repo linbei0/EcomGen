@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-jiajujiafang-jiudian-puchuang-sijiantao-b0154asid6",
+  "name": "净雅酒店风铺床四件套款",
+  "category": {
+    "l1": "家具家纺",
+    "l2": "床品",
+    "leaf": "酒店铺床风床单四件套",
+    "leafKeywords": [
+      "床单四件套",
+      "床笠",
+      "平铺床单",
+      "枕套",
+      "酒店风铺床",
+      "素色床品套件"
+    ]
+  },
+  "description": "白底叠装主图、酒店风铺床实景、垂顺折口细节与套件构成图解分镜",
+  "productFamily": "home",
+  "styleLock": {
+    "direction": "clean hotel-crisp home-textile commerce",
+    "palette": [
+      {
+        "name": "无缝底白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "浅灰墙面",
+        "hex": "#E3E2E0"
+      },
+      {
+        "name": "炭灰金属",
+        "hex": "#34322F"
+      },
+      {
+        "name": "暖陶强调",
+        "hex": "#E0763B"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless white #FFFFFF sweep for packshots, pale room-grey #E3E2E0 for bedroom scenes and the variant screen, one warm off-white board #F6F5F3 for the infographic card",
+    "lightingSystem": "bright soft studio light, front key with a fill card, low skimming sweep to read the weave, gentle contact shadows only, no harsh specular",
+    "surfaceSystem": "crisp dressed bedding on a bare made mattress #F2F3F4, matte seamless studio floor",
+    "typography": "modern geometric sans-serif, one short headline placeholder plus blank ruled label lines, deep charcoal #2D2D2D, no dense body text",
+    "iconSystem": "single-weight thin line icons in warm terracotta #E0763B only, no fill, no 3D, no pictograms with text",
+    "presentationRules": "fabric always shown neatly folded or smoothly dressed, drape and hem rendered flat and crisp, stable scale of the bed group across the set, product centred or on a shared baseline",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no mismatched icon styles",
+      "no duvet, throw or mattress topper hiding the product"
+    ],
+    "lockText": "Campaign Style Lock: consistent premium hotel-crisp home-textile visual system across the entire image set; fixed palette of seamless white #FFFFFF, pale room-grey #E3E2E0, charcoal metal #34322F and one warm terracotta accent #E0763B; neutral bright soft studio lighting with a front key, a fill card and gentle contact shadows only; modern geometric sans-serif with one short headline and blank ruled label lines in deep charcoal #2D2D2D; single-weight thin-line icon style in the terracotta accent; clean high-end bedding photography mixed with minimal infographic elements; stable product scale, centring and crisp drape rendering; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底叠装套件主图",
+      "intent": "在搜索列表里一眼赢下点击，用挺括叠装交代整套床品的量感与洁净",
+      "assetType": "suite-jiajujiafang-jiudian-puchuang-sijiantao-b0154asid6::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level view, folded groups stacked in descending sizes and centred, whole stack inside frame",
+      "lighting": "bright even high-key studio light, front key with a fill card on the shadow side, one soft contact shadow under the base piece",
+      "background": "seamless pure white #FFFFFF sweep",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "no extra whitespace, clean even margins only around the stack",
+      "textZone": "none",
+      "promptTemplate": "Product packshot photography of {product}, the folded pieces stacked in descending sizes and centred. {product_identity_lock}. {style_lock}. Photographed straight-on at eye level with the whole stack inside the frame and nothing cropped. Bright even high-key studio light from a front key with a fill card on the shadow side, and one soft contact shadow grounding the base piece. Seamless pure white background #FFFFFF. The stack occupies 60-70% of the frame with no extra whitespace beyond clean even margins. Square 1:1, 2K, commercial home-textile quality. Negative: no in-image text, no logos or brand marks, no bedframe or mattress, no hands, no loose creases that read as stains, no grey tint on the background, no floating stack without a contact shadow, no duplicated folded pieces, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "SCENE",
+      "displayName": "灰墙铁艺床头铺床实景",
+      "intent": "让买家把自己那张床代入进来，一眼看到铺好之后的整体垂顺效果",
+      "assetType": "suite-jiajujiafang-jiudian-puchuang-sijiantao-b0154asid6::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle from beside the mattress at low near-bed level, pillow row receding to the right",
+      "lighting": "soft daylight sweeping in from an off-frame window at the left, 5500K, long low-contrast shadows along the folds",
+      "background": "pale room-grey painted wall #E3E2E0 with one slim charcoal metal headboard rail #34322F",
+      "props": "two plump pillows in matching cases layered in front of two firmer ones, bare made mattress, no duvet or throw",
+      "productOccupancy": "40-50%",
+      "whitespace": "generous open wall across the upper third reserved for a headline",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene of {product} dressed on a made bed. {product_identity_lock}. {style_lock}. Photographed from a slight 3/4 angle at low near-bed level beside the mattress, the pillow row receding toward the right and the turned-back top edge running diagonally across the lower half. Soft daylight sweeping in from an off-frame window at the left, 5500K, long low-contrast shadows along the folds with one consistent light direction. Background a pale room-grey painted wall #E3E2E0 with one slim charcoal metal headboard rail #34322F. Props: two plump pillows in matching cases in front of two firmer ones, a bare made mattress, no duvet, no throw, no bedside clutter. The bed group occupies 40-50% of the frame and leaves a generous open wall band across the upper third for one short headline placeholder 「{selling_point_1}」 in deep charcoal #2D2D2D. Square 1:1, 2K, aspirational but believable bedroom quality. Negative: no visible person or face, no hands, no stains or pet hair, no duvet or mattress topper hiding the product, no competing bedroom brand, no second line of text, no contradictory shadow direction, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "枕套折口垂顺近景",
+      "intent": "用折口与走线的近景证明铺上之后的平整服帖，承接核心卖点",
+      "assetType": "suite-jiajujiafang-jiudian-puchuang-sijiantao-b0154asid6::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "high 45-degree angle looking down along the bed, folded edge running across the lower third, tight zoom on the hem",
+      "lighting": "soft diffused key from the upper left plus a low skimming side sweep across the weave, gentle shadows in the folds",
+      "background": "the same dressed bed in crisp cool white #F2F3F4",
+      "props": "two plump pillows in matching cases only",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the fold and the hem are the subject",
+      "textZone": "none",
+      "promptTemplate": "Close-up detail shot of {product} dressed on a made bed, tight zoom on the turned-back top edge and the pillow cases. {product_identity_lock}. {style_lock}. Camera from a high 45-degree angle looking down along the bed so the fold edge runs diagonally across the lower third. Soft diffused key light from the upper left plus a low skim of side light sweeping across the weave to reveal its sheen and the stitch line of the hem, gentle shadows pooled in the folds. Background the same dressed bed in crisp cool white #F2F3F4. Props: two plump pillows in matching cases only. The detail fills 55-60% of the frame, minimal whitespace because the fold is the subject. One thin leader line in warm terracotta #E0763B ties a single blank label plate carrying the placeholder 「{callout_1}」 in deep charcoal #2D2D2D to the hem. Square 1:1, 2K, premium home-textile quality. Negative: no dense body text, no second label plate, no hands smoothing the fabric, no visible brand tag or monogram, no pilling or lint, no invented measurements, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "枕角包边微距",
+      "intent": "微距交代包边与走线的做工，把面料质感的不透明证据一次给足",
+      "assetType": "suite-jiajujiafang-jiudian-puchuang-sijiantao-b0154asid6::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "extreme close-up macro at a very low angle skimming along the edge, shallow depth of field, nearest corner sharp",
+      "lighting": "soft diffused top light with a low skimming sweep from the right revealing the fine weave, one gentle contact shadow",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "tight framing, no extra whitespace around the corner",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on one shaped corner where two stitched edges meet. {product_identity_lock}. {style_lock}. Camera at a very low angle skimming along the edge, shallow depth of field so only the nearest corner is sharp and the rest falls away. Soft diffused top light with a low skimming sweep from the right that reveals the fine weave and the fold of the hem, one gentle contact shadow where the piece rests. Background seamless pure white #FFFFFF. Props none. The detail fills 55-60% of the frame with tight framing and no extra whitespace around the corner. Square 1:1, 2K, macro textile quality. Negative: no blurry subject, no duplicated or mirrored corners, no loose threads or snags, no brand tag or embroidered mark, no in-image text, no hands, no translucent fabric showing a hollow interior, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "VARIANT",
+      "displayName": "两叠尺寸并列选规",
+      "intent": "把两种床型的套件并排摆出，替买家当场决定该买哪一档尺寸",
+      "assetType": "suite-jiajujiafang-jiudian-puchuang-sijiantao-b0154asid6::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, two folded groups on one baseline with the fuller group at the left",
+      "lighting": "bright even high-key studio light from the front with a fill card, matching soft contact shadows on both groups",
+      "background": "pale room-grey seamless studio cyc #E3E2E0",
+      "props": "two low blank label plates under the groups, nothing else",
+      "productOccupancy": "70-80% overall",
+      "whitespace": "tight even gaps between the two groups, no extra whitespace above the row",
+      "textZone": "none",
+      "promptTemplate": "E-commerce variant size screen of {product}, two folded groups set side by side on one shared baseline, the fuller group at the left and the slimmer group at the right. {product_identity_lock}. {style_lock}. Photographed straight-on at eye level with identical camera height, distance and crop for both groups so only the folded footprint differs. Bright even high-key studio light from the front with a fill card, matching soft contact shadows beneath both groups, no cast of any hue. Background a pale room-grey seamless studio cyc #E3E2E0. Props: two low blank label plates beneath the groups carrying the placeholders 「{callout_2}」 and 「{callout_3}」 in deep charcoal #2D2D2D. The two groups occupy 70-80% of the frame overall with tight even gaps between them and no extra whitespace above the row. Square 1:1, 2K, clean e-commerce spec screen quality. Negative: no size numerals, no inch or centimetre values, no mattress or bedframe brand, no mixed lighting between the two groups, no duplicated copy of the same stack, no arrows or tick marks, no extra text, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "套件构成清单图解",
+      "intent": "一张图解讲清套件里有什么件、各件怎么铺，消除最后的下单疑虑",
+      "assetType": "suite-jiajujiafang-jiudian-puchuang-sijiantao-b0154asid6::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "flat lay from a top-down 90-degree overhead angle, one folded group low-centre with three icon blocks above",
+      "lighting": "even high-key flat lighting, no dramatic shadow, no hotspot on the fabric",
+      "background": "warm off-white infographic board #F6F5F3",
+      "props": "one small folded group, three thin-line icon blocks in warm terracotta #E0763B, blank ruled label lines",
+      "productOccupancy": "50-60%",
+      "whitespace": "wide even margins around the card panel, clear gutters between the three blocks",
+      "textZone": "none",
+      "promptTemplate": "E-commerce infographic trust screen for {product}, a flat lay of one small folded group at the lower centre with three thin-line icon blocks arranged above it. {product_identity_lock}. {style_lock}. Camera flat from a top-down 90-degree overhead angle so the whole layout reads as one clean card. Even high-key flat lighting with no dramatic shadow and no hotspot on the fabric. Background a warm off-white board #F6F5F3 with wide even margins. The three blocks are drawn in a single-weight thin line in warm terracotta #E0763B with no fill: one shows a case opening drawn with a dotted guide, one a tucked corner drawn with a dotted guide, one a turned-back top edge; each block sits above one blank ruled line carrying the placeholders 「{callout_4}」, 「{callout_5}」 and 「{callout_6}」 in deep charcoal #2D2D2D, under one headline placeholder 「{selling_point_2}」 at the top centre. The folded group occupies 50-60% of the frame with clear gutters between the three blocks. Square 1:1, 2K, minimal e-commerce infographic quality. Negative: no dimensions, no inch or centimetre values, no piece-count numerals, no dense body text, no tiny unreadable type, no certificates or lab seals, no real mattress brand, no filled pictograms, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "逐图事实：001 浅灰墙面＋炭灰铁艺床头栏杆的铺床实景，四只枕头叠放、上沿折口斜贯下半幅；002 白底上两大叠折叠套件同基准线并排、体量一丰一瘦，示两种床型；003 白底渐层叠装套件包拍；004 床上近景两只枕套与折口的光泽垂顺；005 白底极低角度枕角包边微距；006 暖色细线图标＋深炭灰文字的套件构成图解，原图标注了具体英寸与厘米数值。品类判定：主体为铺床用床单套件（床笠＋平铺床单＋枕套），贴身铺床织物，故归「家具家纺 / 床品」，未采用源侧泛化类目；leaf 取「酒店铺床风床单四件套」。已剥离：源平台品牌与字标、图上标题与图标旁的全部尺寸数值（改为 {callout_4}~{callout_6} 空位）、标题中的抗皱与超软一类断言（改为 {selling_point_1}、{selling_point_2} 空位）、结构工艺主张（改为 {callout_1}~{callout_3} 空位），源图标强调色已泛化为中性暖陶色 #E0763B，不含任何可识别标识；产品一律以 {product} 占位，仅保留分镜结构、机位、光位与背景体系。"
+  }
+}

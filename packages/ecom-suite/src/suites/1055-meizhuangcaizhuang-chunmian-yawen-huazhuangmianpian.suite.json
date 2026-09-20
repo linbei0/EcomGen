@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-meizhuangcaizhuang-chunmian-yawen-huazhuangmianpian",
+  "name": "纯棉压纹多用途化妆棉片款",
+  "category": {
+    "l1": "美妆彩妆",
+    "l2": "美妆工具",
+    "leaf": "纯棉压纹化妆棉片",
+    "leafKeywords": [
+      "化妆棉",
+      "化妆棉片",
+      "卸妆棉片",
+      "纯棉棉片",
+      "压纹棉片",
+      "美容工具",
+      "湿敷棉片"
+    ]
+  },
+  "description": "纯棉压纹圆棉片，卸妆擦拭与湿敷多用，柱状竖排便于抽取",
+  "productFamily": "beauty",
+  "styleLock": {
+    "direction": "clean everyday beauty-tool ecommerce",
+    "palette": [
+      {
+        "name": "无缝底白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "淡丁香场",
+        "hex": "#EFEBF7"
+      },
+      {
+        "name": "灰紫演播墙",
+        "hex": "#E4DBEF"
+      },
+      {
+        "name": "紫罗兰强调",
+        "hex": "#7C5CBF"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless pure white #FFFFFF sweep for packshots plus flat lilac tint fields #EFEBF7 and #E4DBEF for layout, use and info screens; no scenery, no texture props",
+    "lightingSystem": "bright even high-key beauty light, front-left softbox key with a large fill card, shadowless with only gentle contact shadows, real cotton fibre and skin texture kept",
+    "surfaceSystem": "matte lilac-tinted board #EFEBF7 and seamless white sweep #FFFFFF, no wood, no stone grain, no reflections",
+    "typography": "modern geometric sans-serif; all in-image words stay as blank placeholder rails instead of rendered copy",
+    "iconSystem": "hairline monoline icons at a single stroke weight in one accent color, empty seal frame allowed",
+    "presentationRules": "stable upright column-pack angle and consistent round-pad diameter across the set; pack artwork and label placement come only from the user's own reference image",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no mismatched icon styles",
+      "no legible source copy or wordmarks"
+    ],
+    "lockText": "Campaign Style Lock: consistent clean everyday beauty-tool ecommerce visual system across the entire image set; fixed palette of seamless white #FFFFFF, soft lilac field #EFEBF7, deeper lilac-grey studio wall #E4DBEF, charcoal hairlines #1F1E24 and one product-matched lilac accent #7C5CBF reserved for markers; neutral bright high-key tone; modern geometric sans-serif with all in-image words left as blank placeholder rails; background system of a seamless white sweep plus flat lilac tint fields, no scenery and no texture props; lighting system of shadowless beauty softbox key from the front-left with a large fill card, gentle contact shadows only, real cotton and skin texture kept; hairline monoline icon style at a single stroke weight; stable upright column-pack angle and consistent round-pad diameter across the set; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no legible source copy."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底柱装竖立主图",
+      "intent": "搜索列表一眼点击，用竖立柱状包装讲清品类与形态。",
+      "assetType": "suite-meizhuangcaizhuang-chunmian-yawen-huazhuangmianpian::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "front facade square to the camera at straight-on eye-level, column pack standing upright, full product visible",
+      "lighting": "bright even high-key studio light, front-left softbox key with a large fill card, one soft contact shadow at the base",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "none, equal clean margins around the pack",
+      "textZone": "none",
+      "promptTemplate": "Product packshot of {product} standing upright as a tall soft column pack. {product_identity_lock}. {style_lock}. Front facade square to the camera at straight-on eye-level, full product visible with clear margins above and below. Bright even high-key studio light with a front-left softbox key and a large fill card on the shadow side, one soft contact shadow grounding the base. Seamless pure white background #FFFFFF, no scenery and no props. The pack occupies 60-70% of the frame, centered, with no extra whitespace. 8K commercial beauty e-commerce quality. Negative: no added headline or body copy, no pack-count numerals or volume figures, no watermark, no fake logo, no decorative graphics, no hands, no tinted or gradient background, no cut-off top or bottom edges, no floating pack without a contact shadow.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "散片扇列留白卖点图",
+      "intent": "主图一秒法则：散放棉片本体铺满右侧，左侧留出主张空轨。",
+      "assetType": "suite-meizhuangcaizhuang-chunmian-yawen-huazhuangmianpian::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed directly from above at a 90-degree overhead flat lay",
+      "lighting": "large overhead softbox giving bright even top light, whisper-soft pad edges, no harsh shadows",
+      "background": "flat soft lilac field #EFEBF7",
+      "props": "only loose rounds taken from the same pack, one turned to show its embossed face",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space on the left 40% for copy",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}, several loose rounds fanned in an overlapping cascade down the right side of the frame with one pad turned up to show its embossed face. {product_identity_lock}. {style_lock}. Photographed directly from above at a 90-degree overhead flat lay. Bright even top light from a large overhead softbox, whisper-soft pad edges, no harsh shadows. Background flat soft lilac field #EFEBF7. The pads occupy 50-60% of the frame on the right, with generous clean negative space on the left 40% kept as an empty rail for copy. 8K commercial beauty e-commerce quality. Negative: no legible words or lettering, no dense body text, no more than one visual idea, no printed marks on the pads, no loose lint, no cloned repeating pad pattern, no watermark, no fake logo.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "眼周轻按擦拭场景",
+      "intent": "让买家代入卸妆与擦拭的真实手法，完成自我投射。",
+      "assetType": "suite-meizhuangcaizhuang-chunmian-yawen-huazhuangmianpian::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "close crop at a slight 3/4 eye-level angle, framed from the brow down so the face stays anonymous",
+      "lighting": "soft beauty clamshell light from the front-top at 5500K, real skin texture with pores kept, gentle skin shadow under the hand",
+      "background": "soft lilac-grey studio field #E4DBEF",
+      "props": "one pad held between fingertips and the cheek",
+      "productOccupancy": "40-50%",
+      "whitespace": "none, even margins around the crop",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle use scene of {product}: a generic hand pressing one soft pad flat against the outer eye and cheek to wipe away makeup, eyes closed, framed from the brow down so no identity reads. {product_identity_lock}. {style_lock}. Close crop at a slight 3/4 eye-level angle with the pad and the hand as the focal point. Soft beauty clamshell light from the front-top at 5500K, real skin texture with visible pores kept, no plastic smoothing, gentle skin shadow under the hand. Background soft lilac-grey studio field #E4DBEF. The pad and hand occupy 40-50% of the frame, with even margins and no extra whitespace. 8K commercial beauty e-commerce quality. Negative: no recognizable person or celebrity likeness, no deformed or extra fingers, no pulled or asymmetrical features, no over-retouched plastic skin, no corner badge or wordmark plate, no added text, no watermark, no fake logo.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "单片压纹纤维微距",
+      "intent": "用压纹与棉纤维微距证明材质与做工，替代参数主张。",
+      "assetType": "suite-meizhuangcaizhuang-chunmian-yawen-huazhuangmianpian::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "extreme close-up macro photographed from a high 75-degree angle looking down along one pad, shallow depth of field",
+      "lighting": "skimming light from the right revealing individual fibres and the emboss relief, one soft shadow at the rim",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the texture is the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of one round lifted from {product}, tight zoom along the embossed quilt face and the crimped rim edge. {product_identity_lock}. {style_lock}. Photographed from a high 75-degree angle looking down on the pad, shallow depth of field with the near rim sharp and the far edge dissolving. Skimming light from the right revealing individual cotton fibres and the emboss relief, one soft shadow sitting at the rim. Background seamless pure white #FFFFFF. The detail fills 55-60% of the frame with minimal margin since the texture is the subject. 8K macro beauty e-commerce quality. Negative: no blurry subject, no wet or clumped fibres, no loose lint balls, no synthetic plastic sheen, no embossed lettering or logo shapes in the texture, no duplicated rim edges, no extra text, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "COMPARISON",
+      "displayName": "两版包装箭头对照",
+      "intent": "沿用双栏加箭头的焕新告知结构，说明换代不换物。",
+      "assetType": "suite-meizhuangcaizhuang-chunmian-yawen-huazhuangmianpian::shot-05",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "two matched panels, each pack photographed at straight-on eye-level with a centred vertical axis, identical framing and scale",
+      "lighting": "bright even high-key light, front-left softbox key with a large fill, matching soft contact shadows under both bases",
+      "background": "flat soft lilac field #EFEBF7 across both panels",
+      "props": "one flat directional arrow marker between the panels and one blank rounded label plate under each pack",
+      "productOccupancy": "50-60% per panel",
+      "whitespace": "narrow clear channel in the middle for the arrow, otherwise none",
+      "textZone": "none",
+      "promptTemplate": "E-commerce comparison layout of {product}, two matched panels showing the same column pack in two wrapper iterations with identical framing, scale and light on both sides, a single flat directional arrow in the accent tone {accent_color} between the panels and one blank rounded label plate under each pack. {product_identity_lock}. {style_lock}. Both packs photographed at straight-on eye-level with a centred vertical axis. Bright even high-key light with a front-left softbox key and a large fill card, soft contact shadows under both bases. Background flat soft lilac field #EFEBF7 across both panels. Each pack occupies 50-60% of its panel, with a narrow clear channel in the middle for the arrow and no other whitespace. 8K commercial beauty e-commerce quality. Negative: no legible headline or before-and-after wording, no wordmarks or series names, no real competitor pack, no price or percentage numerals, no review stars or marketplace badges, no mismatched framing between panels, no floating packs without contact shadows, no watermark, no fake logo.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "背面空信息栏信任图",
+      "intent": "收口降风险：背面信息面与空白参数轨示意规格与说明位置。",
+      "assetType": "suite-meizhuangcaizhuang-chunmian-yawen-huazhuangmianpian::shot-06",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed from behind at a 45-degree rear angle, tight zoom on the rear information face with the column depth still visible",
+      "lighting": "bright even high-key studio light, front key with a soft fill, one gentle contact shadow at the base",
+      "background": "seamless pure white #FFFFFF",
+      "props": "blank placeholder rails, one empty rounded seal frame and two empty square icon boxes",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "clean margins around the rear panel, no extra whitespace",
+      "textZone": "none",
+      "promptTemplate": "E-commerce trust screen of {product} turned to show its rear information face, tight zoom on the back panel carrying blank placeholder rails, one empty rounded seal frame and two empty square icon boxes standing in for handling and material marks. {product_identity_lock}. {style_lock}. Photographed from behind at a 45-degree rear angle so the panel reads flat while the column depth stays visible. Bright even high-key studio light with a front key and a soft fill, one gentle contact shadow at the base. Background seamless pure white #FFFFFF. The rear panel detail fills 55-60% of the frame, with clean margins and no extra whitespace. 8K commercial beauty e-commerce quality. Negative: no legible small print, no manufacturer address lines, no barcode or scannable code digits, no certificate or award artwork, no invented certifications, test results or counts, no review stars, no duplicated panels, no watermark, no fake logo.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "源图 5 张逐图事实：001 竖立柱状软包在白底淡紫调中正面直视陈列，顶部有挂孔与封口条；002 同框双栏，左旧版右新版包装，中间一枚黑色箭头，上方为大字焕新主张；003 俯视散放的圆棉片叠铺右侧，左侧三行大字卖点；004 模特闭眼用单片棉片轻按外眼角擦拭，右下角一块字标角标；005 柱装背面整版说明文字、回收标识与条码。品类判定以图为准：主体始终是棉片与柱状容器本身（包装陈列、散片铺陈、背面信息），擦拭使用仅一镜，故归「美妆彩妆 / 美妆工具」，未取源类目暗示的卸妆配方类；卸妆只作使用语境词。已剥离：两版包装上的品牌字标与系列字样、正面撞色色块版式细节、004 模特面容身份与右下角字标角标、全部图内英文文案原句、背面说明段落/厂商地址/条码/回收标识图形；片数、容量与材质比例等数字一律不入稿，规格与说明位改为空白参数轨、空印章框与空图标盒占位。"
+  }
+}

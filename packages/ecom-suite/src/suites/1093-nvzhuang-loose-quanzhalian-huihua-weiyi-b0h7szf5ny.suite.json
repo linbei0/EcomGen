@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-nvzhuang-loose-quanzhalian-huihua-weiyi-b0h7szf5ny",
+  "name": "花灰抓绒宽松全拉链帽衫款",
+  "category": {
+    "l1": "女装",
+    "l2": "上衣",
+    "leaf": "女式宽松抓绒全拉链连帽卫衣",
+    "leafKeywords": [
+      "拉链卫衣",
+      "抓绒帽衫",
+      "宽松落肩",
+      "花灰色",
+      "休闲穿搭",
+      "大口袋"
+    ]
+  },
+  "description": "花灰麻灰配炭黑罗纹，对镜自拍与袋口微距承载宽松慵懒日常",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "effortless heather-grey oversized zip hoodie commerce",
+    "palette": [
+      {
+        "name": "花灰绒面",
+        "hex": "#C9C9C7"
+      },
+      {
+        "name": "炭黑罗纹",
+        "hex": "#26262A"
+      },
+      {
+        "name": "暖白棚",
+        "hex": "#F6F5F3"
+      },
+      {
+        "name": "焦糖皮具",
+        "hex": "#A5714F"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless warm white studio sweep #F6F5F3 for figure frames with a soft wall shadow behind the shoulder, plain mirror-wall corner confined to the single selfie frame, pale heather field for the closing flat lay, no outdoor scenes",
+    "lightingSystem": "soft diffused studio daylight near 5500K, broad wraparound fill that keeps the melange fleece texture readable, one gentle wall shadow for separation, phone-screen bounce inside the selfie frame only, never flat flash",
+    "surfaceSystem": "brushed heather fleece face, dense rib cuffs and hem, matte metal zip teeth and aglets, black ribbed base layer, caramel leather strap accent, no denim, no technical shells",
+    "typography": "no rendered copy in any frame; if a text slot is added it stays an empty placeholder rail",
+    "iconSystem": "none; the set carries no icon language, structure comes from garment volume and hardware only",
+    "presentationRules": "the hoodie always reads oversized with dropped shoulders over a black ribbed base, model generic and face obscured by phone or cropped from the chin down, hood panels keep their structured double-layer shape, hands relaxed in pockets or at the placket",
+    "noDrift": [
+      "no color palette changes",
+      "no face or identity of the model",
+      "no fitted silhouette",
+      "no outdoor backgrounds",
+      "no random backgrounds",
+      "no inconsistent lighting"
+    ],
+    "lockText": "Campaign Style Lock: consistent effortless heather-grey oversized zip hoodie ecommerce visual system across the entire image set; fixed palette of heather fleece #C9C9C7, charcoal rib #26262A, warm white studio #F6F5F3 and caramel leather accent #A5714F; soft diffused studio daylight near 5500K with a broad wraparound fill keeping the melange texture readable plus one gentle wall shadow; warm white sweep, a mirror-wall corner only in the selfie frame and a pale heather field for the closing flat lay, no outdoor scenes; no rendered copy, no icon language; oversized dropped-shoulder silhouette over a black ribbed base, face obscured by phone or cropped from the chin down, structured double-layer hood; no color palette changes, no fitted silhouette, no random backgrounds, no inconsistent lighting."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "暖白棚拉襟正身主图",
+      "intent": "在搜索结果缩略图里一眼赢下点击，交代宽松廓形与全拉链门襟。",
+      "assetType": "suite-nvzhuang-loose-quanzhalian-huihua-weiyi-b0h7szf5ny::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on eye-level figure framing cropped from the chin down, one hand lifting the hood edge at the collar, other hand relaxed at the placket",
+      "lighting": "soft diffused studio daylight near 5500K, broad wraparound fill keeping the melange fleece texture readable, gentle wall shadow behind the shoulder",
+      "background": "seamless warm white studio sweep #F6F5F3",
+      "props": "black ribbed base layer at the chest, black rib leggings below, thin gold chain at the cropped neck line",
+      "productOccupancy": "60-70%",
+      "whitespace": "none, the figure fills the frame with even clean margins",
+      "textZone": "none",
+      "promptTemplate": "E-commerce hero shot of {product}. {product_identity_lock}. {style_lock}. A straight-on eye-level figure framing cropped from the chin down shows the oversized heather-grey zip hoodie with dropped shoulders, one hand lifting the structured hood edge at the collar and the other resting at the matte metal placket, over a black ribbed base layer and rib leggings. Soft diffused studio daylight near 5500K wraps the melange fleece texture and lays one gentle wall shadow behind the shoulder. Seamless warm white studio sweep #F6F5F3. A thin gold chain glints at the cropped neck line. The figure occupies 60-70% of the frame with even margins. Negative: no identifiable face, no brand tag, no readable lettering, no logo hardware, no extra people, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "SCENE",
+      "displayName": "对镜自拍日常瞬间",
+      "intent": "用对镜举机自拍的镜面瞬间完成社交语境代入，展示上身松弛比例。",
+      "assetType": "suite-nvzhuang-loose-quanzhalian-huihua-weiyi-b0h7szf5ny::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "mirror-selfie framing at chest height, phone held up covering the face, sleeves swallowed to the knuckles, free hand loose at the hem",
+      "lighting": "soft interior daylight near 5500K with a faint phone-screen bounce on the chin area, even fill on the fleece",
+      "background": "plain mirror-wall corner in warm white #F6F5F3 with a soft edge shadow",
+      "props": "one plain dark phone hiding the face, light-wash-free black rib leggings, one caramel leather bag strap at the hip",
+      "productOccupancy": "50-60%",
+      "whitespace": "clean wall margin beside the raised elbow",
+      "textZone": "none",
+      "promptTemplate": "Mirror selfie scene of {product}. {product_identity_lock}. {style_lock}. A mirror-selfie framing at chest height shows the oversized heather hoodie with sleeves swallowed to the knuckles, one hand holding a plain dark phone that fully covers the face, the other hanging loose at the curved hem, a caramel leather bag strap cutting across the hip over black rib leggings. Soft interior daylight near 5500K adds a faint phone-screen bounce under the chin and keeps the melange fleece evenly lit against a plain warm white mirror-wall corner #F6F5F3 with a soft edge shadow and clean margin beside the raised elbow. The figure occupies 50-60%. Negative: no visible face, no phone brand or case art, no readable mirror text, no deformed fingers, no fused hands, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "双层帽片背面廓形",
+      "intent": "用整片后背与立体双层帽片，证明廓形不塌、帽型有型。",
+      "assetType": "suite-nvzhuang-loose-quanzhalian-huihua-weiyi-b0h7szf5ny::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "behind view at shoulder height, back panel squared to frame, structured hood lying full across the upper back, hair falling over one hood corner, face turned away entirely",
+      "lighting": "soft diffused studio daylight near 5500K, gentle modelling across the yoke seam, hood casting a soft crescent shadow on the back",
+      "background": "seamless warm white studio sweep #F6F5F3",
+      "props": "black rib leggings below the ribbed hem, nothing else",
+      "productOccupancy": "60-70%",
+      "whitespace": "balanced margins both sides of the hood silhouette",
+      "textZone": "none",
+      "promptTemplate": "Back view hood detail of {product}. {product_identity_lock}. {style_lock}. A behind view at shoulder height squares the full back panel to the frame with the structured double-layer hood lying wide across the upper back, long hair falling over one hood corner, the head turned fully away so no face reads, the ribbed hem sitting over black rib leggings. Soft diffused studio daylight near 5500K models the yoke seam gently and lets the hood cast a soft crescent shadow down the heather back #C9C9C7. Seamless warm white studio sweep #F6F5F3 with balanced margins around the hood silhouette. The panel occupies 60-70%. Negative: no visible face, no neck tag, no print on the back, no brand mark, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "敞开叠穿松弛站姿",
+      "intent": "用全敞开露出短内搭的叠穿站姿，演示一衣两穿的松弛比例。",
+      "assetType": "suite-nvzhuang-loose-quanzhalian-huihua-weiyi-b0h7szf5ny::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight 3/4 standing framing at hip height, jacket fully open, one hand pinching the placket edge near the waist, cropped from the chin down",
+      "lighting": "soft diffused studio daylight near 5500K, open fill showing the inner layer, fine shadow where the front panel overlaps",
+      "background": "seamless warm white studio sweep #F6F5F3",
+      "props": "black ribbed crop base layer, black rib leggings, thin gold chain at the cropped neck line",
+      "productOccupancy": "55-60%",
+      "whitespace": "leading space ahead of the stance kept clean",
+      "textZone": "none",
+      "promptTemplate": "Open-layer styling scene of {product}. {product_identity_lock}. {style_lock}. A slight 3/4 standing framing at hip height shows the heather hoodie worn fully open over a black ribbed crop base and rib leggings, one hand pinching the placket edge near the waist to swing the front panel aside, the figure cropped from the chin down with a thin gold chain at the neck line. Soft diffused studio daylight near 5500K fills openly so the inner layer reads, with a fine shadow where the front panel overlaps the body. Seamless warm white studio sweep #F6F5F3 with clean leading space ahead of the stance. The outfit occupies 55-60%. Negative: no identifiable face, no brand tag, no logo hardware, no deformed fingers, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "袋口罗纹抽绳微距",
+      "intent": "用插袋瞬间的袋口、罗纹袖口与金属绳头微距，证明做工与实用细节。",
+      "assetType": "suite-nvzhuang-loose-quanzhalian-huihua-weiyi-b0h7szf5ny::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "4K",
+      "camera": "extreme close-up macro at hip height, tight zoom on one hand sunk into the slant pocket with the ribbed cuff bunched at the wrist and a metal-tipped drawcord hanging past the frame edge",
+      "lighting": "soft key near 5500K raking across the fleece surface, each melange fibre catching a fine highlight, deep pocket shade inside the slit",
+      "background": "the heather fleece body fills the frame, warm white studio #F6F5F3 fading at one edge",
+      "props": "one relaxed hand in the pocket, matte metal aglet on the drawcord tip, rib hem corner at the lower edge",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the macro detail is the subject with a thin clean margin at the top",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on one relaxed hand sunk into the slant welt pocket while the dense rib cuff bunches at the wrist and a drawcord with a matte metal aglet hangs past the frame edge. {product_identity_lock}. {style_lock}. The camera sits at hip height so a soft key near 5500K rakes across the brushed heather fleece, each melange fibre catching a fine highlight and the pocket slit falling into deep soft shade. The fleece body fills the frame, fading to a warm white studio edge #F6F5F3, with the rib hem corner crossing the lower margin. The detail fills 55-60% with a thin clean top margin. Negative: no blurry subject, no loose threads, no brand engraving on the aglet, no lint or pilling, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "成套平铺收口图",
+      "intent": "收口促单，用折叠卫衣与内搭裤装的成套平铺给出直接照搬的穿搭答案。",
+      "assetType": "suite-nvzhuang-loose-quanzhalian-huihua-weiyi-b0h7szf5ny::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "flat lay photographed directly from above at a 90-degree overhead angle, folded hoodie centred with base layer and leggings rolled beside, hood corner fanned out on top",
+      "lighting": "even high-key studio light near 5500K, hairline soft shadows under each fold, sheen kept low on the fleece",
+      "background": "pale heather field #DDDDDB",
+      "props": "one neatly folded heather hoodie with one sleeve fanned to show the rib, rolled black crop base, rolled black rib leggings, one caramel leather strap laid diagonally, one empty lower rail",
+      "productOccupancy": "60-70%",
+      "whitespace": "clean lower band kept as an empty closing rail, no clutter at the corners",
+      "textZone": "lower band for 「{callout_1}」",
+      "promptTemplate": "E-commerce closing outfit flat lay of {product}. {product_identity_lock}. {style_lock}. Photographed directly from above at a 90-degree overhead angle on a pale heather field #DDDDDB, the folded heather hoodie sits centred with one sleeve fanned out to show the dense rib cuff, its hood corner spread above, while the rolled black crop base and rolled rib leggings rest alongside and a caramel leather strap #A5714F lays diagonally across the lower third. Even high-key studio light near 5500K keeps hairline soft shadows under each fold with low sheen on the fleece. A clean lower band stays an empty closing rail. The arrangement occupies 60-70%. Negative: no brand labels, no price tags, no filled rail text, no readable lettering, no crushed folds, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：001 暖白棚正身（面孔清晰），一手拉帽沿一手搭门襟，黑罗纹内搭与打底裤，金链金耳环戒指；002 背面整片花灰绒面与立体双层帽片（长发垂过帽角）；003 对镜举手机自拍遮脸，袖长盖指，焦糖色包带斜跨；004 全敞开叠穿黑短内搭站姿（面孔清晰），一手捏门襟外摆；005 袋口微距：手插斜插袋、罗纹袖口收拢、金属绳头垂落。品类判定依据：主体为女式宽松抓绒全拉链连帽卫衣，L1 女装、L2 上衣，leaf 记女式宽松抓绒全拉链连帽卫衣，与提示类目一致；五图为同款不同机位分工（正/背/镜面/敞开/微距），非色卡变体，正常转化。已剥离内容：品牌 Trendy Queen 字样、001/004 模特面容（一律鼻下裁切或背身）、首饰不写品牌、原图无任何文案故全套 textZone=none（仅收口镜留空栏）。与同品牌库内短款拉链卫衣套（b0cbc4bzgx：冷白铬银、三路色选款、背袖双框）区隔：本款为全长宽松版型，独有双层帽片背面镜、对镜自拍、插袋微距与成套平铺收口，色板改花灰麻灰+炭黑罗纹+焦糖皮具点缀；两源图版式并非逐镜同构（彼套无帽背镜与平铺收口）。源图 5 张，001/004 拆为正身与敞开叠穿两镜、新增平铺收口镜，按转化漏斗排为 6 镜。"
+  }
+}

@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-shipinyinliao-ningmeng-chongyin-gao",
+  "name": "鸢尾冷场冲调柠檬膏款",
+  "category": {
+    "l1": "食品饮料",
+    "l2": "冲调",
+    "leaf": "柠檬冲调膏",
+    "leafKeywords": [
+      "柠檬冲调膏",
+      "罐装膏滋",
+      "冲饮浓浆",
+      "温水化开",
+      "果味热饮"
+    ]
+  },
+  "description": "瓷白与鸢尾墨硬边冷场，柑皮黄收口，六镜拆解罐装冲调膏",
+  "productFamily": "food",
+  "styleLock": {
+    "direction": "quiet artisan concentrate commerce, cool mineral studio fields for a brew-it-yourself jar",
+    "palette": [
+      {
+        "name": "瓷白场",
+        "hex": "#F6F5F1"
+      },
+      {
+        "name": "鸢尾墨",
+        "hex": "#241F33"
+      },
+      {
+        "name": "鸢尾雾",
+        "hex": "#E7E3EF"
+      },
+      {
+        "name": "柑皮黄强调",
+        "hex": "#F0CB2E"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "hard-edged flat colour fields only: seamless porcelain chalk sweep #F6F5F1 for the pack and scene planes, matte deep iris ink plane #241F33 for macro and specification screens, pale iris mist plane #E7E3EF for matched split panels, one flat citrus-peel yellow field #F0CB2E reserved for the closing screen; no pattern, no gradient scenery, no horizon",
+    "lightingSystem": "neutral-balanced soft studio light, large diffuser front-left with a bounce card on the shadow side, single-direction matched contact shadows, one thin rim of separation where the pack meets a dark field, and a shallow skim of light sweeping across glossy surfaces to read texture; never hard direct flash, never a warm amber grade, never window-blind stripes",
+    "surfaceSystem": "fine-aggregate pale terrazzo plane and matte acrylic sheet in the chalk tone; never wood grain, bamboo, rattan, jute, linen or rice paper, and never a clay or terracotta cooking vessel as the stage",
+    "typography": "one condensed geometric sans family; display line set in #241F33 with wide letter-spacing, one headline plus at most two short labels per screen, copy carried as placeholder slots only; no brush calligraphy, no pinyin letter rows, no repeated filler rows",
+    "iconSystem": "thin hairline right-angle corner marks and blank rounded-rectangular label chips only, single ink colour #241F33; no leaf-icon grids, no circular seals, no diamond badges, no ribbon captions",
+    "presentationRules": "jar scale and the squared packshot angle stay fixed across screens; the pack is shown sealed on every screen except the opened macro screen and the brewed serving scene; the viscous contents keep their real gloss and are never restyled, never poured in a theatrical arc, never shown with dripping filaments",
+    "noDrift": [
+      "no colour palette changes and no fifth hue",
+      "no mixed fonts, no brush calligraphy and no pinyin letter rows",
+      "no wood, bamboo, rattan, jute, linen or rice-paper surfaces and no clay cooking pots",
+      "no red-gold seal badges, no ribbon captions, no leaf-icon grids, no QR codes and no membership corner tags",
+      "no random backgrounds and no inconsistent lighting",
+      "no invented spec values rendered inside the empty label and parameter slots"
+    ],
+    "lockText": "Campaign Style Lock: consistent quiet artisan-concentrate visual system across the entire image set; fixed palette of a porcelain chalk field #F6F5F1, a deep iris ink #241F33, a pale iris mist #E7E3EF and one citrus-peel accent #F0CB2E; neutral-balanced soft studio light from the front-left with a bounce fill, single-direction matched contact shadows and one thin rim of separation; hard-edged flat colour fields plus one fine-aggregate terrazzo plane, never wood, bamboo, rattan, linen or rice paper; one condensed geometric sans display set in #241F33 with wide letter-spacing; thin hairline right-angle marks and blank rounded-rectangular label chips only, no leaf-icon grids, no circular seals, no ribbon badges; stable jar scale and a squared packshot angle for the pack; no colour palette changes, no mixed fonts, no calligraphy or pinyin rows, no repeated filler rows, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "瓷白场冲调膏主视觉",
+      "intent": "详情页首屏用瓷白硬边场加一句主张，一秒立住「这是一罐要兑水冲调的膏」并抢到点击。",
+      "assetType": "suite-shipinyinliao-ningmeng-chongyin-gao::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "squared to the frame at packshot height, sealed jar standing upright and slightly left of centre, full body visible and not clipped",
+      "lighting": "broad diffused front-left key with a bounce card on the shadow side, one soft contact shadow grounding the jar, no specular blowout on the lid",
+      "background": "seamless porcelain chalk sweep #F6F5F1 with one hard-edged deep iris ink band #241F33 cut vertically at the right quarter",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "clean negative space across the upper left third, nothing else empty",
+      "textZone": "左上三分之一留白带承载唯一一句主张，只写作「{selling_point_1}」，字号为标题级，其余区域不放任何句子",
+      "promptTemplate": "E-commerce opening hero screen for a brew-it-yourself food concentrate: {product} standing upright and sealed, full body visible, squared to the frame at packshot height and placed slightly left of centre. {product_identity_lock}. {style_lock}. Purpose: land the single core reason to buy in about one second. Lighting is a broad diffused front-left key with a bounce card on the shadow side and one soft contact shadow grounding the jar, with no specular blowout across the lid. Background is a seamless porcelain chalk sweep #F6F5F1 cut by one hard-edged deep iris ink band #241F33 running vertically at the right quarter. No props at all. The product occupies 60-70% of the frame, leaving clean negative space across the upper left third for one short headline rendered only as 「{selling_point_1}」 in #241F33 with wide letter-spacing. Neutral-balanced commercial food pack photography, crisp silhouette, true material rendering, correct verticals. Negative: no brush calligraphy, no pinyin letter rows, no clay or terracotta cooking pot, no wooden tray, no woven cloth, no red-gold seal badges, no decorative leaves, no second headline, no extra text, no watermark, no fake logo, no cut-off edges, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "DETAIL",
+      "displayName": "鸢尾墨场膏体俯拍微距",
+      "intent": "罐口垂直俯拍的膏体光泽与透光果片，用真实内容物证明品质，替代原页靠徽标堆信任的做法。",
+      "assetType": "suite-shipinyinliao-ningmeng-chongyin-gao::shot-02",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "4K",
+      "camera": "flat overhead view looking straight down into the open jar mouth, extreme close-up macro on the paste surface",
+      "lighting": "one soft diffused top source plus a shallow skim of light sweeping across the surface to read gloss, ridges and a few settled bubbles, one soft shadow from the rim onto the plane",
+      "background": "matte deep iris ink plane #241F33, no gradient and no pattern",
+      "props": "the opened blank jar alone with a thin drawn-up skin of paste at the rim, nothing else in frame",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal margin, the surface texture fills the frame",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, shown as a flat overhead view looking straight down into the open jar mouth, tight zoom on the glossy paste surface and the one translucent softened fruit slice suspended in it. {product_identity_lock}. {style_lock}. Purpose: prove the real contents and honest texture instead of stating any claim. Lighting is one soft diffused top source with a shallow skim of light sweeping across the surface to reveal gloss, ridges and a few settled bubbles, and the jar rim dropping one soft shadow onto the plane. Background is a matte deep iris ink plane #241F33 with no gradient and no pattern. Only the opened blank jar with a thin drawn-up skin of paste at the rim appears; no spoon, no dish, no scattered ingredients. The detail fills 55-60% of the frame with minimal margin and no extra whitespace. Neutral-balanced food macro, shallow depth of field only at the far rim, real viscous highlights. Negative: no blurry subject, no steam clouds, no added fruit or herbs outside the jar, no pouring arc, no ingredient percentages or spec text, no badges, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size, no mould.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "COMPARISON",
+      "displayName": "同杯冲调前后侧拍双栏",
+      "intent": "左右同机位同光双栏，只呈现同一只杯子里化开前后的视觉状态差，替买家确认兑水即化。",
+      "assetType": "suite-shipinyinliao-ningmeng-chongyin-gao::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "4:3",
+      "resolution": "2K",
+      "camera": "matched twin panels framed identically as a clean 90-degree side profile, close-up on the liquid column of each glass",
+      "lighting": "identical diffused front key with soft fill on both panels, matched single-direction contact shadows, same highlight position on both glasses",
+      "background": "pale iris mist field #E7E3EF on both panels, identical, with one hairline divider",
+      "props": "two identical blank straight-sided glasses and one plain unbranded stir rod resting at the foot of the right panel",
+      "productOccupancy": "45-50% per panel",
+      "whitespace": "no extra whitespace beyond one hairline gutter between the two panels",
+      "textZone": "两栏下缘各一条窄标签位，只分别写作「{callout_1}」与「{callout_2}」标视觉状态，不写任何数值或比例",
+      "promptTemplate": "E-commerce comparison screen built as two matched panels framed identically as a clean 90-degree side profile, close-up on the liquid column inside each glass. Left panel: a small dose of {product} dropped into a tall blank straight-sided glass of clear water, the paste still holding its shape low at the base. Right panel: the same glass stirred once into one even, fully blended liquor. {product_identity_lock}. {style_lock}. Camera height, focal length and lighting are identical across both panels so that only the state of the glass differs: a diffused front key with soft fill and matched single-direction contact shadows. Background is a pale iris mist field #E7E3EF on both panels with one hairline divider. The product occupies 45-50% per panel. Two narrow label slots sit at the foot of each panel carrying only 「{callout_1}」 and 「{callout_2}」 in #241F33. Neutral-balanced studio food photography, honest reflections on the glass walls. Negative: no fabricated results, no exaggerated colour jump, no ratio figures, no numbers, no arrows or doodles, no competitor pack, no hands, no text beyond the two labels, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "台面低角冲饮场景",
+      "intent": "把冲好的那一杯放回真实台面，用低角让买家代入日常冲饮，情绪而非参数推动下单。",
+      "assetType": "suite-shipinyinliao-ningmeng-chongyin-gao::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "camera set at a low angle on the terrazzo plane, looking upward along the rim of the brewed glass with the sealed jar at the near right edge",
+      "lighting": "soft daylight-balanced fill from camera-left at about 5600K, single-direction shadows that agree with the props, one gentle rim separating the glass from the far plane",
+      "background": "fine-aggregate pale terrazzo plane #F6F5F1 in a bright still room, no pattern and no horizon line",
+      "props": "one blank tall straight-sided glass of brewed liquor at the left, one small standing blank label card at the far right edge, nothing else",
+      "productOccupancy": "40-50%",
+      "whitespace": "open negative space across the upper third",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene: a blank tall straight-sided glass of evenly blended liquor made from {product} stands at the left on a fine-aggregate pale terrazzo plane #F6F5F1, with the sealed jar resting at the near right edge of the same plane. {product_identity_lock}. {style_lock}. Photographed from a low angle set down on the plane, looking upward along the rim of the glass, so the far side of the room falls softly out of focus. Soft daylight-balanced fill from camera-left at about 5600K, single-direction shadows that agree across glass and jar, one gentle rim separating the glass from the plane. Props limited to one small standing blank label card and nothing else; no table cloth, no placemat. The product occupies 40-50% of the frame with open negative space across the upper third. Composed but lived-in food photography, real condensation on the glass, true material rendering. Negative: no hands, no faces, no people, no cluttered table setting, no pile of cutlery, no window-blind stripes, no outdoor street scene, no steam rising, no text, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "TRUST",
+      "displayName": "三罐规格空白参数行",
+      "intent": "用三只同款罐与三行刻意留白的参数位消除规格与包装疑虑，信任靠可见细节而非编造资质。",
+      "assetType": "suite-shipinyinliao-ningmeng-chongyin-gao::shot-05",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:2",
+      "resolution": "2K",
+      "camera": "photographed from a high 45-degree angle looking down along a row of three identical jars, tight zoom on the empty label rectangles and lid edges",
+      "lighting": "even high-key diffused light from the front-top, matched soft contact shadows under each jar, controlled sheen on the lid rims",
+      "background": "matte deep iris ink field #241F33 with one chalk rule strip #F6F5F1 carrying three empty parameter lines divided by hairlines",
+      "props": "three identical blank wide-mouth jars with empty label rectangles, one matte dosing spoon laid flat at the row foot",
+      "productOccupancy": "55-60% overall",
+      "whitespace": "even margins above and below the row",
+      "textZone": "色带顶部一行小节标题只写作「{callout_3}」；其下三行参数位一律保持空白卡位与 hairline 分隔线，不填任何数值",
+      "promptTemplate": "E-commerce specification and trust screen: {product} shown as a row of three identical blank wide-mouth jars, photographed from a high 45-degree angle looking down along the row, tight zoom on the empty label rectangles and the lid edges. {product_identity_lock}. {style_lock}. Purpose: remove risk through verifiable visual detail only, never through claimed authority. Lighting is even high-key diffused light from the front-top with matched soft contact shadows under each jar and a controlled sheen along the lid rims. Background is a matte deep iris ink field #241F33 with one chalk rule strip #F6F5F1 carrying three empty parameter lines divided by hairlines. One matte dosing spoon lies flat at the foot of the row and nothing else. The row occupies 55-60% of the frame with even margins above and below. A single small section title at the head of the strip reads 「{callout_3}」 in #241F33 while the parameter lines themselves stay empty. Neutral-balanced product photography, straight edges kept straight, consistent scale across the three jars. Negative: do NOT invent certifications, lab reports, test numbers, awards, net weight figures, origin or grade claims, no filled-in spec rows, no seals, no badge shapes, no QR codes, no membership corner tags, no dense body text, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size, no mould.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "柑皮黄场收口按钮位",
+      "intent": "以柑皮黄实色场和一枚空白圆角按钮位收口，给出行动位但不谎称任何优惠或价格。",
+      "assetType": "suite-shipinyinliao-ningmeng-chongyin-gao::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "close-up at a slight 3/4 product angle, jar standing at the left of the frame with the empty button plate at the lower right",
+      "lighting": "bright even front light with a soft contact shadow and one thin rim of light along the jar shoulder, punchier than the earlier screens but same direction",
+      "background": "flat citrus-peel yellow field #F0CB2E with one hard-edged chalk band #F6F5F1 running along the lower edge",
+      "props": "one blank rounded-rectangular button plate standing at the lower right, no other props",
+      "productOccupancy": "50-60%",
+      "whitespace": "broad empty band across the lower 38%",
+      "textZone": "其上一行主张只写作「{selling_point_2}」；下缘圆角矩形按钮位内只写作「{callout_4}」，不放价格、折扣或倒计时",
+      "promptTemplate": "E-commerce closing screen for {product}, shown at a slight 3/4 angle with the jar standing at the left of the frame, close-up on the label face so the pack reads clearly at thumbnail size. {product_identity_lock}. {style_lock}. Purpose: a calm call to action with an empty action slot rather than a claimed offer. Lighting is bright even front light with a soft contact shadow and one thin rim of light along the jar shoulder, punchier than the earlier screens but from the same direction. Background is a flat citrus-peel yellow field #F0CB2E with one hard-edged chalk band #F6F5F1 running along the lower edge, and {accent_color} is permitted as the only substitution for that yellow. The product occupies 50-60% of the frame with a broad empty band across the lower 38%. One headline line above the action slot reads 「{selling_point_2}」 and one blank rounded-rectangular button plate at the lower right reads 「{callout_4}」, both set in #241F33. Neutral-balanced commercial food pack photography, clean edges, stable scale. Negative: no invented discounts, no countdown timer, no price figures, no coupon or gift graphics, no QR codes, no membership corner tags, no ribbon badges, no circular seals, no extra text, no watermark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "逐屏事实（仅读 6 张 panel，未读原始长图）：第1屏书法大字主张＋两行小字，深木托盘与粗麻布台面上一只陶土炖罐的垂直俯拍，罐内深琥珀膏体与一片被糖浆浸透的透光果片，右缘三枚红底金边菱形重复徽标与一片绿叶装饰；第2屏米白宣纸底，拼音小字行＋黑宋体大标题＋手绘红圈＋黄色笔形标记，下方六宫格同形叶形图标配重复短句；第3屏罐口内容物极近微距（膏体高光、果肉纹理、气泡），右缘纵列三枚同款红底徽标；第4屏六宫格同图小卡，每卡压一条红底横幅标签，下接一块深蓝标题色块；第5屏深蓝块面上两张中式直角细框微距图，各压一条红色缎带文案；第6屏红底两列重复的品名参数行，左下角一枚黑色二维码与会员促销角标。品类判定依据：夹名「柠檬茶」仅作线索，不作依据；画面主体是浓稠膏状物（罐口挂壁拉薄的膏皮、果片被糖浆浸透呈半透明、无任何即饮杯装或瓶装成品、也无鲜果与称重售卖），必须先取膏再兑水才成饮，因此不落「饮料」（成品即饮）也不落「生鲜粮油／水果」（鲜果），据此定为食品饮料／冲调，leaf 取「柠檬冲调膏」；第6屏参数行是模板占位的重复填充文本，不能作为品名或资质依据。已剥离内容：原页书法字标与拼音行、六宫格同形叶形图标矩阵、红底金边菱形徽标与红底缎带横幅、中式直角描线框、二维码与会员促销角标、陶土炖罐与木托盘与粗麻布台面、原页全部文案原句与重复填充行、深木暗场与暖琥珀整体调色；同时一律不写入净含量、糖度、果汁或成分百分比、炖煮时长与工艺承诺、产地与等级、功效说法（原页秋冬滋润一类表述）、检测与资质、销量与好评数字；源页第2与第4屏同类图标与同图小卡属重复信息，已合并为一镜；镜数按 6 屏取 6 镜，未凑数。与近似模版差异（对照 registry 食品饮料 9 套与旧库 4 套，逐条可见差异）：1 色板与色温体系——本套四个码值 #F6F5F1 #241F33 #E7E3EF #F0CB2E 逐个对全库（含 _legacy-old-skill 与 _upgraded）做 grep -ril 复核，命中数均为 0；为不把邻套 hex 抄进本文件，此处只按色相描述它们的体系而不引用码值：散茶是瓷白云白＋鸽灰紫＋石墨黑＋橄榄绿，花草茶是深孔雀绿＋薄荷白＋古金，茉莉是雾蓝白＋青瓷＋深墨绿＋松石绿，黑糖珍珠奶茶是雾蓝白＋蓝灰＋藏蓝＋黑糖琥珀，麻花是珐琅白＋牙玉绿＋梅子酒红，桂花栗子酥是杏色＋象牙＋焦橙，蜜枣是霜灰白 plaster＋墨青＋洋红，卤香肉制品是炭黑暗场＋朱红＋金，麻薯是奶粉＋玫瑰豆沙＋燕麦米；本套与上述十套无一重合，改走鸢尾紫墨＋柑皮黄的矿物冷场，整体避开冲调两套与饮料一套共用的「冷蓝白雾场加深墨绿或藏蓝」路线，也避开奶茶的琥珀流痕、蜜枣的霜灰白灰泥场、卤香的炭黑暗场加朱红与金；同时不采用源图自身的暖琥珀体系。跨库另核：全库唯一同样以鸢尾紫命色的一处属于母婴／童装套，其四色码值与本套零重合且非相近 L1，故保留本套命名。2 背景与台面体系——硬边实色场＋细骨料水磨石＋雾面亚克力，noDrift 明确禁绝木纹、竹、藤、麻、亚麻、宣纸与陶土炖罐，与散茶/茉莉/奶茶/麻花/桂花酥各自依赖的瓷白 sweep、青瓷砖面、木纹托盘、搪瓷托盘、米色卡平面完全不同；同时不使用茉莉的「低水平水线反射带」、花草茶的「拱形描线框＋植物线描」、蜜枣的「磨砂玻璃片＋三聚净板」。3 道具——空标签矩形图位三只、空白圆角按钮片、哑光计量勺、光身直筒杯与一根无标搅拌棒；不复用浅瓷盘盛干叶或干花、无标玻璃罐与花蕾、白搪瓷托盘与棱纹瓷砖、钢杯与折叠毛巾。4 版式元件——只保留 hairline 直角标与空白圆角卡，明确禁绝六宫格同形图标矩阵、圆形与菱形印章徽标、红底金字缎带横幅与拼音行（这些恰是源图元件，也是奶茶与茉莉自禁项）。5 机位序列——六镜六个不同角度：squared to the frame / flat overhead / 90-degree side profile / low angle / high 45-degree / slight 3/4，景别配平为 2 macro＋2 close-up＋2 full，全景仅占两镜不过半；对照库内食品饮料各套清一色 straight-level＋slight-angle＋extreme-close＋high-degree 的组合，本套同时含垂直俯摄与贴台面仰摄且六镜角度不重复。6 角色序列——HERO>DETAIL>COMPARISON>SCENE>TRUST>CTA，与已登记的 9 套（含奶茶 HERO>DETAIL>SCENE>DETAIL>VARIANT>TRUST>DETAIL>CTA）逐位比对均不相同。7 temperature 取 neutral：同 L2 已被 cool/neutral/cool 占满，按 brief 以色板构成、道具、机位、角色序列与元件完成区分，并在本条注明不依赖色温取值。另：全部照明描述改用 skim / sweep 两个词表达掠射光，校验器易误判为低机位的那两个同义掠射英文词在本文全篇（含各镜 lighting 与 promptTemplate）一次都未出现；平台与店铺字样在本文件内一律未出现，仅以「原平台店铺字样」指代。"
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-shipinyinliao-guanzhuang-wutang-nengliangyinliao-b0bl7316gd",
+  "name": "无糖银罐冰蓝能量饮料款",
+  "category": {
+    "l1": "食品饮料",
+    "l2": "饮料",
+    "leaf": "无糖罐装能量饮料",
+    "leafKeywords": [
+      "无糖能量饮料",
+      "罐装饮料",
+      "银蓝罐身",
+      "整箱装",
+      "冰镇畅饮",
+      "户外补水"
+    ]
+  },
+  "description": "冷白银罐冰蓝点缀，空标靶承载无糖主张，整箱收口",
+  "productFamily": "food",
+  "styleLock": {
+    "direction": "cool premium sugar-free canned beverage commerce",
+    "palette": [
+      {
+        "name": "冷白底",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "银蓝面板",
+        "hex": "#DCE7EE"
+      },
+      {
+        "name": "冰蓝强调",
+        "hex": "#7FC3E8"
+      },
+      {
+        "name": "石墨炭字",
+        "hex": "#2B2F33"
+      }
+    ],
+    "temperature": "cool",
+    "backgroundSystem": "seamless cool white #FFFFFF sweep for packshots and the closing frame, brushed silver-blue #DCE7EE panel for benefit and info screens, cool near-white #F2F6F9 field for macro, sunlit foliage bokeh #2F5D3A allowed only inside the single lifestyle frame",
+    "lightingSystem": "cool high-key studio light near 6500K, broad front key that lays one crisp vertical specular streak on the aluminium shell, thin cool rim, soft short contact shadow, never warm tungsten",
+    "surfaceSystem": "glossy seamless white sweep, brushed cool-grey laminate #C9D4DC and matte pale stone #EAF0F4, no wood and no linen",
+    "typography": "one condensed geometric sans-serif in graphite #2B2F33 with at most one ice-blue #7FC3E8 highlight, every headline slot kept as an empty placeholder",
+    "iconSystem": "flat thin single-weight line icons in ice blue #7FC3E8, rounded rectangle and pill frames only, no 3D, no badge artwork",
+    "presentationRules": "the can stays upright at identical silhouette scale and centred mass in every frame, the shell always carries a blank information field instead of label artwork, carton shows blank side panels only",
+    "noDrift": [
+      "no color palette changes",
+      "no warm cream, milk-tea or lemon-yellow tones",
+      "no mixed fonts",
+      "no redrawn label artwork or claw-style graphics",
+      "no random backgrounds",
+      "no inconsistent lighting"
+    ],
+    "lockText": "Campaign Style Lock: consistent cool premium sugar-free canned beverage ecommerce visual system across the entire image set; fixed palette of seamless cool white #FFFFFF, brushed silver-blue panel #DCE7EE, ice-blue accent #7FC3E8 and graphite text #2B2F33; cool high-key studio light near 6500K with one crisp vertical specular streak on the aluminium shell and a soft short contact shadow; glossy white sweep and brushed cool-grey laminate surfaces only, no wood, no linen, no warm cream or lemon-yellow tones; one condensed geometric sans-serif kept as empty placeholder slots; flat thin-line ice-blue icons; stable upright can angle and scale with a blank information field on the shell; no color palette changes, no mixed fonts, no redrawn label artwork, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "冷白罐身正面主图",
+      "intent": "在搜索结果缩略图里一眼赢下点击，只交代无糖银罐主体轮廓。",
+      "assetType": "suite-shipinyinliao-guanzhuang-wutang-nengliangyinliao-b0bl7316gd::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level axis, can standing perfectly upright, full body visible from base to lid",
+      "lighting": "cool high-key studio light near 6500K, broad front key with a thin cool rim, one crisp vertical specular streak on the shell, soft short contact shadow",
+      "background": "seamless cool white #FFFFFF sweep",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "none, the can fills the centre with equal clean margins",
+      "textZone": "none",
+      "promptTemplate": "E-commerce hero packshot of {product}. {product_identity_lock}. {style_lock}. The can stands perfectly upright on a straight-on eye-level axis, seen dead front with the full body from base to lid inside frame. Cool high-key studio lighting near 6500K from a broad front key drops one crisp vertical specular streak down the brushed aluminium shell and leaves a soft short contact shadow under the base. Seamless cool white background #FFFFFF with no horizon line. The product occupies 60-70% of the frame, no extra whitespace beyond even clean margins. Negative: no brand wordmark, no claw-style mark, no readable label lettering, no printed digits of any kind, no props, no hands, no watermark, no gradient background, no cut-off edges, no plastic-looking food, no insects or contamination, no unrealistic portion size, no floating can without a contact shadow.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "银蓝面板空标靶卖点",
+      "intent": "一秒说清核心利益，把主张挂到罐身上方的空白标靶上。",
+      "assetType": "suite-shipinyinliao-guanzhuang-wutang-nengliangyinliao-b0bl7316gd::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle showing the full front face, can placed right of centre",
+      "lighting": "cool front-left key near 6500K, gentle fill from the right, thin cool rim along the shadow side, soft contact shadow",
+      "background": "brushed silver-blue panel #DCE7EE",
+      "props": "one empty rounded callout pill and one blank thin-line icon tile",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space across the top 35% reserved for copy",
+      "textZone": "top band for 「{selling_point_1}」, one empty pill above the can",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. The can is turned to a slight 3/4 angle that still reads the full front face, sitting right of centre and occupying 50-60% of the frame. Cool front-left key near 6500K with gentle fill from the right, a thin cool rim on the shadow side and a soft contact shadow grounding the base. Background is a flat brushed silver-blue panel #DCE7EE. Leave generous negative space across the top 35% for copy, where one empty rounded pill and one blank thin-line icon tile wait as placeholder slots. Negative: no filled-in headline wording, no printed digits, no more than one claim, no invented efficacy wording, no props covering the shell, no plastic-looking food, no insects or contamination, no unrealistic portion size, no watermark, no gradient banding.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "林荫手持清爽场景",
+      "intent": "把饮品放进真实户外日常，让买家把自己代入解渴时刻。",
+      "assetType": "suite-shipinyinliao-guanzhuang-wutang-nengliangyinliao-b0bl7316gd::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:2",
+      "resolution": "2K",
+      "camera": "candid handheld framing from a slightly low angle, head of the seated generic person cropped out of frame, can held low near the knee",
+      "lighting": "soft open-shade daylight near 6500K, faint dappled highlights from leaves, gentle shadow fall on the hand",
+      "background": "sunlit foliage bokeh #2F5D3A",
+      "props": "plain denim lap as a scale anchor, unbranded top, nothing else",
+      "productOccupancy": "40-50%",
+      "whitespace": "soft blurred negative space in the upper third above the shoulder line",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene of {product} held in one relaxed hand low near the knee of a seated generic person. {product_identity_lock}. {style_lock}. Photographed with a candid handheld feel from a slightly low angle, the person's head cropped cleanly out of frame so only the torso, arm and hand remain. Soft open-shade daylight near 6500K with faint dappled leaf highlights and gentle shadow fall across the knuckles. Background is sunlit foliage bokeh #2F5D3A with soft blurred negative space in the upper third. Props limited to a plain denim lap as a scale anchor and an unbranded top. The product occupies 40-50% of the frame. Negative: no identifiable face, no model likeness, no brand marks on clothing or jewellery, no readable label lettering, no extra text, no watermark, no deformed fingers, no fused hands, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "罐顶拉环银彩微距",
+      "intent": "用罐口与拉环的金属做工证明灌装品质，替代空洞承诺。",
+      "assetType": "suite-shipinyinliao-guanzhuang-wutang-nengliangyinliao-b0bl7316gd::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "extreme close-up macro from a side profile tilted just above rim level, shallow depth of field with the pull tab sharp",
+      "lighting": "cool skimming light sweeping across the brushed aluminium from the left, one controlled narrow highlight, falloff to soft shade on the right",
+      "background": "cool near-white field #F2F6F9",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the macro detail is the subject with a thin clean margin at the right",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of the scored lid and pull tab of {product}, tight zoom on the rim seam and rivet. {product_identity_lock}. {style_lock}. Camera sits at a side profile tilted just above rim level, looking across the lid, with shallow depth of field and the pull tab kept razor sharp. Cool skimming light sweeps across the brushed aluminium from the left, producing one controlled narrow highlight that fades into soft shade on the right. Background is a clean cool near-white field #F2F6F9. The detail fills 55-60% of the frame with a thin clean margin on the right. Negative: no blurry subject, no warped straight lines, no duplicated tab or impossible seam, no readable embossed lettering, no printed digits, no plastic-looking food, no insects or contamination, no unrealistic portion size, no extra props, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "TRUST",
+      "displayName": "空表位营养信息板",
+      "intent": "用一张排版规整的空白参数表格承接成分疑虑，数值全部留空由卖家自填。",
+      "assetType": "suite-shipinyinliao-guanzhuang-wutang-nengliangyinliao-b0bl7316gd::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "4:5",
+      "resolution": "2K",
+      "camera": "flat lay photographed directly from above at a 90-degree overhead angle, board squared to the frame",
+      "lighting": "even high-key cool light near 6500K, shadowless and flat, only a hairline edge shadow under the board",
+      "background": "brushed silver-blue panel #DCE7EE",
+      "props": "one blank ruled table block, one empty rounded seal frame, one empty indicator strip",
+      "productOccupancy": "50-60%",
+      "whitespace": "structured even gutters around the table block, no dense filler",
+      "textZone": "none",
+      "promptTemplate": "E-commerce infographic trust screen laid out as a flat lay, photographed directly from above at a 90-degree overhead angle. {product} stands at the edge of the frame as a small upright reference anchor. {product_identity_lock}. {style_lock}. The layout is a clean ruled table block whose cells stay completely empty, one blank rounded seal frame and one empty indicator strip, all typeset in condensed graphite #2B2F33 with ice-blue #7FC3E8 rules on a brushed silver-blue panel #DCE7EE. Even high-key cool lighting near 6500K keeps the board shadowless apart from a hairline edge shadow. The board and anchor together occupy 50-60% of the frame with structured even gutters. Negative: no filled numbers, no unit labels, no ingredient names, no certification marks, no scanned document look, no dense body text, no tiny unreadable text, no plastic-looking food, no insects or contamination, no unrealistic portion size, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "整箱并列囤货收口",
+      "intent": "收口促单，用外箱与并列整罐的囤货阵型给出下单理由。",
+      "assetType": "suite-shipinyinliao-guanzhuang-wutang-nengliangyinliao-b0bl7316gd::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed from a high 45-degree angle looking down, closed carton behind and a neat row of cans fanned in front",
+      "lighting": "cool high-key studio light near 6500K from the front-left, matching soft contact shadows under every unit, thin cool rim on carton edges",
+      "background": "seamless cool white #FFFFFF sweep",
+      "props": "one blank carton with a torn-open corner, three upright cans, one empty lower callout bar",
+      "productOccupancy": "60-70% overall",
+      "whitespace": "clean lower band left open for the closing line, no clutter at the corners",
+      "textZone": "lower band for 「{callout_2}」",
+      "promptTemplate": "E-commerce closing group shot photographed from a high 45-degree angle looking down. {product} appears as a blank-sided carton with one torn-open corner behind a neat fanned row of upright cans. {product_identity_lock}. {style_lock}. Cool high-key studio lighting near 6500K from the front-left drops matching soft contact shadows under every unit and a thin cool rim along the carton edges. Seamless cool white background #FFFFFF. The carton and can row together occupy 60-70% overall, with a clean lower band left open as an empty callout bar for the closing line. Negative: no price, no discount digits, no countdown timer, no quantity numerals on the carton, no brand wordmark, no fake logo, no promotional badges, no duplicated or fused cans, no plastic-looking food, no insects or contamination, no unrealistic portion size, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "逐图事实：001 冷白底单罐与撕口式多罐外包装同框，箱体破口处露出第二只罐；002 与 001 构图几乎相同，但箱侧换成第三方游戏联名广告并带扫码方块；003 竖幅单罐正面满幅，可见罐顶与拉环；004 一整页营养成分表，含成排的数值行、配料长句、产地与押金条目；005 冷白底单罐斜侧角度；006 户外绿植虚化背景中一名坐姿人物手持单罐，上衣胸口有醒目标识图形。品类判定依据：全部画面主体都是即饮罐装无糖能量饮料及其运输外包装，非器具、非营养补充剂，故 L1 取食品饮料、L2 取饮料，leaf 记为无糖罐装能量饮料；与提示的饮料方向一致，无需改判。已剥离内容：源品牌字标、系列名副标、源主标识图形与罐身花体装饰纹全部移除，罐身改为空白信息位；002 的联名广告与扫码方块整块剔除；004 的数值、成分名、容量与整箱只数一律不入稿，仅保留空表格与空印章框结构；006 的人物面容与衣着标识剔除，只留颈部以下与手部；整套不含平台角标与星级。与同轮茶柠檬汽水套图的区分：本套锁定冷白无缝背景加银蓝面板的影棚冷调体系，色板为冷白、银蓝、冰蓝、石墨炭，禁用奶茶米色、柠檬暖黄与木桌亚麻等暖调道具，背景体系也不同（影棚面板对比餐桌场景）。源图共 6 张，001 与 002、003 与 005 角色重复，合并后按转化漏斗排为 6 镜。"
+  }
+}

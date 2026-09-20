@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-shipinyinliao-ningmeng-bingcha-nengliang-yinliao-b0bl756s36",
+  "name": "柠檬冰茶撞色能量饮料罐装款",
+  "category": {
+    "l1": "食品饮料",
+    "l2": "饮料",
+    "leaf": "柠檬冰茶能量饮料罐装",
+    "leafKeywords": [
+      "柠檬冰茶",
+      "能量饮料",
+      "罐装饮料",
+      "冰镇茶饮料",
+      "果味茶饮品",
+      "整箱装饮料"
+    ]
+  },
+  "description": "柠黄撞墨黑高识别体系，白底主图、霓虹氛围、空白参数位到整箱交付",
+  "productFamily": "food",
+  "styleLock": {
+    "direction": "bold high-contrast iced-tea beverage commerce",
+    "palette": [
+      {
+        "name": "柠黄",
+        "hex": "#F5DE17"
+      },
+      {
+        "name": "墨黑",
+        "hex": "#15130F"
+      },
+      {
+        "name": "砂米灰",
+        "hex": "#C8BFAC"
+      },
+      {
+        "name": "电光青",
+        "hex": "#4FE0D2"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "one alternating three-field system: seamless white #FFFFFF packshot field, ink-black neon stage #0B0C10, pale storm-day outdoor field #B9BDC0",
+    "lightingSystem": "bright high-key front-left key with soft fill on packshots, cool skimming accent on macros, hard rim plus long-exposure neon trails only on the dark stage",
+    "surfaceSystem": "glossy mirror table #0B0C10, coarse sand mound #C8BFAC, matte light neutral board #EFEDE7",
+    "typography": "modern geometric sans-serif, all rendered copy stripped to blank plates",
+    "iconSystem": "thin-line icons only in one accent color, no filled badges, no seal artwork",
+    "presentationRules": "the single-serve container always stands upright on its base at the same proportion with the cap ring visible, body carries a blank information band and is never redesigned",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no wordmark or graphic mark drawn on the container body",
+      "no numbers or measurement units rendered anywhere in frame"
+    ],
+    "lockText": "Campaign Style Lock: consistent high-contrast iced-tea beverage commerce visual system across the entire image set; fixed palette of saturated lemon yellow #F5DE17, ink black #15130F, sand-beige neutral #C8BFAC and one electric teal accent #4FE0D2, laid over seamless white #FFFFFF packshot fields; neutral-cool studio lighting with bright high-key fronts and crisp specular control on the metal ends; modern geometric sans-serif; consistent thin-line icon style; one alternating background system of clean white packshot field, ink-black neon stage and pale storm-day outdoor field; stable upright product angle and scale with a blank information band on the body; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no legible copy or wordmark on the container."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "柠茶空白罐身白底主图",
+      "intent": "搜索列表里用高识别撞色剪影一秒抓住点击，作为合规白底主图",
+      "assetType": "suite-shipinyinliao-ningmeng-bingcha-nengliang-yinliao-b0bl756s36::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "4:5",
+      "resolution": "4K",
+      "camera": "straight-on eye-level view of the upright container, full body and cap ring visible",
+      "lighting": "bright even high-key front-left key with soft fill card, soft contact shadow grounding the base",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "even white margin on all four sides, no extra elements",
+      "textZone": "none",
+      "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. The container stands upright and centred on a seamless pure white background #FFFFFF, photographed straight-on at eye level with the full body and the cap ring visible. Bright even high-key studio lighting from the front-left with a soft fill card on the shadow side, one soft contact shadow grounding the base. The body reads as a smooth blank information band carrying no wordmark, no graphic mark and no legible copy, only flat colour blocking of #F5DE17 over #15130F. The product occupies 60-70% of the frame with even white margin on all four sides. 8K commercial beverage e-commerce quality. Negative: no brand wordmark, no graphic logo, no readable label text, no props, no hands, no watermark, no platform badge or star artwork, no gradient background, no floating product without contact shadow, no cut-off edges, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "霓虹光迹暗场卖点图",
+      "intent": "用暗场霓虹光迹把提神恢复的抽象主张一秒视觉化",
+      "assetType": "suite-shipinyinliao-ningmeng-bingcha-nengliang-yinliao-b0bl756s36::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "16:9",
+      "resolution": "2K",
+      "camera": "very low angle looking slightly upward at the centred upright container",
+      "lighting": "hard cool rim from behind with long-exposure light trails sweeping across the dark stage",
+      "background": "glossy near-black mirror table and unlit glow wall #0B0C10",
+      "props": "out-of-focus glow panels behind, no signage",
+      "productOccupancy": "50-60%",
+      "whitespace": "the upper half kept as dark empty negative space, no filler props",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. The container stands centred on a glossy near-black mirror table #0B0C10, photographed from a very low angle looking slightly upward so the cap ring reads against the dark, with its reflection mirrored on the tabletop. Hard cool rim light from behind, long-exposure light trails in #E8437F and #4FE0D2 sweeping through the frame. Background is an unlit glow wall #0B0C10 with out-of-focus panels and no legible signage. The body keeps a clean blank information band free of any wordmark or graphic mark. The product occupies 50-60% of the frame while the upper half stays as dark empty negative space. Negative: no readable neon lettering, no slogan shapes, no brand wordmark, no fake logo, no invented vitality or health claims, no cluttered props, no duplicated product, no cut-off edges, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "风暴沙堆耐力场景图",
+      "intent": "把产品放进极端口渴乏力环境的氛围场景里，让买家自我代入",
+      "assetType": "suite-shipinyinliao-ningmeng-bingcha-nengliang-yinliao-b0bl756s36::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "straight-on eye-level view from behind the crest of the sand mound with long-lens compression",
+      "lighting": "flat overcast daylight from above, faint pale glow breaking at the right, soft diffused shadow under the base",
+      "background": "coarse sand mound #C8BFAC in the lower half under a pale storm-sky field #B9BDC0",
+      "props": "blurred sea horizon and one smooth dark stone at the lower corner",
+      "productOccupancy": "40-50%",
+      "whitespace": "the upper half left as empty pale sky, generous negative space",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene: {product} planted upright at the crest of a coarse sand mound #C8BFAC under a storm-grey sky #B9BDC0. {product_identity_lock}. {style_lock}. Photographed straight-on at eye level from behind the crest with a long lens compressing the horizon, a blurred sea line far behind and one smooth dark stone at the lower corner. Flat overcast daylight from above, faint pale glow breaking at the right, soft diffused shadow directly under the base. The body shows only a blank information band with no wordmark and no legible copy. The product occupies 40-50% of the frame while the upper half stays as empty pale sky with generous negative space. Negative: no people, no hands, no readable text, no watermark, no fake logo, no litter or debris, no disaster or damage scene, no duplicated sand texture, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "冰镇罐身空白信息带微距",
+      "intent": "用金属质感与冷凝水珠证明冰镇新鲜，替换掉原图的商标特写",
+      "assetType": "suite-shipinyinliao-ningmeng-bingcha-nengliang-yinliao-b0bl756s36::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "extreme close-up macro at a clean 90-degree side profile, tight zoom on the blank information band",
+      "lighting": "cool skimming light sweeping from the upper left, shallow depth of field, foreground rim sharp",
+      "background": "pale lemon field #F7EFC9 falling out of focus",
+      "props": "fine condensation beads on the shoulder, nothing else",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, only a narrow band of soft lemon behind the detail",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on the blank information band and the cold metal shoulder of the container, photographed at a clean 90-degree side profile with shallow depth of field and the foreground rim sharp. {product_identity_lock}. {style_lock}. Cool skimming light sweeping in from the upper left so brushed metal, the unprinted surface and fine condensation beads read clearly against a pale lemon field #F7EFC9 falling out of focus. The detail fills 55-60% of the frame with only a narrow band of soft lemon negative space behind it. Negative: no blurry subject, no readable label text, no brand wordmark, no fake logo, no garbled lettering, no droplets shaped like characters, no invented texture claims, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "空白参数表格信息位",
+      "intent": "承接原图参数表的分镜结构，用空表格单元回答规格疑虑而不编造数值",
+      "assetType": "suite-shipinyinliao-ningmeng-bingcha-nengliang-yinliao-b0bl756s36::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "photographed directly from above at a 90-degree overhead angle, flat lay",
+      "lighting": "even high-key flat lighting, no dramatic shadow, soft specular control on the cap ring",
+      "background": "flat off-white blank sheet #F1EFE8 lying on an ink-black matte board #16130F",
+      "props": "one blank ruled sheet with empty rows and empty cells",
+      "productOccupancy": "35-40%",
+      "whitespace": "generous empty margin around the blank sheet",
+      "textZone": "none",
+      "promptTemplate": "E-commerce infographic screen for {product}, photographed directly from above at a 90-degree overhead angle as a flat lay: the container stands upright at the left edge of the frame, its cap ring seen from above, beside a flat off-white blank sheet #F1EFE8 lying on an ink-black matte board #16130F. {product_identity_lock}. {style_lock}. Even high-key flat lighting with no dramatic shadow, one thin-line rule grid on the sheet drawn as empty rows and empty cells with no numbers, no units and no percentages. The product occupies 35-40% of the frame with generous empty margin around the blank sheet. Negative: no fabricated nutrition facts, no numerals or measurement units, no ingredient wording, no dense body text, no tiny unreadable type, no brand wordmark, no fake logo, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "整箱空白外箱交付图",
+      "intent": "用撕口露出内装单支的外箱收口，消除整箱交付与包装破损疑虑",
+      "assetType": "suite-shipinyinliao-ningmeng-bingcha-nengliang-yinliao-b0bl756s36::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:2",
+      "resolution": "2K",
+      "camera": "photographed from a high 45-degree angle looking down on the group at a slight three-quarter turn",
+      "lighting": "bright even high-key studio lighting with soft fill, soft contact shadows grounding both pieces",
+      "background": "seamless light neutral field #EFEDE7",
+      "props": "one plain outer shipper carton with fully blank panels and a torn-open top edge",
+      "productOccupancy": "60-70%",
+      "whitespace": "clean margin along the right side for breathing room",
+      "textZone": "none",
+      "promptTemplate": "E-commerce trust and packaging screen: {product} standing in front of one plain outer shipper carton with fully blank panels and a torn-open top edge that reveals the packed units inside, photographed from a high 45-degree angle looking down on the group at a slight three-quarter turn. {product_identity_lock}. {style_lock}. Bright even high-key studio lighting with soft fill, soft contact shadows grounding both pieces on a seamless light neutral field #EFEDE7. The carton carries no printing at all: no count, no volume text, no wordmark, no graphic mark. The group occupies 60-70% of the frame with clean margin along the right side. Negative: do NOT invent certifications, awards, ratings or test data, no quantity or volume numerals, no fabricated badge artwork, no crushed or dented packaging, no brand wordmark, no fake logo, no watermark, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "五张源图逐图事实：图一为一只细高单支容器与一只柠黄撞墨色外装箱同框、箱体撕开处露出内装单支，箱面印有数量与容量字样；图二为整版营养参数表与配料说明长文字；图三为单支容器正面细高构图，容器上下为色块分区、中段为大图形商标与系列字标；图四为暗场霓虹光迹长曝光，容器立于高反光台面并有完整倒影，背景虚化为发光标语字；图五为容器直立于沙堆顶端、阴天闪电与虚化海平线。品类判定依据：即饮型果味茶饮品，按图归入食品饮料/饮料（非冲调、非生鲜粮油、亦非医药保健营养补充）；提示所称瓶装与图不符，源图为细高罐型，故几何统一写成通用细高单支容器。已剥离内容：罐身品牌字标、系列名与图形商标（改为空白信息带）、外箱上的数量与容量字样、营养参数表内全部数字与配料文字（改为空白表格单元）、背景霓虹标语字样、平台角标与星级类社会证明、原图全部英文文案；所有事实数值一律不入稿。"
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-muying-qinzizhuang",
+  "name": "温馨亲子家庭装套装款",
+  "category": {
+    "l1": "母婴",
+    "l2": "童装",
+    "leaf": "亲子装家庭套装",
+    "leafKeywords": [
+      "亲子装",
+      "家庭装",
+      "亲子T恤",
+      "一家三口套装",
+      "背带裙",
+      "父子母女同款"
+    ]
+  },
+  "description": "亲子家庭装套图模版：白底挂拍、套装卖点、出行场景、包边细节与温馨收口",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "warm playful family-matching apparel commerce",
+    "palette": [
+      {
+        "name": "云朵白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "樱花粉",
+        "hex": "#F2919E"
+      },
+      {
+        "name": "云朵浅粉",
+        "hex": "#F7C5CC"
+      },
+      {
+        "name": "炭灰文字",
+        "hex": "#3B3B3D"
+      }
+    ],
+    "temperature": "warm",
+    "backgroundSystem": "seamless white #FFFFFF for the main packshot, solid sakura pink #F2919E and soft blush pink #F7C5CC for benefit, variant and closing shots, warm cream #F5EDE3 for lifestyle",
+    "lightingSystem": "bright soft studio lighting, front-left key with gentle fill, rounded soft shadows, cozy warm mood",
+    "surfaceSystem": "natural wooden hangers and light wood rack, matte neutral board #EFE9E4 for detail work",
+    "typography": "modern rounded geometric sans-serif",
+    "iconSystem": "soft-edge pink badge and capsule label shapes only, no complex icons",
+    "presentationRules": "stable garment scale, garments hung or laid flat, centered placement, no human faces",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no mismatched icon styles",
+      "no model faces"
+    ],
+    "lockText": "Campaign Style Lock: consistent warm family-matching apparel visual system across the entire image set; fixed palette of cloud white #FFFFFF, sakura pink #F2919E, soft blush pink #F7C5CC and charcoal text #3B3B3D; bright soft studio lighting with a front-left key, rounded gentle shadows and a cozy playful mood; modern rounded geometric sans-serif; simple soft-edge pink badge and capsule label shapes only, no complex icons; clean apparel photography with natural wooden hangers and soft fabric texture; stable garment scale and centered placement; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底挂拍亲子主图",
+      "intent": "搜索列表一眼点击，干净合规的白底主图",
+      "assetType": "suite-muying-qinzizhuang::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level view, garment on a natural wooden hanger, full garment visible and centered",
+      "lighting": "bright even high-key studio lighting, front-left key with soft fill, one soft contact shadow",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. The garment hangs on a natural wooden hanger, photographed straight-on at eye level, full garment visible and centered. Bright even high-key studio lighting with a front-left key and soft fill, one soft contact shadow grounding the hanger. Seamless pure white background #FFFFFF. The garment occupies 60-70% of the frame with no extra whitespace. 8K commercial apparel quality. Negative: no model, no recognizable child face, no props, no watermark, no fake logo, no extra text, no third-party character prints or trademark graphics, no colored background tint, no cut-off edges.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "温馨家庭装卖点",
+      "intent": "一秒传达一家同款的家庭温馨感，建立核心卖点",
+      "assetType": "suite-muying-qinzizhuang::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle at eye level, parent garment and child garment grouped side by side",
+      "lighting": "soft front-left key light, rounded gentle shadows",
+      "background": "solid sakura pink #F2919E with a soft blush banner shape #F7C5CC across the top",
+      "props": "one soft-edge blush banner shape, no physical props",
+      "productOccupancy": "50-60%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. The family-matching set grouped as a parent garment and a child garment side by side, shown at a slight 3/4 angle at eye level. Soft front-left key light with rounded gentle shadows. Solid sakura pink background #F2919E with a soft blush banner shape #F7C5CC across the top, generous negative space on the left 35% for copy. The set occupies 50-60% of the frame. Negative: no model faces, no recognizable child face, no invented fabric or efficacy claims, no dense body text, no watermark, no fake logo, no third-party character prints or trademark graphics, no props covering the garments.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "窗边衣架出行场景",
+      "intent": "代入家庭出行前的整理场景，营造温馨生活感",
+      "assetType": "suite-muying-qinzizhuang::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "documentary eye-level candid view of a light wooden clothing rack",
+      "lighting": "soft morning window light from the left around 5500K, gentle shadows",
+      "background": "warm cream wall #F5EDE3 with a light wood clothing rack",
+      "props": "a small potted green plant and a folded stack of clothes on a nearby stool, not covering the garments",
+      "productOccupancy": "40-50%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle scene of {product}. {product_identity_lock}. {style_lock}. The parent and child garments hang on a light wooden clothing rack beside a bright window, photographed from a documentary eye-level candid view. Soft morning window light from the left around 5500K, gentle shadows. Warm cream wall #F5EDE3. Props: a small potted green plant and a folded stack of clothes on a nearby stool, not covering the garments. The garments occupy 40-50% of the frame with comfortable breathing space around the rack. Negative: no people, no recognizable child face, no clutter, no watermark, no fake logo, no extra text, no third-party character prints or trademark graphics, no impossible shadows.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "袖口包边微距",
+      "intent": "用包边与缝线微距证明做工细节",
+      "assetType": "suite-muying-qinzizhuang::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "extreme close-up macro, clean side profile of the cuff edge",
+      "lighting": "skimming side light from the right revealing stitching and fabric texture, shallow depth of field with foreground sharp",
+      "background": "neutral matte board #EFE9E4",
+      "props": "none",
+      "productOccupancy": "55-60%",
+      "whitespace": "minimal, the detail is the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}. {product_identity_lock}. {style_lock}. Tight zoom on the cuff binding and the round-collar seam, photographed from a clean side profile, the detail fills 55-60% of the frame. Skimming side light from the right revealing stitching and fabric texture, shallow depth of field with the foreground sharp. Neutral matte board background #EFE9E4, minimal whitespace as the detail is the subject. Negative: no blurry subject, no invented fabric composition or thread-count numbers, no hands, no extra text, no watermark, no fake logo, no third-party character prints or trademark graphics.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "VARIANT",
+      "displayName": "双色套装平铺",
+      "intent": "并列展示深浅两色家庭套装，让买家按家庭人数与颜色选择",
+      "assetType": "suite-muying-qinzizhuang::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "top-down 90-degree overhead flat lay, photographed directly from above",
+      "lighting": "even high-key flat lighting with minimal shadow",
+      "background": "soft blush pink #F7C5CC",
+      "props": "none",
+      "productOccupancy": "35-40%",
+      "whitespace": "even margins on all four sides around the flat lay",
+      "textZone": "none",
+      "promptTemplate": "E-commerce variant layout of {product}. {product_identity_lock}. {style_lock}. The full family set in two colorways, a light set and a dark set, laid flat and photographed from a top-down 90-degree overhead angle, directly from above, the two colorways clearly separated. Even high-key flat lighting with minimal shadow. Soft blush pink background #F7C5CC. The set occupies 35-40% of the frame with even margins on all four sides. Negative: no mixed lighting between colorways, no model, no recognizable child face, no overlapping garments, no extra text, no watermark, no fake logo, no third-party character prints or trademark graphics.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "粉色温馨收口",
+      "intent": "粉色暖调收口促单，留空按钮位供后期合成促销信息",
+      "assetType": "suite-muying-qinzizhuang::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "slight 3/4 hero angle at eye level, family set grouped and centered",
+      "lighting": "soft punchy studio light from the front-left, gentle contact shadows",
+      "background": "rose pink #F2919E with a soft blush wave shape #F7C5CC along the bottom",
+      "props": "one empty rounded CTA button placeholder and two empty label capsules left blank",
+      "productOccupancy": "55-60%",
+      "whitespace": "none",
+      "textZone": "none",
+      "promptTemplate": "E-commerce promo close of {product}. {product_identity_lock}. {style_lock}. The family set grouped at a slight 3/4 hero angle at eye level, centered, with one empty rounded CTA button placeholder and two empty label capsules left blank for post-editing copy. Soft punchy studio light from the front-left with gentle contact shadows. Rose pink background #F2919E with a soft blush wave shape #F7C5CC along the bottom. The group occupies 55-60% of the frame with no extra whitespace. Negative: no rendered text inside the button or capsules, no real discount numbers, no invented offers or claims, no model faces, no recognizable child face, no watermark, no fake logo, no third-party character prints or trademark graphics.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "5屏事实：屏1粉色卡通云朵头图主打可爱温馨家庭装新款亲子装，下方为白底木衣架挂拍的男款/女款白色短袖T恤；屏2为成人尺码表（M-3XL，衣长胸围肩宽裤长臀围腰围脚口宽列），模特信息标注为成人身材穿L码，可选颜色为深色印花款，并有提示：妈妈/女童为背带裙、爸爸/男童为黑色裤子；屏3为工艺卖点环绕图（袖口包边、经典圆领、精美印花、实用口袋、条纹裤子）加透气面料宣传段落；屏4为三步蒸汽演示空图框与大图占位；屏5为品牌字标与粉色空框。品类判定：主品为亲子家庭装套装（成人T恤+儿童下装/背带裙同款组合），尺码为成人M-3XL量级且为外穿T恤与下装组合，属母婴/童装（外穿）而非内衣家居服/儿童内衣；亲子装由儿童需求驱动，归母婴/童装。已剥离：品牌字标与英文标语、原文案原句、胸前具体印花图案（只保留矩形图位结构描述，图案交给 product_identity_lock）、尺码表全部实测数值（换空白占位）、面料成分与透气功效断言、蒸汽测试结论；儿童相关画面全部不出现可辨识童模面容，仅用服装挂拍/平铺呈现。"
+  }
+}

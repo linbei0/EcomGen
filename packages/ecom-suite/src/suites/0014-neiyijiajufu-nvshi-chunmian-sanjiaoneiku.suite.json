@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-neiyijiajufu-nvshi-chunmian-sanjiaoneiku",
+  "name": "云柔纯棉无痕三角内裤款",
+  "category": {
+    "l1": "内衣家居服",
+    "l2": "女士内衣",
+    "leaf": "女士纯棉三角内裤",
+    "leafKeywords": [
+      "女士内裤",
+      "纯棉内裤",
+      "三角内裤",
+      "无痕内裤",
+      "透气内裤",
+      "内裤"
+    ]
+  },
+  "description": "纯棉云柔触感，金环云雾透气场景，玻璃罩密封洁净呈现，多色可选",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "warm soft lingerie ecommerce",
+    "palette": [
+      {
+        "name": "陶土玫瑰底",
+        "hex": "#C98D77"
+      },
+      {
+        "name": "蜜桃粉面",
+        "hex": "#F2BCA5"
+      },
+      {
+        "name": "深可可字色",
+        "hex": "#4A2E28"
+      },
+      {
+        "name": "淡金强调",
+        "hex": "#C9A063"
+      }
+    ],
+    "temperature": "warm",
+    "backgroundSystem": "layered warm gradient color-block panels in dusty terracotta #C98D77 and blush peach #F2BCA5, matte rose-gold podiums and thin gold circle frames, flat gentle depth",
+    "lightingSystem": "soft warm diffused studio light around 4500K, front-left key with gentle fill, soft contact shadows, airy glow in scene shots",
+    "surfaceSystem": "matte gradient panels, rose-gold round podiums, flowing silk satin fabric for texture shots",
+    "typography": "modern geometric sans-serif, bold two-line Chinese headlines in 「」 with small letter-spaced English category labels, one family only",
+    "iconSystem": "thin gold circle frames and rounded gold-border cards, single stroke weight, #C9A063",
+    "presentationRules": "briefs always front-facing, softly floating or laid flat with true fabric texture, stable center-weighted scale, no model required",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no mismatched icon styles"
+    ],
+    "lockText": "Campaign Style Lock: consistent warm soft lingerie ecommerce visual system across the entire image set; fixed palette of dusty terracotta gradient background #C98D77, blush peach #F2BCA5, deep cocoa brown text #4A2E28, and thin gold accent #C9A063; warm tone; modern geometric sans-serif headlines with short Chinese text in 「」 and small letter-spaced English category labels; layered soft gradient color-block backgrounds with matte rose-gold podiums and thin gold circle frames; soft warm diffused studio lighting with gentle glow and soft contact shadows; consistent thin gold frames and rounded gold-border card language; product always shown front-facing with visible soft fabric texture and stable scale; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "云朵色块轻盈主图",
+      "intent": "开场一秒传达柔软纯棉卖点，暖色色块衬出产品赢取点击",
+      "assetType": "suite-neiyijiajufu-nvshi-chunmian-sanjiaoneiku::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "front view at a slight 3/4 angle, eye-level, product softly floating in the lower half of the vertical frame",
+      "lighting": "soft warm studio light, front-left key with gentle fill, soft contact shadow grounding the product",
+      "background": "layered dusty terracotta gradient color blocks #C98D77 with a large blush peach circle shape #F2BCA5",
+      "props": "one or two soft white feathers drifting at the frame edge",
+      "productOccupancy": "50-60%",
+      "whitespace": "none",
+      "textZone": "左上文案槽：字距拉开的英文品类标签、两行大标题、细分隔线与一行短副标",
+      "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. Front view at a slight 3/4 angle, eye-level, product softly floating in the lower half of a vertical 2:3 frame. Soft warm studio lighting, front-left key with gentle fill, soft contact shadow grounding the product. Layered dusty terracotta gradient color-block background #C98D77 with a large blush peach circle shape #F2BCA5 behind the product, a thin white divider line under the headline. One soft white feather drifting near the lower right edge. Product occupies 50-60% of frame. Upper-left text block: small letter-spaced English category label, two-line headline in #4A2E28 reading 「{selling_point_1}」, thin white divider, short subcopy in #4A2E28 reading 「{callout_1}」. Clean high-end vertical ecommerce quality. Negative: no brand logos, no watermarks, no dense body text, no hands, no model, no garbled text, no cut-off product, no extra props.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "SCENE",
+      "displayName": "金环云雾呼吸场景",
+      "intent": "用金环云雾的空气感把透气卖点变成可感知的场景氛围",
+      "assetType": "suite-neiyijiajufu-nvshi-chunmian-sanjiaoneiku::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "straight-on eye-level view, product suspended inside a thin gold circle ring standing above a round podium",
+      "lighting": "soft warm diffused light with a gentle glow through the mist, soft shadows on the podium",
+      "background": "dusty rose gradient #D99C86 fading to #E8B4A0, soft mist wisps in the lower half",
+      "props": "thin gold circle ring stand #C9A063, round matte rose-gold podium, light mist",
+      "productOccupancy": "60-70%",
+      "whitespace": "none",
+      "textZone": "左上文案槽：英文品类标签、两行大标题与一行短副标",
+      "promptTemplate": "Lifestyle scene of {product}. {product_identity_lock}. {style_lock}. Straight-on eye-level view, product suspended inside a thin gold circle ring #C9A063 that stands on a round matte rose-gold podium, soft mist wisps drifting around the lower half. Soft warm diffused lighting with a gentle glow through the mist, soft shadows on the podium surface. Dusty rose gradient background #D99C86 fading to #E8B4A0. Product occupies 60-70% of frame with the ring standing close around it. Upper-left text block: small English category label, two-line headline in #4A2E28 reading 「{selling_point_2}」, short subcopy 「{callout_2}」, balanced against the ring composition. Airy breathable mood. Negative: no hands, no model, no brand logos, no dense body text, no garbled text, no heavy fog covering the product, no floating product without the ring and podium.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "丝缎垂坠质感特写",
+      "intent": "以丝缎与侧光证明面料触感与做工，坐实柔顺丝滑卖点",
+      "assetType": "suite-neiyijiajufu-nvshi-chunmian-sanjiaoneiku::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "close-up photographed from a high 45-degree angle looking down, product laid on flowing silk satin fabric filling the lower half",
+      "lighting": "raking warm side light revealing fabric weave, elastic waistband edge and soft sheen; shallow depth of field, foreground sharp",
+      "background": "flowing peach satin fabric drape #F2A88E",
+      "props": "none (silk satin fabric surface only)",
+      "productOccupancy": "55-60%",
+      "whitespace": "none",
+      "textZone": "左上文案槽：两行大标题与一行短副标",
+      "promptTemplate": "Extreme close-up detail of {product}. {product_identity_lock}. {style_lock}. Photographed from a high 45-degree angle looking down, product laid on flowing silk satin fabric whose soft folds fill the lower half of the frame. Raking warm side light revealing fabric weave, elastic waistband edge and soft sheen; shallow depth of field with the foreground sharp. Flowing peach satin background #F2A88E. Detail occupies 55-60% of frame with the satin folds completing the composition. Upper-left text block: two-line headline in #4A2E28 reading 「{selling_point_3}」, short subcopy 「{callout_3}」. Negative: no blurry subject, no chaotic wrinkles, no brand logos, no extra text, no watermark, no hands, no plastic-looking fabric.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "VARIANT",
+      "displayName": "四色金边卡色卡阵",
+      "intent": "金边圆角卡并排四色，同角度同光呈现可选色系促进选择",
+      "assetType": "suite-neiyijiajufu-nvshi-chunmian-sanjiaoneiku::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "straight-on flat presentation, four rounded cards in a 2x2 grid, identical front view, identical scale and lighting across all four",
+      "lighting": "even warm diffused light, no lighting drift between cards, soft contact shadows inside each card",
+      "background": "warm peach gradient #E8AC93 with rounded rectangle cards edged by thin gold borders #C9A063",
+      "props": "one small palm leaf entering from the upper right corner",
+      "productOccupancy": "60-70%",
+      "whitespace": "none",
+      "textZone": "顶部文案槽：两行大标题与一行短副标，卡内不放文字",
+      "promptTemplate": "E-commerce variant grid of {product}. {product_identity_lock}. {style_lock}. Straight-on flat presentation: four rounded rectangle cards with thin gold borders #C9A063 arranged in a 2x2 grid, each card showing {product} in a different color, front view, identical scale and lighting across all four: mint green #BFE3C0, lilac #DCC8E8, sky blue #BCD9EE, soft peach #F5D3BC. Warm peach gradient background #E8AC93 with one small palm leaf entering from the upper right corner. Products overall occupy 60-70% of frame. Top text block: two-line headline in #4A2E28 reading 「{selling_point_4}」, short subcopy 「{callout_4}」, no text inside the cards. Negative: no lighting drift between cards, no two cards sharing the same color, no brand logos, no extra text, no watermark, no color cast on card backgrounds.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "产品参数信息图",
+      "intent": "结构化参数行消除尺寸颜色疑虑，具体数值留待生成时按实物填写",
+      "assetType": "suite-neiyijiajufu-nvshi-chunmian-sanjiaoneiku::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "straight-on flat graphic layout with no perspective, stacked spec rows",
+      "lighting": "even flat lighting, fully readable text zones",
+      "background": "warm dusty-pink textured gradient #D99C86",
+      "props": "optional small product swatch inset at the top",
+      "productOccupancy": "0-10% (optional small inset only)",
+      "whitespace": "about 25% page margins around the spec rows",
+      "textZone": "四行规格列表：加粗行标签 + 细竖分隔线 + 参数槽位，首行下带一行小字免责说明",
+      "promptTemplate": "E-commerce spec infographic for {product}. {product_identity_lock}. {style_lock}. Straight-on flat graphic layout with no perspective: four stacked spec rows on a warm dusty-pink textured gradient background #D99C86, each row with a bold cocoa-brown label in #4A2E28 reading 「尺寸」「颜色」「功能」「适用」, a thin vertical divider, and one value slot per row: {callout_5}, {callout_6}, {callout_7}, {callout_8}; one small disclaimer line 「{callout_9}」 under the first row. Optional small {product} swatch inset at the top occupying no more than 10% of the frame; the spec text block fills about 45% and the rows breathe on about 25% page margins. Clean readable structured layout. Negative: no fabricated numbers or specs, no dense body text, no QR codes, no watermarks, no brand logos, no fake certificates, no garbled characters.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "玻璃罩密封洁净",
+      "intent": "玻璃罩密封意象收口卫生信任，以洁净可视细节代替虚构背书",
+      "assetType": "suite-neiyijiajufu-nvshi-chunmian-sanjiaoneiku::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "2:3",
+      "resolution": "2K",
+      "camera": "photographed from a low angle looking slightly upward, product sealed inside a transparent glass dome on a round pedestal",
+      "lighting": "bright even warm high-key light, soft highlight streak on the glass dome, grounded contact shadow",
+      "background": "darker rose backdrop panel #B97F6C over a dusty rose floor #D99C86",
+      "props": "transparent glass dome bell jar, round matte rose-gold pedestal, one small green palm leaf at the top corner",
+      "productOccupancy": "60-70%",
+      "whitespace": "none",
+      "textZone": "左上文案槽：两行大标题与一行短副标",
+      "promptTemplate": "Trust concept shot of {product}. {product_identity_lock}. {style_lock}. Photographed from a low angle looking slightly upward: product sealed inside a transparent glass dome bell jar with a soft highlight streak, standing on a round matte rose-gold pedestal. Bright even warm high-key lighting, soft reflections on the glass, grounded contact shadow under the pedestal. Darker rose backdrop panel #B97F6C over a dusty rose floor #D99C86, one small green palm leaf entering from the top corner. Product occupies 60-70% of frame with the dome wrapped close around it. Upper-left text block: two-line headline in #4A2E28 reading 「{selling_point_5}」, short subcopy 「{callout_3}」. The spotless glass, sealed silhouette and clean pedestal carry the hygiene story. Negative: do NOT invent certifications, awards, ratings or test data; no fake seals or badges, no brand logos, no dense body text, no garbled text, no watermark, no smudged glass artifacts.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 8,
+    "detached": true,
+    "notes": "源为单张详情长图（女装 (16).JPG），已切片为 8 张 panels 逐片分析。主产品依图判定为女士纯棉三角内裤（粉/薄荷绿/丁香紫/浅蓝/蜜桃五色无模特平铺），源文件夹名'女装'不适用，按 taxonomy 归内衣家居服/女士内衣（沿该库'以图为准'先例）。已剥离：英文品类字标、尾屏扫码促销卡、尾屏参数表与实物矛盾的无关残留字段与数值（判定为源卖家未改模板的遗留文案），相关文字全部转为 {callout}/{selling_point} 槽位待生成时填写。全套无模特无品牌；8 张 panels 实为 1 张长图切片。"
+  }
+}

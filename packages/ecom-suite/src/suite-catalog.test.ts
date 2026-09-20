@@ -13,7 +13,10 @@ const validDocument: SuiteDocumentInput = {
 
 describe("suite catalog", () => {
   it("loads the built-in suite library from SQLite and derives asset types", () => {
-    expect(listBuiltinSuiteIndex()).toHaveLength(953);
+    const index = listBuiltinSuiteIndex();
+    // 内置库随品类持续扩充，不锁定总数；只保护“非空且 id 唯一”这一目录不变量。
+    expect(index.length).toBeGreaterThan(0);
+    expect(new Set(index.map((entry) => entry.id)).size).toBe(index.length);
     const suite = getBuiltinSuite("suite-hufugehu-jiemianru");
     expect(suite).toBeDefined();
     expect(suite?.origin).toBe("builtin");

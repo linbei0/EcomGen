@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-shipinyinliao-pingguo-qipao-lingtang-nengliangyin-b0fl9gk819",
+  "name": "苹果气泡零糖能量饮料款",
+  "category": {
+    "l1": "食品饮料",
+    "l2": "饮料",
+    "leaf": "零糖苹果味气泡能量饮料",
+    "leafKeywords": [
+      "能量饮料",
+      "气泡饮料",
+      "零糖",
+      "苹果味",
+      "罐装饮料",
+      "整箱装"
+    ]
+  },
+  "description": "苹果红与丁香紫撞色果味体系，空表位承接成分主张，口味阵列收口",
+  "productFamily": "food",
+  "styleLock": {
+    "direction": "playful fruity zero-sugar canned sparkling energy commerce",
+    "palette": [
+      {
+        "name": "苹果红",
+        "hex": "#E23B2E"
+      },
+      {
+        "name": "丁香紫雾",
+        "hex": "#CDBBEA"
+      },
+      {
+        "name": "深林绿字",
+        "hex": "#1E5B33"
+      },
+      {
+        "name": "奶油白底",
+        "hex": "#FFF7EE"
+      }
+    ],
+    "temperature": "warm",
+    "backgroundSystem": "seamless cream white #FFF7EE sweep for packshots, saturated apple-red #E23B2E gradient field for the flavour hero, soft lilac #CDBBEA studio field for line-up and endorsement frames, no dark or neon stages",
+    "lightingSystem": "bright warm-key studio light with soft even fill, one crisp specular streak on the aluminium shell, gentle short contact shadows, dewy condensation sparkle on the chilled can, never moody low-key",
+    "surfaceSystem": "glossy seamless cream sweep, matte lilac paper backdrop, pale apple-cream laminate shelf blocks, fresh apple skin and cut flesh as the only fruit garnish",
+    "typography": "one rounded serif display paired with a calm geometric sans in deep forest green #1E5B33, every headline and quote slot kept as an empty placeholder",
+    "iconSystem": "flat single-weight line icons in deep green #1E5B33 inside blank pill rows, one empty serrated seal burst, no 3D badges, no star ratings",
+    "presentationRules": "the can stands upright at identical silhouette scale in every frame, the lilac shell always carries a blank flavour band instead of label artwork, fruit garnish stays whole or cleanly halved, carton and tray show blank side panels only",
+    "noDrift": [
+      "no color palette changes",
+      "no cool ice-blue or neon black stages",
+      "no mixed fonts",
+      "no redrawn label artwork or fruit illustration style shift",
+      "no random backgrounds",
+      "no inconsistent lighting"
+    ],
+    "lockText": "Campaign Style Lock: consistent playful fruity zero-sugar canned sparkling beverage ecommerce visual system across the entire image set; fixed palette of apple red #E23B2E, lilac mist #CDBBEA, deep forest green #1E5B33 and cream white #FFF7EE; bright warm-key studio light with one crisp specular streak on the aluminium shell and dewy condensation sparkle on the chilled can; glossy cream sweep, matte lilac paper and pale laminate shelf blocks only, fresh apple garnish allowed, no cool ice-blue or neon black stages; one rounded serif display with calm geometric sans kept as empty placeholder slots; flat thin deep-green line icons and blank seal bursts; stable upright can angle and scale with a blank flavour band on the shell; no color palette changes, no mixed fonts, no redrawn label artwork, no random backgrounds, no inconsistent lighting."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "奶油白底提箱单罐主图",
+      "intent": "在搜索结果缩略图里一眼赢下点击，交代整箱提装与单罐的组合关系。",
+      "assetType": "suite-shipinyinliao-pingguo-qipao-lingtang-nengliangyin-b0fl9gk819::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level axis, one can standing fully upright at the right edge, open display tray of cans receding behind it",
+      "lighting": "bright warm-key studio light with soft even fill, one crisp vertical specular streak on each shell, gentle short contact shadows under base and tray",
+      "background": "seamless cream white #FFF7EE sweep",
+      "props": "one blank-sided open display tray holding upright cans, one whole red apple and one clean apple wedge at the tray foot",
+      "productOccupancy": "60-70%",
+      "whitespace": "none, the tray and hero can fill the centre with equal clean margins",
+      "textZone": "none",
+      "promptTemplate": "E-commerce hero packshot of {product}. {product_identity_lock}. {style_lock}. One can stands perfectly upright at the right edge on a straight-on eye-level axis while an open display tray of matching cans recedes behind it, a whole red apple and one clean wedge resting at the tray foot. Bright warm-key studio light with soft even fill drops one crisp vertical specular streak down each aluminium shell and leaves gentle short contact shadows. Seamless cream white background #FFF7EE with no horizon line. The product group occupies 60-70% of the frame with even clean margins. Negative: no brand wordmark, no readable label lettering, no printed digits, no sugar or nutrient callouts, no watermark, no cut-off cans, no fused or duplicated tray cans, no plastic-looking food, no insects or contamination, no unrealistic portion size, no floating can without a contact shadow.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "果红场冷凝紧凑卖点图",
+      "intent": "一秒说清鲜摘果味主张，用冰镇冷凝与鲜果围绕放大口渴感。",
+      "assetType": "suite-shipinyinliao-pingguo-qipao-lingtang-nengliangyin-b0fl9gk819::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "tight zoom on the chilled upper half of the upright can from a slight low angle, dewy condensation beads filling the near plane",
+      "lighting": "warm bright key from the front-left, sparkle catchlights on every droplet, soft fill keeping the red field saturated without bloom",
+      "background": "saturated apple-red #E23B2E gradient field",
+      "props": "two whole red apples and one halved apple flanking the base, green leaves as accents",
+      "productOccupancy": "55-60%",
+      "whitespace": "generous negative space across the top 30% reserved for copy",
+      "textZone": "top band for 「{selling_point_1}」",
+      "promptTemplate": "E-commerce flavour benefit hero of {product}. {product_identity_lock}. {style_lock}. A tight zoom frames the chilled upper half of the upright can from a slight low angle, dewy condensation beads catching sparkle highlights across the lilac shell. Warm bright key from the front-left over a saturated apple-red gradient field #E23B2E, soft fill keeping the red rich without bloom. Two whole red apples and one clean halved apple with leaf accents flank the unseen base. The can detail occupies 55-60% of the frame with generous negative space across the top 30% held as an empty headline placeholder band. Negative: no filled-in headline wording, no printed digits, no brand wordmark, no invented efficacy claim, no plastic-looking fruit, no brown or bruised apple flesh, no plastic-looking food, no insects or contamination, no unrealistic portion size, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "素白格拍日常拼贴",
+      "intent": "用多格真实生活快照完成自我代入，让买家想象自己随手开罐的时刻。",
+      "assetType": "suite-shipinyinliao-pingguo-qipao-lingtang-nengliangyin-b0fl9gk819::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "frontal collage grid of six lifestyle tiles, each tile framed square with thin cream gutters, varied candid framings inside",
+      "lighting": "mixed natural daylight per tile, soft window light in indoor frames, open-shade daylight outdoors, all kept bright and warm",
+      "background": "lilac #CDBBEA paper field behind the grid tiles",
+      "props": "cans held in relaxed hands, a plain tote, a car cup holder, a shopping basket, all unbranded",
+      "productOccupancy": "40-50%",
+      "whitespace": "thin even gutters between tiles, one clear centre band kept empty",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle collage screen of {product}: a frontal grid of six square candid tiles on a soft lilac paper field #CDBBEA, each tile showing anonymous people enjoying the can, every figure cropped from the chin down or shown from behind so no face is identifiable. {product_identity_lock}. {style_lock}. Scenes include a hand lifting the can beside a plain tote, a can resting in a car cup holder, a basket holding several cans, two hands clinking cans in greeting, a can on a kitchen counter, one held mid-walk. Mixed bright natural daylight per tile, warm and airy. The tile grid occupies 40-50% overall with a clear empty centre band. Negative: no identifiable face, no model likeness, no social media chrome, no handles or usernames, no store signage, no readable label lettering, no brand wordmark, no watermark, no deformed fingers, no fused hands, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "VARIANT",
+      "displayName": "五罐扇形口味阵列",
+      "intent": "让买家一眼看到可选口味谱系，按自己的偏好挑款下单。",
+      "assetType": "suite-shipinyinliao-pingguo-qipao-lingtang-nengliangyin-b0fl9gk819::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle fanning five upright cans across a pale laminate shelf block, centre can closest and sharpest",
+      "lighting": "bright warm-key studio light, matching soft contact shadows under every base, thin rim on each shell edge",
+      "background": "soft lilac #CDBBEA studio field with a few floating soap bubbles",
+      "props": "five upright cans with blank flavour bands in different accent fruits, a few clear bubbles near the corners",
+      "productOccupancy": "60-70%",
+      "whitespace": "clean upper band left open for the line-up headline placeholder",
+      "textZone": "upper band for 「{callout_1}」",
+      "promptTemplate": "E-commerce flavour line-up of {product}. {product_identity_lock}. {style_lock}. Five upright cans fan across a pale laminate shelf block at a slight 3/4 angle, the centre can closest and sharpest, each shell carrying a blank flavour band tinted with a different fruit accent colour carried by {accent_color}. A few clear soap bubbles drift near the corners over a soft lilac studio field #CDBBEA. Bright warm-key studio light drops matching soft contact shadows under every base and a thin rim along each shell edge. The can fan occupies 60-70% with a clean upper band kept as an empty headline placeholder. Negative: no flavour names, no printed digits, no brand wordmark, no readable label lettering, no merged or fused cans, no inconsistent can scale, no watermark, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "空表双栏信息看板",
+      "intent": "用排版规整的空白成分板承接配料疑虑，数值全部留空由卖家自填。",
+      "assetType": "suite-shipinyinliao-pingguo-qipao-lingtang-nengliangyin-b0fl9gk819::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on flat infographic framing, can edge anchoring the left column, ruled board filling the right",
+      "lighting": "even high-key warm light, shadowless board surface apart from a hairline edge shadow under the can",
+      "background": "split field, apple-red #E23B2E header band over a lilac #CDBBEA board",
+      "props": "one blank ruled nutrition table block, four empty icon rows in deep-green pill frames, one blank serrated seal burst",
+      "productOccupancy": "50-60%",
+      "whitespace": "structured even gutters around the table and icon rows, no dense filler",
+      "textZone": "none",
+      "promptTemplate": "E-commerce information screen of {product}. {product_identity_lock}. {style_lock}. Straight-on flat infographic framing: the upright can edge anchors the left column as a small reference, while the right holds a clean ruled nutrition table block whose cells stay completely empty, four blank icon rows in deep forest green #1E5B33 pill frames, and one empty serrated seal burst, all set on a lilac board #CDBBEA under an apple-red header band #E23B2E. Even high-key warm lighting keeps the board shadowless apart from a hairline edge shadow. The board and anchor together occupy 50-60% with structured even gutters. Negative: no filled numbers, no unit labels, no ingredient names, no certification marks, no dosage claims, no tiny unreadable text, no dense body text, no brand wordmark, no watermark, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "绿字留白引言收口图",
+      "intent": "用一张品牌人背书版式收口信任，引言位置留空由卖家填真实文案。",
+      "assetType": "suite-shipinyinliao-pingguo-qipao-lingtang-nengliangyin-b0fl9gk819::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "eye-level portrait framing cropped from the chin down, can raised beside the jaw line at the left third",
+      "lighting": "soft warm studio portrait light, gentle falloff behind, small catchlight on the shell rim",
+      "background": "soft lilac #CDBBEA studio field with two drifting bubbles",
+      "props": "one empty rounded quote card with blank ruled lines, plain unbranded knit top",
+      "productOccupancy": "40-50%",
+      "whitespace": "right half kept as an open copy field for the endorsement placeholder",
+      "textZone": "right card for 「{callout_2}」",
+      "promptTemplate": "E-commerce endorsement close of {product}. {product_identity_lock}. {style_lock}. An eye-level portrait framing shows a generic person cropped cleanly from the chin down, wearing a plain unbranded knit top, raising the can beside the jaw line at the left third of the frame over a soft lilac studio field #CDBBEA with two drifting bubbles. Soft warm studio portrait light with gentle falloff behind and a small catchlight on the shell rim. On the right half, one empty rounded quote card with blank ruled lines waits as the endorsement placeholder, the whole right side kept as an open copy field. The figure and can occupy 40-50%. Negative: no identifiable face, no founder name, no signature, no handle or username, no readable label lettering, no brand wordmark, no filled quote text, no watermark, no plastic-looking food, no insects or contamination, no unrealistic portion size.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "逐图事实：001 奶油白底，开口提箱内多罐阵列+右侧单立罐+前景整苹果与切块；002 苹果红渐场，罐身布满冷凝水珠，两侧整苹果与剖半苹果，顶部大字口味主张；003 左半整版营养成分表（卡路里/毫克/百分比成排数值、配料长句、咖啡因含量行），右半四行图标主张（含具体 mg 数与临床字样）加锯齿糖章与底部无添加横条；004 丁香紫场五罐不同口味扇形阵列+漂浮泡泡+顶部标语；005 紫底社交拼贴十余格，全部为可辨识真人面孔并带账号名与商超名；006 创始人肖像+署名引言卡+账号名。品类判定依据：主体为即饮罐装零糖果味气泡能量饮料，L1 食品饮料、L2 饮料，leaf 记零糖苹果味气泡能量饮料，与提示类目一致。已剥离内容：品牌字标、口味名、0g 糖锯齿章、全部营养数值/成分名/剂量/临床与无添加主张、账号名与商超名、创始人与全部真人面容（改颈部以下裁切或背影）、原标语原句，一律改为空白表格单元、空图标行、空引言卡与 {selling_point_n}/{callout_n} 占位；005 拼贴压缩为六格无社交界面版式。色板走苹果红+丁香紫+深林绿暖果体系，与库内冷白冰蓝无糖罐套、柠黄墨黑霓虹冰茶套明显区隔。源图 6 张，逐图一镜排为 6 镜。"
+  }
+}

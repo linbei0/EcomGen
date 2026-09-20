@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-yiyaobaojian-lvxing-jiujiubao-b0b41mysgp",
+  "name": "便携分格硬壳旅行急救包款",
+  "category": {
+    "l1": "医药保健",
+    "l2": "家庭常备",
+    "leaf": "便携旅行急救包",
+    "leafKeywords": [
+      "急救包",
+      "旅行急救盒",
+      "家庭常备",
+      "户外露营应急",
+      "便携医护收纳盒",
+      "分格硬壳"
+    ]
+  },
+  "description": "硬壳分格一箱收纳，出行露营居家随取随用的常备急救盒",
+  "productFamily": "home",
+  "styleLock": {
+    "direction": "clean clinical-ready household first-aid commerce",
+    "palette": [
+      {
+        "name": "冷白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "雾灰蓝",
+        "hex": "#EEF2F7"
+      },
+      {
+        "name": "深靛蓝",
+        "hex": "#123A8F"
+      },
+      {
+        "name": "信号红",
+        "hex": "#E2202B"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless cool white #FFFFFF for packshots, mist blue-grey #EEF2F7 for infographic screens, deep indigo #123A8F for the credential card; outdoor lifestyle frames graded to the same neutral key with a solid signal-red #E2202B arc band reserved for copy",
+    "lightingSystem": "bright even high-key studio light with a front key and soft fill, soft contact shadows, no harsh speculars; lifestyle frames keep neutral daylight at 5500K with directional skimming or sweeping sun",
+    "surfaceSystem": "matte white board and pale stone-grey counter #E4E7EA; outdoor surfaces read as matte natural ground and timber",
+    "typography": "modern geometric sans-serif, headline-only copy held in placeholder slots, never dense body text",
+    "iconSystem": "thin single-weight line markers and empty rounded seal outlines in one accent colour, no emblem or cross shapes",
+    "presentationRules": "stable straight-on 3/4 read of the closed hard case across packshots, lid opens to a flat top-down reveal, product scale locked between shots so the case always reads the same size",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no emblem, cross or badge artwork added to any surface",
+      "no numeric counts, prices or credential marks invented on screen"
+    ],
+    "lockText": "Campaign Style Lock: consistent clean clinical-ready household first-aid visual system across the entire image set; fixed palette of cool white #FFFFFF, mist blue-grey #EEF2F7, deep indigo #123A8F and one signal red accent #E2202B; neutral studio temperature with bright even high-key light, front key, soft fill and soft contact shadows, outdoor frames locked to neutral 5500K daylight; seamless white for packshots, mist blue-grey for infographic screens, deep indigo for the credential card and one solid signal-red arc band reserved for copy; modern geometric sans-serif with headline-only placeholder text; thin single-weight line markers and empty seal outlines only; stable straight-on 3/4 product angle and locked case scale; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no emblem or badge artwork, no invented numbers or credentials."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底硬壳急救盒主图",
+      "intent": "搜索列表一眼点击，用圆润硬壳与提手立住可信的常备感。",
+      "assetType": "suite-yiyaobaojian-lvxing-jiujiubao-b0b41mysgp::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, closed case standing upright, full product visible",
+      "lighting": "bright even high-key studio light, front key with soft fill, soft contact shadow",
+      "background": "seamless pure white #FFFFFF with a matte white floor sweep",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "even clean margin on all four sides",
+      "textZone": "none",
+      "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. The case closed and standing upright, straight-on eye-level view, full product visible with nothing cropped by the frame. Bright even high-key studio lighting from the front with a soft fill on the shadow side and a gentle contact shadow grounding the case. Seamless pure white background #FFFFFF with a matte white floor sweep. The product occupies 60-70% of the frame, leaving an even clean margin on all four sides and no copy anywhere. 8K commercial e-commerce quality. Negative: no props, no hands, no cross or medical emblem graphics, no wordmark or corner badge, no piece-count or price sticker, no on-image text, no watermark, no gradient background, no cut-off edges, no floating product without a contact shadow.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "DETAIL",
+      "displayName": "三步分色分区内容图",
+      "intent": "把盒内分区与护理流程一次讲清，消除买了不知道够不够用的疑虑。",
+      "assetType": "suite-yiyaobaojian-lvxing-jiujiubao-b0b41mysgp::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "flat lay from a top-down 90-degree angle, mid-shot framing the opened interior",
+      "lighting": "even flat high-key lighting, almost no shadow, fully readable layout",
+      "background": "mist blue-grey #EEF2F7 panel field with three stacked colour blocks in deep indigo #123A8F, pure white #FFFFFF and signal red #E2202B",
+      "props": "the opened case with blank divider trays, three plain unprinted dressing sachets and one folded gauze strip",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space in the left 34% column for copy",
+      "textZone": "left 34% column holding one headline placeholder and three blank numbered label rows",
+      "promptTemplate": "E-commerce infographic flat lay of {product}, photographed from a top-down 90-degree angle with the case opened flat so the divider trays and sachets read as a mid-shot of the interior rather than a full product view. {product_identity_lock}. {style_lock}. Even flat high-key lighting with almost no shadow so the layout stays readable. Background mist blue-grey #EEF2F7 carrying three stacked colour blocks in deep indigo #123A8F, pure white #FFFFFF and signal red #E2202B, each block holding one large numeral and a blank single-line label slot. Props: plain unprinted dressing sachets and one folded gauze strip on unmarked surfaces. The opened case occupies 50-60% of the frame on the right with generous negative space in the left 34% column for copy. Headline placeholder 「{callout_1}」 above three blank numbered label rows 「{callout_2}」 and 「{callout_3}」. Negative: no piece counts, no quantities or dimensions, no ingredient or dosage wording, no dense body text, no cross emblem, no wordmark, no barcode or QR code, no wounds or blood, no fabricated certification, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "营地长桌就绪场景",
+      "intent": "让买家把自己代入家庭户外聚会，一眼明白该备一盒。",
+      "assetType": "suite-yiyaobaojian-lvxing-jiujiubao-b0b41mysgp::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 eye-level with a candid documentary feel, figures cropped from the chin down",
+      "lighting": "soft late-afternoon daylight at 5500K sweeping in from the right, gentle rim on shoulders, natural directional shadows",
+      "background": "sunlit forest bokeh #4E6B4A over matte pine-needled ground #8C7A5B with one blurred tent corner at the right edge",
+      "props": "a matte timber picnic table with plain unlabeled cups and containers, none covering the product",
+      "productOccupancy": "40-50%",
+      "whitespace": "flat solid arc band across the lower 28% kept clean for the headline",
+      "textZone": "lower 28% signal-red arc band with one centred short headline placeholder",
+      "promptTemplate": "Lifestyle scene: {product} standing closed at the edge of a matte timber picnic table in a sunlit conifer campsite. {product_identity_lock}. {style_lock}. Photographed at a slight 3/4 eye-level angle with a candid documentary feel, people present only as non-identifiable figures cropped from the chin down or seen from behind, no child face in frame. Soft late-afternoon daylight at 5500K sweeping in from the right, gentle rim on the shoulders and natural directional shadows across the tabletop. Background of sunlit forest bokeh #4E6B4A over matte pine-needled ground #8C7A5B with one blurred tent corner at the right edge. Props: plain unlabeled cups and containers, none covering the product. The product occupies 40-50% of the frame while a flat solid signal-red #E2202B arc band fills the lower 28% and stays clean for copy. One short headline placeholder 「{selling_point_1}」 centred inside the band. Negative: no identifiable faces, no corner badge or wordmark, no original campaign wording, no wound or injury imagery, no branded packaging in the scene, no cluttered props, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "硬壳合页卡扣微距",
+      "intent": "用壳体质感与卡扣做工证明耐压耐用，替收纳安全兜底。",
+      "assetType": "suite-yiyaobaojian-lvxing-jiujiubao-b0b41mysgp::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "extreme close-up macro from a clean 90-degree side profile, shallow depth of field on the lid seam",
+      "lighting": "skimming side light from the left revealing moulded texture, one controlled soft highlight, no blown speculars",
+      "background": "neutral pale board #EDEFF2 falling gently out of focus",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal, the seam and latch are the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom on the lid seam, hinge and side latches of the hard shell. {product_identity_lock}. {style_lock}. Photographed from a clean 90-degree side profile with a shallow depth of field and the seam edge critically sharp. Skimming side light from the left revealing the moulded surface texture and the latch detail, one controlled soft highlight and no blown speculars. Background neutral pale board #EDEFF2 falling gently out of focus. The detail fills 55-60% of the frame with no extra whitespace around the crop. Negative: no blurry subject, no water droplets or splash staging, no label or emblem inside the crop, no hands, no props, no extra text, no duplicated latch elements, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "SCENE",
+      "displayName": "山林徒步随行场景",
+      "intent": "铺开适用场景清单，让通勤旅行宿舍车居各场景都对号入座。",
+      "assetType": "suite-yiyaobaojian-lvxing-jiujiubao-b0b41mysgp::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "low angle looking upward, mid-shot cropped from the chin down so the pack strap carries the product",
+      "lighting": "dappled midday daylight at 5500K skimming through the canopy, soft open shadows, one gentle highlight edge on the case lid",
+      "background": "deep green forest bokeh #2F5B3C with matte dirt trail #9A8768 crossing the lower third",
+      "props": "a plain unbranded daypack with the closed case clipped to the outside strap, two blurred figures behind",
+      "productOccupancy": "40-50%",
+      "whitespace": "flat solid arc band across the lower 30% kept clear for copy",
+      "textZone": "lower 30% signal-red arc band with one headline placeholder plus one short blank list line",
+      "promptTemplate": "Lifestyle coverage scene: {product} clipped to the outside strap of a plain unbranded daypack on a conifer forest trail. {product_identity_lock}. {style_lock}. Photographed from a low angle looking upward, mid-shot cropped from the chin down so no face is identifiable, with two blurred figures further along the trail. Dappled midday daylight at 5500K skimming through the canopy, soft open shadows and one gentle highlight edge on the case lid. Background of deep green forest bokeh #2F5B3C with matte dirt trail #9A8768 crossing the lower third. The product and pack occupy 40-50% of the frame while a flat solid signal-red #E2202B arc band fills the lower 30%, leaving generous clear space inside the band for copy. Headline placeholder 「{selling_point_2}」 plus one short blank list line placeholder 「{callout_4}」 inside the band. Negative: no identifiable faces, no corner badge or wordmark, no original campaign wording, no first-aid act shown on skin, no branded apparel logos, no duplicated hikers, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "空白印章背书收口",
+      "intent": "用留白资质位收口降风险，具体凭证由卖家后期合规填入。",
+      "assetType": "suite-yiyaobaojian-lvxing-jiujiubao-b0b41mysgp::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on flat graphic composition, product at a slight 3/4 in the lower right",
+      "lighting": "even clean studio light, soft contact shadow under the product, no dramatic falloff",
+      "background": "deep indigo #123A8F field with a centred pure white #FFFFFF shield panel",
+      "props": "two empty circular seal outlines and one empty rounded spec row, all left blank",
+      "productOccupancy": "50-60%",
+      "whitespace": "broad clear margin above and below the shield panel",
+      "textZone": "centred white shield panel holds one short headline placeholder, lower indigo band holds one more line",
+      "promptTemplate": "E-commerce trust screen, straight-on flat graphic composition. {product} placed at a slight 3/4 in the lower right of a deep indigo #123A8F field with a centred pure white #FFFFFF shield panel. {product_identity_lock}. {style_lock}. Even clean studio lighting with a soft contact shadow under the product and no dramatic falloff. Props: two empty circular seal outlines and one empty rounded spec row, all left blank as proof placeholders for post-production. The product and panel together occupy 50-60% of the frame with a broad clear margin above and below the shield. One short headline placeholder 「{callout_5}」 centred inside the shield and one short line placeholder 「{callout_6}」 in the lower indigo band. Negative: do NOT invent certifications, lab reports, regulatory marks, prescription or eligibility programmes, no filled seal artwork, no cross emblem, no wordmark, no ratings or review counts, no barcode, no tiny unreadable text, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：001 白底正面硬壳方盒，盖面版式为字标描形色块＋红色标题＋圆形件数角标＋价格主张条＋内容物拼贴；002 营地长桌群聚（成人与儿童面孔可辨），暖侧光、右缘帐篷一角，左上竖排胶囊字标，底部约三成纯色弧带承载两行大写标题；003 森林徒步队列，低角度仰视领队，绿色虚化，同款弧带承载标题与用途清单；004 纯图文卡，深蓝底白色盾牌块承载红色资质缩写与描边字标，无产品；005 盒背面标签版式，白色说明区分组清单＋条形码＋二维码，右侧三条色块分栏承载序号与单品图。品类判定：主体为消费者便携硬壳医护收纳盒，装填清洁巾、敷料与创贴类常备耗材，非器械、非营养补充、非清洁消毒用品，故取 L1 医药保健 / L2 家庭常备（与源类目提示一致），leaf 为便携旅行急救包。成图 6 镜漏斗：白底主图→分区内容信息图→营地场景→卡扣微距→徒步覆盖场景→资质留白收口。已剥离：品牌字标与全部子品牌名、医护十字描形图形、件数角标与价格主张、资质缩写与无处方字样、条形码与二维码、英文标题原句与用途清单原句、成人及儿童模特面孔与身份；伤口、血迹与上药动作一律不入镜，改为洁净分格、空参数行与空白印章占位。"
+  }
+}

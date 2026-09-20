@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-jiayongdianqi-bianxie-danbing-zhibingji",
+  "name": "拉丝钢台面便携子弹冰制冰机款",
+  "category": {
+    "l1": "家用电器",
+    "l2": "厨房电器",
+    "leaf": "便携子弹冰制冰机",
+    "leafKeywords": [
+      "制冰机",
+      "便携制冰机",
+      "子弹冰",
+      "不锈钢机身",
+      "台面式制冰",
+      "厨房电器",
+      "家用小家电"
+    ]
+  },
+  "description": "开盖可见满篮子弹冰，台面场景与空白尺寸线拆解卖点，参数数值全留白",
+  "productFamily": "electronics",
+  "styleLock": {
+    "direction": "cool premium countertop-appliance ecommerce",
+    "palette": [
+      {
+        "name": "底白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "冰雾蓝白",
+        "hex": "#EAF3F9"
+      },
+      {
+        "name": "墨灰文字",
+        "hex": "#2D3238"
+      },
+      {
+        "name": "强调玫红楔块",
+        "hex": "#E21B4F"
+      }
+    ],
+    "temperature": "cool",
+    "backgroundSystem": "backgrounds cycle between seamless studio white #FFFFFF, a pale veined marble counter #EFEEEA and an icy blue-white field #EAF3F9, with the dark brushed fascia #2E3237 reserved for the operation macro; one hard-edged solid crimson corner wedge #E21B4F appears only on information and closing screens, never a gradient falloff and never photographic depth blur inside an information screen",
+    "lightingSystem": "cool 5600K soft key from the upper left with a broad right bounce fill, brushed steel reading as narrow vertical gradient bands instead of mirror smears, short tight contact shadow directly under the base, no warm cast, no coloured rim light and no dramatic hotspot",
+    "surfaceSystem": "seamless white studio sweep #FFFFFF, pale veined marble counter #EFEEEA and the moulded basket interior in light brushed grey #DDE2E6; ice is always translucent frost-white with real internal fractures, never a welded block",
+    "typography": "one modern geometric sans-serif: bold two-line headline in #2D3238 on light fields or #FFFFFF on the wedge, stacked caption slots beside each icon, hairline leader lines ending in one small solid dot; headline 32-38pt, caption 15-18pt, all wording carried as placeholders and no English category word printed in frame",
+    "iconSystem": "thin-line pictograms only, single uniform stroke weight, drawn in #FFFFFF over the dark band or #2D3238 over light fields, one pictogram per caption slot; no filled pictograms, no gloss, nothing that reads as a certification mark, seal or badge",
+    "presentationRules": "the appliance stays upright at one true scale on the same front axis with the lid hinged open at the same angle across the set, never re-scaled and never clipped; every display, indicator lamp, button face, dimension leader, callout chip and size chip stays blank with no glyph, no digit and no unit; the scoop is the only soft prop and never covers the body",
+    "noDrift": [
+      "no brand wordmark, English category eyebrow, store badge, promotional corner flag or QR block",
+      "no digits, units, readouts, daily-ice weight, cycle minutes, capacities or dimensions drawn on any panel, leader line, chip or screen",
+      "no colour palette changes and no warm wood, mint, rose-gold or gradient-glass surface replacing the white, marble and icy blue-white fields",
+      "no mixed fonts, no serif, no handwritten or cartoon lettering, no drop shadow behind headline text",
+      "no inconsistent key direction and no mismatched pictogram stroke weights between screens",
+      "no dense white fog, no plastic-looking opaque ice cubes and no floating product without a contact shadow"
+    ],
+    "lockText": "Campaign Style Lock: consistent cool premium countertop-appliance ecommerce visual system across the entire image set; fixed palette of seamless white #FFFFFF, icy blue-white field #EAF3F9, ink-grey copy #2D3238 and one crimson accent wedge #E21B4F used only as a solid hard-edged corner block; cool 5600K soft key from the upper left with a broad right bounce fill, brushed steel reading as narrow vertical gradient bands rather than mirror smears, short tight contact shadow under the base, no warm cast and no coloured rim light; backgrounds cycle between seamless white #FFFFFF, pale veined marble counter #EFEEEA and the icy blue-white field #EAF3F9, with the dark brushed fascia #2E3237 only in the operation macro, one hard-edged crimson corner wedge on information and closing screens, never a gradient falloff and never photographic depth blur inside an information screen; one modern geometric sans-serif with a bold two-line headline, stacked caption slots and hairline leader lines ending in one small solid dot, headline 32-38pt and caption 15-18pt, no English category word printed in frame; thin-line pictograms only with one uniform stroke weight, never a seal or badge; the appliance stays upright at one true scale on the same front axis with the lid at one hinge angle, and every display, indicator lamp, button face, dimension leader, callout chip and size chip stays blank with no glyph, no digit and no unit; no colour palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no rendered readouts, no invented figures."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底开盖满冰主图",
+      "intent": "在搜索列表里用开盖露出满篮冰粒的干净白底主图一眼赢得点击",
+      "assetType": "suite-jiayongdianqi-bianxie-danbing-zhibingji::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "straight-on at the unit's own eye level with a slight 3/4 turn to the left, lid open, full body visible with clean headroom",
+      "lighting": "cool 5600K high-key key from the upper left with a broad right bounce fill, narrow vertical gradient bands on the brushed shell, short tight contact shadow under the base",
+      "background": "seamless studio white #FFFFFF",
+      "props": "one ice scoop resting at the lower left, no other prop",
+      "productOccupancy": "60-70%",
+      "whitespace": "no copy at all, an even clear margin on all four sides of the unit",
+      "textZone": "none",
+      "promptTemplate": "E-commerce packshot of {product}. {product_identity_lock}. {style_lock}. The unit stands on a seamless studio white sweep #FFFFFF, seen straight-on at its own eye level with a slight 3/4 turn to the left, the lid hinged open so the loaded basket reads clearly, whole body inside the frame with clean headroom and nothing clipped. Cool 5600K high-key key light from the upper left with a broad right bounce fill, the brushed shell rendering as narrow vertical gradient bands, a short tight contact shadow directly under the base. One ice scoop rests at the lower left and no other prop enters the frame. The product occupies 60-70% of the frame with an even clear margin on all four sides and no copy anywhere. Every indicator, button face and panel marking stays a blank unlit surface with no glyph, no digit and no graduation. 4K commercial appliance photography. Negative: no wordmark or logo on the door panel, no rendered text, no digits or units, no lit readout, no gradient or tinted background, no hands, no drink glass, no citrus or fruit, no water streaks on the steel, no floating product without a contact shadow, no cut-off edges, no duplicated basket.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "SCENE",
+      "displayName": "大理石台面三图标场景",
+      "intent": "把机器放进真实厨房台面，用右栏三枚线性图标一秒交代核心主张",
+      "assetType": "suite-jiayongdianqi-bianxie-danbing-zhibingji::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "squarely frontal at eye level, unit on the left half, counter line level with the base",
+      "lighting": "cool 5600K soft key from the upper left with a window-side fill, gentle falloff toward the right, tight contact shadow",
+      "background": "pale veined marble counter #EFEEEA with a cool grey kitchen wall softly out of focus behind",
+      "props": "one scoop holding ice at the lower right corner, nothing else",
+      "productOccupancy": "40-50%",
+      "whitespace": "generous negative space across the right 45% for the headline and the stacked caption column",
+      "textZone": "right 45%: one two-line headline plus three stacked icon captions",
+      "promptTemplate": "Lifestyle scene of {product} standing on a pale veined marble counter #EFEEEA in a real kitchen, cool grey wall softly out of focus behind. {product_identity_lock}. {style_lock}. Photographed squarely frontal at eye level, the unit sitting on the left half of the frame with the counter line level with its base. Cool 5600K soft key from the upper left with a window-side fill, tight contact shadow under the base, brushed shell reading as narrow vertical gradient bands. One scoop holding ice rests at the lower right corner and no other prop appears. The product occupies 40-50% of the frame and the right 45% stays as generous clean negative space for copy. A bold two-line headline in #2D3238 reads 「{selling_point_1}」 at 38pt, and beneath it three thin-line pictograms stack vertically, each paired with one short caption reading 「{callout_1}」, 「{callout_2}」 and 「{callout_3}」 at 16pt. Every indicator and panel marking on the unit stays blank with no glyph and no digit. Negative: no wordmark, no seal or badge, no star rating, no promotional corner flag, no fourth caption row, no face or hand, no bottle clutter on the counter, no warm tungsten cast, no lit display, no percentage or capacity figures, no duplicated appliance.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "俯视满篮冰粒微距",
+      "intent": "用近乎垂直的俯视微距交代出冰篮与滤梳结构，证明制冰结果而非宣称",
+      "assetType": "suite-jiayongdianqi-bianxie-danbing-zhibingji::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "photographed directly from above at a near 90-degree overhead angle, extreme close-up macro looking into the open basket",
+      "lighting": "cool 5600K top light with a slight skimming sweep across the ice faces, shallow depth of field keeping the front cubes sharp",
+      "background": "moulded basket interior in light brushed grey #DDE2E6",
+      "props": "the two moulded handle tabs at the left and right frame edges, no scoop",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "a clean clear band kept across the top third, ice packing the lower two thirds",
+      "textZone": "top band: one headline plus one sub-line",
+      "promptTemplate": "E-commerce detail macro looking into the open basket of {product}, photographed directly from above at a near 90-degree overhead angle as an extreme close-up macro of the ice mound with the moulded comb bar behind it. {product_identity_lock}. {style_lock}. Cool 5600K top light with a slight skimming sweep across the ice faces so each cube reads as translucent frost-white with real internal fractures, shallow depth of field keeping the front cubes sharp and the comb bar soft. The basket interior wall is light brushed grey #DDE2E6 and the two moulded handle tabs sit at the left and right frame edges. The detail fills 55-60% of the frame, the lower two thirds packed by ice and a clean clear band kept across the top. One headline reads 「{selling_point_3}」 in #2D3238 at 34pt with one sub-line reading 「{callout_6}」 at 16pt. Negative: no welded ice block, no plastic-looking opaque cubes, no yellowed or dirty cubes, no water pooling outside the basket, no hand reaching in, no melted puddle, no dense body text, no wordmark, no lit readout, no tiling duplicate of the same cube, no muddy shadow inside the basket.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "VARIANT",
+      "displayName": "双规格冰粒与空白尺寸线",
+      "intent": "用两枚空白规格片与无数字引出线回答选哪种冰与占多大位置，消除尺寸疑虑",
+      "assetType": "suite-jiayongdianqi-bianxie-danbing-zhibingji::shot-04",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "elevated three-quarter view from the front-left at about 30 degrees looking down onto the open lid",
+      "lighting": "even 5600K light from above left, one hairline shadow under the base, no specular hotspot",
+      "background": "icy blue-white field #EAF3F9 with a soft bed of out-of-focus ice shapes in the upper right",
+      "props": "the scoop resting inside the basket, four hairline dimension leaders, two outline size chips",
+      "productOccupancy": "50-60%",
+      "whitespace": "left and bottom bands kept clear for the empty leader lines, upper right kept clear for the two chips",
+      "textZone": "top-left headline band plus two chip captions at the upper right",
+      "promptTemplate": "E-commerce spec and choice screen of {product}. {product_identity_lock}. {style_lock}. The unit is seen from an elevated three-quarter view at the front-left, about 30 degrees looking down onto the open lid with the scoop resting inside the basket, set on an icy blue-white field #EAF3F9 with a soft bed of out-of-focus ice shapes filling the upper right. Even 5600K light from above left, one hairline shadow under the base and no specular hotspot. Four hairline dimension leaders with plain arrow ends run along the left and bottom edges, drawn only as empty rules and empty brackets with no digit, no unit and no tick label. Two small rounded outline chips sit at the upper right, each holding only a plain capsule outline at a different scale and no letter. The product occupies 50-60% of the frame, the left and bottom bands staying clear. One headline in #2D3238 reads 「{selling_point_2}」 at 34pt and the two chip captions read 「{callout_4}」 and 「{callout_5}」 at 15pt. Negative: no measurement numbers, no ruler graduations, no wordmark, no price, no reference to any real competitor, no second appliance body, no tilted perspective warp on the straight edges, no hands, no gradient background, no dense body text.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "面板指尖轻触特写",
+      "intent": "用低角度掠射微距交代一键操作的手感与布局，把易用性变成可见动作",
+      "assetType": "suite-jiayongdianqi-bianxie-danbing-zhibingji::shot-05",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "extreme close-up macro seen at a shallow 20-degree low angle skimming along the control strip",
+      "lighting": "cool 5600K soft top light with one wide sweeping highlight travelling along the dark fascia, thin edge highlight on the recessed button outlines",
+      "background": "charcoal brushed fascia #2E3237 filling the lower two thirds of the frame",
+      "props": "one generic fingertip entering from the top edge, a light ice-white plate carrying the headline",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "a clean light band kept across the top third for the headline card",
+      "textZone": "upper band: headline on a light plate plus one short caption",
+      "promptTemplate": "E-commerce operation macro of the control strip on {product}, seen at a shallow 20-degree low angle skimming along the dark fascia as an extreme close-up macro with shallow depth of field. {product_identity_lock}. {style_lock}. Cool 5600K soft top light with one wide sweeping highlight travelling across the charcoal brushed fascia #2E3237, the recessed button outlines catching a thin edge highlight. One generic fingertip enters from the top edge and rests on a single button, the finger otherwise cropped so no palm, wrist or body is visible. Every indicator lamp is drawn as a blank unlit circle and the display area as a dark empty well, with no label, no glyph, no digit and no status colour. The detail fills 55-60% of the frame with a clean band across the top third. A headline sits on a light ice-white plate #EAF3F9 above the panel, reading 「{selling_point_4}」 in #2D3238 at 32pt, and one short caption below it reads 「{callout_7}」 at 15pt. Negative: no extra fingers, no fused or bent knuckles, no visible palm or wrist, no glowing text, no segment readout, no button legends or letter marks, no wordmark, no room reflection smeared across the fascia, no warped straight lines, no over-retouched skin.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "玫红楔块一键取冰收口",
+      "intent": "用同款机位加硬边楔形色块与按钮形收尾，把前面积累的欲望收成一次点击",
+      "assetType": "suite-jiayongdianqi-bianxie-danbing-zhibingji::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on at eye level with a slight 3/4 turn to the right, unit on the left, wedge block on the right third",
+      "lighting": "cool 5600K key from the upper left with a broad right bounce, crisp short contact shadow, contrast slightly punchier than the opening packshot",
+      "background": "icy blue-white field #EAF3F9 with one hard-edged solid crimson corner wedge #E21B4F cut across the right third",
+      "props": "the scoop resting in the basket, no glass and no drinks",
+      "productOccupancy": "50-60%",
+      "whitespace": "the wedge panel kept free of everything except one headline and one button shape",
+      "textZone": "wedge panel: one headline plus one rounded button shape",
+      "promptTemplate": "E-commerce closing screen of {product} standing on an icy blue-white field #EAF3F9, seen straight-on at eye level with a slight 3/4 turn to the right, one solid crimson wedge block #E21B4F cut hard-edged across the right third of the frame. {product_identity_lock}. {style_lock}. Cool 5600K key from the upper left with a broad right bounce fill, crisp short contact shadow under the base and contrast slightly punchier than the opening packshot. The lid stays hinged at the same angle as the first screen with the scoop resting in the basket and nothing covering the shell. The product occupies 50-60% of the frame, and the wedge panel carries only one headline and one rounded button shape with everything else left clear. A headline in #FFFFFF on the wedge reads 「{selling_point_5}」 at 36pt and the button shape below reads 「{callout_8}」 at 18pt, set in the same geometric sans-serif as the rest of the set. Negative: no discount percentage, no price, no countdown timer, no shipping promise, no star rating, no platform badge, no wordmark, no QR block, no drink glasses, no citrus garnish, no second product, no soft gradient on the wedge, no clipped product edge.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：001 白底略偏 3/4 机位，开盖露出满篮子弹冰、左下放一把取冰勺；002 抬高的三分之四视角，机身边四条尺寸引出线、右上两枚大小区分的小片、右侧硬边色块标题栏；003 大理石台面正机位，右侧竖排三枚线性图标配短句，右下角斜切色块；004 近乎垂直俯视的特写，满篮子弹冰与后侧滤梳条，顶部一段标题文案；005 深色控制面板特写，一枚指尖按在按键上，指示灯点亮并带字符标签。品类判定依据：机身侧面有压缩机散热孔阵、顶部有制冷控制条与指示灯，属电动制冷设备，故 L1 定为家用电器、L2 定为厨房电器，而非无电机的家居日用厨房用品；源站把它挂在 Home & Kitchen 大类下，此处按图改判。已剥离内容：机门与右下角的品牌字标、斜切色块里的英文品名与日产冰量数值、四条引出线上的英寸数字、三枚图标旁的英文主张原句、004 与 005 顶部的整段英文文案原句、面板上的按键字符与指示标签；日产冰量、单次制冰时长、水箱容积一类事实数值全部不入稿，屏幕、指示灯、尺寸线与规格片一律改写为空白无读数占位；产品主体一律以 {product} 占位，只保留分镜结构、机位、光位、色板与排版骨架。源套图止于面板特写没有收口镜，故末镜按 002/003 已有的硬边斜切色块版式补一镜 CTA，仅沿用其几何结构，不含任何优惠与价格事实。"
+  }
+}

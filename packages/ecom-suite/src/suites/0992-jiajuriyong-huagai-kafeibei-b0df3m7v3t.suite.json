@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-jiajuriyong-huagai-kafeibei-b0df3m7v3t",
+  "name": "滑钮直饮石墨暗场咖啡随行杯款",
+  "category": {
+    "l1": "家居日用",
+    "l2": "水具餐具",
+    "leaf": "滑盖直饮双层保温咖啡随行杯",
+    "leafKeywords": [
+      "滑盖咖啡杯",
+      "保温随行杯",
+      "直饮滑钮杯",
+      "双层钢壁杯",
+      "通勤咖啡杯",
+      "防漏杯盖"
+    ]
+  },
+  "description": "石墨暗场大留白卖点，滑钮直饮与钢壁卷边逐镜拆解",
+  "productFamily": "home",
+  "styleLock": {
+    "direction": "premium graphite studio drinkware commerce",
+    "palette": [
+      {
+        "name": "石墨灰场",
+        "hex": "#4A4E54"
+      },
+      {
+        "name": "瓷白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "冷霜灰",
+        "hex": "#DFE4E7"
+      },
+      {
+        "name": "青灰强调",
+        "hex": "#5C7C8D"
+      }
+    ],
+    "temperature": "cool",
+    "backgroundSystem": "one solid flat matte field per screen on a graphite studio system: seamless pure white #FFFFFF for the packshot, deep graphite #4A4E54 as the dominant benefit and rim-detail field, cool frost-grey #DFE4E7 for the lid-interior macro, one weathered clay masonry step in muted brick tone #A0655A for the single lifestyle frame only; never a gradient, never a horizon line, never a mixed or random environment",
+    "lightingSystem": "bright even cool studio lighting, front-left softbox key with a large fill card on the shadow side, soft contact shadows that always fall the same way, one slow skimming highlight sweeping across moulded lid edges on the dark screens, 5200K directional daylight on the single lifestyle frame",
+    "surfaceSystem": "matte seamless paper sweep on the studio screens; sunlit weathered brick masonry with soft mortar joints in the one lifestyle frame; no glossy mirror floor and no reflective table top",
+    "typography": "modern geometric sans-serif heavy display headline reserved for post compositing, upper 30-40% of the frame kept clear, every rendered frame carries only blank rounded label plates, empty dimension bars and one empty button outline",
+    "iconSystem": "single-weight outlined glyphs and thin leader rules in #5C7C8D ending on empty label plates; no solid pictograms, no emoji, no star rows",
+    "presentationRules": "upright tapered tumbler held at a constant scale and centred low in frame, lid always reads as one moulded piece married to the body, one clear claim per screen, macro screens shot along the part axis rather than floating the product",
+    "noDrift": [
+      "no colour palette changes",
+      "no mixed fonts",
+      "no random or gradient backgrounds",
+      "no inconsistent lighting direction",
+      "no mismatched icon styles",
+      "no invented spec numbers, units, hours or percentages"
+    ],
+    "lockText": "Campaign Style Lock: consistent premium graphite studio drinkware visual system across the entire image set; fixed palette of deep graphite field #4A4E54, seamless pure white #FFFFFF, cool frost-grey #DFE4E7 and one muted steel-teal accent #5C7C8D; cool tonality kept across every screen except one daylight lifestyle frame; one solid flat matte field per screen with no gradient, no horizon and no mixed environment; bright even cool studio lighting with a front-left softbox key, large fill card, soft same-direction contact shadows and one slow skimming highlight along moulded lid edges; modern geometric sans-serif reserved for post compositing while every rendered frame carries only blank rounded label plates, empty dimension bars and one empty button outline; single-weight thin leader rules in #5C7C8D and no solid pictograms; stable upright tapered tumbler at constant scale, lid married to the body, one claim per screen; no colour palette changes, no mixed fonts, no random or gradient backgrounds, no inconsistent lighting direction, no mismatched icon styles, no invented spec numbers, units, hours or percentages."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底滑钮盖随行杯主图",
+      "intent": "搜索列表一眼点击，用纯白底直立全身像讲清杯型与滑钮盖轮廓。",
+      "assetType": "suite-jiajuriyong-huagai-kafeibei-b0df3m7v3t::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level view rotated only about 15 degrees, cup standing upright on its base, full product inside frame",
+      "lighting": "bright even high-key cool studio light, front-left softbox key with fill card, broad soft roll-off on the lid, narrow contact shadow under the base",
+      "background": "seamless pure white #FFFFFF sweep, no horizon",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "even margin ring all around, no extra whitespace",
+      "textZone": "none",
+      "promptTemplate": "Product packshot photography of {product}. {product_identity_lock}. {style_lock}. The cup stands upright on its base in a straight-on eye-level view rotated only about 15 degrees, so the front face and one edge of the slide lid both read, full product inside the frame with nothing clipped. Bright even high-key cool studio lighting from a front-left softbox with a fill card on the shadow side, one broad soft roll-off across the moulded lid and a narrow contact shadow grounding the base. Seamless pure white background #FFFFFF with no horizon. No props. The product occupies 60-70% of the frame, centred with an even margin ring and no extra whitespace. Crisp edges, matte body grain and the lid-to-body seam readable, 8K commercial drinkware quality. Negative: no overlay lettering or wordmark on the body, no added logo artwork, no watermark, no hands, no colour-swatch strip, no gradient background, no glossy mirror floor, no floating product without a contact shadow, no cut-off edges.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "暗场滑钮直饮卖点图",
+      "intent": "主图一秒法则：仰拍推钮与饮口，一眼看懂不揭盖即可直饮。",
+      "assetType": "suite-jiajuriyong-huagai-kafeibei-b0df3m7v3t::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "very low angle looking upward at the shoulder of the cup, lid dominating the lower two thirds",
+      "lighting": "cool key from the upper left with a large bounce on the right, one sweeping highlight travelling across the matte lid, short shadow under the lid lip",
+      "background": "solid matte graphite field #4A4E54, flat, no gradient",
+      "props": "none",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous clean negative space across the upper 40% held for the headline",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product} on a solid graphite field. {product_identity_lock}. {style_lock}. Camera placed at a very low angle looking upward at the shoulder of the cup, so the slide lid and its recessed thumb pad dominate the lower two thirds while the body tapers away below. Cool even studio key from the upper left with a large bounce card on the right, one slow sweeping highlight travelling across the matte lid so the slide pad and the sip opening both read, a short shadow sitting under the lid lip. Solid matte graphite background #4A4E54, flat with no horizon and no gradient. The product occupies 50-60% of the frame low-centre, with generous clean negative space across the upper 40% held clear for the headline. One blank rounded label plate only, no rendered words. Negative: no readable text, letters or numbers anywhere, no platform badges or star rows, no more than one visual claim, no invented hour or temperature figures, no hands, no watermark, no added logo artwork, no gradient background.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "盖内密封圈微距",
+      "intent": "以盖内同心密封圈与直饮通道的微距结构，替防漏主张做可视证明。",
+      "assetType": "suite-jiajuriyong-huagai-kafeibei-b0df3m7v3t::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "extreme close-up macro straight down the lid axis into the upturned inner face, shallow depth of field",
+      "lighting": "soft cool studio light skimming across the inner face from the left at a low incidence so every rib casts a short shadow",
+      "background": "solid cool frost-grey field #DFE4E7",
+      "props": "one empty rounded label plate with a thin leader rule in #5C7C8D",
+      "productOccupancy": "55-60%",
+      "whitespace": "minimal, the detail is the subject, clear corner at the lower left",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of the removed lid of {product}, photographed straight down the lid axis into its upturned inner face so the concentric gasket ring, the recessed sip channel and the small slide button read as one continuous geometry. {product_identity_lock}. {style_lock}. Shallow depth of field with the near edge of the ring crisp and the far wall falling off, tight zoom on the sealing channel. Soft cool studio light skimming across the inner face from the left at a low incidence so every rib and mould line casts a short shadow. Solid cool frost-grey background #DFE4E7, flat and gradient-free. One thin leader rule in #5C7C8D runs from an empty rounded label plate onto the gasket ring, with no words on the plate. The lid detail occupies 55-60% of the frame. Negative: no blurry subject, no duplicated or cloned lid, no embossed marks or characters reproduced from the source, no invented technical claims, no cross-section of walls that do not exist on the product, no hands, no watermark, no added logo artwork.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "卷边杯口双层钢壁特写",
+      "intent": "用杯口卷边与双层钢壁内壁的真实质感，坐实保温结构与饮用安全。",
+      "assetType": "suite-jiajuriyong-huagai-kafeibei-b0df3m7v3t::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "close-up from just above the rim at a shallow 25-degree downward angle looking into the open mouth",
+      "lighting": "cool key from the front-right plus a narrow strip bounce along the rim, one clean continuous specular line on the steel edge, matte outer body kept soft",
+      "background": "solid matte graphite field #4A4E54",
+      "props": "two blank dimension bars in #5C7C8D with empty end caps beside the rim",
+      "productOccupancy": "55-60%",
+      "whitespace": "generous negative space on the upper left 35% for the callout block",
+      "textZone": "none",
+      "promptTemplate": "Detail close-up of the open mouth of {product}, photographed from just above the rim at a shallow 25-degree downward angle looking into the neck, so the rolled rim, the threaded inner wall and the double-wall steel edge sit in one frame while the body drops away below. {product_identity_lock}. {style_lock}. Cool studio key from the front-right plus a narrow strip bounce running along the rim, the polished steel catching one clean continuous specular line while the matte outer body stays soft. Solid matte graphite background #4A4E54, no gradient. Two blank dimension bars in #5C7C8D with empty end caps float beside the rim, carrying no numbers and no units. The rim detail occupies 55-60% of the frame with generous negative space on the upper left 35% reserved for the callout block. Negative: no invented size figures, units or capacity text, no readable letters, no water droplets or steam implying unverified performance, no busy grid, no warped ellipse on the rim, no hands, no watermark, no added logo artwork.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "SCENE",
+      "displayName": "砖阶双手递杯场景",
+      "intent": "让买家把自己代入通勤路上随手递杯的日常，建立尺寸与握持手感。",
+      "assetType": "suite-jiajuriyong-huagai-kafeibei-b0df3m7v3t::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed from above at a steep 60-degree high angle, forearms and hands only, heads fully out of frame",
+      "lighting": "warm directional daylight from the upper left around 5200K, short consistent shadows, pale bounce keeping the dark lids readable",
+      "background": "sunlit weathered clay brick masonry step in muted tone #A0655A, mortar joints softening out of focus",
+      "props": "a denim-clad knee in the lower foreground, nothing else",
+      "productOccupancy": "40-50%",
+      "whitespace": "none, the hands and step fill the frame",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle handoff scene of {product}: two people pass two units of the product between them on a sunlit weathered brick step, hands wrapped at the widest point of the bodies while one thumb rests on the slide button. {product_identity_lock}. {style_lock}. Photographed from above at a steep 60-degree high angle so the lids and both pairs of hands fill the frame, heads and faces entirely outside the shot, only forearms, hands and a denim-clad knee visible. Warm directional daylight from the upper left around 5200K, low contrast, every shadow falling the same way, a pale bounce card keeping the dark lid faces readable. Background of muted clay brick masonry #A0655A with soft mortar joints falling slightly out of focus. The two units together occupy 40-50% of the frame, no extra whitespace. Negative: no recognisable face or model identity, no readable branding on sleeves, nails or the body, no duplicated or cloned cups, no missing or fused fingers, no in-image text, no watermark, no added logo artwork, no impossible contact shadows.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "CTA",
+      "displayName": "双杯成组暗场收口图",
+      "intent": "收口促成，用双杯成组与空白按钮框承接组合购买决策。",
+      "assetType": "suite-jiajuriyong-huagai-kafeibei-b0df3m7v3t::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 hero angle on a pair, front unit full height and second unit tucked just behind its shoulder",
+      "lighting": "bright cool studio light from a front-left softbox with fill, thin sweeping highlight along each lid edge, soft paired contact shadows",
+      "background": "solid matte graphite field #4A4E54",
+      "props": "one empty rounded button outline in #5C7C8D low-centre",
+      "productOccupancy": "55-60% overall",
+      "whitespace": "generous negative space across the upper 30% reserved for the offer line",
+      "textZone": "none",
+      "promptTemplate": "E-commerce promo close of {product}: two units stand side by side at a slight 3/4 hero angle, the front unit at full height and the second tucked just behind its shoulder, on a solid graphite field. {product_identity_lock}. {style_lock}. Bright cool studio lighting from a front-left softbox with a fill card, a thin sweeping highlight along each lid edge and soft contact shadows beneath both bases falling the same way. Solid matte graphite background #4A4E54 with one empty rounded button outline in #5C7C8D centred low in the frame, rendering no words and no numerals. The pair occupies 55-60% of the frame overall, with generous negative space across the upper 30% reserved for the offer line. Negative: no invented discount percentages or prices, no countdown or urgency graphics, no star ratings or review counts, no platform badges, no readable text, no cloned product parts, no watermark, no added logo artwork, no floating product without a contact shadow.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "源图 5 张逐图事实：001 纯白底直立单杯、机身近正脸微侧；002 石墨灰暗场大字号标题下的滑盖与拇指推钮仰拍；003 翻面盖内侧同心密封圈与直饮通道的轴对齐微距；004 高角下杯口卷边与双层钢壁内壁特写，左侧配大字与两行时长字样；005 砖阶上两人双手各持一杯的俯拍递杯场景，画面中央叠有店铺字标。品类判定依据：源商品页类目惯挂旅行杯/厨房小电等杂项，但按图为主开口 tapered 杯身加滑钮直饮盖的随身饮水器，无电加热部件，故判 家居日用 / 水具餐具，leaf 取滑盖直饮双层保温咖啡随行杯。已剥离内容：源品牌字标与杯身、盖面浮雕字样、原平台店铺字样与角标、002/003/004 的大字原句与 004 中两行时长数值、005 中两位人物的面容与手部身份细节；容量口径、保温时长、材质等级、防漏等级等一切事实数值与资质均不入稿，改为空白标签板、空尺寸条与空按钮框；产品一律以 {product} 占位。视觉体系取源图的石墨暗场加大留白卖点结构，色板与背景场全部锁在灰场与冷霜灰，与库内冷调海洋场系、暖沙粉场系两套杯类模版分场明显，无共用场色。"
+  }
+}

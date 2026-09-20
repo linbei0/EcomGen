@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-shoujishuma-mini-lingjimai-b0cmjtsvrw",
+  "name": "即插即用迷你领夹麦款",
+  "category": {
+    "l1": "手机数码",
+    "l2": "耳机音频",
+    "leaf": "迷你夹式即插无线麦克风",
+    "leafKeywords": [
+      "迷你领夹麦",
+      "无线麦克风",
+      "即插即用",
+      "手机直播收音",
+      "双人同录",
+      "防风绒罩",
+      "短视频收音"
+    ]
+  },
+  "description": "衣领即夹直插手机、双麦同录、免应用免配对收音",
+  "productFamily": "electronics",
+  "styleLock": {
+    "direction": "minimal creator-audio ecommerce, cool porcelain and clean",
+    "palette": [
+      {
+        "name": "冷瓷白",
+        "hex": "#F4F6F7"
+      },
+      {
+        "name": "雾灰蓝",
+        "hex": "#CBD6DC"
+      },
+      {
+        "name": "石板墨蓝",
+        "hex": "#26303A"
+      },
+      {
+        "name": "冰川青强调",
+        "hex": "#4F8C96"
+      }
+    ],
+    "temperature": "cool",
+    "backgroundSystem": "seamless cool porcelain #F4F6F7 for packshot and contents screens, soft mist blue-grey #CBD6DC studio fields for wear screens, pale slate interiors for scene screens, deep slate #26303A ground for the macro screen",
+    "lightingSystem": "soft diffused front-left key at 5500K with a cool bounce fill, one restrained rim sweep, gentle contact shadows, cool neutral grade, no harsh specular bursts",
+    "surfaceSystem": "cool porcelain board #F4F6F7, washed greige linen #D8D4CC on the detail screen, deep slate #26303A macro ground",
+    "typography": "modern geometric sans-serif held inside the style system only, every glyph area left blank for post-composited copy",
+    "iconSystem": "thin single-weight line icons and empty rounded chip outlines in glacier cyan #4F8C96, no filled pictograms",
+    "presentationRules": "stable straight-on to slight 3/4 product scale, clip arm, button panel and plug edge always readable, never overlapped by props or hands",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no mismatched icon styles",
+      "no rendered in-image copy, badges, digits or model names"
+    ],
+    "lockText": "Campaign Style Lock: consistent minimal creator-audio ecommerce visual system across the entire image set; fixed palette of cool porcelain #F4F6F7, mist blue-grey #CBD6DC, deep slate #26303A and one glacier cyan accent #4F8C96; cool neutral lighting with a soft diffused front-left key at 5500K, a cool bounce fill, one restrained rim sweep and gentle contact shadows; modern geometric sans-serif; thin single-weight line icons and empty rounded chip outlines only; matte charcoal product bodies with fine surface grain, one controlled specular roll and a single soft status dot; clean high-end product photography mixed with minimal infographic scaffolding; stable straight-on to slight 3/4 product scale and centring; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "冷瓷白底三件立姿主图",
+      "intent": "搜索列表首图，用一枚接收器配两枚夹式的立姿剪影赢一眼点击",
+      "assetType": "suite-shoujishuma-mini-lingjimai-b0cmjtsvrw::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, upright units centred, full silhouette visible",
+      "lighting": "bright even high-key front-left softbox key with a bounce card on the shadow side, soft contact shadows",
+      "background": "seamless cool porcelain #F4F6F7",
+      "props": "two foam caps and one small flat connector adapter at the upper right",
+      "productOccupancy": "60-70%",
+      "whitespace": "even margin all around, no extra whitespace and no copy band",
+      "textZone": "none",
+      "promptTemplate": "Seamless-field marketplace hero of {product}. {product_identity_lock}. {style_lock}. A pair of clipped units standing upright beside one flat-plug receiver, photographed straight-on at eye level, centred and symmetrical so the search thumbnail reads as one clean silhouette, every body fully visible and nothing clipped. Bright even high-key studio lighting with a front-left softbox key and a bounce card on the shadow side, soft contact shadows grounding each piece so nothing floats. Seamless cool porcelain background #F4F6F7, matte bodies showing fine surface grain and one restrained specular roll along each shoulder. Props limited to two foam caps and one small flat connector adapter floating clear at the upper right corner. The group occupies 60-70% of the frame. Even margin all around the product, no extra whitespace and no copy band. 1:1, 8K commercial electronics quality. Negative: no wordmark, logo or model lettering on any body, no printed or rendered text of any kind, no packaging art, no hands, no watermark or QR code, no tinted gradient background, no duplicated or merged product parts, no clipped edges.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "领口绒罩佩戴特写",
+      "intent": "一秒交代核心利益：夹在衣领就近拾音、无需配对即可录",
+      "assetType": "suite-shoujishuma-mini-lingjimai-b0cmjtsvrw::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "tight zoom chest-height mid-shot at a slight 3/4 angle from the wearer's left",
+      "lighting": "soft diffused daylight-weighted key from the upper left with a gentle wrap fill, low contrast, honest weave texture",
+      "background": "calm mist blue-grey studio field #CBD6DC falling out of focus",
+      "props": "the wearer's plain knit collar only",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous clean space across the upper left 35%, left completely glyph-free",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product} worn at the collar. {product_identity_lock}. {style_lock}. Tight zoom chest-height mid-shot at a slight 3/4 angle from the wearer's left, the fuzzy cap sitting just below the jaw while the head is cropped out of frame so no identity reads; the clip arm, the glossy button panel and the single soft status dot all stay legible. Soft diffused daylight-weighted key from the upper left with a gentle wrap-around fill, low contrast, honest fabric weave and skin texture on the neck edge. Background of a calm mist blue-grey studio field #CBD6DC falling fully out of focus with no horizon clutter. Props limited to the plain knit garment itself, nothing overlapping the clip. The worn unit occupies 50-60% of the frame. Generous clean space across the upper left 35% left completely free of glyphs, badges and icons. 1:1, crisp commercial rendering. Negative: no recognizable face or eye detail, no printed clothing text or brand labels, no rendered headline, no duplicated microphone, no plastic-smoothed skin, no watermark, no fake logo.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "SCENE",
+      "displayName": "三格上手场景矩阵",
+      "intent": "用同屏三格铺开拍、佩戴、远距离隔空录的用法，完成身份代入",
+      "assetType": "suite-shoujishuma-mini-lingjimai-b0cmjtsvrw::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "each panel straight-on at eye level with identical lens height and matched crop",
+      "lighting": "consistent soft daylight-weighted light in every panel, unified shadow direction from the left",
+      "background": "cool porcelain cards #EDF1F4 with even gutters",
+      "props": "small tripods and one slab smartphone, blank screens",
+      "productOccupancy": "40-50%",
+      "whitespace": "generous empty margin above the grid carrying no headline and no badges",
+      "textZone": "none",
+      "promptTemplate": "E-commerce usage matrix of {product}: three matched vignettes on one screen, a desk talking-head setup with a slab smartphone on a small tripod, a chest-height wear close-up, and a standing wide framing beside a second tripod phone, each showing the clipped unit at collar height. {product_identity_lock}. {style_lock}. Every panel photographed straight-on at eye level with the same lens height and matched crop, figures cropped below the chin or turned away so no identity reads. Consistent soft daylight-weighted lighting through all three panels with one unified shadow direction from the left. Panels sit on cool porcelain cards #EDF1F4 with even gutters and one thin divider, each closed by a small empty rounded caption outline carrying no glyphs. Props limited to two small tripods and one slab smartphone whose screens read as blank panels. The three vignettes together occupy 40-50% of the frame. Generous empty margin above the grid kept free of headline, badges and icons. Negative: no readable signage or storefront lettering, no on-screen interface or recording glyphs, no phone brand mark or distinctive camera bump, no recognizable face, no inconsistent panel brightness, no duplicated unit inside one panel, no rendered copy, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "双人同录支架开拍",
+      "intent": "证明两枚夹机可隔空同录一台手机，把受众推向自用想象",
+      "assetType": "suite-shoujishuma-mini-lingjimai-b0cmjtsvrw::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "low angle looking slightly upward from the height of a phone propped on a small tripod",
+      "lighting": "soft even window light from the front-right at 5500K with a mild cool wall bounce, honest skin texture",
+      "background": "pale slate-blue interior wall #C9D3D9 with soft out-of-focus shelving",
+      "props": "one small tripod with one slab smartphone, blank viewfinder",
+      "productOccupancy": "40-50%",
+      "whitespace": "clean blurred space across the top 25% holding no text and no badges",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle dual-recording scene featuring {product}. {product_identity_lock}. {style_lock}. Two creators standing a pace apart in a bright room, each wearing one clipped unit with its fuzzy cap, photographed from a low angle looking slightly upward as if from a smartphone propped on a small tripod in the foreground; that phone reads as a blank viewfinder with no interface glyphs, no meters and no numbers. Soft even window light entering from the front-right at 5500K with a mild cool bounce off the wall, honest skin texture and gentle natural falloff. Both heads cropped above the chin or turned into three-quarter back so no face is identifiable. Background of a pale slate-blue interior wall #C9D3D9 with soft out-of-focus shelving. Props limited to one tripod and one phone, never overlapping either collar. The two clipped units and the phone occupy 40-50% of the frame. Clean blurred space across the top 25% kept free of copy and badges. 1:1, believable candid texture with slight grain. Negative: no recognizable face or celebrity likeness, no on-screen interface or level readout, no brand labels on clothing, no third or duplicated microphone, no mismatched shadow direction, no ring-light artifact, no watermark, no extra text.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "布面躺充绒纤维微距",
+      "intent": "用绒毛、肩线与充电口咬合微距证明做工与回充方式，参数留空",
+      "assetType": "suite-shoujishuma-mini-lingjimai-b0cmjtsvrw::shot-05",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "extreme close-up macro in a clean 90-degree side profile, shallow depth of field",
+      "lighting": "single soft skimming light sweeping from the left at low incidence, one restrained specular line on the shoulder",
+      "background": "washed greige linen #D8D4CC easing into a deep slate shadow band #26303A",
+      "props": "one short charging cable seated in the port, one empty rounded status outline",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "minimal margin, the texture is the subject",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, tight zoom where the fuzzy windscreen cap meets the matte body shoulder and where a short charging cable sits fully seated in the port, laid on softly rumpled washed linen. {product_identity_lock}. {style_lock}. Camera held in a clean 90-degree side profile with shallow depth of field, front fibre tips razor sharp while the second unit dissolves behind. Single soft skimming light sweeping from the left at a low incidence to read every fibre and the mould seam of the clip hinge, with one restrained specular line along the body shoulder and no bloom. Background of washed greige linen #D8D4CC easing into a deep slate shadow band #26303A at the frame edge, no horizon. Props limited to the seated cable plus one small empty rounded status outline that is deliberately blank, with no digits, no bars and no percentage. The detail fills 55-60% of the frame, minimal margin since the texture is the subject. 4K macro commercial quality, 1:1. Negative: no blurry subject, no melting or duplicated fibres, no battery, duration or range readout of any kind, no wordmark on the body, no dust or scratches implying damage, no spilled highlight bloom, no extra text, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "全家福俯拍空标签",
+      "intent": "交底到手件数与配件形态，用空白标签框消除到手落差风险",
+      "assetType": "suite-shoujishuma-mini-lingjimai-b0cmjtsvrw::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "flat lay photographed directly from above at a 90-degree overhead angle",
+      "lighting": "even high-key flat studio lighting, cool neutral colour temperature, no dramatic shadow",
+      "background": "seamless cool porcelain board #F4F6F7",
+      "props": "foam caps, spare fuzzy caps, coiled short cable, flat connector adapter, empty rounded label outlines",
+      "productOccupancy": "35-40%",
+      "whitespace": "generous even gutters between rows plus a clean band across the top 20% with no headline",
+      "textZone": "none",
+      "promptTemplate": "E-commerce contents and trust screen of {product}, flat lay photographed directly from above at a 90-degree overhead angle. {product_identity_lock}. {style_lock}. Two clipped units lying parallel with their fuzzy caps aligned and one flat-plug receiver laid across them, then a lower row of two foam caps, one coiled short charging cable, two spare fuzzy caps and one small flat connector adapter, every piece spaced in tidy rows on a seamless cool porcelain board #F4F6F7 and carrying its own soft contact shadow. Beneath each piece sits an empty rounded label outline and a blank unbranded device-silhouette frame, all deliberately left with no glyphs, no model names, no counts and no numbers. Even high-key flat studio lighting with a cool neutral colour temperature and no dramatic shadow. The laid-out contents occupy 35-40% of the frame. Generous even gutters between rows plus a clean band across the top 20% holding no headline and no badges. Negative: no certification seals, test-report artwork or award shields, no warranty or rating badges, no invented counts, digits or unit labels, no real phone or console silhouette, no packaging art, no shadow direction mismatch, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "逐图事实：图1 近白底上两枚夹式机身配一枚带扁平插头的接收器竖立并列，右上角另置两枚海绵套与一枚触点转接头，机身仅一枚绿色状态点；图2 灰色针织衫领口佩戴一枚带灰色绒毛罩的机身，颈部以上出画，左侧米灰墙面留大字区；图3 同屏三格（桌前手机三脚架自拍录制、高领衫胸口佩戴特写、站立远距对镜头讲话），顶部一行大字；图4 两枚带绒罩机身躺在浅亚麻布面上、各插一条短线缆，暖侧光长投影，顶部大字讲连续录制时长；图5 两人各佩戴一枚绒罩机身、前景手机横置在小三脚架上，屏内为录制界面含红点与电平条，左上大字含双麦与无线距离数值；图6 浅灰底俯视全家福（两枚夹机、一枚带插头接收器、两枚海绵套、一卷短线缆、两枚绒罩、一枚触点转接头），每件下方英文品名与件数。品类判定：主产品为夹在衣领就近拾音、经接收器直插手机的迷你无线领夹麦克风，核心是音频采集而非手机本体或支架，故判为手机数码／耳机音频，与源站挂载类目无关。与库内同品类既有模版的差异：本套源图无痛点分栏、无波形前后对比、无悬浮同心弧卖点与六格矩阵，改由领口佩戴特写、三格上手矩阵与布面躺充微距承担中段说服，因此分镜逐镜不同构、属可转化形态；为避免视觉体系撞车，色板与背景由暖燕麦／米黄／亚麻暖调整体改为冷瓷白／雾灰蓝／石板墨蓝加冰川青强调的冷调体系。已剥离：源品牌字标与系列名、机身字样、原平台排名与店铺字样、全部原英文标题句式与图内文案、连续录制时长与无线距离等数字主张（改为空白状态条与空标签框）、出镜人物面容与身份（改为颈部以下裁切或背身）、手机屏幕内的录制界面与电平读数（改为空白取景框）、配件上的机型适配插画品牌特征。"
+  }
+}

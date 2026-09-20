@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-meizhuangcaizhuang-chunbu-gongchuang-shise-chunna-b0bk9t5lj8",
+  "name": "拱窗视窗雾面试色唇泥款",
+  "category": {
+    "l1": "美妆彩妆",
+    "l2": "唇部",
+    "leaf": "雾面唇颊两用唇泥",
+    "leafKeywords": [
+      "雾面唇泥",
+      "唇颊两用",
+      "哑光唇妆",
+      "唇部试色",
+      "前臂试色",
+      "拱形视窗排版",
+      "选色宫格"
+    ]
+  },
+  "description": "拱窗视窗排人像与唇色，开盖管身配雾泥色块，全部色号由强调色占位承载",
+  "productFamily": "beauty",
+  "styleLock": {
+    "direction": "airy pastel editorial lip colour commerce",
+    "palette": [
+      {
+        "name": "瓷白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "雾蓝",
+        "hex": "#D9E5F1"
+      },
+      {
+        "name": "藕雾紫",
+        "hex": "#C6B9CB"
+      },
+      {
+        "name": "珊瑚玫线",
+        "hex": "#D65D68"
+      }
+    ],
+    "temperature": "neutral",
+    "backgroundSystem": "seamless porcelain white #FFFFFF for packshots, periwinkle matte fields #D9E5F1 for the arch and oval window layouts and the outdoor crop, lotus-lilac panels #C6B9CB behind the shade grid, and one warm ivory board #F4EFE7 for the stroke chart; the coral-rose hairline #D65D68 is only ever a rule, an outline or a leader line, never a lip or swatch hue, because every shade value is carried by the accent placeholder",
+    "lightingSystem": "bright even high-key neutral studio light, front-left softbox key with a fill card, butterfly light on skin crops, skimming sweep across matte mud ridges, soft contact shadows only and never a wet specular on a velvet finish; the one outdoor crop keeps a hard afternoon sun from the upper right",
+    "surfaceSystem": "seamless white sweep plus lotus-lilac and periwinkle matte boards laid flat for overhead charts, and raw travertine blocks #E9DED0 stacked at differing heights under the still-life stage, no horizon and no table edge visible",
+    "typography": "modern geometric sans-serif only: one oversized headline band, one blank label column and small ruled parameter lines, all in-image copy supplied at generation time as placeholders",
+    "iconSystem": "thin single-weight hairline arch and oval window outlines, hairline four-point star rules and blank rounded label pills, no filled illustrative icons and no tick, cross or arrow graphics",
+    "presentationRules": "one open-tube-with-flocked-applicator anchor reused at stable scale, formula always rendered as powdery velvet with feathered swipe edges, every person cropped inside a window mask or turned away so no identity is held, and every lip or swatch hue carried by the accent placeholder instead of a fixed shade",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no mismatched icon styles",
+      "no fixed lip shade hue across the set",
+      "no glossy finish on a matte product"
+    ],
+    "lockText": "Campaign Style Lock: consistent airy pastel editorial lip colour visual system across the entire image set; fixed palette of seamless porcelain white #FFFFFF, periwinkle #D9E5F1, lotus-lilac #C6B9CB and one coral-rose hairline accent #D65D68, with every lip and swatch hue carried by one accent placeholder; bright even high-key neutral studio lighting with a front-left softbox key and fill card, butterfly light on skin crops, skimming sweep across matte mud ridges, soft contact shadows and no wet speculars; modern geometric sans-serif typography only; thin single-weight hairline window outlines, hairline star rules and blank rounded label pills; stable open-tube-with-flocked-applicator anchor angle and scale with powdery feathered swipe edges; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "瓷白开盖雾泥主图",
+      "intent": "搜索列表一眼点击，用立管、侧倒的盖体与抽出刷杆加身后一大片抹开的雾面泥色块，同时交代器形与哑光质地",
+      "assetType": "suite-meizhuangcaizhuang-chunbu-gongchuang-shise-chunna-b0bk9t5lj8::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level, tube upright and centred, cap tipped on its side with the applicator resting against it, full product visible",
+      "lighting": "bright even high-key neutral studio light, front-left softbox key with a fill card, soft contact shadows, no wet specular on the velvet finish",
+      "background": "seamless porcelain white #FFFFFF",
+      "props": "the tipped cap with the separated flocked tapered applicator resting against it, and one broad matte mud-swipe of the formula laid diagonally behind the group",
+      "productOccupancy": "60-70%",
+      "whitespace": "no extra whitespace beyond an even margin above and below the group",
+      "textZone": "none",
+      "promptTemplate": "Product packshot photography of {product}. {product_identity_lock}. {style_lock}. One slim cylindrical tube standing open and upright at the centre, its cap tipped on its side with the flocked tapered applicator resting against it, photographed straight-on at eye-level with the whole product visible and nothing cropped by the frame edge, plus one broad matte mud-swipe of the formula laid diagonally behind the group with its hue carried entirely by {accent_color}. Bright even high-key neutral studio lighting with a front-left softbox key and a fill card on the shadow side, soft contact shadows grounding every piece, no wet specular on the velvet finish. Seamless porcelain white background #FFFFFF. The product occupies 60-70% of the frame. No extra whitespace beyond an even margin above and below the group. 8K commercial beauty e-commerce quality. Negative: no printed wordmark, ribbon band or lettering on the tube or cap, no satin or glossy sheen on the formula, no hands, no props other than the cap and applicator, no tinted or gradient background, no floating product without a contact shadow, no cut-off edges, no in-image text, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "拱窗雾面唇妆主张",
+      "intent": "承接主图，用拱形视窗里的人像妆效加右下角唇部微距插图与左下角泥色块徽章，一秒给出成膜雾面主张",
+      "assetType": "suite-meizhuangcaizhuang-chunbu-gongchuang-shise-chunna-b0bk9t5lj8::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "arch window portrait photographed from a slight 45-degree high angle looking down over the tilted face, plus one extreme close-up macro lip panel inset at the lower right",
+      "lighting": "butterfly beauty light from front-above at 5500K with gentle fill, real skin texture with visible pores, soft contact shadow under the swatch badge",
+      "background": "periwinkle matte field #D9E5F1 with the arch window cut out of it",
+      "props": "one rounded-corner lip macro panel inset at the lower right and one irregular mud-swipe badge at the lower left",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous clear margin kept across the top band for the headline",
+      "textZone": "顶部空白标题带「{callout_1}」，左下色块徽章内一行空白标签位「{selling_point_1}」",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. A tall arch-shaped window mask cut into a periwinkle field #D9E5F1 holds an anonymous generic adult beauty portrait photographed from a slight 45-degree high angle looking down over a softly tilted face, gaze dropped and turned away off-camera so no identifying feature is held, the lips sitting at the centre of the window tinted entirely by {accent_color} as a soft-focus velvet film with the natural lip lines still readable. One rounded-corner panel at the lower right carries an extreme close-up macro tight zoom of the same matte finish, and one irregular mud-swipe badge at the lower left carries a single blank label slot reading 「{selling_point_1}」; one clean headline band across the top carries only 「{callout_1}」. Butterfly beauty light from front-above at 5500K with gentle fill, real skin texture with visible pores, soft contact shadow under the badge. The window and the two insets together occupy 50-60% of the frame. A generous clear margin is kept across the top band for copy. Negative: no recognizable person or celebrity likeness, no eyes held front-on, no airbrushed plastic skin, no wet lacquer finish on a matte lip, no shade code or series letter rendered anywhere, no invented wear-time or coverage wording beyond the placeholders, no more than two copy lines, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "VARIANT",
+      "displayName": "椭圆窗点涂四格唇色",
+      "intent": "把上妆手势与四格唇部微距并置在同一版面，让买家在统一雾面妆效下自行比对深浅",
+      "assetType": "suite-meizhuangcaizhuang-chunbu-gongchuang-shise-chunna-b0bk9t5lj8::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "oval window at a slight 3/4 angle for the application crop, four matched square tight close-up macro lip panels stepped below it, each photographed straight-on at eye-level",
+      "lighting": "even high-key frontal light with a soft fill, identical light direction and height in every panel, real skin texture with visible lip lines",
+      "background": "lotus-lilac panel #C6B9CB under the stepped grid, outlined by one coral-rose hairline #D65D68",
+      "props": "the loaded flocked applicator held to the lips inside the window, one oversized blank numeral block at the right, one blank rounded label pill under each panel",
+      "productOccupancy": "60-70% overall",
+      "whitespace": "open bands between the stepped rows and around the outer frame for copy",
+      "textZone": "顶部标题带「{selling_point_2}」，四格下方各一枚完全未印的圆角标签位",
+      "promptTemplate": "E-commerce shade-selection screen for {product}. {product_identity_lock}. {style_lock}. An oval window mask at the upper left, outlined in one coral-rose hairline #D65D68, crops an anonymous hand bringing the loaded flocked applicator to the lips at a slight 3/4 angle with the fingers relaxed and correctly formed, the person turned away and cropped at the nose so only lips, philtrum and chin remain. Below and to the right, four matched square panels step down a lotus-lilac field #C6B9CB, each one a tight close-up macro of the same lip shape in a visibly lighter or deeper value inside the single accent family carried by {accent_color}, every panel finished with the same powdery feathered contour. One oversized series-numeral block sits at the right as a completely unprinted blank shape, one headline band across the top carries only 「{selling_point_2}」, and each panel keeps one blank rounded label pill beneath it. Even high-key frontal light with a soft fill and identical light direction in every panel, real skin texture with visible lip lines, soft contact shadow under each panel. The window and the four panels together occupy 60-70% of the frame overall. Open bands are kept between the stepped rows and around the outer frame for copy. Negative: no readable shade codes, digits or series letters, no recognizable person or full face, no deformed or extra fingers, no lighting drift between panels, no duplicated panel, no printed text inside the blank pills, no arrow or tick graphics, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "竖向色条与臂部试色双层",
+      "intent": "用上层竖向色条微距与下层前臂引线色块给出第二套质地与深浅读法，回答质地与上肤疑虑",
+      "assetType": "suite-meizhuangcaizhuang-chunbu-gongchuang-shise-chunna-b0bk9t5lj8::shot-04",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "4K",
+      "camera": "two-tier layout photographed directly from above at a 90-degree overhead angle",
+      "lighting": "soft even top light with a skimming sweep across the stroke ridges so the dried matte grain reads, soft contact shadow along the outer edge of the arm",
+      "background": "warm ivory board #F4EFE7 across the upper tier and a periwinkle board #D9E5F1 across the lower tier",
+      "props": "four thick vertical matte mud strokes in the upper tier, one anonymous forearm with four patted rectangular swatches and hairline leader lines in the lower tier",
+      "productOccupancy": "55-60%",
+      "whitespace": "even empty margins above and below each tier, no extra whitespace outside the two bands",
+      "textZone": "上层每条色带下一条空白标签位「{callout_2}」，下层四枚引线末端各一条空白标签位",
+      "promptTemplate": "E-commerce texture and swatch reference screen for {product}, a two-tier layout photographed directly from above at a 90-degree overhead angle. {product_identity_lock}. {style_lock}. Upper tier on a warm ivory board #F4EFE7: a neat row of four thick vertical matte mud strokes, each one an extreme close-up macro that shows the powdery crumb grain and the feathered trailing edge, all drawn from the single accent family carried by {accent_color} and stepping from the lightest pat to the deepest, each stroke with one blank label slot beneath it carrying 「{callout_2}」. Lower tier on a periwinkle board #D9E5F1: one anonymous forearm laid diagonally from wrist to elbow, carrying four small rectangular patted swatches in the same accent family, each joined to one empty label slot by a thin coral-rose hairline leader line #D65D68. Soft even top light with a skimming sweep across the stroke ridges so the dried matte grain reads, plus a soft contact shadow along the outer edge of the arm. The two tiers together occupy 55-60% of the frame. Even empty margins above and below each tier with no extra whitespace outside the two bands. Negative: no shade numbers, codes or handwritten marks, no faces, no duplicated or merged arms, no deformed or extra fingers, no glossy wet-looking swatches, no banding or fake texture inside the strokes, no tiny unreadable type, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "SCENE",
+      "displayName": "蓝天仰拍雾泥氛围",
+      "intent": "用仰视天空氛围人像把雾面妆效放进一种夏日情绪里，让买家自我代入并留出标题位",
+      "assetType": "suite-meizhuangcaizhuang-chunbu-gongchuang-shise-chunna-b0bk9t5lj8::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "photographed from a very low angle looking upward, cropped just below the shoulders, product group small at the lower right corner",
+      "lighting": "hard afternoon sun from the upper right at 5600K with gentle rim separation, real skin texture with visible pores, soft contact shadow under the tube",
+      "background": "open periwinkle sky field #BDD4EA with two thin hairline arc rules at the outer edges",
+      "props": "one closed tube with its cap drawn plus the standing flocked applicator at the lower right on a lotus-lilac plinth #C6B9CB",
+      "productOccupancy": "40-50%",
+      "whitespace": "generous negative space across the upper third for the headline",
+      "textZone": "顶部标题带「{callout_3}」",
+      "promptTemplate": "Lifestyle scene: {product}. {product_identity_lock}. {style_lock}. Photographed from a very low angle looking upward, an anonymous generic adult figure with the face turned away in soft three-quarter profile and the gaze off to the side sits against an open periwinkle sky field #BDD4EA, wind-blown hair strands crossing the frame, the crop cutting just below the shoulders so no identity is held and only the matte lip colour reads, that colour carried entirely by {accent_color} with a powdery feathered edge. One closed tube with its cap drawn and the flocked applicator standing beside it sits small at the lower right corner on a lotus-lilac plinth #C6B9CB. Hard afternoon sun from the upper right at 5600K with gentle rim separation, real skin texture with visible pores, soft contact shadow under the tube. One clean headline band across the top carries only 「{callout_3}」, and two thin hairline arc rules sit at the outer edges. The figure and the product corner together occupy 40-50% of the frame. Generous negative space is kept across the upper third for copy. Negative: no recognizable person or celebrity likeness, no eyes facing the camera, no plastic smoothed skin, no wet glossy lip finish, no printed wordmark or packaging lettering, no invented claim wording beyond the placeholder, no extra props, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "石台全家福空白规格卡",
+      "intent": "收口前用错位石台陈列交代到手数量与器形组件，规格与凭证全部留成空行与空印章框",
+      "assetType": "suite-meizhuangcaizhuang-chunbu-gongchuang-shise-chunna-b0bk9t5lj8::shot-06",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on eye-level stage of blocks at differing heights, full grouping visible and nothing cropped, with the info panel read straight-on",
+      "lighting": "bright even high-key neutral studio light, front-left softbox key with a fill card, soft contact shadows grounding every block and tube",
+      "background": "raw travertine block stage #E9DED0 against a porcelain white wall #FFFFFF",
+      "props": "several closed tubes, one lying on its side, a few dried flower stems behind the tallest block, one open tube with applicator and a matte mud swipe, and one rounded blank info panel",
+      "productOccupancy": "50-60%",
+      "whitespace": "an even margin above the block stage, no extra whitespace outside the panel",
+      "textZone": "圆角卡内四行空白参数线与一枚空白印章框，另一条短标签位「{selling_point_3}」",
+      "promptTemplate": "E-commerce trust and contents screen for {product}. {product_identity_lock}. {style_lock}. Several closed tubes are staged at differing heights on raw travertine blocks #E9DED0 against a porcelain white wall #FFFFFF, one tube lying on its side at the right and a few dried flower stems rising behind the tallest block, photographed straight-on at eye-level with the full grouping visible and nothing cropped. A rounded periwinkle panel #D9E5F1 sits across the lower third carrying only four blank ruled parameter lines, one empty seal box and one short label slot reading 「{selling_point_3}」; beside it one open tube with its drawn applicator and a broad matte mud-swipe of the formula laid behind, that hue carried entirely by {accent_color}. Bright even high-key neutral studio lighting with a front-left softbox key and a fill card, soft contact shadows grounding every block and every tube. The stage and the panel together occupy 50-60% of the frame. An even margin above the block stage with no extra whitespace outside the panel. Negative: do NOT invent certifications, awards, lab results, warranty terms, net-weight or shade-count figures; no readable digits, unit letters or spec values inside the panel, no brand wordmark, distributor name or address, no barcode or QR code, no star ratings or review counts, no platform badges, no garbled half-formed characters, no watermark.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "逐图事实：1 瓷白底一支开盖细圆管直立、盖体侧倒、绒毛斜头刷杆搭在盖口，身后一大片斜向抹开的雾面泥色块；2 雾蓝底上一枚拱形视窗裁人像，视窗内低头妆容脸，右下角一枚圆角唇部微距插图，左下一片不规则泥色块内印系列字样；3 雾蓝与藕紫叠底，左上椭圆视窗内手持刷杆点涂上唇，右侧大号系列字样，下方四格错落唇部微距各配编号；4 双层页，上层暖白底四枚竖向色条各配编号，下层雾蓝底一条斜放前臂四枚矩形色块以引线配编号；5 仰拍蓝天人像，发丝飘动，右下角立管与抽出刷杆，顶部手写标题带；6 洞石砖错位搭台陈列六支管身并插干花，下方一枚雾蓝圆角卡内含规格与保修等数值行，右侧开盖管身与一片抹开色块。分镜处理：全六镜一一对应，人物一律收进拱窗或椭圆视窗内或转为侧背仰视、鼻部以上不锁身份，色号编号与系列字样改为未印标签位与未印数字块，第 6 图规格卡改为空参数行与空印章框。品类判定：全部图像围绕唇部着色产品的雾面成膜妆效、上唇试色与选色体系展开，属着色彩妆而非护理清洁，判美妆彩妆/唇部，与主会话品类提示一致（源图另示唇颊两用，主用仍为唇部）。已剥离：原品牌字标与管身字母、系列与色号编号、原图英文文案原句、模特面容与身份、原平台角标与店铺字样，一律改为 {product} 占位、{selling_point_n} 与 {callout_n} 占位、未印色块与空白标签位；唇色与全部试色色相由 {accent_color} 承载，不锁死具体色号色值；第 6 图规格与保修数值行改为空参数线，不保留任何数字。分镜体系与库内同品牌唇泥模版不同构：该套以编号主张墙、九格选色墙与方格质地微距墙为主，本套以拱窗与椭圆视窗人像、仰拍天空氛围与洞石错位陈列为主，故按独立模版转化；色板另取雾蓝、藕雾紫与洞石灰，与该模版的藕雾灰、暗梅灰区分。"
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-nvzhuang-changxiu-niukou-zhishan",
+  "name": "女士修身长袖纽扣衬衫款",
+  "category": {
+    "l1": "女装",
+    "l2": "上衣",
+    "leaf": "女士修身长袖纽扣衬衫",
+    "leafKeywords": [
+      "女士衬衫",
+      "长袖纽扣衫",
+      "通勤职业上衣",
+      "收腰修身版型",
+      "尖领法式袖口",
+      "挂拍白底主图"
+    ]
+  },
+  "description": "隐形人台白底挂拍，靠版型结构与车线微距逐镜说服",
+  "productFamily": "fashion",
+  "styleLock": {
+    "direction": "clean premium womenswear tailoring commerce",
+    "palette": [
+      {
+        "name": "纯白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "雾蓝浅灰",
+        "hex": "#EEF2F6"
+      },
+      {
+        "name": "冷灰蓝",
+        "hex": "#7C9AB5"
+      },
+      {
+        "name": "深炭灰",
+        "hex": "#2D2D2D"
+      }
+    ],
+    "temperature": "cool",
+    "backgroundSystem": "seamless pure white #FFFFFF packshots alternating with a matte pale mist panel #EEF2F6 for benefit and infographic screens",
+    "lightingSystem": "bright even high-key studio light, front-left softbox key with fill, 5500K, low-contrast soft contact shadow, sweeping side light skimming the fabric to read seams",
+    "surfaceSystem": "matte pale mist board #EEF2F6 and seamless white sweep #FFFFFF, no textured props, no wood or stone",
+    "typography": "modern geometric sans-serif, thin charcoal rules, all rendered copy left to post-production",
+    "iconSystem": "thin single-weight line icons in cool grey-blue #7C9AB5, kept as empty slots in template",
+    "presentationRules": "garment always shown on a headless invisible-mannequin form or flat lay, consistent button-placket facing, stable scale, symmetrical sleeve spacing, no face and no limbs",
+    "noDrift": [
+      "no color palette changes",
+      "no mixed fonts",
+      "no random textured backgrounds or lifestyle props",
+      "no inconsistent lighting or hard speculars",
+      "no visible model identity, head or hands",
+      "no filled spec numbers or badge artwork"
+    ],
+    "lockText": "Campaign Style Lock: consistent premium womenswear tailoring visual system across the entire image set; fixed palette of seamless pure white background #FFFFFF, matte pale mist panel #EEF2F6, deep charcoal rules #2D2D2D and one cool grey-blue accent #7C9AB5; bright even high-key studio lighting at 5500K with a front-left key, soft fill and a sweeping side light skimming the fabric, soft contact shadows only; modern geometric sans-serif with thin single-weight line icons; garments presented on a headless invisible-mannequin form or in a symmetric flat lay; stable garment scale and placket facing; no color palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no mismatched icon styles, no model identity."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底挂拍衬衫主图",
+      "intent": "搜索列表一眼点击：正面全身廓形干净呈现，占据首图位。",
+      "assetType": "suite-nvzhuang-changxiu-niukou-zhishan::shot-01",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on eye-level front view, full silhouette from collar to curved hem, no clipping",
+      "lighting": "bright even high-key studio light, front-left key with soft fill, 5500K, soft contact shadow under the hem",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "60-70%",
+      "whitespace": "no extra whitespace, even clean margin around the silhouette only",
+      "textZone": "none",
+      "promptTemplate": "Product photography of {product}. {product_identity_lock}. {style_lock}. The garment shown on a headless invisible-mannequin form, straight-on eye-level front view, full silhouette visible from collar stand to curved shirt-tail hem, no head, no neck, no face, no arms or hands. Bright even high-key studio lighting with a front-left key and soft fill at 5500K, soft contact shadow grounding the hem. Seamless pure white background #FFFFFF. The product occupies 60-70% of the frame, no extra whitespace beyond an even clean margin. 2K, commercial apparel e-commerce quality. Negative: no model face or body parts, no hanger, no size tab lettering, no brand wordmark, no crushed folds, no plastic-looking fabric, no grey tinted background, no cut-off cuffs or hem, no watermark, no text, no props.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "收腰版型卖点图",
+      "intent": "一秒讲清核心利益：腰线与省道带来的修身轮廓。",
+      "assetType": "suite-nvzhuang-changxiu-niukou-zhishan::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle from the wearer's left, full garment visible",
+      "lighting": "soft front key at 5500K with a sweeping light skimming across the waist darts, soft contact shadow",
+      "background": "matte pale mist panel #EEF2F6",
+      "props": "none",
+      "productOccupancy": "50-60%",
+      "whitespace": "generous negative space on the right 35% for copy",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. The garment on a headless invisible-mannequin form shown at a slight 3/4 angle from the wearer's left, full body visible, the shaped waistline carried by front and side darts being the single visual idea, no head, no face, no hands. Soft front key light at 5500K with a sweeping light skimming across the waist seams so the tailoring reads clearly, soft contact shadow below the hem. Background matte pale mist panel #EEF2F6. The product occupies 50-60% of the frame with generous negative space on the right 35% left clean for copy. 2K, minimal clean apparel commerce. Negative: no model face or limbs, no second visual claim, no rendered words or numbers, no fabricated fabric composition figures, no props, no duplicated buttons or sleeves, no hard specular highlights, no watermark, no fake logo.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "DETAIL",
+      "displayName": "背面育克下摆细节",
+      "intent": "用背面结构解释工艺，打消版型与做工疑虑。",
+      "assetType": "suite-nvzhuang-changxiu-niukou-zhishan::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "straight-on eye-level rear view photographed from behind, full back panel visible",
+      "lighting": "even soft light from above-front plus a sweeping side light skimming the back panel, low-contrast shadows",
+      "background": "seamless pure white #FFFFFF",
+      "props": "none",
+      "productOccupancy": "55-60%",
+      "whitespace": "no extra whitespace except a clean margin below the curved hem",
+      "textZone": "none",
+      "promptTemplate": "Structural detail screen of {product}. {product_identity_lock}. {style_lock}. The garment on a headless invisible-mannequin form photographed from behind at a straight-on rear eye-level view, showing the shoulder yoke seam, the centre back panel and the curved shirt-tail hem, both cuffs turned into the same plane, no head and no face. Even soft studio light from above-front with a sweeping side light skimming across the back panel so the seam lines read, low-contrast soft shadows. Seamless pure white background #FFFFFF. The product occupies 55-60% of the frame, no extra whitespace except a clean margin below the hem. 2K commercial apparel quality. Negative: no model head or face, no gaping or floating seams, no wrinkled fabric, no size tab lettering, no hanger, no text labels, no watermark, no fake logo, no cut-off cuffs.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "DETAIL",
+      "displayName": "三行留白卖点信息图",
+      "intent": "横版信息图承接三条卖点，图内文字全部留空交给后期。",
+      "assetType": "suite-nvzhuang-changxiu-niukou-zhishan::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "4:3",
+      "resolution": "2K",
+      "camera": "slight 3/4 angle, garment anchored on the right half facing the empty left column",
+      "lighting": "soft front-left key at 5500K with a gentle sweep across the placket, soft contact shadow",
+      "background": "matte pale mist panel #EEF2F6",
+      "props": "three thin horizontal rules with blank label bars, empty thin-line icon slots",
+      "productOccupancy": "55-60%",
+      "whitespace": "generous negative space on the left 40% reserved for post-production copy",
+      "textZone": "none",
+      "promptTemplate": "E-commerce infographic layout of {product}. {product_identity_lock}. {style_lock}. The garment on a headless invisible-mannequin form placed on the right half at a slight 3/4 angle facing left, no head, no face, no hands. On the left, a stack of three thin horizontal rule lines in deep charcoal #2D2D2D, each above a blank label bar with no legible characters, plus two empty thin-line icon slots in cool grey-blue #7C9AB5. Soft front-left key light at 5500K with a gentle sweep across the button placket, soft contact shadow grounding the hem. Background matte pale mist panel #EEF2F6. The product occupies 55-60% of the frame with generous negative space on the left 40% kept clean for copy set later. 2K, minimal apparel infographic. Negative: no rendered Chinese or English words, no fabricated percentages or composition figures, no invented certifications or test data, no more than three label rows, no dense body text, no arrows or badge artwork, no model face, no watermark, no fake logo.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "领口袖口四宫格微距",
+      "intent": "四格同光微距证明面料织纹与车线纽扣的做工。",
+      "assetType": "suite-nvzhuang-changxiu-niukou-zhishan::shot-05",
+      "mode": "PIXEL_PROTECTED",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "extreme close-up macro quad grid, tight zoom on each construction detail, shallow depth of field",
+      "lighting": "skimming side light from the upper left revealing weave and topstitch, controlled soft highlights, matched across all four panels",
+      "background": "seamless pure white #FFFFFF showing through the thin panel gutters",
+      "props": "none",
+      "productOccupancy": "detail fills 55-60% per panel",
+      "whitespace": "no extra whitespace, only a thin white gutter between panels",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product}, four matched panels sharing identical framing, camera height and lighting: the pointed collar stand from a high 45-degree angle, the button placket from a clean 90-degree side profile, a woven fabric fold in macro, and the barrel cuff with its buttons from a low angle. {product_identity_lock}. {style_lock}. Tight zoom on each construction detail with shallow depth of field and the foreground stitching sharp, skimming side light from the upper left revealing weave and topstitch, controlled soft highlights and no harsh speculars. Seamless pure white background #FFFFFF visible only in the thin gutters. Each detail fills 55-60% of its panel, no extra whitespace. 2K, tactile apparel craft quality. Negative: no blurry subject, no size label lettering, no warped straight lines or duplicated buttons across panels, no plastic-looking fabric, no lint or stains, no visible skin or hands, no text overlay, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "平铺留白规格信任图",
+      "intent": "俯拍平铺收口：以工整折叠与空白规格条建立可信交付印象。",
+      "assetType": "suite-nvzhuang-changxiu-niukou-zhishan::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "3:4",
+      "resolution": "2K",
+      "camera": "flat lay photographed directly from above at a 90-degree overhead angle",
+      "lighting": "even high-key light from a large overhead source, faint skimming light along the fold edges, no dramatic shadows",
+      "background": "matte pale mist board #EEF2F6",
+      "props": "one slim blank specification strip with empty ruled rows",
+      "productOccupancy": "35-40%",
+      "whitespace": "generous even negative space around the flat lay",
+      "textZone": "none",
+      "promptTemplate": "E-commerce trust and packing screen showing {product} laid flat and neatly folded on a matte surface, photographed directly from above at a 90-degree overhead angle, collar squared and both sleeves folded symmetrically. {product_identity_lock}. {style_lock}. Even high-key lighting from a large overhead source with a faint skimming light along the fold edges, soft contact shadow under the fabric so nothing floats, no dramatic shadows. Surface matte pale mist board #EEF2F6, with one slim blank specification strip of empty ruled rows in deep charcoal #2D2D2D along the bottom, every cell left unfilled. The garment occupies 35-40% of the frame with generous even negative space around the flat lay. 2K, calm verified-by-craft quality. Negative: no model, no face, no hands, no invented certifications, ratings or test data, no filled specification values, no barcode or QR artwork, no packaging wordmark, no crumpled fabric, no floating garment without contact shadow, no watermark, no text.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 5,
+    "detached": true,
+    "notes": "逐图事实：001 与 002 为同一隐形人台白底正面挂拍（门襟敞开度与袖口翻折略有差异，属近重复）；003 为同件背面挂拍，可见过肩育克缝、后中片与圆弧摆、双扣袖口；004 为横版信息图，服装居右、左侧三行细分隔线配英文卖点行；005 为 2x2 微距四宫格（领座、门襟钉扣、布纹折、袖克夫）。品类判定依据：以图为准，收腰省与 X 型腰线、圆弧长短摆、尖领法式克夫判定为女士外穿长袖上衣，故归 女装/上衣（源平台类目同为女装，无需改判）；非贴身衣，故不入 内衣家居服。变体闸门结论：5 张全为同一浅色款的正/背/信息图/细节分工，不是仅换色的色卡陈列，正常转化。已剥离内容：原品牌字标与店铺字样、领口尺码标字样、004 三行原文案整句及其中的面料成分百分比（改为空白标签条占位）、任何平台徽章与星级角标、原图文案排版用词；模特本即为无头隐形人台，模版内一律不写面容与身份，仅保留挂拍与平铺结构。"
+  }
+}

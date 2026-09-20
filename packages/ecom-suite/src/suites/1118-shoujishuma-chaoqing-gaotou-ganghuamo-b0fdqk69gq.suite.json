@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "ecomgen.suite",
+  "id": "suite-shoujishuma-chaoqing-gaotou-ganghuamo-b0fdqk69gq",
+  "name": "超清高透大屏贴合钢化膜款",
+  "category": {
+    "l1": "手机数码",
+    "l2": "手机配件",
+    "leaf": "适配 Pro Max 机型超清高透钢化屏幕保护膜",
+    "leafKeywords": [
+      "钢化屏幕保护膜",
+      "超清高透",
+      "精准贴合",
+      "抗刮耐磨",
+      "边缘倒角",
+      "对齐托盘安装",
+      "Pro Max 机型"
+    ]
+  },
+  "description": "适配大尺寸 Pro Max 机型、超清高透、边缘精准贴合、对齐托盘一次落位",
+  "productFamily": "electronics",
+  "styleLock": {
+    "direction": "crisp optically-clear tech accessory commerce",
+    "palette": [
+      {
+        "name": "纯白",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "雾白",
+        "hex": "#F2F4F7"
+      },
+      {
+        "name": "石墨黑",
+        "hex": "#1B1F24"
+      },
+      {
+        "name": "冰湖澈青",
+        "hex": "#6FB4C2"
+      }
+    ],
+    "temperature": "cool",
+    "backgroundSystem": "seamless pure white #FFFFFF for the packshot, mist white #F2F4F7 for the feature screen, glacier wash #E4EFF2 for scene and install screens, graphite slate #1B1F24 for the two edge-lit demonstration screens; no gradient scenery other than the open glacier horizon",
+    "lightingSystem": "cool 6000K studio light, large front softbox key with a fill card, one narrow rim strip tracing every glass edge, low contrast elsewhere, soft contact shadows, controlled single streak specular on the film surface, no coloured cast on the glass",
+    "surfaceSystem": "matte mist-white board #F2F4F7 and brushed graphite slate #1B1F24, plus one narrow ribbed glass strip used as a refractive foreground band",
+    "typography": "modern geometric sans-serif, held entirely off-image so every headline and label plate inside the frame stays blank",
+    "iconSystem": "single-weight thin-line glyph tiles in #1B1F24 on mist white #F2F4F7, rounded rectangle frames, each paired with an empty label plate, no rendered characters",
+    "presentationRules": "the film always reads as an optically clear sheet bounded by one bright edge line; the phone is always a generic unbranded large-screen body with a blank screen and no badge or camera island identity; product scale and centring stable across the set",
+    "noDrift": [
+      "no colour palette changes",
+      "no mixed fonts",
+      "no random backgrounds",
+      "no inconsistent lighting",
+      "no rendered brand marks, letters or numbers",
+      "no tinted or coloured glass"
+    ],
+    "lockText": "Campaign Style Lock: consistent crisp optically-clear tech-accessory ecommerce visual system across the entire image set; fixed palette of seamless pure white #FFFFFF, mist white #F2F4F7, graphite black #1B1F24 and one glacier-teal accent #6FB4C2 with an open glacier-wash horizon #E4EFF2; cool neutral studio grade; modern geometric sans-serif kept off-image so every headline and label plate stays blank; single-weight thin-line icon tiles only; background system alternates pure white, mist white, glacier wash and graphite slate; lighting system is a cool 6000K front softbox with a narrow rim strip tracing every glass edge, low contrast, soft contact shadows and one controlled streak specular, no coloured cast on the glass; the film always reads as an optically clear sheet with one bright edge line and the phone always reads as a generic unbranded large-screen body; stable product scale and placement; no colour palette changes, no mixed fonts, no random backgrounds, no inconsistent lighting, no rendered brand marks or letters or numbers, no tinted or coloured glass."
+  },
+  "shots": [
+    {
+      "shotId": "shot-01",
+      "order": 1,
+      "shotRole": "HERO",
+      "displayName": "白底膜盒净透主图",
+      "intent": "在搜索列表里一眼赢得点击：白底呈现零售盒、扇形展开的透明膜片与安装对齐框，建立品类识别与净透质感。",
+      "assetType": "suite-shoujishuma-chaoqing-gaotou-ganghuamo-b0fdqk69gq::shot-01",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "straight-on eye-level packshot, carton turned at a slight three-quarter on the left, sheet row receding to the right, nothing clipped",
+      "lighting": "bright even high-key, large front softbox with fill card on the shadow side, narrow rim strip along every glass edge, soft contact shadows under each item",
+      "background": "seamless pure white #FFFFFF ground and wall",
+      "props": "one blank unbranded retail carton panel and one translucent alignment tray",
+      "productOccupancy": "60-70%",
+      "whitespace": "generous even negative space all round, no reserved copy block",
+      "textZone": "none",
+      "promptTemplate": "Packshot photography of {product}. {product_identity_lock}. {style_lock}. Straight-on eye-level view: a blank unbranded retail carton panel stands turned at a slight three-quarter attitude on the left, while the transparent sheets fan out in one receding row on the right and a translucent alignment tray leans at the outer edge, everything fully inside frame and uncut. Bright even high-key studio lighting, a large front softbox with a fill card on the shadow side, one narrow rim strip running along every glass edge, soft contact shadows pooling under each item so nothing floats. Seamless pure white background #FFFFFF meeting a matching white ground plane. The whole group occupies 60-70% of the frame, with generous negative space and even margins all round and no reserved copy block. Square 1:1 crop, 2K, crisp commercial electronics quality. Negative: no brand names, no logos, no lettering or numbers on the carton, no printed front-panel artwork, no sheet multiplying into extra duplicates, no phone brand or model identity, no coloured glass tint, no gradient background, no cut-off edges, no hands, no watermark, no decorative elements.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-02",
+      "order": 2,
+      "shotRole": "HERO",
+      "displayName": "图标环列超清卖点图",
+      "intent": "主图一秒法则：用环列特性图标把超清高透与贴合的第一购买理由在视线扫过的一秒内说完，主张词位一律留空。",
+      "assetType": "suite-shoujishuma-chaoqing-gaotou-ganghuamo-b0fdqk69gq::shot-02",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "slight 3/4 eye-level, upper two thirds of the device upright at centre, sheet hovering just in front of the glass",
+      "lighting": "cool front softbox key with a rim strip igniting the sheet edge, low contrast, faint contact shadow under the device",
+      "background": "mist white #F2F4F7 seamless field",
+      "props": "six thin-line glyph tiles in two even columns, each above one blank label plate",
+      "productOccupancy": "50-60%",
+      "whitespace": "two clean side columns of negative space held for the icon set",
+      "textZone": "none",
+      "promptTemplate": "E-commerce benefit hero of {product}. {product_identity_lock}. {style_lock}. Photographed at a slight 3/4 eye-level attitude: the upper two thirds of a generic unbranded large-screen phone body stand upright at the centre with a blank dark screen, and one optically clear sheet hovers a hand's width in front of the glass, its bright edge line catching the rim light. Six single-weight thin-line glyph tiles sit in two evenly spaced side columns on mist white #F2F4F7, each tile above one empty rounded label plate that carries no characters at all. Cool front softbox key with a narrow rim strip along the sheet edge, low contrast, one faint contact shadow under the device. The central pair occupies 50-60% of the frame, the two side columns staying as clean negative space for the icon grid. Square 1:1 crop, 2K. Negative: no rendered words or letters or numbers, no headline block, no star ratings, no badge seals, no invented test data or percentages, no more than one glyph idea per tile, no icon overlapping the product, no real phone brand or model identity, no busy background, no hands, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-03",
+      "order": 3,
+      "shotRole": "PAIN_POINT",
+      "displayName": "锋刃掠面划痕痛点",
+      "intent": "把日常钥匙刀具刮擦屏幕的焦虑可视化，让买家在自己的使用经验里对上号，再由膜面替他把风险接住。",
+      "assetType": "suite-shoujishuma-chaoqing-gaotou-ganghuamo-b0fdqk69gq::shot-03",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "very low angle looking upward along the face of the diagonally laid device, blade entering from the right edge",
+      "lighting": "directional cool key from the upper left, hard rim on the bevel, deeper contrast on the threat side, one tight specular streak at the blade contact",
+      "background": "graphite slate #1B1F24 ground fading into a glacier-teal haze #6FB4C2 behind the device",
+      "props": "one generic utility blade entering from the right frame edge, no hand shown",
+      "productOccupancy": "40-50%",
+      "whitespace": "open negative space across the upper third kept empty rather than captioned",
+      "textZone": "none",
+      "promptTemplate": "E-commerce pain-point demonstration of {product}. {product_identity_lock}. {style_lock}. Photographed from a very low angle looking upward along the face of a generic unbranded large-screen body laid on a diagonal, the clear sheet already seated on the glass, while a fresh utility blade enters from the right frame edge with no hand shown and its tip is drawn across the protected surface, throwing a small scatter of warm sparks at the contact point while the sheet beneath still reads intact and unmarked. Directional cool key from the upper left with a hard rim tracing the bevel, contrast deeper on the threat side, one tight specular streak at the blade contact, a thin contact shadow grounding the device. Graphite slate background #1B1F24 fading into a glacier-teal haze #6FB4C2 behind it. The device occupies 40-50% of the frame with open negative space kept across the upper third, held empty instead of captioned. Square 1:1 crop, 2K. Negative: no shattered or cracked glass, no scratched bare screen surface, no injury or blood, no tool brand or packaging, no hand or fingers in frame, no captions, arrows or check marks, no numbers or percentages, no fabricated lab or hardness claims, no watermark, no extra text.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-04",
+      "order": 4,
+      "shotRole": "SCENE",
+      "displayName": "冰原透景超清场景",
+      "intent": "用可被看见的清晰度完成场景代入：膜内景色锐利、膜外景色柔化，让超清高透不用一个字就被读懂。",
+      "assetType": "suite-shoujishuma-chaoqing-gaotou-ganghuamo-b0fdqk69gq::shot-04",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "high 45-degree angle looking down onto the sheet leaning across a sculpted fine-grain terrain field",
+      "lighting": "soft cool daylight-grade key from behind-left at 6000K, long gentle shadow gradients, no hard specular",
+      "background": "glacier-wash horizon field #E4EFF2 grading to mist white #F2F4F7 above",
+      "props": "sculpted fine-grain terrain band and one narrow ribbed glass strip as refractive foreground",
+      "productOccupancy": "40-50%",
+      "whitespace": "open uncluttered horizon kept as breathing negative space above the sheet",
+      "textZone": "none",
+      "promptTemplate": "Lifestyle clarity scene built around {product}. {product_identity_lock}. {style_lock}. Photographed from a high 45-degree angle looking down, one optically clear sheet leaning at an angle across a sculpted fine-grain terrain field, so the ground read through the glass stays crisp and undistorted while the same ground outside the sheet falls softly out of focus. A narrow ribbed glass strip runs across the lower foreground and refracts one bright banded line under the sheet corner. Soft cool daylight-grade key from behind-left at 6000K, long gentle shadow gradients, no hard speculars, a soft shadow where the sheet meets the ground. Background is an open glacier-wash horizon field #E4EFF2 grading into mist white #F2F4F7 above. The sheet occupies 40-50% of the frame with generous negative space left open above the horizon as breathing room rather than for any caption. Square 1:1 crop, 2K. Negative: no packaging, no brand marks, no rendered headline or letters, no duplicated terrain texture behind the sheet, no prismatic rainbow artefacts, no coloured or tinted glass, no warped straight edge on the sheet, no people or faces, no floating sheet without a contact shadow, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-05",
+      "order": 5,
+      "shotRole": "DETAIL",
+      "displayName": "倒角边缘贴合微距",
+      "intent": "用微距证明做工：倒角抛亮、开孔让位、边缘与机身转角齐平，消除割手与顶壳的最后一层疑虑。",
+      "assetType": "suite-shoujishuma-chaoqing-gaotou-ganghuamo-b0fdqk69gq::shot-05",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "4K",
+      "camera": "extreme close-up macro at a shallow 15-degree oblique, tight zoom on the bevelled corner, shallow depth of field, near edge line sharp",
+      "background": "graphite slate #1B1F24 with a faint glacier-teal reflection #6FB4C2 at the far edge",
+      "lighting": "skimming light sweeping along the bevel, one continuous bright stroke on the chamfer, deep fall-off, controlled specular",
+      "props": "three short thin arc indicators glowing at the seam",
+      "productOccupancy": "detail fills 55-60%",
+      "whitespace": "no extra whitespace beyond a dark fall-off at the frame corners",
+      "textZone": "none",
+      "promptTemplate": "Extreme close-up macro of {product} seated on the corner of a generic unbranded large-screen body, tight zoom on the bevelled edge and the cutout that gives the front sensor room. {product_identity_lock}. {style_lock}. Camera at a shallow 15-degree oblique with a very short working distance, shallow depth of field so only the near edge line stays sharp. A skimming light sweeps along the bevel so the polished chamfer reads as one continuous bright stroke, and three short thin arc indicators glow at the seam where sheet meets corner. Graphite slate ground #1B1F24 with a faint glacier-teal reflection #6FB4C2 along the far edge, controlled specular, deep fall-off. The detail fills 55-60% of the frame with no extra whitespace beyond the dark fall-off at the corners. Square 1:1 crop, 4K so the edge holds up under zoom. Negative: no blurry subject, no warped or bent straight lines, no duplicated bevel or doubled corner, no callout arrows, dimension lines or labels, no letters or numbers, no dust specks or trapped bubbles, no greasy fingerprint smudge, no invented thickness figures, no watermark.",
+      "supportsImageReference": true
+    },
+    {
+      "shotId": "shot-06",
+      "order": 6,
+      "shotRole": "TRUST",
+      "displayName": "对齐托盘落位收口",
+      "intent": "收口消除最大购买顾虑：透明对齐托盘让膜片一次落位、方向不歪，把装坏的可能从决策里拿走。",
+      "assetType": "suite-shoujishuma-chaoqing-gaotou-ganghuamo-b0fdqk69gq::shot-06",
+      "mode": "CREATIVE",
+      "aspectRatio": "1:1",
+      "resolution": "2K",
+      "camera": "photographed directly from above at a 90-degree overhead angle in a tidy flat lay",
+      "lighting": "even high-key cool light, minimal soft shadows, one edge shadow under the tray, low-glare specular on the sheet",
+      "background": "glacier wash #E4EFF2 matte field",
+      "props": "one translucent alignment tray seated over the device, one blank wipe tab with no printed characters",
+      "productOccupancy": "35-40% overall",
+      "whitespace": "generous whitespace and open margins on all four sides, no reserved copy block",
+      "textZone": "none",
+      "promptTemplate": "E-commerce risk-free installation screen for {product}. {product_identity_lock}. {style_lock}. Photographed directly from above at a 90-degree overhead angle as a tidy flat lay: a generic unbranded large-screen body lies face up on a glacier-wash matte field #E4EFF2, one translucent alignment tray sits squarely over it, and the clear sheet is half lowered into the tray while a single fingertip enters from the top-right of frame to press its centre. Even high-key cool light, minimal soft shadows, one soft edge shadow under the tray so nothing floats, a low-glare specular running across the sheet. Props stay limited to the alignment tray and one blank wipe tab carrying no printed characters. The whole layout occupies 35-40% of the frame with generous whitespace and open margins on all four sides. Square 1:1 crop, 2K. Negative: no deformed or extra fingers, no visible face or body, no skin retouching, no tool brand, no rendered instructions or step numbers or arrows, no bubbles drawn as damage, no tilted or misaligned tray, no logos, no watermark, no extra text.",
+      "supportsImageReference": true
+    }
+  ],
+  "provenance": {
+    "sourceKind": "viral-reference-set",
+    "sourceImageCount": 6,
+    "detached": true,
+    "notes": "源 6 张官方主图逐图事实：001 白底零售盒与扇形展开的透明膜片、彩色安装对齐框同框，盒面排布细线特性图标与圆环徽标；002 浅蓝底上通用机身正面 3/4、一片膜悬于屏前、左右各三枚细线图标配英文特性字；003 淡蓝紫地貌背景，膜片立于细密砂丘前做超清折射演示，底部一条条纹玻璃压边，顶部两行英文标题；004 机角倒角与传感器开孔微距，边缘三道发光弧线示意精准贴合，左上英文短语；005 深色机身斜置于浅蓝底，美工刀尖划过膜面溅火星，顶部两行英文主张；006 俯拍平铺，透明对齐托盘压在机身上，指尖按落膜片，白色英文标题。品类判定以图为准：主体是透明钢化玻璃膜片，机身只是通用无品牌大屏占位件（leaf 写通用适配 Pro Max 机型，不写任何具体品牌型号与标识），对齐框属安装配件，故归「手机数码 / 手机配件」，未采用源平台类目挂法。已剥离内容：零售盒与图内全部字标、系列名、原平台店铺字样、英文标题原句、圆环徽标与星级/徽章类社会证明；特性图标标签一律改为空白标签板，厚度、硬度、透光率、件数等不可验证数字与主张不入稿，改由使用方自填或留空；片数不入稿。与库内既有膜类模版逐镜比对：既有两套为 10 镜深色系结构，本套为 6 镜浅色系（白底盒装同框、图标环列、锋刃痛点、冰原透景、倒角微距、托盘俯拍），分镜不同构，非通版重复。"
+  }
+}
