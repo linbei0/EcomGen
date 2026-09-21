@@ -24,20 +24,7 @@ describe("首页 · 项目画廊", () => {
     expect(await screen.findByText("设置 · Provider")).toBeInTheDocument();
   });
 
-  it("有项目时渲染画廊卡片", async () => {
-    server.use(
-      http.get(`${BASE}/projects`, () =>
-        HttpResponse.json({ items: [PROJECT_FIXTURE], nextCursor: null }),
-      ),
-    );
-    renderWithProviders(<HomePage />);
-    expect(await screen.findByRole("link", { name: /无线耳机 SPU/ })).toBeInTheDocument();
-    expect(screen.queryByText("项目画廊 · 暂无项目")).not.toBeInTheDocument();
-    expect(screen.queryByText("国内平台")).not.toBeInTheDocument();
-    expect(screen.queryByText("创意")).not.toBeInTheDocument();
-  });
-
-  it("有生成图时显示原图角标与套图数量", async () => {
+  it("有项目时渲染画廊卡片与原图角标、套图数量", async () => {
     server.use(
       http.get(`${BASE}/projects`, () =>
         HttpResponse.json({
@@ -58,10 +45,12 @@ describe("首页 · 项目画廊", () => {
     );
     renderWithProviders(<HomePage />);
     expect(await screen.findByRole("link", { name: /无线耳机 SPU/ })).toBeInTheDocument();
-    expect(screen.getByText("原图")).toBeInTheDocument();
-    expect(screen.getByText("生成 3 张套图")).toBeInTheDocument();
+    expect(screen.queryByText("项目画廊 · 暂无项目")).not.toBeInTheDocument();
+    // 卡片不展示平台与模式标签
     expect(screen.queryByText("国内平台")).not.toBeInTheDocument();
     expect(screen.queryByText("创意")).not.toBeInTheDocument();
+    expect(screen.getByText("原图")).toBeInTheDocument();
+    expect(screen.getByText("生成 3 张套图")).toBeInTheDocument();
   });
 
   it("可从卡片菜单归档项目", async () => {

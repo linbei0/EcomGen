@@ -4,6 +4,25 @@ import { describe, expect, it } from "vitest";
 import { adaptAsset, adaptExport, adaptExportJobBundle, adaptProject, adaptProjectDetail, adaptStoryboardBundle, exportDownloadUrl } from "./projectDetail";
 import { adaptTemplate } from "./templates";
 
+/** adaptProject 的公共 payload：用例只覆盖与自身规则相关的差异。 */
+function projectPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "p1",
+    name: "耳机",
+    platformTargets: ["TAOBAO"],
+    targetMarket: null,
+    copyLanguage: null,
+    reasoningProviderId: "r",
+    reasoningModelId: "m",
+    imageProviderId: "i",
+    imageModelId: "img",
+    defaultMode: "CREATIVE",
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 describe("adapters", () => {
   it("模板 snake_case 转为 camelCase", () => {
     const adapted = adaptTemplate({
@@ -74,65 +93,25 @@ describe("adapters", () => {
   });
 
   it("分割模型引用协议未知时置空，避免面板回显脏数据", () => {
-    const project = adaptProject({
-      id: "p1",
-      name: "耳机",
-      platformTargets: ["TAOBAO"],
-      targetMarket: null,
-      copyLanguage: null,
-      reasoningProviderId: "r",
-      reasoningModelId: "m",
-      imageProviderId: "i",
-      imageModelId: "img",
-      segmentationModel: { providerId: "s", modelId: "m", protocol: "unknown" },
-      defaultMode: "CREATIVE",
-      createdAt: "2026-08-01T00:00:00.000Z",
-      updatedAt: "2026-08-01T00:00:00.000Z",
-    });
+    const project = adaptProject(projectPayload({ segmentationModel: { providerId: "s", modelId: "m", protocol: "unknown" } }));
     expect(project?.segmentationModel).toBeNull();
   });
 
   // 用例直接取自协议注册表：本地再抄一份协议名单曾漏掉 gitee_sam3，导致该渠道的项目被解析成未配置分割模型
   it.each(SEGMENTATION_PROTOCOLS)("分割模型引用保留注册表中的协议 %s", (protocol) => {
-    const project = adaptProject({
-      id: "p1",
-      name: "耳机",
-      platformTargets: ["TAOBAO"],
-      targetMarket: null,
-      copyLanguage: null,
-      reasoningProviderId: "r",
-      reasoningModelId: "m",
-      imageProviderId: "i",
-      imageModelId: "img",
-      segmentationModel: { providerId: "s", modelId: "m", protocol },
-      defaultMode: "CREATIVE",
-      createdAt: "2026-08-01T00:00:00.000Z",
-      updatedAt: "2026-08-01T00:00:00.000Z",
-    });
+    const project = adaptProject(projectPayload({ segmentationModel: { providerId: "s", modelId: "m", protocol } }));
     expect(project?.segmentationModel).toEqual({ providerId: "s", modelId: "m", protocol });
   });
 
   it("项目列表封面解析原图与输出 id，并去掉封面重复项", () => {
-    const project = adaptProject({
-      id: "p1",
-      name: "耳机",
-      platformTargets: ["TAOBAO"],
-      targetMarket: null,
-      copyLanguage: null,
-      reasoningProviderId: "r",
-      reasoningModelId: "m",
-      imageProviderId: "i",
-      imageModelId: "img",
-      defaultMode: "CREATIVE",
-      createdAt: "2026-08-01T00:00:00.000Z",
-      updatedAt: "2026-08-01T00:00:00.000Z",
+    const project = adaptProject(projectPayload({
       cover: {
         productAssetId: "a1",
         coverOutputId: "o1",
         previewOutputIds: ["o2", "o1", "o3"],
         outputCount: 4,
       },
-    });
+    }));
     expect(project?.cover).toEqual({
       productAssetId: "a1",
       coverOutputId: "o1",

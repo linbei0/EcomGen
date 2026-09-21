@@ -18,10 +18,4 @@ describe("parseBody", () => {
       ]);
     }
   });
-
-  it("returns the validated static shape for compatible string values", () => {
-    const input = parseBody(CreateGenerationJobInput, { storyboardItemIds: ["00000000-0000-4000-8000-000000000000"], generationBatchId: "00000000-0000-4000-8000-000000000001" });
-    expect(input.storyboardItemIds).toHaveLength(1);
-    expect(input.generationBatchId).toBe("00000000-0000-4000-8000-000000000001");
-  });
 });

@@ -38,7 +38,10 @@ function renderBoard() {
 }
 
 describe("工作台 · 确认并生成", () => {
-  it("全选后可一次提交全部 itemId", async () => {
+  it.each([
+    { selection: "全选", submitted: [ITEM_ID, ITEM_ID_B] },
+    { selection: "仅勾选一项", submitted: [ITEM_ID] },
+  ])("已确认分镜只提交选中的 itemId（$selection）", async ({ selection, submitted }) => {
     const user = userEvent.setup();
     let captured: unknown;
     server.use(
@@ -57,10 +60,11 @@ describe("工作台 · 确认并生成", () => {
         captured = await request.json();
         return HttpResponse.json(
           {
-            jobs: [
-              { ...GENERATE_JOB_FIXTURE, storyboardItemId: ITEM_ID },
-              { ...GENERATE_JOB_FIXTURE, id: "ffffffff-0000-4111-8222-333333333333", storyboardItemId: ITEM_ID_B },
-            ],
+            jobs: submitted.map((storyboardItemId, index) => ({
+              ...GENERATE_JOB_FIXTURE,
+              id: index === 0 ? GENERATE_JOB_FIXTURE.id : "ffffffff-0000-4111-8222-333333333333",
+              storyboardItemId,
+            })),
           },
           { status: 202 },
         );
@@ -68,42 +72,15 @@ describe("工作台 · 确认并生成", () => {
     );
 
     renderBoard();
-    expect(await screen.findByRole("button", { name: "全选" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "全选" }));
+    const checkbox = await screen.findByRole("checkbox", { name: "选择白底/纯色底产品主图" });
+    if (selection === "全选") {
+      await user.click(screen.getByRole("button", { name: "全选" }));
+    } else {
+      await user.click(checkbox);
+    }
     await user.click(screen.getByRole("button", { name: "确认并生成" }));
     await waitFor(() => {
-      expect(captured).toMatchObject({
-        storyboardItemIds: [ITEM_ID, ITEM_ID_B],
-      });
-    });
-  });
-
-  it("已确认分镜只提交勾选的 itemId", async () => {
-    const user = userEvent.setup();
-    let captured: unknown;
-    server.use(
-      http.get(`${BASE}/projects/:projectId`, () =>
-        HttpResponse.json(
-          projectDetailPayload({
-            storyboard: confirmedBoard.storyboard,
-            items: confirmedBoard.items,
-          }),
-        ),
-      ),
-      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
-        HttpResponse.json(storyboardPayload(confirmedBoard.storyboard, confirmedBoard.items)),
-      ),
-      http.post(`${BASE}/projects/:projectId/generation-jobs`, async ({ request }) => {
-        captured = await request.json();
-        return HttpResponse.json({ jobs: [{ ...GENERATE_JOB_FIXTURE, storyboardItemId: ITEM_ID }] }, { status: 202 });
-      }),
-    );
-
-    renderBoard();
-    await user.click(await screen.findByRole("checkbox", { name: "选择白底/纯色底产品主图" }));
-    await user.click(screen.getByRole("button", { name: "确认并生成" }));
-    await waitFor(() => {
-      expect(captured).toMatchObject({ storyboardItemIds: [ITEM_ID] });
+      expect(captured).toMatchObject({ storyboardItemIds: submitted });
     });
   });
 

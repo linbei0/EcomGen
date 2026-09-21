@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { useState } from "react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { suiteFixtures } from "../../test/msw/fixtures";
 import { BASE, suiteStore, suitesResponse } from "../../test/msw/handlers";
@@ -27,7 +27,6 @@ describe("SuitePickerDialog 分页与筛选", () => {
   const requests: string[] = [];
 
   beforeEach(() => {
-    suiteStore.length = 0;
     suiteStore.push(...suiteFixtures(FIXTURE_COUNT));
     requests.length = 0;
     server.use(
@@ -40,10 +39,6 @@ describe("SuitePickerDialog 分页与筛选", () => {
         return HttpResponse.json(suitesResponse(new URL(request.url).searchParams));
       }),
     );
-  });
-
-  afterEach(() => {
-    suiteStore.length = 0;
   });
 
   it("首屏只取一页，并把分页与检索参数交给服务端", async () => {

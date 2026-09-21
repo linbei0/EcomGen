@@ -94,6 +94,68 @@ function renderPendingFrame(): void {
   for (const { callback } of callbacks) callback(0);
 }
 
+/** 选框拖拽用例的脚本步骤：触发 pointer 事件，或就地断言光标/实时预览。 */
+type DragStep =
+  | { fire: "pointerdown" | "pointermove" | "pointerup"; x: number; y: number }
+  | { expectCursor: string }
+  | { expectPreview: [number, number, number, number] };
+
+/** 四类拖拽手势：初始 200×200 选框由用例统一画好，这里只描述其后的操作与预期 bounds。 */
+const dragGestures: Array<{ gesture: string; steps: DragStep[]; bounds: { x: number; y: number; width: number; height: number } }> = [
+  {
+    gesture: "移动已框选区域只提交移动后的选择框",
+    steps: [
+      { fire: "pointerdown", x: 150, y: 100 },
+      { fire: "pointermove", x: 350, y: 250 },
+      { fire: "pointerup", x: 350, y: 250 },
+    ],
+    bounds: { x: 300, y: 250, width: 200, height: 200 },
+  },
+  {
+    gesture: "拖动边框移动整个区域并显示移动光标",
+    steps: [
+      { fire: "pointermove", x: 150, y: 100 },
+      { expectCursor: "move" },
+      { fire: "pointerdown", x: 150, y: 100 },
+      { fire: "pointermove", x: 250, y: 150 },
+      { fire: "pointerup", x: 250, y: 150 },
+    ],
+    bounds: { x: 200, y: 150, width: 200, height: 200 },
+  },
+  {
+    gesture: "拖动角点实时调整大小并显示对角缩放光标",
+    steps: [
+      { fire: "pointermove", x: 300, y: 300 },
+      { expectCursor: "nwse-resize" },
+      { fire: "pointerdown", x: 300, y: 300 },
+      { fire: "pointermove", x: 400, y: 350 },
+      { expectPreview: [100, 100, 300, 250] },
+      { fire: "pointerup", x: 400, y: 350 },
+    ],
+    bounds: { x: 100, y: 100, width: 300, height: 250 },
+  },
+  {
+    gesture: "拖动边中点只调整对应方向的尺寸",
+    steps: [
+      { fire: "pointermove", x: 200, y: 100 },
+      { expectCursor: "ns-resize" },
+      { fire: "pointerdown", x: 200, y: 100 },
+      { fire: "pointermove", x: 200, y: 50 },
+      { fire: "pointerup", x: 200, y: 50 },
+    ],
+    bounds: { x: 100, y: 50, width: 200, height: 250 },
+  },
+];
+
+/** 分层模式用例的公共前置：当前成图既无识别方案、无导出记录，也无导出历史。 */
+function stubEmptyLayerState(): void {
+  server.use(
+    http.get(`${BASE}/outputs/:outputId/layer-plan`, () => new HttpResponse(null, { status: 404 })),
+    http.get(`${BASE}/outputs/:outputId/layer-exports`, () => new HttpResponse(null, { status: 404 })),
+    http.get(`${BASE}/outputs/:outputId/layer-exports/history`, () => HttpResponse.json({ exports: [] })),
+  );
+}
+
 describe("图片编辑画布", () => {
   beforeEach(() => {
     currentAlpha = 1;
@@ -137,7 +199,7 @@ describe("图片编辑画布", () => {
     expect(resolveReferenceImageUrl("/api/v1/files/assets/reference.png", "/api/v1")).toBe("/api/v1/files/assets/reference.png");
   });
 
-  it("拖动已框选区域后只提交移动后的选择框", async () => {
+  it.each(dragGestures)("拖动选框：$gesture", async ({ steps, bounds }) => {
     const user = userEvent.setup();
     let submittedAnnotations: unknown;
     server.use(
@@ -152,18 +214,31 @@ describe("图片编辑画布", () => {
     vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 1000, height: 1000 } as DOMRect);
     initializeCanvas();
     expect(canvas.width).toBe(1000);
+    // 先画定 200×200 的初始选框
     firePointer(canvas, "pointerdown", 1, 100, 100);
     expect(canvas.setPointerCapture).toHaveBeenCalledWith(1);
     firePointer(canvas, "pointermove", 1, 300, 300);
     firePointer(canvas, "pointerup", 1, 300, 300);
-    firePointer(canvas, "pointerdown", 2, 150, 100);
-    firePointer(canvas, "pointermove", 2, 350, 250);
-    firePointer(canvas, "pointerup", 2, 350, 250);
-    await user.type(screen.getByPlaceholderText(/把选中的菠萝颜色/), "移动框选区域");
+
+    for (const step of steps) {
+      if ("expectCursor" in step) {
+        expect(canvas.style.cursor).toBe(step.expectCursor);
+        continue;
+      }
+      if ("expectPreview" in step) {
+        canvasContext.strokeRect.mockClear();
+        renderPendingFrame();
+        expect(canvasContext.strokeRect).toHaveBeenCalledWith(...step.expectPreview);
+        continue;
+      }
+      firePointer(canvas, step.fire, 2, step.x, step.y);
+    }
+
+    await user.type(screen.getByPlaceholderText(/把选中的菠萝颜色/), "提交框选调整");
     await user.click(screen.getByRole("button", { name: "生成计划" }));
 
     expect(submittedAnnotations).toMatchObject({
-      annotations: [{ type: "rect", bounds: { x: 300, y: 250, width: 200, height: 200 } }],
+      annotations: [{ type: "rect", bounds }],
     });
   });
 
@@ -260,99 +335,6 @@ describe("图片编辑画布", () => {
     expect(tintFillStyles).toContain("#f07800");
   });
 
-  it("拖动选框边框时移动整个区域并显示移动光标", async () => {
-    const user = userEvent.setup();
-    let submittedAnnotations: unknown;
-    server.use(
-      http.post(`${BASE}/edit-sessions/:sessionId/turns`, async ({ request }) => {
-        submittedAnnotations = JSON.parse(String((await request.formData()).get("annotations")));
-        return HttpResponse.json({ turnId: "turn-1" });
-      }),
-    );
-    renderEditor();
-
-    const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-tool='rect']")!;
-    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 1000, height: 1000 } as DOMRect);
-    initializeCanvas();
-    firePointer(canvas, "pointerdown", 1, 100, 100);
-    firePointer(canvas, "pointermove", 1, 300, 300);
-    firePointer(canvas, "pointerup", 1, 300, 300);
-    firePointer(canvas, "pointermove", 2, 150, 100);
-    expect(canvas.style.cursor).toBe("move");
-    firePointer(canvas, "pointerdown", 3, 150, 100);
-    firePointer(canvas, "pointermove", 3, 250, 150);
-    firePointer(canvas, "pointerup", 3, 250, 150);
-    await user.type(screen.getByPlaceholderText(/把选中的菠萝颜色/), "移动选框边框");
-    await user.click(screen.getByRole("button", { name: "生成计划" }));
-
-    expect(submittedAnnotations).toMatchObject({
-      annotations: [{ type: "rect", bounds: { x: 200, y: 150, width: 200, height: 200 } }],
-    });
-  });
-
-  it("拖动选框角点时实时调整大小并显示对角缩放光标", async () => {
-    const user = userEvent.setup();
-    let submittedAnnotations: unknown;
-    server.use(
-      http.post(`${BASE}/edit-sessions/:sessionId/turns`, async ({ request }) => {
-        submittedAnnotations = JSON.parse(String((await request.formData()).get("annotations")));
-        return HttpResponse.json({ turnId: "turn-1" });
-      }),
-    );
-    renderEditor();
-
-    const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-tool='rect']")!;
-    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 1000, height: 1000 } as DOMRect);
-    initializeCanvas();
-    firePointer(canvas, "pointerdown", 1, 100, 100);
-    firePointer(canvas, "pointermove", 1, 300, 300);
-    firePointer(canvas, "pointerup", 1, 300, 300);
-    firePointer(canvas, "pointermove", 2, 300, 300);
-    expect(canvas.style.cursor).toBe("nwse-resize");
-    firePointer(canvas, "pointerdown", 3, 300, 300);
-    canvasContext.strokeRect.mockClear();
-    firePointer(canvas, "pointermove", 3, 400, 350);
-    renderPendingFrame();
-    expect(canvasContext.strokeRect).toHaveBeenCalledWith(100, 100, 300, 250);
-    firePointer(canvas, "pointerup", 3, 400, 350);
-    await user.type(screen.getByPlaceholderText(/把选中的菠萝颜色/), "拉伸选框角点");
-    await user.click(screen.getByRole("button", { name: "生成计划" }));
-
-    expect(submittedAnnotations).toMatchObject({
-      annotations: [{ type: "rect", bounds: { x: 100, y: 100, width: 300, height: 250 } }],
-    });
-  });
-
-  it("拖动选框边中点时只调整对应方向的尺寸", async () => {
-    const user = userEvent.setup();
-    let submittedAnnotations: unknown;
-    server.use(
-      http.post(`${BASE}/edit-sessions/:sessionId/turns`, async ({ request }) => {
-        submittedAnnotations = JSON.parse(String((await request.formData()).get("annotations")));
-        return HttpResponse.json({ turnId: "turn-1" });
-      }),
-    );
-    renderEditor();
-
-    const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-tool='rect']")!;
-    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 1000, height: 1000 } as DOMRect);
-    initializeCanvas();
-    firePointer(canvas, "pointerdown", 1, 100, 100);
-    firePointer(canvas, "pointermove", 1, 300, 300);
-    firePointer(canvas, "pointerup", 1, 300, 300);
-    firePointer(canvas, "pointermove", 2, 200, 100);
-    expect(canvas.style.cursor).toBe("ns-resize");
-    firePointer(canvas, "pointerdown", 3, 200, 100);
-    firePointer(canvas, "pointermove", 3, 200, 50);
-    firePointer(canvas, "pointerup", 3, 200, 50);
-    await user.type(screen.getByPlaceholderText(/把选中的菠萝颜色/), "拉伸选框上边");
-    await user.click(screen.getByRole("button", { name: "生成计划" }));
-
-    expect(submittedAnnotations).toMatchObject({
-      annotations: [{ type: "rect", bounds: { x: 100, y: 50, width: 200, height: 250 } }],
-    });
-  });
-
   it("即使之前选过橙色标注，编辑笔刷光标仍使用编辑蓝", async () => {
     const user = userEvent.setup();
     renderEditor();
@@ -373,10 +355,7 @@ describe("图片编辑画布", () => {
 
   it("分层模式下只保留平移与画框工具，隐藏编辑工具", async () => {
     const user = userEvent.setup();
-    server.use(
-      http.get(`${BASE}/outputs/:outputId/layer-plan`, () => new HttpResponse(null, { status: 404 })),
-      http.get(`${BASE}/outputs/:outputId/layer-exports`, () => new HttpResponse(null, { status: 404 })),
-    );
+    stubEmptyLayerState();
     renderEditor();
     await user.click(screen.getByRole("button", { name: "AI 分层导出" }));
 
@@ -389,10 +368,7 @@ describe("图片编辑画布", () => {
 
   it("分层模式下空格在输入框中不触发平移，在画布上仍可临时平移", async () => {
     const user = userEvent.setup();
-    server.use(
-      http.get(`${BASE}/outputs/:outputId/layer-plan`, () => new HttpResponse(null, { status: 404 })),
-      http.get(`${BASE}/outputs/:outputId/layer-exports`, () => new HttpResponse(null, { status: 404 })),
-    );
+    stubEmptyLayerState();
     renderEditor();
     await user.click(screen.getByRole("button", { name: "AI 分层导出" }));
 
@@ -408,10 +384,7 @@ describe("图片编辑画布", () => {
 
   it("分层模式下不再绘制编辑与保护遮罩", async () => {
     const user = userEvent.setup();
-    server.use(
-      http.get(`${BASE}/outputs/:outputId/layer-plan`, () => new HttpResponse(null, { status: 404 })),
-      http.get(`${BASE}/outputs/:outputId/layer-exports`, () => new HttpResponse(null, { status: 404 })),
-    );
+    stubEmptyLayerState();
     renderEditor();
     initializeCanvas();
     renderPendingFrame();
@@ -424,11 +397,7 @@ describe("图片编辑画布", () => {
 
   it("快速框选提交后触发的残留渲染帧不会抹掉刚画上的选框", async () => {
     const user = userEvent.setup();
-    server.use(
-      http.get(`${BASE}/outputs/:outputId/layer-plan`, () => new HttpResponse(null, { status: 404 })),
-      http.get(`${BASE}/outputs/:outputId/layer-exports`, () => new HttpResponse(null, { status: 404 })),
-      http.get(`${BASE}/outputs/:outputId/layer-exports/history`, () => HttpResponse.json({ exports: [] })),
-    );
+    stubEmptyLayerState();
     renderEditor();
     initializeCanvas();
     await user.click(screen.getByRole("button", { name: "AI 分层导出" }));

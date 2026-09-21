@@ -41,9 +41,16 @@ function renderExport(outputs = [OUTPUT_FIXTURE, OUTPUT_B_FIXTURE]) {
   );
 }
 
+/** 两个用例共用的结果区操作：全选图片后打包下载。 */
+async function submitExport() {
+  const user = userEvent.setup();
+  renderExport();
+  await user.click(await screen.findByRole("button", { name: "全选图片" }));
+  await user.click(await screen.findByRole("button", { name: /打包下载/ }));
+}
+
 describe("工作台 · 导出", () => {
   it("打包下载显式提交已选择的 outputIds", async () => {
-    const user = userEvent.setup();
     let captured: unknown;
     server.use(
       http.post(`${BASE}/projects/:projectId/export-jobs`, async ({ request }) => {
@@ -51,9 +58,7 @@ describe("工作台 · 导出", () => {
         return HttpResponse.json({ job: EXPORT_JOB_FIXTURE, export: EXPORT_FIXTURE }, { status: 202 });
       }),
     );
-    renderExport();
-    await user.click(await screen.findByRole("button", { name: "全选图片" }));
-    await user.click(await screen.findByRole("button", { name: /打包下载/ }));
+    await submitExport();
     await waitFor(() => {
       expect(captured).toMatchObject({
         outputIds: [OUTPUT_ID, OUTPUT_ID_B],
@@ -64,7 +69,6 @@ describe("工作台 · 导出", () => {
   });
 
   it("成功后提供下载，优先 downloadUrl", async () => {
-    const user = userEvent.setup();
     server.use(
       http.post(`${BASE}/projects/:projectId/export-jobs`, () =>
         HttpResponse.json({ job: EXPORT_JOB_FIXTURE, export: EXPORT_FIXTURE }, { status: 202 }),
@@ -77,9 +81,7 @@ describe("工作台 · 导出", () => {
         }),
       ),
     );
-    renderExport();
-    await user.click(await screen.findByRole("button", { name: "全选图片" }));
-    await user.click(await screen.findByRole("button", { name: /打包下载/ }));
+    await submitExport();
     const link = await screen.findByRole("link", { name: "打开 ZIP" });
     expect(link).toHaveAttribute("href", "https://files.local/pack.zip");
   });

@@ -10,6 +10,7 @@ vi.mock("@earendil-works/pi-ai/api/openai-responses.lazy", () => ({
 }));
 
 import { probeReasoning } from "./reasoning-probe.js";
+import { resolveReasoningProfile } from "./reasoning-profile.js";
 
 describe("reasoning probe", () => {
   it("uses the resolved Pi profile and returns final text", async () => {
@@ -27,7 +28,8 @@ describe("reasoning probe", () => {
       apiKey: "secret",
     })).resolves.toMatchObject({ text: "OK" });
 
-    expect(streamSimple).toHaveBeenCalledWith(expect.objectContaining({ compat: { maxTokensField: "max_tokens", thinkingFormat: "qwen", supportsDeveloperRole: false } }), expect.any(Object), expect.objectContaining({ apiKey: "secret", maxTokens: 512 }));
+    // 探活透传的是解析结果本身；compat 表的具体取值由 reasoning-profile.test.ts 守住
+    expect(streamSimple).toHaveBeenCalledWith(expect.objectContaining({ compat: resolveReasoningProfile("dashscope_qwen") }), expect.any(Object), expect.objectContaining({ apiKey: "secret", maxTokens: 512 }));
   });
 
   it("uses the Responses adapter for the explicit Responses protocol", async () => {

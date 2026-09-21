@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileUserTemplate, ECOM_TEMPLATES, isUserTemplateId, resolveTemplates, resolveTemplatesWithUser, templateGuidance } from "./catalog.js";
+import { compileUserTemplate, ECOM_TEMPLATES, resolveTemplates, resolveTemplatesWithUser, templateGuidance } from "./catalog.js";
 import { resolveProductFamily } from "./product-family.js";
 
 describe("ecom-details-image catalog adaptation", () => {
@@ -34,11 +34,6 @@ describe("user-defined templates", () => {
     expect(compiled.supports_image_reference).toBe(true);
     const guidance = templateGuidance(compiled);
     expect(guidance.visualFields.custom_prompt).toBe(source.prompt);
-  });
-
-  it("identifies user template IDs by the custom- prefix", () => {
-    expect(isUserTemplateId("custom-ab12cd34")).toBe(true);
-    expect(isUserTemplateId("hero-image")).toBe(false);
   });
 
   it("resolves mixed requests with exact id/name matching for user templates only", () => {

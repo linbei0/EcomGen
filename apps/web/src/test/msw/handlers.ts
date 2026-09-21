@@ -27,6 +27,13 @@ export const userTemplateStore: typeof USER_TEMPLATE_FIXTURE[] = [{ ...USER_TEMP
 /** 套图内存态：用例按需填充（清空由用例自己负责），默认空库与改动前的行为一致。 */
 export const suiteStore: ReturnType<typeof suiteFixtures> = [];
 
+/** 恢复内存态默认值：测试基建在每个用例结束后调用，避免模块级 store 造成用例间的顺序依赖。 */
+export function resetStores(): void {
+  userTemplateStore.length = 0;
+  userTemplateStore.push({ ...USER_TEMPLATE_FIXTURE });
+  suiteStore.length = 0;
+}
+
 /** 套图列表的游标语义与后端一致：游标是上一页最后一张套图的 ID，找不到即视为已到底。 */
 export function suitesResponse(query: URLSearchParams) {
   const l1Counts: Record<string, number> = {};

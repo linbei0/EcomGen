@@ -39,6 +39,35 @@ function renderResults() {
   );
 }
 
+/** 打开灯箱并用当前分镜发起重新生成；两个重新生成用例共用的入口流程。 */
+async function regenerateFromLightbox(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: "灯箱" }));
+  await user.click(await screen.findByRole("button", { name: "用此分镜重新生成" }));
+  expect(await screen.findByText("重新生成配置")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "开始生成" }));
+}
+
+/** 带一条编辑派生输出的项目详情 + 分镜 stub；画布相关用例共用。 */
+function useEditedProject() {
+  const edited = {
+    ...OUTPUT_FIXTURE,
+    id: "eeeeeeee-1111-4222-8333-666666666666",
+    parentOutputId: OUTPUT_ID,
+    rootOutputId: OUTPUT_ID,
+    editSessionId: "edit-session-1",
+    editTurnId: "edit-turn-1",
+  };
+  server.use(
+    http.get(`${BASE}/projects/:projectId`, () =>
+      HttpResponse.json(projectDetailPayload({ ...confirmed, outputs: [OUTPUT_FIXTURE, edited] })),
+    ),
+    http.get(`${BASE}/projects/:projectId/storyboard`, () =>
+      HttpResponse.json(storyboardPayload(confirmed.storyboard, confirmed.items)),
+    ),
+  );
+  return edited;
+}
+
 describe("工作台 · 结果", () => {
   it("按中文分镜名分组，每张成图提供单图下载入口", async () => {
     server.use(
@@ -94,10 +123,7 @@ describe("工作台 · 结果", () => {
       }),
     );
     renderResults();
-    await user.click(await screen.findByRole("button", { name: "灯箱" }));
-    await user.click(await screen.findByRole("button", { name: "用此分镜重新生成" }));
-    expect(await screen.findByText("重新生成配置")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "开始生成" }));
+    await regenerateFromLightbox(user);
     await waitFor(() => {
       expect(captured).toMatchObject({
         storyboardItemIds: [ITEM_ID],
@@ -122,30 +148,13 @@ describe("工作台 · 结果", () => {
       http.post(`${BASE}/projects/:projectId/generation-jobs`, async ({ request }) => { captured = await request.json(); return HttpResponse.json({ jobs: [] }, { status: 202 }); }),
     );
     renderResults();
-    await user.click(await screen.findByRole("button", { name: "灯箱" }));
-    await user.click(await screen.findByRole("button", { name: "用此分镜重新生成" }));
-    await user.click(await screen.findByRole("button", { name: "开始生成" }));
+    await regenerateFromLightbox(user);
     await waitFor(() => expect(captured).toMatchObject({ generationConfig: { imageModel: { providerId: PROVIDER_ID, modelId: "gpt-image-1" } } }));
   });
 
   it("编辑版本关系画布提供单图下载按钮", async () => {
     const user = userEvent.setup();
-    const edited = {
-      ...OUTPUT_FIXTURE,
-      id: "eeeeeeee-1111-4222-8333-666666666666",
-      parentOutputId: OUTPUT_ID,
-      rootOutputId: OUTPUT_ID,
-      editSessionId: "edit-session-1",
-      editTurnId: "edit-turn-1",
-    };
-    server.use(
-      http.get(`${BASE}/projects/:projectId`, () =>
-        HttpResponse.json(projectDetailPayload({ ...confirmed, outputs: [OUTPUT_FIXTURE, edited] })),
-      ),
-      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
-        HttpResponse.json(storyboardPayload(confirmed.storyboard, confirmed.items)),
-      ),
-    );
+    useEditedProject();
     renderResults();
     await user.click(await screen.findByRole("button", { name: "查看 1 个编辑版本" }));
     expect(await screen.findByRole("button", { name: "下载 V2" })).toBeInTheDocument();
@@ -153,21 +162,8 @@ describe("工作台 · 结果", () => {
 
   it("关闭编辑器后返回编辑版本关系画布", async () => {
     const user = userEvent.setup();
-    const edited = {
-      ...OUTPUT_FIXTURE,
-      id: "eeeeeeee-1111-4222-8333-666666666666",
-      parentOutputId: OUTPUT_ID,
-      rootOutputId: OUTPUT_ID,
-      editSessionId: "edit-session-1",
-      editTurnId: "edit-turn-1",
-    };
+    const edited = useEditedProject();
     server.use(
-      http.get(`${BASE}/projects/:projectId`, () =>
-        HttpResponse.json(projectDetailPayload({ ...confirmed, outputs: [OUTPUT_FIXTURE, edited] })),
-      ),
-      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
-        HttpResponse.json(storyboardPayload(confirmed.storyboard, confirmed.items)),
-      ),
       http.post(`${BASE}/projects/:projectId/outputs/:outputId/edit-sessions`, ({ params }) =>
         HttpResponse.json({
           id: "edit-session-1",

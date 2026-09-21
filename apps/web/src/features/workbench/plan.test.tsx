@@ -19,17 +19,23 @@ function renderSetup() {
   );
 }
 
+/** 规划提交类用例的公共前置：/projects 与 planning-jobs 的 stub，并收集最后一次请求体。 */
+function usePlanningCapture() {
+  const captured: Record<string, unknown> = {};
+  server.use(
+    http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
+    http.post(`${BASE}/projects/:projectId/planning-jobs`, async ({ request }) => {
+      Object.assign(captured, await request.json());
+      return HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 8 });
+    }),
+  );
+  return captured;
+}
+
 describe("工作台 · 规划", () => {
   it("手动选择后提交规划方式和 requestedTypes", async () => {
     const user = userEvent.setup();
-    let captured: unknown;
-    server.use(
-      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
-      http.post(`${BASE}/projects/:projectId/planning-jobs`, async ({ request }) => {
-        captured = await request.json();
-        return HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 8 });
-      }),
-    );
+    const captured = usePlanningCapture();
 
     renderSetup();
     expect(await screen.findByDisplayValue("无线耳机 SPU")).toBeInTheDocument();
@@ -53,14 +59,7 @@ describe("工作台 · 规划", () => {
 
   it("AI 智能规划不提交手动选择的图片类型", async () => {
     const user = userEvent.setup();
-    let captured: Record<string, unknown> | undefined;
-    server.use(
-      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
-      http.post(`${BASE}/projects/:projectId/planning-jobs`, async ({ request }) => {
-        captured = await request.json() as Record<string, unknown>;
-        return HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 8 });
-      }),
-    );
+    const captured = usePlanningCapture();
 
     renderSetup();
     await screen.findByDisplayValue("无线耳机 SPU");
@@ -76,14 +75,7 @@ describe("工作台 · 规划", () => {
 
   it("AI 规划图片数在 1 到 12 之间调整并随请求提交", async () => {
     const user = userEvent.setup();
-    let captured: Record<string, unknown> | undefined;
-    server.use(
-      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
-      http.post(`${BASE}/projects/:projectId/planning-jobs`, async ({ request }) => {
-        captured = await request.json() as Record<string, unknown>;
-        return HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 8 });
-      }),
-    );
+    const captured = usePlanningCapture();
 
     renderSetup();
     await screen.findByDisplayValue("无线耳机 SPU");
@@ -180,14 +172,7 @@ describe("工作台 · 规划", () => {
 
   it("手动选择可勾选自定义模板并随 requestedTypes 提交", async () => {
     const user = userEvent.setup();
-    let captured: { planningMode?: string; requestedTypes?: string[] } | undefined;
-    server.use(
-      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(projectDetailPayload())),
-      http.post(`${BASE}/projects/:projectId/planning-jobs`, async ({ request }) => {
-        captured = (await request.json()) as typeof captured;
-        return HttpResponse.json({ ...PLAN_JOB_FIXTURE, status: "QUEUED", progress: 8 });
-      }),
-    );
+    const captured = usePlanningCapture();
 
     renderSetup();
     expect(await screen.findByDisplayValue("无线耳机 SPU")).toBeInTheDocument();
@@ -196,8 +181,8 @@ describe("工作台 · 规划", () => {
     await user.click(screen.getByRole("button", { name: "生成分镜" }));
 
     await waitFor(() => {
-      expect(captured?.planningMode).toBe("MANUAL");
-      expect(captured?.requestedTypes).toContain("custom-a1b2c3d4");
+      expect(captured.planningMode).toBe("MANUAL");
+      expect(captured.requestedTypes).toContain("custom-a1b2c3d4");
     });
     expect(await screen.findByText("排队中")).toBeInTheDocument();
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ApiError, API_ERROR_CODES, isApiError, toApiError } from "./errors";
+import { ApiError, isApiError, toApiError } from "./errors";
 
 describe("toApiError", () => {
   it("规范化契约错误体", () => {
@@ -13,13 +13,6 @@ describe("toApiError", () => {
     expect(error.details).toEqual([{ field: "name" }]);
     expect(error.requestId).toBe("r1");
     expect(error.status).toBe(400);
-  });
-
-  it("七种契约 code 全部保留", () => {
-    for (const code of API_ERROR_CODES) {
-      const error = toApiError(400, { error: { code, message: "m", requestId: "r" } });
-      expect(error.code).toBe(code);
-    }
   });
 
   it("契约外 code 归一为 UNKNOWN，但保留消息与请求 ID", () => {

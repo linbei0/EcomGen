@@ -20,6 +20,54 @@ function seedProvider(repository: EcomRepository) {
   });
 }
 
+type ProviderRecord = ReturnType<EcomRepository["saveProvider"]>;
+type ProjectInput = Parameters<EcomRepository["createProject"]>[0];
+type StoryboardItemInput = Parameters<EcomRepository["saveStoryboard"]>[3][number];
+
+/** 项目字段默认值：用例只覆盖与自身规则相关的差异。 */
+function makeProjectInput(provider: ProviderRecord, overrides: Partial<ProjectInput> = {}): ProjectInput {
+  return {
+    name: "cup",
+    category: null,
+    productDescription: null,
+    verifiedFacts: [],
+    prohibitedClaims: [],
+    brandGuidelines: {},
+    platformTargets: ["TAOBAO"],
+    targetMarket: null,
+    copyLanguage: null,
+    reasoningProviderId: provider.id,
+    reasoningModelId: "reasoner",
+    imageProviderId: provider.id,
+    imageModelId: "image",
+    defaultMode: "CREATIVE",
+    imageResolution: "1K",
+    imageAspectRatio: "AUTO",
+    candidatesPerType: 1,
+    ...overrides,
+  };
+}
+
+/** 分镜条目默认值：仅覆盖与用例规则相关的字段。 */
+function storyboardItem(overrides: Partial<StoryboardItemInput> = {}): StoryboardItemInput {
+  return {
+    assetType: "hero-image",
+    displayName: "杯子首图",
+    shotRole: null,
+    templateVariant: null,
+    candidateCount: 1,
+    referencedAssets: [],
+    mode: "CREATIVE",
+    status: "DRAFT",
+    promptInstruction: "hero",
+    compiledPrompt: null,
+    factClaims: [],
+    riskFlags: [],
+    sortOrder: 0,
+    ...overrides,
+  };
+}
+
 describe("EcomRepository", () => {
   it("用户自定义模板 CRUD 往返，upsert 保留 createdAt，删除不阻断", () => {
     const database = openDatabase(":memory:");
@@ -30,8 +78,8 @@ describe("EcomRepository", () => {
     expect(updated.createdAt).toBe(created.createdAt);
     expect(repository.getUserTemplate("custom-ab12cd34")).toMatchObject({ name: "改名", prompt: "updated prompt", defaultSize: "1024x1536", supportsImageReference: false });
     const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
-    repository.saveStoryboard(project.id, "", "DRAFT", [{ assetType: "custom-ab12cd34", displayName: "自定义项", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0, imageProviderId: provider.id, imageModelId: "image" }]);
+    const project = repository.createProject(makeProjectInput(provider));
+    repository.saveStoryboard(project.id, "", "DRAFT", [storyboardItem({ assetType: "custom-ab12cd34", displayName: "自定义项", promptInstruction: "cup", imageProviderId: provider.id, imageModelId: "image" })]);
     // 模板被分镜引用时仍可删除；旧分镜的生成失败由 worker 模板解析显式报错
     expect(repository.deleteUserTemplate("custom-ab12cd34")).toBe(true);
     expect(repository.deleteUserTemplate("custom-ab12cd34")).toBe(false);
@@ -41,8 +89,8 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
-    repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero-image", displayName: "主图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0, imageProviderId: provider.id, imageModelId: "image" }]);
+    const project = repository.createProject(makeProjectInput(provider));
+    repository.saveStoryboard(project.id, "", "CONFIRMED", [storyboardItem({ displayName: "主图", status: "CONFIRMED", promptInstruction: "cup", imageProviderId: provider.id, imageModelId: "image" })]);
     const item = repository.listStoryboardItems(project.id)[0]!;
     const queuedJob = repository.createJob({ id: "provider-delete-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {}, providerId: provider.id, modelId: "image" });
     expect(repository.deleteProvider(provider.id)).toBe("deleted");
@@ -60,7 +108,7 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const project = repository.createProject(makeProjectInput(provider));
     const payload = { project: { ...project }, planning: { planningMode: "AI" as const, requestedTypes: [], targetImageCount: 6, userInstruction: null } };
     for (let index = 0; index < 21; index += 1) {
       const job = repository.createJob({ id: `plan-${index}`, projectId: project.id, storyboardItemId: null, type: "PLAN", input: {} });
@@ -78,14 +126,13 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const projectBase = { category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO" as const], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE" as const, imageResolution: "1K" as const, imageAspectRatio: "AUTO" as const, candidatesPerType: 1 };
-    const projectA = repository.createProject({ name: "Alpha 店铺", ...projectBase });
-    const projectB = repository.createProject({ name: "Beta 店铺", ...projectBase });
+    const projectA = repository.createProject(makeProjectInput(provider, { name: "Alpha 店铺" }));
+    const projectB = repository.createProject(makeProjectInput(provider, { name: "Beta 店铺" }));
     const storagePath = "assets/source.png";
     const oldDuplicate = repository.createAsset({ projectId: projectA.id, role: "PRODUCT_TRUTH", storagePath, hash: "dup", originalName: "old.png", mimeType: "image/png", width: null, height: null });
     const newDuplicate = repository.createAsset({ projectId: projectB.id, role: "PRODUCT_TRUTH", storagePath, hash: "dup", originalName: "new.png", mimeType: "image/png", width: null, height: null });
     const unique = repository.createAsset({ projectId: projectB.id, role: "STYLE_REFERENCE", storagePath, hash: "unique", originalName: "unique.png", mimeType: "image/png", width: null, height: null });
-    repository.saveStoryboard(projectA.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "杯子首图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    repository.saveStoryboard(projectA.id, "lock", "DRAFT", [storyboardItem()]);
     const item = repository.listStoryboardItems(projectA.id)[0]!;
     const job = repository.createJob({ id: "library-gen-job", projectId: projectA.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
     const generated = repository.createOutput({ projectId: projectA.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/gen.png", hash: "gen", width: 1024, height: 1024 });
@@ -124,8 +171,8 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "分层店铺", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO" as const], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE" as const, imageResolution: "1K" as const, imageAspectRatio: "AUTO" as const, candidatesPerType: 1 });
-    repository.saveStoryboard(project.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "杯子首图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    const project = repository.createProject(makeProjectInput(provider, { name: "分层店铺" }));
+    repository.saveStoryboard(project.id, "lock", "DRAFT", [storyboardItem()]);
     const item = repository.listStoryboardItems(project.id)[0]!;
     const generateJob = repository.createJob({ id: "layer-gen-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
     const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: generateJob.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/hero.png", hash: "hero-output", width: 1024, height: 1024 });
@@ -163,7 +210,7 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const project = repository.createProject(makeProjectInput(provider));
     const safe = repository.createJob({ id: "recover-safe", projectId: project.id, storyboardItemId: null, type: "PLAN", input: {} });
     const uncertain = repository.createJob({ id: "recover-uncertain", projectId: project.id, storyboardItemId: null, type: "GENERATE", input: {} });
     database.prepare("UPDATE jobs SET status='RUNNING' WHERE id IN (?, ?)").run(safe.id, uncertain.id);
@@ -186,7 +233,7 @@ describe("EcomRepository", () => {
     expect(repository.getJob(forgeJob.id)?.status).toBe("QUEUED");
 
     const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const project = repository.createProject(makeProjectInput(provider));
     // 指纹含 NULL 项目：全局任务与项目任务互不串号
     expect(repository.findJobByFingerprint(null, "forge-fp")?.id).toBe("forge-1");
     repository.createJob({ id: "project-job", projectId: project.id, storyboardItemId: null, type: "PLAN", input: {}, requestFingerprint: "forge-fp" });
@@ -213,7 +260,7 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const input: Parameters<EcomRepository["createProject"]>[0] = { name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 };
+    const input = makeProjectInput(provider);
     const project = repository.createProject(input);
     expect(project.archivedAt).toBeNull();
     expect(repository.listProjects()).toHaveLength(1);
@@ -229,7 +276,7 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const project = repository.createProject(makeProjectInput(provider));
     expect(repository.deleteArchivedProject(project.id)).toBe("not_archived");
     repository.updateProject(project.id, { archivedAt: "2026-08-01T01:00:00.000Z" });
     expect(repository.deleteArchivedProject(project.id)).toBe("deleted");
@@ -369,25 +416,7 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const project = repository.createProject({
-      name: "cup",
-      category: null,
-      productDescription: null,
-      verifiedFacts: [],
-      prohibitedClaims: [],
-      brandGuidelines: {},
-      platformTargets: ["TAOBAO"],
-      targetMarket: null,
-      copyLanguage: null,
-      reasoningProviderId: provider.id,
-      reasoningModelId: "reasoner",
-      imageProviderId: provider.id,
-      imageModelId: "image",
-      defaultMode: "CREATIVE",
-      imageResolution: "1K",
-      imageAspectRatio: "AUTO",
-      candidatesPerType: 1,
-    });
+    const project = repository.createProject(makeProjectInput(provider));
     const job = repository.createJob({ id: "copywrite-job", projectId: project.id, storyboardItemId: null, type: "COPYWRITE", input: { target: "PRODUCT_DESCRIPTION" } });
     repository.saveCopywritingResult({ jobId: job.id, projectId: project.id, target: "PRODUCT_DESCRIPTION", content: "产品名称：随行杯" });
     expect(repository.getCopywritingResult(job.id)).toMatchObject({ jobId: job.id, projectId: project.id, target: "PRODUCT_DESCRIPTION", content: "产品名称：随行杯" });
@@ -398,8 +427,8 @@ describe("EcomRepository", () => {
   it("keeps an edit session across derived outputs and records immutable output lineage", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database); const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
-    const storyboard = repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero-image", displayName: "杯子首图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "cup", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
+    const project = repository.createProject(makeProjectInput(provider));
+    const storyboard = repository.saveStoryboard(project.id, "", "CONFIRMED", [storyboardItem({ status: "CONFIRMED", promptInstruction: "cup" })]);
     const item = repository.listStoryboardItems(project.id)[0]!;
     const job = repository.createJob({ id: "edit-lineage-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
     const root = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/root.png", hash: "root" });
@@ -419,44 +448,27 @@ describe("EcomRepository", () => {
     database.close();
   });
 
-  it("keeps storyboard items bound to a project version and persists generated outputs", () => {
+  it("keeps storyboard items bound to a project version and persists edits", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const project = repository.createProject({
-      name: "cup",
+    const project = repository.createProject(makeProjectInput(provider, {
       category: "home",
       productDescription: "insulated travel cup",
       verifiedFacts: ["304 stainless steel body"],
       prohibitedClaims: ["keeps hot for 24 hours"],
       brandGuidelines: { accent: "#1A3A2E" },
-      platformTargets: ["TAOBAO"],
-      targetMarket: null,
-      copyLanguage: null,
-      reasoningProviderId: provider.id,
-      reasoningModelId: "reasoner",
-      imageProviderId: provider.id,
-      imageModelId: "image",
       defaultMode: "PIXEL_PROTECTED",
-      imageResolution: "1K",
-      imageAspectRatio: "AUTO",
-      candidatesPerType: 2
-    });
-    const storyboard = repository.saveStoryboard(project.id, "quiet clean commercial photography", "DRAFT", [{
-      assetType: "hero-image",
+      candidatesPerType: 2,
+    }));
+    const storyboard = repository.saveStoryboard(project.id, "quiet clean commercial photography", "DRAFT", [storyboardItem({
       displayName: "白底/纯色底产品主图",
       shotRole: "HERO",
       templateVariant: "luxury",
       candidateCount: 2,
-      referencedAssets: [],
       mode: "PIXEL_PROTECTED",
-      status: "DRAFT",
       promptInstruction: "hero image",
-      compiledPrompt: null,
-      factClaims: [],
-      riskFlags: [],
-      sortOrder: 0
-    }]);
+    })]);
     const item = repository.listStoryboardItems(project.id)[0];
     expect(storyboard.version).toBe(1);
     expect(item.displayName).toBe("白底/纯色底产品主图");
@@ -469,21 +481,12 @@ describe("EcomRepository", () => {
     expect(item.templateVariant).toBe("luxury");
     expect(repository.getProject(project.id)?.verifiedFacts).toEqual(["304 stainless steel body"]);
     expect(repository.getProject(project.id)?.candidatesPerType).toBe(2);
-    const appended = repository.saveStoryboard(project.id, "second campaign", "DRAFT", [{
+    const appended = repository.saveStoryboard(project.id, "second campaign", "DRAFT", [storyboardItem({
       assetType: "lifestyle-scene",
       displayName: "场景化生活图",
       shotRole: "SCENE",
-      templateVariant: null,
-      candidateCount: 1,
-      referencedAssets: [],
-      mode: "CREATIVE",
-      status: "DRAFT",
       promptInstruction: "lifestyle",
-      compiledPrompt: null,
-      factClaims: [],
-      riskFlags: [],
-      sortOrder: 0
-    }]);
+    })]);
     expect(appended.version).toBe(2);
     expect(repository.listStoryboardItems(project.id).map((row) => row.assetType)).toEqual(["hero-image", "lifestyle-scene"]);
     expect(repository.deleteStoryboardItem(repository.listStoryboardItems(project.id)[1]!.id)?.assetType).toBe("lifestyle-scene");
@@ -497,6 +500,16 @@ describe("EcomRepository", () => {
       imageAspectRatio: "1:1",
       candidateCount: 3,
     });
+    database.close();
+  });
+
+  it("records the generation job fingerprint, cancellation flag and web research audit", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject(makeProjectInput(provider));
+    repository.saveStoryboard(project.id, "lock", "DRAFT", [storyboardItem()]);
+    const item = repository.listStoryboardItems(project.id)[0]!;
     const job = repository.createJob({ id: "job-1", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: { candidateIndex: 1 }, requestFingerprint: "fp-1", providerId: provider.id, modelId: "image", estimatedCost: { status: "UNKNOWN" } });
     expect(repository.findJobByFingerprint(project.id, "fp-1")?.id).toBe("job-1");
     expect(repository.updateJob(job.id, { cancelRequested: true })?.cancelRequested).toBe(true);
@@ -506,6 +519,17 @@ describe("EcomRepository", () => {
     repository.recordWebResearchAttempt({ jobId: job.id, query: "product photography lighting", sourceId: "tavily", sourceName: "Tavily", sourceKind: "tavily", status: "SUCCEEDED", resultCount: 3, errorMessage: null });
     expect(repository.getWebResearchAudit(job.id)).toMatchObject({ invocationCount: 1, failedAttemptCount: 1, successfulAttemptCount: 1 });
     expect(repository.listWebResearchAttempts(job.id)).toMatchObject([{ sourceId: "brave", status: "FAILED" }, { sourceId: "tavily", status: "SUCCEEDED", resultCount: 3 }]);
+    database.close();
+  });
+
+  it("persists generated outputs and reuses the record for a duplicate generation key", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject(makeProjectInput(provider));
+    repository.saveStoryboard(project.id, "lock", "DRAFT", [storyboardItem()]);
+    const item = repository.listStoryboardItems(project.id)[0]!;
+    const job = repository.createJob({ id: "job-1", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
     const output = repository.createOutput({
       projectId: project.id,
       storyboardItemId: item.id,
@@ -564,7 +588,7 @@ describe("EcomRepository", () => {
 
   it("persists ordered project and temporary references on an edit turn", () => {
     const database = openDatabase(":memory:"); const repository = new EcomRepository(database); const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const project = repository.createProject(makeProjectInput(provider));
     repository.saveStoryboard(project.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "主图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
     const item = repository.listStoryboardItems(project.id)[0]!; const job = repository.createJob({ id: "reference-job", projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
     const output = repository.createOutput({ projectId: project.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/base.png", hash: "base" });
@@ -583,25 +607,7 @@ describe("EcomRepository", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const projectInput = {
-      name: "cup",
-      category: null as string | null,
-      productDescription: null as string | null,
-      verifiedFacts: [] as string[],
-      prohibitedClaims: [] as string[],
-      brandGuidelines: {} as Record<string, string>,
-      platformTargets: ["TAOBAO"] as Array<"TAOBAO" | "AMAZON">,
-      targetMarket: null,
-      copyLanguage: null,
-      reasoningProviderId: provider.id,
-      reasoningModelId: "reasoner",
-      imageProviderId: provider.id,
-      imageModelId: "image",
-      defaultMode: "CREATIVE" as const,
-      imageResolution: "1K" as const,
-      imageAspectRatio: "AUTO" as const,
-      candidatesPerType: 1
-    };
+    const projectInput = makeProjectInput(provider);
     const withOutputs = repository.createProject({ ...projectInput, name: "with-outputs" });
     const empty = repository.createProject({ ...projectInput, name: "empty" });
     const firstAsset = repository.createAsset({ projectId: withOutputs.id, role: "PRODUCT_TRUTH", storagePath: "assets/first.png", hash: "h1", originalName: "first.png", mimeType: "image/png", width: null, height: null });
@@ -609,21 +615,7 @@ describe("EcomRepository", () => {
     repository.createAsset({ projectId: withOutputs.id, role: "STYLE_REFERENCE", storagePath: "assets/ref.png", hash: "h3", originalName: "ref.png", mimeType: "image/png", width: null, height: null });
     database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-08-01T00:00:00.000Z", firstAsset.id);
     database.prepare("UPDATE assets SET created_at=? WHERE id=?").run("2026-08-01T00:01:00.000Z", secondAsset.id);
-    const storyboard = repository.saveStoryboard(withOutputs.id, "lock", "DRAFT", [{
-      assetType: "hero-image",
-      displayName: "主图",
-      shotRole: null,
-      templateVariant: null,
-      candidateCount: 1,
-      referencedAssets: [],
-      mode: "CREATIVE",
-      status: "DRAFT",
-      promptInstruction: "hero",
-      compiledPrompt: null,
-      factClaims: [],
-      riskFlags: [],
-      sortOrder: 0
-    }]);
+    const storyboard = repository.saveStoryboard(withOutputs.id, "lock", "DRAFT", [storyboardItem({ displayName: "主图" })]);
     const item = repository.listStoryboardItems(withOutputs.id)[0]!;
     const job = repository.createJob({ id: "job-cover", projectId: withOutputs.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
     const oldest = repository.createOutput({ projectId: withOutputs.id, storyboardItemId: item.id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "out/1.png", hash: "o1" });
@@ -649,7 +641,7 @@ describe("LayerPlan / LayerExport 持久化", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", segmentationModel: { providerId: provider.id, modelId: "fal-ai/sam-3/image" }, defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const project = repository.createProject(makeProjectInput(provider, { segmentationModel: { providerId: provider.id, modelId: "fal-ai/sam-3/image" } }));
     expect(repository.getProject(project.id)?.segmentationModel).toEqual({ providerId: provider.id, modelId: "fal-ai/sam-3/image", protocol: "fal" });
     expect(repository.updateProject(project.id, { segmentationModel: { providerId: provider.id, modelId: "grounded-sam-2", protocol: "grounded_sam" } })?.segmentationModel).toMatchObject({ protocol: "grounded_sam" });
 
@@ -681,7 +673,7 @@ describe("LayerPlan / LayerExport 持久化", () => {
     const database = openDatabase(":memory:");
     const repository = new EcomRepository(database);
     const provider = seedProvider(repository);
-    const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", segmentationModel: { providerId: provider.id, modelId: "fal-ai/sam-3/image" }, defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+    const project = repository.createProject(makeProjectInput(provider, { segmentationModel: { providerId: provider.id, modelId: "fal-ai/sam-3/image" } }));
     // 未发出外部请求的 RUNNING 分层任务可安全重跑：记录回到 QUEUED 并清空错误
     const planJob = repository.createJob({ id: "recover-plan", projectId: project.id, storyboardItemId: null, type: "LAYER_PLAN", status: "QUEUED", input: { outputId: "out-1" } });
     const plan = repository.createLayerPlan({ projectId: project.id, outputId: "out-1", jobId: planJob.id, outputHash: "hash-1", status: "RUNNING", elements: [], error: { message: "stale" } });

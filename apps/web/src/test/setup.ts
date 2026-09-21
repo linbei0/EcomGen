@@ -3,6 +3,7 @@ import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
 
 import { server } from "./msw/server";
+import { resetStores } from "./msw/handlers";
 
 // jsdom 缺失、antd 依赖的浏览器 API
 if (typeof window !== "undefined") {
@@ -45,5 +46,6 @@ afterEach(() => {
   server.resetHandlers();
   cleanup();
   sessionStorage.clear();
+  resetStores();
 });
 afterAll(() => server.close());

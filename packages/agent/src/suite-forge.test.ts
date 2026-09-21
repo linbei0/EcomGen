@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const captured = vi.hoisted(() => ({
   options: undefined as { systemPrompt?: string; initialState?: { thinkingLevel?: string }; onPayload?: unknown } | undefined,
@@ -48,6 +48,17 @@ vi.mock("@earendil-works/pi-ai/api/openai-completions.lazy", () => ({
 import { forgeSuite, type SuiteForgeInput } from "./suite-forge.js";
 import { ShotStreamCounter } from "./shot-progress.js";
 
+/** mock 捕获对象跨用例共享，统一复位才能保证任一用例失败都不会影响后续用例。 */
+beforeEach(() => {
+  captured.options = undefined;
+  captured.prompt = "";
+  captured.images = undefined;
+  captured.errorMessage = undefined;
+  captured.responseText = "{}";
+  captured.turns = [];
+  captured.listeners = [];
+});
+
 const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/jpeg" };
 
 const imageInput: SuiteForgeInput = {
@@ -64,8 +75,6 @@ const imageInput: SuiteForgeInput = {
 
 describe("forgeSuite", () => {
   it("把参考图作为视觉输入交给 Agent 并解析出 JSON 对象", async () => {
-    captured.errorMessage = undefined;
-    captured.images = undefined;
     captured.responseText = JSON.stringify({ id: "suite-demo", name: "示例套图", shots: [{ shotId: "hero" }] });
 
     const result = await forgeSuite(imageInput);
@@ -77,8 +86,6 @@ describe("forgeSuite", () => {
   });
 
   it("模型不支持视觉时不透传图片，仅依赖技能提示词", async () => {
-    captured.errorMessage = undefined;
-    captured.images = undefined;
     captured.responseText = JSON.stringify({ id: "suite-demo" });
 
     await forgeSuite({ ...imageInput, model: { ...imageInput.model, input: ["text"] } });
@@ -87,7 +94,6 @@ describe("forgeSuite", () => {
   });
 
   it("把用户提示写入指令，便于 Worker 端做稳定指纹与提示追溯", async () => {
-    captured.errorMessage = undefined;
     captured.responseText = JSON.stringify({ id: "suite-demo" });
 
     await forgeSuite({
@@ -155,7 +161,6 @@ describe("forgeSuite 分镜进度回调", () => {
   /** 逐字符回放一轮，返回回调收到的所有计数（含跨轮）。 */
   async function collectProgress(turns: string[][]): Promise<number[]> {
     const text = turns[turns.length - 1]?.join("") ?? "{}";
-    captured.errorMessage = undefined;
     captured.responseText = text;
     captured.turns = turns;
     const seen: number[] = [];
@@ -177,9 +182,7 @@ describe("forgeSuite 分镜进度回调", () => {
   });
 
   it("不传回调时不订阅，行为与之前一致", async () => {
-    captured.errorMessage = undefined;
     captured.responseText = JSON.stringify({ id: "suite-demo" });
-    captured.turns = [];
     await forgeSuite(imageInput);
     expect(captured.listeners).toHaveLength(0);
   });

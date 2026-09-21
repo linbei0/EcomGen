@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const captured = vi.hoisted(() => ({
   streamMock: vi.fn(),
@@ -33,6 +33,17 @@ vi.mock("@earendil-works/pi-ai/api/openai-completions.lazy", () => ({
 }));
 
 import { validateCopywriting, writeCopywriting, type CopywritingInput } from "./copywriter.js";
+
+/** mock 捕获对象跨用例共享，统一复位才能保证任一用例失败都不会影响后续用例。 */
+beforeEach(() => {
+  captured.options = undefined;
+  captured.prompt = "";
+  captured.images = [];
+  captured.response = "";
+  captured.responseQueue = [];
+  captured.promptCount = 0;
+  captured.streamMock.mockReset();
+});
 
 const input: CopywritingInput = {
   target: "PRODUCT_DESCRIPTION",
@@ -110,7 +121,6 @@ describe("writeCopywriting", () => {
       suitableAudience: "通勤上班族",
       expectedScenarios: "通勤与办公",
     })];
-    captured.promptCount = 0;
 
     const result = await writeCopywriting(input);
 
@@ -118,7 +128,6 @@ describe("writeCopywriting", () => {
     expect(result.content.length).toBeLessThanOrEqual(500);
     expect(captured.promptCount).toBe(2);
     expect(captured.prompt).toContain("too long");
-    captured.responseQueue = [];
   });
 
   it("容差带内（400~600 字符）的轻微超限直接放行，不触发压缩重试", async () => {
@@ -136,7 +145,6 @@ describe("writeCopywriting", () => {
       suitableAudience: "注重音质与佩戴舒适度的通勤上班族和商旅人士".padEnd(140, "例"),
       expectedScenarios: "通勤路上、差旅途中、办公室专注工作与居家休闲".padEnd(140, "景"),
     });
-    captured.promptCount = 0;
 
     const result = await writeCopywriting(input);
 

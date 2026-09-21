@@ -12,6 +12,16 @@ function openDrawer() {
   renderWithProviders(<SettingsDrawer open onClose={() => {}} />);
 }
 
+/** 创建/校验失败两个用例共用的表单填写：进入添加表单并填入四个必填字段。 */
+async function fillProviderForm(user: ReturnType<typeof userEvent.setup>, values: { name: string; modelId: string }) {
+  await user.click(await screen.findByRole("button", { name: /添加 Provider/ }));
+  await user.type(screen.getByLabelText(/名称/), values.name);
+  await user.type(screen.getByLabelText("Base URL"), "https://api.test.local/v1");
+  await user.type(screen.getByLabelText("API Key"), "sk-test");
+  await user.type(screen.getByPlaceholderText("模型 ID，如 gpt-image-1"), values.modelId);
+  await user.click(screen.getByRole("button", { name: /^添加$/ }));
+}
+
 describe("设置抽屉 · Provider", () => {
   it("展示 Provider 列表：密钥状态、模型统计、能力摘要", async () => {
     openDrawer();
@@ -36,12 +46,7 @@ describe("设置抽屉 · Provider", () => {
     );
 
     openDrawer();
-    await user.click(await screen.findByRole("button", { name: /添加 Provider/ }));
-    await user.type(screen.getByLabelText(/名称/), "测试 Provider");
-    await user.type(screen.getByLabelText("Base URL"), "https://api.test.local/v1");
-    await user.type(screen.getByLabelText("API Key"), "sk-test");
-    await user.type(screen.getByPlaceholderText("模型 ID，如 gpt-image-1"), "gpt-image-1");
-    await user.click(screen.getByRole("button", { name: /^添加$/ }));
+    await fillProviderForm(user, { name: "测试 Provider", modelId: "gpt-image-1" });
 
     expect(await screen.findByText("已添加 Provider")).toBeInTheDocument();
     expect(await screen.findByText("编辑 Provider")).toBeInTheDocument();
@@ -150,12 +155,7 @@ describe("设置抽屉 · Provider", () => {
     );
 
     openDrawer();
-    await user.click(await screen.findByRole("button", { name: /添加 Provider/ }));
-    await user.type(screen.getByLabelText(/名称/), "X");
-    await user.type(screen.getByLabelText("Base URL"), "https://api.test.local/v1");
-    await user.type(screen.getByLabelText("API Key"), "sk-test");
-    await user.type(screen.getByPlaceholderText("模型 ID，如 gpt-image-1"), "m1");
-    await user.click(screen.getByRole("button", { name: /^添加$/ }));
+    await fillProviderForm(user, { name: "X", modelId: "m1" });
 
     expect(await screen.findByText(/baseUrl 不是合法 URL/)).toBeInTheDocument();
     expect(

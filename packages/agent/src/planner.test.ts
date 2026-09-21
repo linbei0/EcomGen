@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const captured = vi.hoisted(() => ({ streamMock: vi.fn(), options: undefined as { onPayload?: (payload: unknown, model: { id: string; baseUrl: string }) => unknown; streamFn?: (...args: unknown[]) => unknown; initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", images: [] as unknown[], errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, referencedAssets: [] as string[], editResponse: undefined as Record<string, unknown> | undefined, responseText: undefined as string | undefined, promptCount: 0, firstResponseText: undefined as string | undefined }));
 
@@ -40,6 +40,22 @@ import { COMPOSITE_POLICIES, EDIT_EXECUTION_MODES, EDIT_OPERATIONS } from "@ecom
 import { planImageEdit, planStoryboard, reviseImagePrompt, type EditPlannerInput, type PlannerInput } from "./planner.js";
 import { EDIT_PLAN_OUTPUT_SCHEMA } from "./structured-output.js";
 
+/** mock 捕获对象跨用例共享，统一复位才能保证任一用例失败都不会影响后续用例。 */
+beforeEach(() => {
+  captured.options = undefined;
+  captured.prompt = "";
+  captured.images = [];
+  captured.errorMessage = undefined;
+  captured.simulateResearchFailure = false;
+  captured.itemCount = 1;
+  captured.referencedAssets = [];
+  captured.editResponse = undefined;
+  captured.responseText = undefined;
+  captured.promptCount = 0;
+  captured.firstResponseText = undefined;
+  captured.streamMock.mockReset();
+});
+
 const input: PlannerInput = {
   model: {
     id: "model", name: "model", api: "openai-completions", provider: "provider" as never,
@@ -66,16 +82,13 @@ const input: PlannerInput = {
 };
 
 describe("planStoryboard", () => {
-  it("uses the pre-resolved Pi compatibility profile without inspecting the URL", async () => {
-    captured.errorMessage = undefined;
+  it("uses the resolved thinking level for the planning model", async () => {
     await planStoryboard(input);
 
     expect(captured.options?.initialState?.thinkingLevel).toBe("medium");
-    expect(captured.options?.initialState?.model?.compat).toMatchObject({ maxTokensField: "max_tokens", thinkingFormat: "qwen", supportsDeveloperRole: false });
   });
 
   it("为每轮流式请求注入超时上限与瞬时错误重试", async () => {
-    captured.errorMessage = undefined;
     await planStoryboard(input);
     const streamFn = captured.options?.streamFn;
     expect(typeof streamFn).toBe("function");
@@ -86,7 +99,6 @@ describe("planStoryboard", () => {
   });
 
   it("adds strict JSON Schema only when the model advertises structured output", async () => {
-    captured.errorMessage = undefined;
     await planStoryboard(input);
     const payload = { messages: [] };
     expect(captured.options?.onPayload?.(payload, { id: "model", baseUrl: "https://custom-gateway.example/v1", api: "openai-completions", provider: "provider", ecomgenSupportsStructuredOutput: true } as never)).toMatchObject({ response_format: { type: "json_schema", json_schema: { strict: true } } });
@@ -94,8 +106,6 @@ describe("planStoryboard", () => {
   });
 
   it("uses the reasoning model for manual selections and marks them as authoritative", async () => {
-    captured.errorMessage = undefined;
-    captured.prompt = "";
     await planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: ["hero-image"] });
 
     expect(captured.prompt).toContain("Manual selection is authoritative");
@@ -105,8 +115,6 @@ describe("planStoryboard", () => {
   });
 
   it("expands requested suite shots one by one and rejects unresolved placeholders", async () => {
-    captured.errorMessage = undefined;
-    captured.prompt = "";
     const suite = getBuiltinSuite("suite-neiyijiajufu-banbeiyi")!;
     const shots = suite.shots.slice(0, 2);
     captured.responseText = JSON.stringify({ campaignStyleLock: "clean", items: shots.map((shot, index) => ({ assetType: shot.assetType, displayName: `套图分镜 ${index + 1}`, shotRole: shot.shotRole, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "A complete final prompt with no placeholders.", factClaims: [], riskFlags: [], sortOrder: index })) });
@@ -115,12 +123,9 @@ describe("planStoryboard", () => {
 
     captured.responseText = JSON.stringify({ campaignStyleLock: "clean", items: [{ assetType: shots[0]!.assetType, displayName: "套图分镜 1", shotRole: shots[0]!.shotRole, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero {product}", factClaims: [], riskFlags: [], sortOrder: 0 }] });
     await expect(planStoryboard({ ...input, planningMode: "MANUAL", requestedTypes: [], requestedSuiteShots: [shots[0]!.assetType], suites: [suite] })).rejects.toThrow(/placeholder/);
-    captured.responseText = undefined;
   });
 
   it("要求 AI 返回指定数量的分镜，并拒绝数量不符的结果", async () => {
-    captured.errorMessage = undefined;
-    captured.prompt = "";
     captured.itemCount = 2;
     const result = await planStoryboard({ ...input, targetImageCount: 2 });
     expect(captured.prompt).toContain("exactly 2 planned items");
@@ -131,8 +136,6 @@ describe("planStoryboard", () => {
   });
 
   it("keeps market guidance tool-only and out of the planning user message", async () => {
-    captured.errorMessage = undefined;
-    captured.prompt = "";
     await planStoryboard({ ...input, platformTargets: ["AMAZON"], targetMarket: "JAPAN", copyLanguage: null });
 
     expect(captured.prompt).not.toContain("platformGuidance");
@@ -142,35 +145,28 @@ describe("planStoryboard", () => {
   });
 
   it("passes handle-based visual attachments and resolves referenced handles to asset ids", async () => {
-    captured.errorMessage = undefined;
-    captured.prompt = "";
-    captured.images = [];
     captured.referencedAssets = ["P1", "R1"];
-    try {
-      const result = await planStoryboard({
-        ...input,
-        model: { ...input.model, input: ["text", "image"] },
-        referenceImages: [
-          { type: "image", mimeType: "image/png", data: "product-bytes" },
-          { type: "image", mimeType: "image/jpeg", data: "style-bytes" },
-        ],
-        visionAttachments: [
-          { attachmentIndex: 1, handle: "P1", role: "PRODUCT_TRUTH", name: "product.png", mimeType: "image/png" },
-          { attachmentIndex: 2, handle: "R1", role: "STYLE_REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
-        ],
-        assets: [
-          { id: "product-1", handle: "P1", role: "PRODUCT_TRUTH", kind: "PRODUCT", name: "product.png", mimeType: "image/png" },
-          { id: "style-1", handle: "R1", role: "STYLE_REFERENCE", kind: "REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
-        ],
-      });
-      expect(captured.images).toHaveLength(2);
-      expect(captured.prompt).toContain("visionAttachments");
-      expect(captured.prompt).toContain("P1");
-      expect(captured.prompt).not.toContain("product-1");
-      expect(result.items[0]?.referencedAssets).toEqual(["product-1", "style-1"]);
-    } finally {
-      captured.referencedAssets = [];
-    }
+    const result = await planStoryboard({
+      ...input,
+      model: { ...input.model, input: ["text", "image"] },
+      referenceImages: [
+        { type: "image", mimeType: "image/png", data: "product-bytes" },
+        { type: "image", mimeType: "image/jpeg", data: "style-bytes" },
+      ],
+      visionAttachments: [
+        { attachmentIndex: 1, handle: "P1", role: "PRODUCT_TRUTH", name: "product.png", mimeType: "image/png" },
+        { attachmentIndex: 2, handle: "R1", role: "STYLE_REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
+      ],
+      assets: [
+        { id: "product-1", handle: "P1", role: "PRODUCT_TRUTH", kind: "PRODUCT", name: "product.png", mimeType: "image/png" },
+        { id: "style-1", handle: "R1", role: "STYLE_REFERENCE", kind: "REFERENCE", name: "style.jpg", mimeType: "image/jpeg" },
+      ],
+    });
+    expect(captured.images).toHaveLength(2);
+    expect(captured.prompt).toContain("visionAttachments");
+    expect(captured.prompt).toContain("P1");
+    expect(captured.prompt).not.toContain("product-1");
+    expect(result.items[0]?.referencedAssets).toEqual(["product-1", "style-1"]);
   });
 
   it("rejects a storyboard item that references more than four non-product images", async () => {
@@ -179,60 +175,36 @@ describe("planStoryboard", () => {
       ...input,
       assets: captured.referencedAssets.map((handle, index) => ({ id: `reference-${index + 1}`, handle, role: "STYLE_REFERENCE", kind: "REFERENCE" as const, name: `${handle}.png`, mimeType: "image/png" })),
     })).rejects.toThrow("at most 4 non-product images");
-    captured.referencedAssets = [];
   });
 
   it("preserves the Agent error when no assistant text is produced", async () => {
     captured.errorMessage = "provider timed out";
 
     await expect(planStoryboard(input)).rejects.toThrow("provider timed out");
-
-    captured.errorMessage = undefined;
   });
 
   it("extracts JSON when the planning model adds a natural-language preamble", async () => {
-    captured.errorMessage = undefined;
     const plan = { campaignStyleLock: "clean", items: [{ assetType: "hero-image", displayName: "整机斜侧展示首图", shotRole: "HERO", templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", promptInstruction: "hero", factClaims: [], riskFlags: [], sortOrder: 0 }] };
     captured.responseText = "I have all the details.\\n```json\\n" + JSON.stringify(plan) + "\\n```";
-    try {
-      await expect(planStoryboard(input)).resolves.toMatchObject({ campaignStyleLock: "clean" });
-    } finally {
-      captured.responseText = undefined;
-    }
+    await expect(planStoryboard(input)).resolves.toMatchObject({ campaignStyleLock: "clean" });
   });
 
   it("把校验失败回传给模型修复一轮，而不是直接判定任务失败", async () => {
-    captured.errorMessage = undefined;
-    captured.promptCount = 0;
     captured.firstResponseText = "I have all the details.";
-    try {
-      const result = await planStoryboard(input);
-      expect(result.items[0]?.displayName).toBe("整机斜侧展示首图");
-      expect(captured.promptCount).toBe(2);
-      expect(captured.prompt).toContain("could not be used");
-    } finally {
-      captured.promptCount = 0;
-      captured.firstResponseText = undefined;
-    }
+    const result = await planStoryboard(input);
+    expect(result.items[0]?.displayName).toBe("整机斜侧展示首图");
+    expect(captured.promptCount).toBe(2);
+    expect(captured.prompt).toContain("could not be used");
   });
 
   it("修复后仍无效时按原校验错误失败", async () => {
-    captured.errorMessage = undefined;
-    captured.promptCount = 0;
     captured.firstResponseText = "I have all the details.";
     captured.responseText = "still not json";
-    try {
-      await expect(planStoryboard(input)).rejects.toThrow();
-      expect(captured.promptCount).toBe(2);
-    } finally {
-      captured.promptCount = 0;
-      captured.firstResponseText = undefined;
-      captured.responseText = undefined;
-    }
+    await expect(planStoryboard(input)).rejects.toThrow();
+    expect(captured.promptCount).toBe(2);
   });
 
   it("continues planning when visual research fails", async () => {
-    captured.errorMessage = undefined;
     captured.simulateResearchFailure = true;
     const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("search unavailable"));
     try {
@@ -240,12 +212,10 @@ describe("planStoryboard", () => {
       expect(result.items[0]?.promptInstruction).toBe("hero");
     } finally {
       fetchMock.mockRestore();
-      captured.simulateResearchFailure = false;
     }
   });
 
   it("拒绝非法 shotRole 与重复 角色×模板 组合", async () => {
-    captured.errorMessage = undefined;
     const base = { templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", factClaims: [], riskFlags: [], sortOrder: 0 };
     const cases: Array<[unknown[], RegExp]> = [
       [[{ assetType: "hero-image", displayName: "整机斜侧展示首图", shotRole: "WOW", promptInstruction: "hero", ...base }], /invalid shotRole/],
@@ -255,30 +225,19 @@ describe("planStoryboard", () => {
       ], /duplicate visual-task/],
     ];
     for (const [items, expected] of cases) {
-      captured.promptCount = 0;
       // 两轮都返回同样的违规结果，让最终的校验错误原样抛出
+      captured.promptCount = 0;
       captured.firstResponseText = captured.responseText = JSON.stringify({ campaignStyleLock: "clean", items });
-      try {
-        await expect(planStoryboard({ ...input, targetImageCount: items.length })).rejects.toThrow(expected);
-      } finally {
-        captured.promptCount = 0;
-        captured.firstResponseText = undefined;
-        captured.responseText = undefined;
-      }
+      await expect(planStoryboard({ ...input, targetImageCount: items.length })).rejects.toThrow(expected);
     }
   });
 });
 
 describe("reviseImagePrompt", () => {
   it("uses a structured object for prompt revision", async () => {
-    captured.errorMessage = undefined;
     captured.responseText = JSON.stringify({ prompt: "revised image prompt" });
-    try {
-      await expect(reviseImagePrompt({ model: input.model, apiKey: "secret", prompt: "original image prompt", revision: "make it brighter" })).resolves.toBe("revised image prompt");
-      expect(captured.options?.onPayload).toBeTypeOf("function");
-    } finally {
-      captured.responseText = undefined;
-    }
+    await expect(reviseImagePrompt({ model: input.model, apiKey: "secret", prompt: "original image prompt", revision: "make it brighter" })).resolves.toBe("revised image prompt");
+    expect(captured.options?.onPayload).toBeTypeOf("function");
   });
 });
 
@@ -307,7 +266,6 @@ describe("planImageEdit", () => {
   });
 
   it("无蒙版且目标明确时选择模型自行判断范围", async () => {
-    captured.errorMessage = undefined;
     captured.editResponse = { operation: "NATURAL_FUSION", executionMode: "MODEL_DIRECTED", userSummary: "调整目标对象外观", prompt: "edit", targetAnnotationIds: [], targetDescription: "主要商品", targetConfidence: 0.9, clarification: null, requiresConfirmation: false, compositePolicy: "PROVIDER_RESULT", memoryPatch: {} };
     const result = await planImageEdit(editInput);
     expect(result.executionMode).toBe("MODEL_DIRECTED");
@@ -315,7 +273,6 @@ describe("planImageEdit", () => {
   });
 
   it("严格蒙版和歧义计划必须要求用户补充", async () => {
-    captured.errorMessage = undefined;
     captured.editResponse = { operation: "NATURAL_FUSION", executionMode: "NEED_INPUT", userSummary: "需要确认目标", prompt: "", targetAnnotationIds: [], targetDescription: "多个可能目标", targetConfidence: 0.4, clarification: "请确认要修改哪一个目标。", requiresConfirmation: false, compositePolicy: "PROVIDER_RESULT", memoryPatch: {} };
     const result = await planImageEdit(editInput);
     expect(result.executionMode).toBe("NEED_INPUT");

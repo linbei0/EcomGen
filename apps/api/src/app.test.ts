@@ -42,6 +42,8 @@ beforeEach(async () => {
   // 与 buildApi 共享同一个文件库，保证端点操作和断言看到相同的状态真相
   database = openDatabase(join(dataDir, "ecomgen.sqlite"));
   repository = new EcomRepository(database);
+  // enqueue 是模块级共享 mock：逐用例清零，断言不依赖文件内的执行顺序
+  vi.mocked(enqueue).mockClear();
 });
 
 afterEach(async () => {
@@ -50,18 +52,51 @@ afterEach(async () => {
   rmSync(dataDir, { recursive: true, force: true });
 });
 
-function seedFailedGenerateJob(): ReturnType<EcomRepository["createJob"]> {
-  const provider = repository.saveProvider({
+type ProviderModels = Parameters<EcomRepository["saveProvider"]>[0]["models"];
+type ProjectInput = Parameters<EcomRepository["createProject"]>[0];
+
+const DEFAULT_MODELS: ProviderModels = [
+  { id: "reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
+  { id: "image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" }
+];
+
+function saveProvider(models: ProviderModels = DEFAULT_MODELS) {
+  return repository.saveProvider({
     name: "test",
     baseUrl: "https://example.test/v1",
     encryptedApiKey: "encrypted",
     reasoningProtocol: "openai",
-    models: [
-      { id: "reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
-      { id: "image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" }
-    ]
+    models
   });
-  const project = repository.createProject({ name: "cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+}
+
+/** 项目字段默认值：用例只覆盖与自身规则相关的差异。 */
+function makeProject(providerId: string, overrides: Partial<ProjectInput> = {}) {
+  return repository.createProject({
+    name: "cup",
+    category: null,
+    productDescription: null,
+    verifiedFacts: [],
+    prohibitedClaims: [],
+    brandGuidelines: {},
+    platformTargets: ["TAOBAO"],
+    targetMarket: null,
+    copyLanguage: null,
+    reasoningProviderId: providerId,
+    reasoningModelId: "reasoner",
+    imageProviderId: providerId,
+    imageModelId: "image",
+    defaultMode: "CREATIVE",
+    imageResolution: "1K",
+    imageAspectRatio: "AUTO",
+    candidatesPerType: 1,
+    ...overrides,
+  });
+}
+
+function seedFailedGenerateJob(): ReturnType<EcomRepository["createJob"]> {
+  const provider = saveProvider();
+  const project = makeProject(provider.id);
   const job = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "GENERATE", input: { candidateIndex: 1 }, providerId: provider.id, modelId: "image" });
   repository.updateJob(job.id, { status: "FAILED", progress: 100, error: { message: "fetch failed" } });
   return job;
@@ -89,18 +124,9 @@ describe("POST /api/v1/jobs/:jobId/retry", () => {
   });
 });
 
-function seedProject(repository: EcomRepository, name: string) {
-  const provider = repository.saveProvider({
-    name: "test",
-    baseUrl: "https://example.test/v1",
-    encryptedApiKey: "encrypted",
-    reasoningProtocol: "openai",
-    models: [
-      { id: "reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
-      { id: "image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" }
-    ]
-  });
-  return repository.createProject({ name, category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1 });
+function seedProject(name: string) {
+  const provider = saveProvider();
+  return makeProject(provider.id, { name });
 }
 
 /** 与 buildApi 共享同一 dataDir：测试侧直接用 LocalAssetStore 落盘源文件，绕开 multipart 构造。 */
@@ -111,8 +137,8 @@ async function seedSourceAsset(repository: EcomRepository, projectId: string, co
 
 describe("asset library", () => {
   it("从资产库复制图片到目标项目：新记录、独立文件，库列表按 hash 去重并映射来源", async () => {
-    const sourceProject = seedProject(repository, "source");
-    const targetProject = seedProject(repository, "target");
+    const sourceProject = seedProject("source");
+    const targetProject = seedProject("target");
     const source = await seedSourceAsset(repository, sourceProject.id, await samplePng());
 
     const listing = await app.inject({ method: "GET", url: "/api/v1/library-assets" });
@@ -135,7 +161,7 @@ describe("asset library", () => {
   });
 
   it("缩略图端点按内容 hash 惰性生成 webp，并作为库条目 thumbnailUrl", async () => {
-    const project = seedProject(repository, "source");
+    const project = seedProject("source");
     const source = await seedSourceAsset(repository, project.id, await samplePng());
     const listing = await app.inject({ method: "GET", url: "/api/v1/library-assets" });
     const listed = listing.json<{ items: Array<{ id: string; thumbnailUrl: string }> }>().items.find((item) => item.id === `asset:${source.id}`);
@@ -145,7 +171,7 @@ describe("asset library", () => {
   });
 
   it("库列表包含生成结果并按 GENERATED 类型筛选", async () => {
-    const project = seedProject(repository, "source");
+    const project = seedProject("source");
     repository.saveStoryboard(project.id, "lock", "DRAFT", [{ assetType: "hero-image", displayName: "杯子首图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "DRAFT", promptInstruction: "hero", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
     const item = repository.listStoryboardItems(project.id)[0]!;
     const job = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: item.id, type: "GENERATE", input: {} });
@@ -162,8 +188,8 @@ describe("asset library", () => {
   });
 
   it("库条目不存在或源文件缺失时返回 404 且不产生新记录", async () => {
-    const sourceProject = seedProject(repository, "source");
-    const targetProject = seedProject(repository, "target");
+    const sourceProject = seedProject("source");
+    const targetProject = seedProject("target");
     const unknown = await app.inject({
       method: "POST",
       url: `/api/v1/projects/${targetProject.id}/assets/from-library`,
@@ -182,30 +208,26 @@ describe("asset library", () => {
     expect(repository.listAssets(targetProject.id)).toHaveLength(0);
   });
 
-  it("目标项目已有同内容图片时拒绝复制", async () => {
-    const sourceProject = seedProject(repository, "source");
-    const targetProject = seedProject(repository, "target");
-    const source = await seedSourceAsset(repository, sourceProject.id, await samplePng());
-    const first = await app.inject({ method: "POST", url: `/api/v1/projects/${targetProject.id}/assets/from-library`, payload: { itemId: `asset:${source.id}` } });
+  it("from-library 复制同样执行容量上限与同内容校验", async () => {
+    const source = await seedSourceAsset(repository, seedProject("source").id, await samplePng());
+
+    const capacityTarget = seedProject("target-capacity");
+    for (let index = 0; index < 6; index += 1) {
+      repository.createAsset({ projectId: capacityTarget.id, role: "PRODUCT_TRUTH", storagePath: `assets/${capacityTarget.id}/${index}.png`, hash: `hash-${index}`, originalName: `${index}.png`, mimeType: "image/png", width: null, height: null });
+    }
+    const overCapacity = await app.inject({ method: "POST", url: `/api/v1/projects/${capacityTarget.id}/assets/from-library`, payload: { itemId: `asset:${source.id}`, kind: "PRODUCT" } });
+    expect(overCapacity.statusCode).toBe(400);
+
+    const duplicateTarget = seedProject("target-duplicate");
+    const first = await app.inject({ method: "POST", url: `/api/v1/projects/${duplicateTarget.id}/assets/from-library`, payload: { itemId: `asset:${source.id}` } });
     expect(first.statusCode).toBe(201);
-    const second = await app.inject({ method: "POST", url: `/api/v1/projects/${targetProject.id}/assets/from-library`, payload: { itemId: `asset:${source.id}` } });
+    const second = await app.inject({ method: "POST", url: `/api/v1/projects/${duplicateTarget.id}/assets/from-library`, payload: { itemId: `asset:${source.id}` } });
     expect(second.statusCode).toBe(400);
   });
 
-  it("商品图达到容量上限后拒绝从库复制", async () => {
-    const sourceProject = seedProject(repository, "source");
-    const targetProject = seedProject(repository, "target");
-    for (let index = 0; index < 6; index += 1) {
-      repository.createAsset({ projectId: targetProject.id, role: "PRODUCT_TRUTH", storagePath: `assets/${targetProject.id}/${index}.png`, hash: `hash-${index}`, originalName: `${index}.png`, mimeType: "image/png", width: null, height: null });
-    }
-    const source = await seedSourceAsset(repository, sourceProject.id, await samplePng());
-    const response = await app.inject({ method: "POST", url: `/api/v1/projects/${targetProject.id}/assets/from-library`, payload: { itemId: `asset:${source.id}`, kind: "PRODUCT" } });
-    expect(response.statusCode).toBe(400);
-  });
-
   it("省略 kind 时沿用源资产 role", async () => {
-    const sourceProject = seedProject(repository, "source");
-    const targetProject = seedProject(repository, "target");
+    const sourceProject = seedProject("source");
+    const targetProject = seedProject("target");
     const source = await seedSourceAsset(repository, sourceProject.id, await samplePng(), "STYLE_REFERENCE");
     const response = await app.inject({ method: "POST", url: `/api/v1/projects/${targetProject.id}/assets/from-library`, payload: { itemId: `asset:${source.id}` } });
     expect(response.statusCode).toBe(201);
@@ -219,19 +241,17 @@ async function samplePng(): Promise<Buffer> {
 }
 
 function seedLayerProject(segmentationModelId: string | null) {
-  const provider = repository.saveProvider({
-    name: "layer",
-    baseUrl: "https://example.test/v1",
-    encryptedApiKey: "encrypted",
-    reasoningProtocol: "openai",
-    models: [
-      { id: "reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
-      { id: "reasoner-2", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
-      { id: "sam-3", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "fal" },
-      { id: "layerize", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "seedream_layerize" }
-    ]
+  const provider = saveProvider([
+    { id: "reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
+    { id: "reasoner-2", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
+    { id: "sam-3", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "fal" },
+    { id: "layerize", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "seedream_layerize" }
+  ]);
+  const project = makeProject(provider.id, {
+    name: "layer-cup",
+    imageModelId: null,
+    segmentationModel: segmentationModelId ? { providerId: provider.id, modelId: segmentationModelId } : null,
   });
-  const project = repository.createProject({ name: "layer-cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: null, defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1, segmentationModel: segmentationModelId ? { providerId: provider.id, modelId: segmentationModelId } : null });
   repository.saveStoryboard(project.id, "", "CONFIRMED", [{ assetType: "hero", displayName: "主图", shotRole: null, templateVariant: null, candidateCount: 1, referencedAssets: [], mode: "CREATIVE", status: "CONFIRMED", promptInstruction: "", compiledPrompt: null, factClaims: [], riskFlags: [], sortOrder: 0 }]);
   const item = repository.listStoryboardItems(project.id)[0]!;
   const job = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "GENERATE", input: {} });
@@ -240,8 +260,6 @@ function seedLayerProject(segmentationModelId: string | null) {
 }
 
 describe("layer plan & layer exports", () => {
-  beforeEach(() => { vi.mocked(enqueue).mockClear(); });
-
   it("layer-plan 入队 LAYER_PLAN 任务并按指纹复用同一方案", async () => {
     const { project, output } = seedLayerProject(null);
     const first = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-plan`, payload: {} });
@@ -280,56 +298,69 @@ describe("layer plan & layer exports", () => {
     expect(response.statusCode).toBe(404);
   });
 
-  it("layer-exports 依次校验分割模型、识别方案与元素合法性", async () => {
-    const { output } = seedLayerProject(null);
-    const noModel = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { elements: [{ id: "a", name: "瓶子", source: "auto" }] } });
+  it("layer-exports 在缺少分割模型或识别方案时拒绝", async () => {
+    const withoutModel = seedLayerProject(null);
+    const noModel = await app.inject({ method: "POST", url: `/api/v1/outputs/${withoutModel.output.id}/layer-exports`, payload: { elements: [{ id: "a", name: "瓶子", source: "auto" }] } });
     expect(noModel.statusCode).toBe(422);
     expect(noModel.json<{ error: { code: string } }>().error.code).toBe("PROVIDER_NOT_CONFIGURED");
 
     const configured = seedLayerProject("sam-3");
     const noPlan = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "a", name: "瓶子", source: "auto" }] } });
     expect(noPlan.statusCode).toBe(409);
+  });
 
-    // 画框/提示词元素无需识别方案即可直接分层（planId 为空）；auto 元素仍要求已成功的识别方案
-    const manualOnly = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "m-1", name: "自定义", source: "manual", bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }] } });
+  it("layer-exports 允许画框/提示词元素免识别方案，但画框元素必须携带 bbox", async () => {
+    const { output } = seedLayerProject("sam-3");
+
+    const manualOnly = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { elements: [{ id: "m-1", name: "自定义", source: "manual", bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }] } });
     expect(manualOnly.statusCode).toBe(202);
     expect(manualOnly.json<{ layerExport: { planId: string | null; status: string } }>().layerExport).toMatchObject({ planId: null, status: "QUEUED" });
 
-    const promptOnly = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "p-1", name: "标题", source: "prompt" }] } });
+    const promptOnly = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { elements: [{ id: "p-1", name: "标题", source: "prompt" }] } });
     expect(promptOnly.statusCode).toBe(202);
 
-    const plan = repository.createLayerPlan({ projectId: configured.project.id, outputId: configured.output.id, jobId: randomUUID(), outputHash: "hash-1", status: "SUCCEEDED", elements: [{ id: "el-1", name: "瓶子", source: "auto", bbox: null }], error: null });
-    const manualWithoutBbox = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "m-1", name: "背景", source: "manual" }] } });
+    const manualWithoutBbox = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { elements: [{ id: "m-1", name: "背景", source: "manual" }] } });
     expect(manualWithoutBbox.statusCode).toBe(400);
+  });
 
-    const unknownAuto = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { planId: plan.id, elements: [{ id: "el-x", name: "不存在", source: "auto" }] } });
+  it("layer-exports 的 auto 元素必须引用所属识别方案中的元素", async () => {
+    const { project, output } = seedLayerProject("sam-3");
+    const plan = repository.createLayerPlan({ projectId: project.id, outputId: output.id, jobId: randomUUID(), outputHash: "hash-1", status: "SUCCEEDED", elements: [{ id: "el-1", name: "瓶子", source: "auto", bbox: null }], error: null });
+
+    const unknownAuto = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { planId: plan.id, elements: [{ id: "el-x", name: "不存在", source: "auto" }] } });
     expect(unknownAuto.statusCode).toBe(409);
 
     // auto 元素引用方案局部 id，必须携带其所属 planId；重识别后旧选择不得静默套用到新方案
-    const stalePlan = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { planId: randomUUID(), elements: [{ id: "el-1", name: "瓶子", source: "auto" }] } });
+    const stalePlan = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { planId: randomUUID(), elements: [{ id: "el-1", name: "瓶子", source: "auto" }] } });
     expect(stalePlan.statusCode).toBe(409);
+  });
 
-    const valid = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { planId: plan.id, elements: [{ id: "el-1", name: "瓶子", source: "auto" }, { id: "m-1", name: "自定义", source: "manual", bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }] } });
+  it("layer-exports 成功后复用指纹并按时间倒序列出历史", async () => {
+    const { project, output } = seedLayerProject("sam-3");
+    const plan = repository.createLayerPlan({ projectId: project.id, outputId: output.id, jobId: randomUUID(), outputHash: "hash-1", status: "SUCCEEDED", elements: [{ id: "el-1", name: "瓶子", source: "auto", bbox: null }], error: null });
+    const payload = { planId: plan.id, elements: [{ id: "el-1", name: "瓶子", source: "auto" }, { id: "m-1", name: "自定义", source: "manual", bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }] };
+
+    const valid = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload });
     expect(valid.statusCode).toBe(202);
     const bundle = valid.json<{ job: { type: string }; layerExport: { id: string; planId: string; includeBackground: boolean; status: string } }>();
     expect(bundle.job.type).toBe("LAYER_EXPORT");
     expect(bundle.layerExport).toMatchObject({ planId: plan.id, includeBackground: true, status: "QUEUED" });
     expect(vi.mocked(enqueue).mock.calls.some(([, payload]) => payload.kind === "layer_export")).toBe(true);
 
-    const duplicate = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { planId: plan.id, elements: [{ id: "el-1", name: "瓶子", source: "auto" }, { id: "m-1", name: "自定义", source: "manual", bbox: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }] } });
+    const duplicate = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload });
     expect(duplicate.statusCode).toBe(202);
     expect(duplicate.json<{ layerExport: { id: string } }>().layerExport.id).toBe(bundle.layerExport.id);
 
-    // 历史导出按时间倒序列出每次导出；重复请求命中指纹不新增记录（前面已产生 manualOnly/promptOnly/valid 三条）
-    const another = await app.inject({ method: "POST", url: `/api/v1/outputs/${configured.output.id}/layer-exports`, payload: { elements: [{ id: "p-9", name: "标题", source: "prompt" }] } });
+    const another = await app.inject({ method: "POST", url: `/api/v1/outputs/${output.id}/layer-exports`, payload: { elements: [{ id: "p-9", name: "标题", source: "prompt" }] } });
     expect(another.statusCode).toBe(202);
-    const history = await app.inject({ method: "GET", url: `/api/v1/outputs/${configured.output.id}/layer-exports/history` });
+    const history = await app.inject({ method: "GET", url: `/api/v1/outputs/${output.id}/layer-exports/history` });
     expect(history.statusCode).toBe(200);
     const listed = history.json<{ exports: Array<{ id: string; psdDownloadUrl: string | null; layerFiles: Array<{ downloadUrl: string }> | null }> }>().exports;
-    expect(listed).toHaveLength(4);
+    expect(listed).toHaveLength(2);
     expect(listed[0].id).toBe(another.json<{ layerExport: { id: string } }>().layerExport.id);
     // 未完成的导出没有产物：下载链接为空且不暴露存储路径
     expect(listed.every((item) => item.psdDownloadUrl === null)).toBe(true);
+
     const missingHistory = await app.inject({ method: "GET", url: `/api/v1/outputs/${randomUUID()}/layer-exports/history` });
     expect(missingHistory.statusCode).toBe(404);
   });
@@ -503,18 +534,11 @@ describe("GET /api/v1/suites 分页与筛选", () => {
 
 describe("segmentation model declarations & refs", () => {
   function seedSegmentationProvider() {
-    const provider = repository.saveProvider({
-      name: "seg",
-      baseUrl: "https://example.test/v1",
-      encryptedApiKey: "encrypted",
-      reasoningProtocol: "openai",
-      models: [
-        { id: "reasoner", supportsVision: true, supportsThinking: true, supportsTools: true, supportsStructuredOutput: true, imageApiKind: null },
-        { id: "image", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" },
-        { id: "sam-3", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "fal" }
-      ]
-    });
-    const project = repository.createProject({ name: "seg-cup", category: null, productDescription: null, verifiedFacts: [], prohibitedClaims: [], brandGuidelines: {}, platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE", imageResolution: "1K", imageAspectRatio: "AUTO", candidatesPerType: 1, segmentationModel: null });
+    const provider = saveProvider([
+      ...DEFAULT_MODELS,
+      { id: "sam-3", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "fal" }
+    ]);
+    const project = makeProject(provider.id, { name: "seg-cup", segmentationModel: null });
     return { provider, project };
   }
 
