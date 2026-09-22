@@ -1,5 +1,6 @@
 import { gunzipSync } from "node:zlib";
 
+import { requestSignal } from "./abort.js";
 import { ProviderConnection, ProviderError } from "./openai-compatible.js";
 import type { FalSegmentationResult } from "./fal.js";
 
@@ -28,6 +29,8 @@ export interface GiteeSam3SegmentationInput {
   textPrompt?: string;
   /** 不受支持：Gitee pipeline 表单没有框提示字段。 */
   box?: { xMin: number; yMin: number; xMax: number; yMax: number };
+  /** 调用方取消信号；中断会真正断开在途请求，避免取消后继续等待并按次计费。 */
+  signal?: AbortSignal;
 }
 
 interface GiteeSam3Segment {
@@ -57,12 +60,12 @@ export class GiteeSam3SegmentationProvider {
       // 文档支持网络图片 URL：直接作为表单字符串字段传给服务端拉取。
       form.set("image", input.imageUrl);
     }
-    // 分割请求按次计费：只提交一次，网络失败/超时如实上报，不自动重发。
+    // 分割请求按次计费：只提交一次，网络失败/超时/取消如实上报，不自动重发。
     const response = await fetch(new URL(`${this.baseUrl()}${GITEE_SAM3_SEGMENTATION_PATH}`), {
       method: "POST",
       headers: { authorization: `Bearer ${this.connection.apiKey}` },
       body: form,
-      signal: AbortSignal.timeout(SEGMENTATION_REQUEST_TIMEOUT_MS)
+      signal: requestSignal(input.signal, SEGMENTATION_REQUEST_TIMEOUT_MS)
     });
     if (!response.ok) throw new ProviderError(await response.text(), response.status);
     const body = await response.json() as GiteeSam3Response;

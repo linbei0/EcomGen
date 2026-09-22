@@ -52,6 +52,11 @@ const forgeSuite = () => ({
   provenance: { sourceKind: "viral-reference-set", sourceImageCount: 2, detached: true, notes: "e2e-mock" }
 });
 const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "", layerPlanPrompt: "", suiteForgePrompt: "", samRequests: [], groundedRequests: [], layerizeRequests: [], giteeRequests: [] };
+// 取消场景：带 marker 的生图请求永不响应，用来验证取消是否真正断开在途 HTTP 而不是等超时。
+const hangingImagePromptMarker = "e2e-hang-forever";
+const cancellation = { hangingRequests: 0, abortedBeforeResponse: 0 };
+// 取消场景的规划结果：模式必须是 CREATIVE，PIXEL_PROTECTED 会要求项目存在商品真值图。
+const hangingPlan = () => ({ campaignStyleLock: "clean off-white ecommerce system", items: [{ ...plan.items[0], mode: "CREATIVE", promptInstruction: `${plan.items[0].promptInstruction} ${hangingImagePromptMarker}` }] });
 const children = [];
 // 与 apps/worker 的启动日志配对；改动任一侧都要同步，否则这里会退化成启动超时。
 const WORKER_READY_LINE = "ecomgen worker ready";
@@ -113,6 +118,15 @@ try {
         response.end();
         return;
       }
+      // 取消场景的项目：描述里带 marker 时返回同样带 marker 的 Prompt，让生图请求命中"永不返回"分支
+      if (requestText.includes(hangingImagePromptMarker)) {
+        response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        response.write(`data: ${JSON.stringify({ id: "mock-hanging-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(hangingPlan()) }, finish_reason: null }] })}\n\n`);
+        response.write(`data: ${JSON.stringify({ id: "mock-hanging-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+        response.write("data: [DONE]\n\n");
+        response.end();
+        return;
+      }
       observed.planningPrompt = body.toString("utf8");
       response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
       response.write(`data: ${JSON.stringify({ id: "mock-plan", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(plan) }, finish_reason: null }] })}\n\n`);
@@ -141,6 +155,15 @@ try {
         return;
       }
       observed.imagePrompt = body.toString("utf8");
+      // 取消场景：上游一直不返回。若 Worker 取消没有真正中断连接，这里永远不会观测到 abort。
+      if (observed.imagePrompt.includes(hangingImagePromptMarker)) {
+        cancellation.hangingRequests += 1;
+        let abortRecorded = false;
+        const recordAbort = () => { if (abortRecorded) return; abortRecorded = true; cancellation.abortedBeforeResponse += 1; };
+        request.on("aborted", recordAbort);
+        response.on("close", () => { if (!response.writableEnded) recordAbort(); });
+        return;
+      }
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ id: "mock-image", data: [{ b64_json: onePixelPng }] }));
       return;
@@ -498,7 +521,45 @@ try {
   const committedSuiteSummary = suites.items.find((suite) => suite.id === committedForge.suiteId);
   assert.ok(committedSuiteSummary, "committed suite should be listed");
   assert.equal(committedSuiteSummary.name, editedForgeSuite.name);
-  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge");
+  // 取消传播：上游永不返回时，取消必须真正断开在途请求，而不是等超时后再丢弃已计费的结果。
+  // 已生成的分镜被服务端冻结 Prompt，因此这里用一个独立项目构造该请求，顺带不干扰主链路的产物计数。
+  const cancelProject = await requestJson(`${base}/projects`, "POST", {
+    name: "Cancel case",
+    category: "home",
+    productDescription: `A cup used to verify cancellation behaviour. ${hangingImagePromptMarker}`,
+    verifiedFacts: [],
+    prohibitedClaims: [],
+    brandGuidelines: { accent: "#1A3A2E", tone: "premium practical" },
+    platformTargets: ["AMAZON"],
+    targetMarket: "UNITED_STATES",
+    copyLanguage: "en-US",
+    reasoningProviderId: provider.id,
+    reasoningModelId: "mock-reasoner",
+    imageProviderId: provider.id,
+    imageModelId: "mock-image",
+    defaultMode: "CREATIVE",
+    imageResolution: "1K",
+    imageAspectRatio: "AUTO",
+    candidatesPerType: 1
+  });
+  await requestJson(`${base}/projects/${cancelProject.id}/planning-jobs`, "POST", { planningMode: "AI", requestedTypes: ["hero-image"], candidatesPerType: 1, targetImageCount: 1 });
+  const cancelPlanJob = await waitForJob(base, cancelProject.id, "PLAN");
+  assert.equal(cancelPlanJob.status, "SUCCEEDED");
+  const cancelStoryboard = await requestJson(`${base}/projects/${cancelProject.id}/storyboard`, "GET");
+  await requestJson(`${base}/projects/${cancelProject.id}/storyboard/confirm`, "POST", {});
+  const cancelGeneration = await requestJson(`${base}/projects/${cancelProject.id}/generation-jobs`, "POST", { storyboardItemIds: [cancelStoryboard.items[0].id] });
+  const cancelJobId = cancelGeneration.jobs[0].id;
+  await waitFor(() => cancellation.hangingRequests === 1, 15_000, "hanging generation request");
+  // 取消之前请求必须仍在途，否则这条断言无法证明取消"中断"了什么。
+  assert.equal(cancellation.abortedBeforeResponse, 0);
+  await requestJson(`${base}/jobs/${cancelJobId}/cancel`, "POST");
+  const cancelledGeneration = await waitJob(base, cancelJobId);
+  assert.equal(cancelledGeneration.status, "CANCELLED");
+  await waitFor(() => cancellation.abortedBeforeResponse === 1, 15_000, "aborted provider connection");
+  // 取消不是瞬时错误：重发一次就是再付一次费，因此上游只允许收到一次请求。
+  assert.equal(cancellation.hangingRequests, 1);
+  assert.equal((await requestJson(`${base}/projects/${cancelProject.id}/outputs`, "GET")).length, 0);
+  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge -> cancel aborts in-flight generation");
 } finally {
   await Promise.all(children.map(stop));
   if (mock) await new Promise((resolveClose) => mock.close(resolveClose));

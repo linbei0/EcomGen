@@ -1,16 +1,19 @@
+import { requestSignal } from "./abort.js";
 import type { ImageEditInput, ImageGenerationInput, ImageGenerationResult, ImageInput, ProviderConnection, ProviderProbeResult } from "./openai-compatible.js";
 import { ProviderError } from "./openai-compatible.js";
+
+const GEMINI_REQUEST_TIMEOUT_MS = 120_000;
 
 /** Google Gemini native image generation（Nano Banana）适配器。 */
 export class GeminiImageProvider {
   public constructor(private readonly connection: ProviderConnection) {}
 
   public async generate(input: ImageGenerationInput): Promise<ImageGenerationResult> {
-    return this.request(input.model, input.prompt, input.images, input.idempotencyKey, input.imageAspectRatio, input.imageResolution);
+    return this.request(input.model, input.prompt, input.images, input.idempotencyKey, input.imageAspectRatio, input.imageResolution, input.signal);
   }
 
   public async editImage(input: ImageEditInput): Promise<ImageGenerationResult> {
-    return this.request(input.model, input.prompt, [input.sourceImage, ...(input.referenceImages ?? [])], input.idempotencyKey, input.imageAspectRatio, input.imageResolution);
+    return this.request(input.model, input.prompt, [input.sourceImage, ...(input.referenceImages ?? [])], input.idempotencyKey, input.imageAspectRatio, input.imageResolution, input.signal);
   }
 
   public async probe(): Promise<ProviderProbeResult> {
@@ -24,7 +27,7 @@ export class GeminiImageProvider {
     return { latencyMs: Date.now() - started, models };
   }
 
-  private async request(model: string, prompt: string, images?: ImageInput[], idempotencyKey?: string, imageAspectRatio?: string, imageResolution?: string): Promise<ImageGenerationResult> {
+  private async request(model: string, prompt: string, images?: ImageInput[], idempotencyKey?: string, imageAspectRatio?: string, imageResolution?: string, cancel?: AbortSignal): Promise<ImageGenerationResult> {
     const parts = [
       { text: prompt },
       ...(images ?? []).map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.data.toString("base64") } }))
@@ -47,7 +50,7 @@ export class GeminiImageProvider {
             : {})
         }
       }),
-      signal: AbortSignal.timeout(120_000)
+      signal: requestSignal(cancel, GEMINI_REQUEST_TIMEOUT_MS)
     });
     if (!response.ok) throw new ProviderError(await response.text(), response.status);
     const body = await response.json() as { response?: unknown; candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string }; inline_data?: { mime_type?: string; data?: string } }> } }> };

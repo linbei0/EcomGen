@@ -1,5 +1,7 @@
 import type { EditOperation, ModelCapabilities } from "@ecomgen/contracts";
 
+import { requestSignal } from "./abort.js";
+
 export interface ProviderConnection {
   baseUrl: string;
   apiKey: string;
@@ -20,6 +22,8 @@ export interface ImageGenerationInput {
   mask?: { data: Buffer; filename: string; mimeType: string };
   inputFidelity?: "low" | "high";
   operation?: EditOperation;
+  /** 调用方取消信号；中断会真正断开在途请求，避免取消后继续等待并按次计费。 */
+  signal?: AbortSignal;
 }
 
 export interface ImageInput {
@@ -42,6 +46,8 @@ export interface ImageEditInput {
   mask?: ImageInput;
   operation: EditOperation;
   inputFidelity?: "low" | "high";
+  /** 调用方取消信号；中断会真正断开在途请求，避免取消后继续等待并按次计费。 */
+  signal?: AbortSignal;
 }
 
 export interface ImageEditCapabilities {
@@ -87,6 +93,8 @@ export function highInputFidelityForOpenAiImageModel(modelId: string): "high" | 
 // gpt-image high 档带参考图的 edits 请求经常超过 2 分钟；超时过短会把本可完成的
 // 生成直接杀掉。允许通过环境变量按部署调整，默认 5 分钟。
 const DEFAULT_IMAGE_REQUEST_TIMEOUT_MS = 300_000;
+/** 下载 Provider 返回的图片 URL；该请求与生图请求同源受控，同样需要超时与取消。 */
+const IMAGE_DOWNLOAD_TIMEOUT_MS = 120_000;
 const IMAGE_REQUEST_RETRIES = 1;
 const RETRYABLE_IMAGE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
@@ -96,12 +104,15 @@ function imageRequestTimeoutMs(): number {
   return Math.min(600_000, Math.max(60_000, raw));
 }
 
-/** 生图请求瞬时错误（网络失败、超时、408/429/5xx）判定。 */
+/**
+ * 生图请求瞬时错误（网络失败、超时、408/429/5xx）判定。
+ * 不含 AbortError：取消只可能来自调用方信号，重发一次就是再付一次费。
+ */
 function isTransientImageRequestError(error: unknown): boolean {
   if (error instanceof ProviderError) return RETRYABLE_IMAGE_STATUS.has(error.status);
   const name = error instanceof Error ? error.name : "";
-  // TimeoutError/AbortError 来自请求超时；TypeError 通常是底层网络失败。
-  return name === "TimeoutError" || name === "AbortError" || name === "TypeError";
+  // TimeoutError 来自 AbortSignal.timeout；TypeError 通常是底层网络失败。
+  return name === "TimeoutError" || name === "TypeError";
 }
 
 export class OpenAiCompatibleImageProvider {
@@ -119,8 +130,8 @@ export class OpenAiCompatibleImageProvider {
       quality: input.quality,
       response_format: "b64_json",
       n: 1
-    }));
-    return this.readImageResponse(response);
+    }), input.signal);
+    return this.readImageResponse(response, input.signal);
   }
 
   public async editImage(input: ImageEditInput): Promise<ImageGenerationResult> {
@@ -133,7 +144,8 @@ export class OpenAiCompatibleImageProvider {
       mask: input.mask,
       inputFidelity: input.inputFidelity,
       operation: input.operation,
-      idempotencyKey: input.idempotencyKey
+      idempotencyKey: input.idempotencyKey,
+      signal: input.signal
     });
   }
 
@@ -159,12 +171,12 @@ export class OpenAiCompatibleImageProvider {
       form.append("image", new Blob([new Uint8Array(image.data)], { type: image.mimeType }), image.filename);
     }
     if (input.mask) form.append("mask", new Blob([new Uint8Array(input.mask.data)], { type: input.mask.mimeType }), input.mask.filename);
-    const response = await this.postWithRetry(new URL("images/edits", this.baseUrl()), this.headers(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {}), form);
-    return this.readImageResponse(response);
+    const response = await this.postWithRetry(new URL("images/edits", this.baseUrl()), this.headers(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {}), form, input.signal);
+    return this.readImageResponse(response, input.signal);
   }
 
   /** 带一次瞬时错误重试的生图请求；幂等键由调用方提供，重试不会产生重复产物。 */
-  private async postWithRetry(url: URL, headers: Record<string, string>, body: BodyInit): Promise<Response> {
+  private async postWithRetry(url: URL, headers: Record<string, string>, body: BodyInit, cancel?: AbortSignal): Promise<Response> {
     let lastError: unknown;
     for (let attempt = 0; attempt <= IMAGE_REQUEST_RETRIES; attempt += 1) {
       try {
@@ -172,25 +184,27 @@ export class OpenAiCompatibleImageProvider {
           method: "POST",
           headers,
           body,
-          signal: AbortSignal.timeout(imageRequestTimeoutMs())
+          signal: requestSignal(cancel, imageRequestTimeoutMs())
         });
         if (response.ok || !RETRYABLE_IMAGE_STATUS.has(response.status) || attempt === IMAGE_REQUEST_RETRIES) return response;
         lastError = new ProviderError(await response.text(), response.status);
       } catch (error) {
         lastError = error;
+        // 取消不是瞬时故障：重试会再发一次已计费的生成请求。
+        if (cancel?.aborted) throw error;
         if (!isTransientImageRequestError(error) || attempt === IMAGE_REQUEST_RETRIES) throw error;
       }
     }
     throw lastError instanceof Error ? lastError : new ProviderError(String(lastError), 502);
   }
 
-  private async readImageResponse(response: Response): Promise<ImageGenerationResult> {
+  private async readImageResponse(response: Response, cancel?: AbortSignal): Promise<ImageGenerationResult> {
     if (!response.ok) throw new ProviderError(await response.text(), response.status);
     const body = await response.json() as { data?: Array<{ b64_json?: string; url?: string }>; task_id?: string; id?: string };
     const result = body.data?.[0];
     if (result?.b64_json) return { image: Buffer.from(result.b64_json, "base64"), mimeType: "image/png", providerTaskId: body.task_id ?? body.id };
     if (result?.url) {
-      const imageResponse = await fetch(result.url);
+      const imageResponse = await fetch(result.url, { signal: requestSignal(cancel, IMAGE_DOWNLOAD_TIMEOUT_MS) });
       if (!imageResponse.ok) throw new ProviderError("Provider returned an unreadable image URL", imageResponse.status);
       const mimeType = imageResponse.headers.get("content-type")?.split(";")[0] ?? "image/png";
       return { image: Buffer.from(await imageResponse.arrayBuffer()), mimeType, providerTaskId: body.task_id ?? body.id };

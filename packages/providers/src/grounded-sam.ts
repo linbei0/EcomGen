@@ -1,3 +1,4 @@
+import { requestSignal } from "./abort.js";
 import { ProviderConnection, ProviderError } from "./openai-compatible.js";
 import type { FalSegmentationResult } from "./fal.js";
 
@@ -19,6 +20,8 @@ export interface GroundedSamSegmentationInput {
   imageUrl: string;
   textPrompt?: string;
   box?: { xMin: number; yMin: number; xMax: number; yMax: number };
+  /** 调用方取消信号；中断会真正断开在途请求，避免取消后继续等待并按次计费。 */
+  signal?: AbortSignal;
 }
 
 interface GroundedSamMask { data?: string; mime_type?: string; width?: number; height?: number; bbox?: unknown; score?: unknown; }
@@ -28,7 +31,7 @@ export class GroundedSamSegmentationProvider {
   public constructor(private readonly connection: ProviderConnection) { }
 
   public async segment(input: GroundedSamSegmentationInput): Promise<FalSegmentationResult> {
-    const image = await resolveImageData(input.imageUrl);
+    const image = await resolveImageData(input.imageUrl, input.signal);
     const payload: Record<string, unknown> = { image };
     if (input.textPrompt !== undefined && input.textPrompt.trim().length > 0) payload.text_prompt = input.textPrompt.trim();
     if (input.box) {
@@ -39,8 +42,8 @@ export class GroundedSamSegmentationProvider {
         y_max: Math.round(input.box.yMax)
       }];
     }
-    // 自托管分割同样按次计费：只提交一次，失败如实上报，不自动重发。
-    const response = await fetch(new URL(this.baseUrl()), { method: "POST", headers: this.headers(), body: JSON.stringify(payload), signal: AbortSignal.timeout(SEGMENTATION_REQUEST_TIMEOUT_MS) });
+    // 自托管分割同样按次计费：只提交一次，失败/取消如实上报，不自动重发。
+    const response = await fetch(new URL(this.baseUrl()), { method: "POST", headers: this.headers(), body: JSON.stringify(payload), signal: requestSignal(input.signal, SEGMENTATION_REQUEST_TIMEOUT_MS) });
     if (!response.ok) throw new ProviderError(await response.text(), response.status);
     const body = await response.json() as GroundedSamResponse;
     const mask = body.masks?.[0];
@@ -75,13 +78,13 @@ export class GroundedSamSegmentationProvider {
 }
 
 /** data URI 拆 base64；http(s) URL 由 Worker 端抓取（自托管服务通常访问不到本机文件）。 */
-async function resolveImageData(imageUrl: string): Promise<{ data: string; mime_type: string }> {
+async function resolveImageData(imageUrl: string, cancel?: AbortSignal): Promise<{ data: string; mime_type: string }> {
   if (imageUrl.startsWith("data:")) {
     const comma = imageUrl.indexOf(",");
     const mimeType = /data:([^;]+)/.exec(imageUrl.slice(0, comma))?.[1] ?? "image/png";
     return { data: imageUrl.slice(comma + 1), mime_type: mimeType };
   }
-  const response = await fetch(imageUrl, { signal: AbortSignal.timeout(SEGMENTATION_REQUEST_TIMEOUT_MS) });
+  const response = await fetch(imageUrl, { signal: requestSignal(cancel, SEGMENTATION_REQUEST_TIMEOUT_MS) });
   if (!response.ok) throw new ProviderError("segmentation input image is unreadable", response.status);
   return { data: Buffer.from(await response.arrayBuffer()).toString("base64"), mime_type: response.headers.get("content-type")?.split(";")[0] ?? "image/png" };
 }

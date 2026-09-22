@@ -47,14 +47,15 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
   const job = repository.getJob(queueJob.data.jobId); if (!job) throw new Error(`Database job is missing: ${queueJob.data.jobId}`);
   if (job.status === "CANCELLED" || job.cancelRequested) return;
   await updateJob(job, { status: "RUNNING", progress: 5, error: null });
+  const cancellation = startJobCancellation(job);
   try {
     if (queueJob.data.kind === "plan") await executePlan(job);
     else if (queueJob.data.kind === "copywrite") await executeCopywriting(job);
-    else if (queueJob.data.kind === "generate") await executeGeneration(job);
+    else if (queueJob.data.kind === "generate") await executeGeneration(job, cancellation.signal);
     else if (queueJob.data.kind === "edit_plan") await executeEditPlan(job);
-    else if (queueJob.data.kind === "edit_generate") await executeEditGeneration(job);
+    else if (queueJob.data.kind === "edit_generate") await executeEditGeneration(job, cancellation.signal);
     else if (queueJob.data.kind === "layer_plan") await executeLayerPlan(job);
-    else if (queueJob.data.kind === "layer_export") await executeLayerExport(job);
+    else if (queueJob.data.kind === "layer_export") await executeLayerExport(job, cancellation.signal);
     else if (queueJob.data.kind === "suite_forge") await executeSuiteForge(job);
     else await executeExport(job);
     // 终态与清空外部请求标记在同一条 UPDATE 内原子完成：标记一旦设置就只在终态消失，
@@ -72,6 +73,8 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
     }
     await updateJob(job, { status: "FAILED", progress: 100, error: { message, providerStatus: error instanceof ProviderError ? error.status : undefined } });
     throw error;
+  } finally {
+    cancellation.dispose();
   }
 }, { connection: redis, concurrency: Number(process.env.WORKER_CONCURRENCY ?? 2) });
 
@@ -271,7 +274,7 @@ function configuredWebResearch() {
   return sources.length ? { sources, maxResults: 3, timeoutMs: 8_000 } : undefined;
 }
 
-async function executeGeneration(job: JobRecord): Promise<void> {
+async function executeGeneration(job: JobRecord, signal: AbortSignal): Promise<void> {
   throwIfCancelled(job);
   if (!job.storyboardItemId) throw new Error("Generation job has no storyboard item");
   const project = projectFor(job); const item = repository.getStoryboardItem(job.storyboardItemId); if (!item || item.projectId !== project.id) throw new Error("Storyboard item is missing or belongs to another project");
@@ -326,8 +329,8 @@ async function executeGeneration(job: JobRecord): Promise<void> {
     ? highInputFidelityForOpenAiImageModel(model.id)
     : undefined;
   const result = await generator.generate(model.imageApiKind === "gemini"
-    ? { model: model.id, prompt: compiledPrompt, imageAspectRatio: aspectRatio, imageResolution: resolution, images: images.length ? images : undefined, idempotencyKey: generationKey }
-    : { model: model.id, prompt: compiledPrompt, size, quality: "high", images: images.length ? images : undefined, inputFidelity, idempotencyKey: generationKey });
+    ? { model: model.id, prompt: compiledPrompt, imageAspectRatio: aspectRatio, imageResolution: resolution, images: images.length ? images : undefined, idempotencyKey: generationKey, signal }
+    : { model: model.id, prompt: compiledPrompt, size, quality: "high", images: images.length ? images : undefined, inputFidelity, idempotencyKey: generationKey, signal });
   throwIfCancelled(job);
   await updateJob(job, { progress: 80, providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED }); const stored = await storage.putOutput(project.id, result.image, extensionForMime(result.mimeType), generationKey);
   throwIfCancelled(job);
@@ -410,7 +413,7 @@ async function executeEditPlan(job: JobRecord): Promise<void> {
   await updateJob(job, { progress: 90 });
 }
 
-async function executeEditGeneration(job: JobRecord): Promise<void> {
+async function executeEditGeneration(job: JobRecord, signal: AbortSignal): Promise<void> {
   const turn = editTurnFor(job);
   const project = projectFor(job);
   const config = editGenerationConfigFor(project, turn);
@@ -465,8 +468,8 @@ async function executeEditGeneration(job: JobRecord): Promise<void> {
       idempotencyKey: generationKey
     };
     const result = await generator.editImage(model.imageApiKind === "gemini"
-      ? { ...editInput, imageAspectRatio: project.imageAspectRatio, imageResolution: config.imageResolution }
-      : { ...editInput, quality: "high", size: resolveImageSize(config.imageResolution, project.imageAspectRatio, "1024x1024"), inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined });
+      ? { ...editInput, imageAspectRatio: project.imageAspectRatio, imageResolution: config.imageResolution, signal }
+      : { ...editInput, quality: "high", size: resolveImageSize(config.imageResolution, project.imageAspectRatio, "1024x1024"), inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined, signal });
     throwIfCancelled(job);
     await updateJob(job, { progress: 30 + Math.round((candidateIndex / config.candidateCount) * 45), providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED });
     const composed = plan.executionMode === "MASKED" && plan.compositePolicy === "MASK_LOCKED" && mask
@@ -550,7 +553,7 @@ async function executeLayerPlan(job: JobRecord): Promise<void> {
   await updateJob(job, { progress: 90 });
 }
 
-async function executeLayerExport(job: JobRecord): Promise<void> {
+async function executeLayerExport(job: JobRecord, signal: AbortSignal): Promise<void> {
   const record = layerExportFor(job);
   const project = projectFor(job);
   try {
@@ -591,7 +594,7 @@ async function executeLayerExport(job: JobRecord): Promise<void> {
     if (protocol === "seedream_layerize") {
       // 一次调用拆分全部元素：手动框选换算为 0-1000 bbox 标签，自动元素用语义名称。
       const layerizer = new SeedreamLayerizeProvider({ baseUrl: provider.baseUrl, apiKey }, { modelId: segmentationModelId });
-      const result = await layerizer.layerize({ imageUrl, prompt: seedreamLayerizePrompt(elements), quality: "auto" });
+      const result = await layerizer.layerize({ imageUrl, prompt: seedreamLayerizePrompt(elements), quality: "auto", signal });
       throwIfCancelled(job);
       if (result.base) inpaintedBackground = await decodeRgba(result.base.data, width, height);
       for (const layer of result.layers) {
@@ -623,7 +626,7 @@ async function executeLayerExport(job: JobRecord): Promise<void> {
         // 文本提示优先用识别产出的英文 promptEn（部分分割渠道只接受英文），没有则退回元素名；
         // 手动框选直接用画框坐标，不传文本提示。
         const textPrompt = element.source === "manual" ? undefined : element.promptEn?.trim() || element.name;
-        const result = await segmenter.segment({ imageUrl, textPrompt, box, modelPath });
+        const result = await segmenter.segment({ imageUrl, textPrompt, box, modelPath, signal });
         throwIfCancelled(job);
         measuredBboxes.set(element.id, result.bbox);
         const mask = await normalizeMask(result.mask, width, height);
@@ -976,6 +979,28 @@ async function providerMaskFor(source: Buffer, editMask: Buffer, protectMask?: B
 }
 class JobCancelled extends Error { }
 function throwIfCancelled(job: JobRecord): void { const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") throw new JobCancelled(`Job ${job.id} was cancelled`); }
+
+// 取消状态的真相源是数据库（取消接口、重试替代原任务、失败转取消都只写库，不广播事件），
+// 但 throwIfCancelled 只在检查点生效，无法打断已经发出的 Provider 请求。
+const CANCEL_POLL_INTERVAL_MS = 2_000;
+
+/**
+ * 把任务取消传播到在途 HTTP 请求。
+ *
+ * 没有中断时，用户点取消后 Worker 会继续等待上游返回（生图默认上限 5 分钟），该次生成
+ * 照常计费，拿到结果后又被取消检查丢弃。这里以 JobCancelled 作为中断原因：fetch 会把
+ * abort reason 原样抛出，因此任务级 catch 能按既有取消分支落为 CANCELLED，不会被记为失败。
+ */
+function startJobCancellation(job: JobRecord): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const timer = setInterval(() => {
+    const current = repository.getJob(job.id);
+    if (current?.cancelRequested || current?.status === "CANCELLED") controller.abort(new JobCancelled(`Job ${job.id} was cancelled`));
+  }, CANCEL_POLL_INTERVAL_MS);
+  // 轮询不应阻止进程退出；dispose 仍负责在任务结束后清掉定时器。
+  timer.unref();
+  return { signal: controller.signal, dispose: () => clearInterval(timer) };
+}
 function extensionForMime(mimeType: string): string { return mimeType.includes("webp") ? ".webp" : mimeType.includes("jpeg") ? ".jpg" : ".png"; }
 
 /** 生成结果入库派生：读取尺寸并尽量写入缩略图缓存；任一步失败都不阻断生成主流程。 */

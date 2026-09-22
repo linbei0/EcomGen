@@ -1,3 +1,4 @@
+import { requestSignal } from "./abort.js";
 import { ProviderConnection, ProviderError } from "./openai-compatible.js";
 
 /**
@@ -22,6 +23,8 @@ export interface FalSegmentationInput {
   box?: { xMin: number; yMin: number; xMax: number; yMax: number };
   /** fal 模型路径；默认 fal-ai/sam-3/image，可换 sam-3-1 等兼容端点。 */
   modelPath?: string;
+  /** 调用方取消信号；中断会真正断开在途请求，避免取消后继续等待并按次计费。 */
+  signal?: AbortSignal;
 }
 
 export interface FalSegmentationResult {
@@ -59,13 +62,13 @@ export class FalSegmentationProvider {
       }];
     }
     const modelPath = (input.modelPath ?? DEFAULT_FAL_SAM3_MODEL_PATH).replace(/^\/+|\/+$/g, "");
-    // 分割请求按次计费：只提交一次，网络失败/超时如实上报，不自动重发。
-    const response = await fetch(new URL(`${this.baseUrl()}${modelPath}`), { method: "POST", headers: this.headers(), body: JSON.stringify(payload), signal: AbortSignal.timeout(SEGMENTATION_REQUEST_TIMEOUT_MS) });
+    // 分割请求按次计费：只提交一次，网络失败/超时/取消如实上报，不自动重发。
+    const response = await fetch(new URL(`${this.baseUrl()}${modelPath}`), { method: "POST", headers: this.headers(), body: JSON.stringify(payload), signal: requestSignal(input.signal, SEGMENTATION_REQUEST_TIMEOUT_MS) });
     if (!response.ok) throw new ProviderError(await response.text(), response.status);
     const body = await response.json() as FalSamResponse;
     const ref = body.masks?.[0] ?? body.image;
     if (!ref?.url) throw new ProviderError("fal response does not contain a mask", 502);
-    const mask = await this.readImage(ref);
+    const mask = await this.readImage(ref, input.signal);
     const box = Array.isArray(body.boxes) ? body.boxes[0] : undefined;
     const score = Array.isArray(body.scores) ? body.scores[0] : undefined;
     return {
@@ -96,7 +99,7 @@ export class FalSegmentationProvider {
     return { latencyMs: Date.now() - started, models: null };
   }
 
-  private async readImage(ref: FalImageRef): Promise<{ data: Buffer; mimeType: string }> {
+  private async readImage(ref: FalImageRef, cancel?: AbortSignal): Promise<{ data: Buffer; mimeType: string }> {
     const url = ref.url;
     if (!url) throw new ProviderError("fal returned a mask entry without a URL", 502);
     if (url.startsWith("data:")) {
@@ -105,7 +108,7 @@ export class FalSegmentationProvider {
       const mimeType = /data:([^;]+)/.exec(header)?.[1] ?? "image/png";
       return { data: Buffer.from(url.slice(comma + 1), "base64"), mimeType };
     }
-    const imageResponse = await fetch(url, { signal: AbortSignal.timeout(SEGMENTATION_REQUEST_TIMEOUT_MS) });
+    const imageResponse = await fetch(url, { signal: requestSignal(cancel, SEGMENTATION_REQUEST_TIMEOUT_MS) });
     if (!imageResponse.ok) throw new ProviderError("fal returned an unreadable mask URL", imageResponse.status);
     const mimeType = imageResponse.headers.get("content-type")?.split(";")[0] ?? ref.content_type ?? "image/png";
     return { data: Buffer.from(await imageResponse.arrayBuffer()), mimeType };

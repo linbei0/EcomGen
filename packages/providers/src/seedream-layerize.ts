@@ -1,3 +1,4 @@
+import { requestSignal } from "./abort.js";
 import { ProviderConnection, ProviderError } from "./openai-compatible.js";
 
 /**
@@ -28,6 +29,8 @@ export interface SeedreamLayerizeInput {
   prompt?: string;
   /** 输出档位；auto 跟随输入分辨率，非 auto 时映射为方舟 size 参数。 */
   quality?: "auto" | "1K" | "1.5K" | "2K";
+  /** 调用方取消信号；中断会真正断开在途请求，避免取消后继续等待并按次计费。 */
+  signal?: AbortSignal;
 }
 
 export interface SeedreamLayerizeLayer {
@@ -64,19 +67,19 @@ export class SeedreamLayerizeProvider {
     };
     if (input.prompt !== undefined && input.prompt.trim().length > 0) payload.prompt = input.prompt.trim();
     if (input.quality && input.quality !== "auto") payload.size = input.quality;
-    // 计费请求只发一次，失败如实上报，交由任务状态与人工重试决定，不自动重发。
+    // 计费请求只发一次，失败/取消如实上报，交由任务状态与人工重试决定，不自动重发。
     const response = await fetch(this.endpoint("images/generations"), {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(SUBMIT_TIMEOUT_MS)
+      signal: requestSignal(input.signal, SUBMIT_TIMEOUT_MS)
     });
     if (!response.ok) throw new ProviderError(await errorText(response), response.status);
     const body = await response.json() as SeedreamGenerationResponse;
     if (typeof body.error?.message === "string" && body.error.message.length > 0) {
       throw new ProviderError(body.error.message, 502);
     }
-    return this.parseResult(body);
+    return this.parseResult(body, input.signal);
   }
 
   /**
@@ -96,7 +99,7 @@ export class SeedreamLayerizeProvider {
     return { latencyMs: Date.now() - started, models: null };
   }
 
-  private async parseResult(body: SeedreamGenerationResponse): Promise<SeedreamLayerizeResult> {
+  private async parseResult(body: SeedreamGenerationResponse, cancel?: AbortSignal): Promise<SeedreamLayerizeResult> {
     const items = Array.isArray(body.data) ? [...body.data] : [];
     if (items.length === 0) throw new ProviderError("Seedream layerize response returned no layers", 502);
     items.sort((left, right) => (left.z_index ?? 0) - (right.z_index ?? 0));
@@ -105,7 +108,7 @@ export class SeedreamLayerizeProvider {
     for (const [index, item] of items.entries()) {
       if (!item.url) throw new ProviderError(`Seedream result item ${index} has no image URL`, 502);
       const zIndex = item.z_index ?? index;
-      const image = await readResultImage(item.url);
+      const image = await readResultImage(item.url, cancel);
       if (zIndex === 0) {
         base = { data: image.data, mimeType: image.mimeType };
         continue;
@@ -127,13 +130,13 @@ export class SeedreamLayerizeProvider {
 }
 
 /** 结果 URL 允许 data URI（本地/直连网关）或 http(s) CDN 地址；结果链接有效期短，取到即下载。 */
-async function readResultImage(url: string): Promise<{ data: Buffer; mimeType: string }> {
+async function readResultImage(url: string, cancel?: AbortSignal): Promise<{ data: Buffer; mimeType: string }> {
   if (url.startsWith("data:")) {
     const comma = url.indexOf(",");
     const mimeType = /data:([^;]+)/.exec(url.slice(0, comma))?.[1] ?? "image/png";
     return { data: Buffer.from(url.slice(comma + 1), "base64"), mimeType };
   }
-  const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+  const response = await fetch(url, { signal: requestSignal(cancel, DOWNLOAD_TIMEOUT_MS) });
   if (!response.ok) throw new ProviderError("Seedream result image URL is unreadable", response.status);
   return { data: Buffer.from(await response.arrayBuffer()), mimeType: response.headers.get("content-type")?.split(";")[0] ?? "image/png" };
 }

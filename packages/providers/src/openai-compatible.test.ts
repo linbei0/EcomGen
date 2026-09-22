@@ -121,3 +121,93 @@ describe("OpenAI-compatible image editing", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+/** 构造按 name 判定瞬时性的错误，复现 AbortSignal 的两种中断来源。 */
+function namedError(name: string, message: string): Error {
+  const error = new Error(message);
+  error.name = name;
+  return error;
+}
+
+/** 只接受连接、永不返回的 fetch 替身，用于验证在途请求能否被取消中断。 */
+function hangingFetch(): { fetchMock: ReturnType<typeof vi.fn>; captured: () => AbortSignal | undefined } {
+  let signal: AbortSignal | undefined;
+  const fetchMock = vi.fn(async (_url: URL, init?: RequestInit) => {
+    signal = init?.signal ?? undefined;
+    return await new Promise<Response>((_resolve, reject) => {
+      signal?.addEventListener("abort", () => reject(signal?.reason), { once: true });
+    });
+  });
+  return { fetchMock, captured: () => signal };
+}
+
+describe("生图请求的取消传播", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("取消中断在途生成请求，且不再重发付费请求", async () => {
+    const { fetchMock, captured } = hangingFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    const pending = provider.generate({ model: "image-model", prompt: "cup", idempotencyKey: "key-1", signal: controller.signal });
+    const reason = new Error("cancelled-by-user");
+    controller.abort(reason);
+    await expect(pending).rejects.toThrow("cancelled-by-user");
+    // 请求信号确实被传给了 fetch，且随调用方取消而中断。
+    expect(captured()?.aborted).toBe(true);
+    // 重发一次就是再付一次费：取消后必须停在一次请求上。
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("AbortError 不再被当作瞬时错误重试", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(namedError("AbortError", "The operation was aborted."));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await expect(provider.generate({ model: "image-model", prompt: "cup" })).rejects.toThrow("The operation was aborted.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("取消原因无论叫什么名字都不会被重试", async () => {
+    // AbortError 已从瞬时错误白名单移除；TimeoutError 仍是瞬时错误，只能靠"调用方已取消"
+    // 这一判断拦住——取消与超时同时逼近时若不拦住，取消就会再发一次已计费的请求。
+    for (const name of ["AbortError", "TimeoutError"]) {
+      const controller = new AbortController();
+      const { fetchMock } = hangingFetch();
+      vi.stubGlobal("fetch", fetchMock);
+      const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+      const pending = provider.generate({ model: "image-model", prompt: "cup", signal: controller.signal });
+      controller.abort(namedError(name, "cancelled"));
+      await expect(pending).rejects.toThrow("cancelled");
+      expect(fetchMock, `${name} 取消后仍重发了上游请求`).toHaveBeenCalledTimes(1);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("超时仍按瞬时错误重试一次", async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(namedError("TimeoutError", "The operation was aborted due to timeout"))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("generated").toString("base64") }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await expect(provider.generate({ model: "image-model", prompt: "cup" })).resolves.toMatchObject({ mimeType: "image/png" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("下载 Provider 返回的图片 URL 时同样传入中断信号", async () => {
+    let downloadSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn(async (url: URL | string, init?: RequestInit) => {
+      if (String(url).includes("cdn.example.test")) {
+        downloadSignal = init?.signal ?? undefined;
+        return new Response(Buffer.from("downloaded"), { status: 200, headers: { "content-type": "image/webp" } });
+      }
+      return new Response(JSON.stringify({ data: [{ url: "https://cdn.example.test/image.webp" }] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    const result = await provider.generate({ model: "image-model", prompt: "cup", signal: new AbortController().signal });
+    expect(result.mimeType).toBe("image/webp");
+    // 修复前该下载既无超时也无取消，可能永久挂起。
+    expect(downloadSignal).toBeDefined();
+    expect(downloadSignal?.aborted).toBe(false);
+  });
+});
