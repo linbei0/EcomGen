@@ -2063,6 +2063,137 @@
   position: relative;
 }
 
+/* 缩略图用 antd Image：className 落在内层 img（沿用 outputImage 的裁切），
+   rootClassName 落在包裹 div 上，撑满卡片宽度，避免 inline-block 收缩后按图片原始宽度溢出 */
+.reviewImage {
+  display: block;
+  width: 100%;
+  cursor: zoom-in;
+}
+
+/* 看图时背景蒙灰：工作台本身是暗房（--bg-lightbox #17171a），antd 默认的 45% 黑遮罩压上去
+   等于没盖——背景本来就接近黑。改成 off-white 薄雾 + 背景模糊，页面内容退成灰色底噪，
+   图片才从页面里立起来。antd 样式是运行时注入的，靠级联顺序压不住，必须 !important。 */
+:global(.ant-image-preview-mask) {
+  background: color-mix(in srgb, var(--text-2) 34%, transparent) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+/* antd 预览层的翻页按钮默认贴视口两缘（各 8px），窄图两侧会空出几百像素。
+   ReviewStage 在预览打开后把图片半宽写进 --ecomgen-preview-image-half，按钮据此贴到图片两侧；
+   变量缺失时按 40vw 估算，仍比贴边近得多。 */
+:global(.ant-image-preview-switch-prev) {
+  inset-inline-start: max(8px, calc(50% - var(--ecomgen-preview-image-half, 40vw) - 58px)) !important;
+}
+
+:global(.ant-image-preview-switch-next) {
+  inset-inline-end: max(8px, calc(50% - var(--ecomgen-preview-image-half, 40vw) - 58px)) !important;
+}
+
+/* 翻页按钮视觉：antd 默认是 39px 半透明圆钮 + 细箭头，压在图片和灰色薄雾上都不够醒目。
+   改成近实底深色圆钮、加粗描边与外阴影，悬停直接填充项目唯一强调色（琥珀）+ 深色箭头，
+   反馈一眼可见。灯箱的翻页按钮（.overlayNav）沿用同一套数值，两个看图入口保持一致。 */
+:global(.ant-image-preview-switch-prev),
+:global(.ant-image-preview-switch-next) {
+  width: 46px !important;
+  height: 46px !important;
+  border: 1px solid color-mix(in srgb, var(--text-1) 32%, transparent) !important;
+  background: rgb(13 13 15 / 0.86) !important;
+  color: var(--text-1) !important;
+  font-size: 20px !important;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.45) !important;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease !important;
+}
+
+:global(.ant-image-preview-switch-prev:hover),
+:global(.ant-image-preview-switch-next:hover),
+:global(.ant-image-preview-switch-prev:focus-visible),
+:global(.ant-image-preview-switch-next:focus-visible) {
+  border-color: var(--accent) !important;
+  background: var(--accent) !important;
+  color: var(--bg-0) !important;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.45), 0 0 0 4px var(--accent-subtle) !important;
+}
+
+/* 序列两端的按钮 antd 会置为禁用，禁用态不能沿用琥珀悬停反馈（选择器要带 :hover 才压得住上面的悬停规则） */
+:global(.ant-image-preview-switch-disabled),
+:global(.ant-image-preview-switch-disabled:hover),
+:global(.ant-image-preview-switch-disabled:focus-visible) {
+  border-color: var(--line-1) !important;
+  background: rgb(13 13 15 / 0.55) !important;
+  color: var(--text-3) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
+/* 底部计数与操作条：antd 的底是 colorBgMask 的 10% 黑、文字是 65% 白（previewOperation* token），
+   压在灰色薄雾上与背景糊在一起。改成与翻页按钮同一套近实底深色胶囊；图标用暖白，不用纯白。 */
+:global(.ant-image-preview-progress) {
+  padding: 4px 12px !important;
+  border: 1px solid color-mix(in srgb, var(--text-1) 20%, transparent) !important;
+  border-radius: 999px !important;
+  background: rgb(13 13 15 / 0.86) !important;
+  color: var(--text-1) !important;
+  font-size: 14px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+:global(.ant-image-preview-actions) {
+  padding: 4px 10px !important;
+  border: 1px solid color-mix(in srgb, var(--text-1) 32%, transparent) !important;
+  background: rgb(13 13 15 / 0.86) !important;
+  font-size: 20px !important;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.45) !important;
+}
+
+:global(.ant-image-preview-actions-action) {
+  border-radius: 50% !important;
+  color: var(--text-1) !important;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease !important;
+}
+
+/* 操作条悬停沿用翻页按钮的琥珀反馈，整个看图层的悬停语言保持一致 */
+:global(.ant-image-preview-actions-action:not(.ant-image-preview-actions-action-disabled):hover),
+:global(.ant-image-preview-actions-action:not(.ant-image-preview-actions-action-disabled):focus-visible) {
+  background: var(--accent) !important;
+  color: var(--bg-0) !important;
+}
+
+:global(.ant-image-preview-actions-action-disabled),
+:global(.ant-image-preview-actions-action-disabled:hover) {
+  background: transparent !important;
+  color: var(--text-3) !important;
+  cursor: not-allowed !important;
+}
+
+/* 右上角关闭钮与翻页按钮同属一套操作控件，一并去糊化，避免同一层里一半清楚一半发灰 */
+:global(.ant-image-preview-close) {
+  width: 40px !important;
+  height: 40px !important;
+  border: 1px solid color-mix(in srgb, var(--text-1) 32%, transparent) !important;
+  background: rgb(13 13 15 / 0.86) !important;
+  color: var(--text-1) !important;
+  font-size: 18px !important;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.45) !important;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease !important;
+}
+
+:global(.ant-image-preview-close:hover),
+:global(.ant-image-preview-close:focus-visible) {
+  border-color: var(--accent) !important;
+  background: var(--accent) !important;
+  color: var(--bg-0) !important;
+}
+
 /* 悬浮选择按钮：圆形玻璃按钮，悬停出现；选中后填充主题色并显示对勾 */
 .outputSelect {
   position: absolute;
@@ -2257,6 +2388,72 @@
   gap: 20px;
 }
 
+/* 图片与翻页按钮同占第一列并显式定行：auto-placement 会把后加入的元素挤到第二行。
+   类名由 antd Image 的 rootClassName 落在外层包裹 div 上（className 落在内层 img 上）。 */
+.lightboxImage {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.lightboxTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lightboxTitle em {
+  color: var(--text-3);
+  font-size: 13px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 图片左右边缘的翻页按钮：叠在图片之上，随图片列居中 */
+.lightboxNavPrev,
+.lightboxNavNext {
+  z-index: 2;
+  grid-area: 1 / 1;
+  align-self: center;
+}
+
+.lightboxNavPrev {
+  justify-self: start;
+  margin-left: 8px;
+}
+
+.lightboxNavNext {
+  justify-self: end;
+  margin-right: 8px;
+}
+
+/* 深色圆钮：antd 预览层与灯箱两个看图入口共用同一套数值，避免同一交互两副长相 */
+.overlayNav {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--text-1) 32%, transparent);
+  border-radius: 50%;
+  background: rgb(13 13 15 / 0.86);
+  color: var(--text-1);
+  cursor: pointer;
+  place-items: center;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.45);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.overlayNav:hover,
+.overlayNav:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-0);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.45), 0 0 0 4px var(--accent-subtle);
+}
+
 /* 高图时限制图片不超出视口，避免弹层整体滚动 */
 .lightboxBody :global(.ant-image img) {
   max-height: calc(100vh - 220px);
@@ -2268,6 +2465,7 @@
 .lightboxMeta {
   display: flex;
   flex-direction: column;
+  grid-area: 1 / 2;
   gap: 12px;
   min-height: 0;
   contain: size;

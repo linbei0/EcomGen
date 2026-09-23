@@ -1,6 +1,6 @@
 import { App, Button, Image, InputNumber, Modal, Select } from "antd";
-import { Download, Maximize2, Minus, Plus } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { ChevronLeft, ChevronRight, Download, Maximize2, Minus, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 
 import type { Output, ProjectDetail, StoryboardItem } from "../../api/adapters/projectDetail";
 import { useProviders } from "../../api/hooks/useProviders";
@@ -19,6 +19,71 @@ import { RESOLUTION_LABEL } from "../../lib/roles";
 import { ASPECT_SELECT_OPTIONS, renderAspectOption } from "./aspectOptions";
 import { modelOptions } from "../../lib/modelOptions";
 import { EditImageWorkspace } from "./EditImageWorkspace";
+
+/** 在看图序列里前后移动一格；首尾相接，序列不足两张或当前不在序列里时保持原地。 */
+function stepThrough(sequence: readonly string[], currentId: string | null, delta: number): string | null {
+  const index = currentId ? sequence.indexOf(currentId) : -1;
+  if (index < 0 || sequence.length < 2) return currentId;
+  return sequence[(index + delta + sequence.length) % sequence.length] ?? currentId;
+}
+
+/** 预览层图片的半宽，由 usePreviewNavOffset 写入；样式靠它把 antd 的翻页按钮贴到图片两侧。 */
+const PREVIEW_IMAGE_HALF = "--ecomgen-preview-image-half";
+
+/**
+ * antd 预览的翻页按钮固定在视口两缘（各 8px），窄图两侧会空出几百像素。
+ * 预览打开后量图片的布局宽度（offsetWidth 不含 transform，缩放时按钮不会跟着跑到视口外），
+ * 写进 CSS 变量收拢按钮；量不到时保持未设置，样式按视口比例估算。
+ */
+function usePreviewNavOffset(open: boolean): void {
+  useEffect(() => {
+    if (!open) return;
+    let observer: ResizeObserver | undefined;
+    let cancelled = false;
+    const measure = () => {
+      const image = document.querySelector<HTMLImageElement>(".ant-image-preview-img");
+      const root = document.querySelector<HTMLElement>(".ant-image-preview");
+      if (!image || !root || image.offsetWidth === 0) return;
+      root.style.setProperty(PREVIEW_IMAGE_HALF, `${image.offsetWidth / 2}px`);
+    };
+    // 预览层是独立 portal：打开当帧还没排版，等两帧再量。切换图片与图片解码完成都会改变布局宽度。
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (cancelled) return;
+      measure();
+      const image = document.querySelector<HTMLImageElement>(".ant-image-preview-img");
+      if (!image || typeof ResizeObserver === "undefined") return;
+      observer = new ResizeObserver(measure);
+      observer.observe(image);
+    }));
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [open]);
+}
+
+/** 左右方向键翻图；输入控件里不拦截，避免抢走 Select 与输入框的按键。 */
+function useArrowNavigation(enabled: boolean, onPrev: () => void, onNext: () => void): void {
+  useEffect(() => {
+    if (!enabled) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.isContentEditable || (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        onPrev();
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        onNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [enabled, onPrev, onNext]);
+}
 
 export function ReviewStage({
   detail,
@@ -51,6 +116,7 @@ export function ReviewStage({
   }, [editedOutputs]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [versionRootId, setVersionRootId] = useState<string | null>(null);
   // 超过 4 张的分镜默认折叠，展开状态按"批次:分镜"记录，避免跨批次串扰
@@ -88,6 +154,20 @@ export function ReviewStage({
   const lightbox = detail.outputs.find((output) => output.id === lightboxId);
   const lightboxItem = items.find((item) => item.id === lightbox?.storyboardItemId);
 
+  // 灯箱的切换序列与结果页展示顺序一致（批次 → 分镜 → 成图），并且包含被折叠隐藏的成图：
+  // 翻到尽头才发现漏图，比翻出一张当前折叠的图更糟。
+  const outputSequence = useMemo(
+    () => batches.flatMap((batch) => batch.groups.flatMap((group) => group.outputs.map((output) => output.id))),
+    [batches],
+  );
+  const stepLightbox = useCallback((delta: number) => setLightboxId((current) => stepThrough(outputSequence, current, delta)), [outputSequence]);
+  const positionOf = (outputId: string | null) => {
+    const index = outputId ? outputSequence.indexOf(outputId) : -1;
+    return index >= 0 && outputSequence.length > 1 ? { index: index + 1, total: outputSequence.length } : undefined;
+  };
+
+  usePreviewNavOffset(previewOpen);
+
   if (detail.outputs.length === 0) {
     return (
       <div className={styles.placeholder}>
@@ -99,56 +179,59 @@ export function ReviewStage({
 
   return (
     <div className={styles.lightboxStage}>
-      {batches.map((batch) => (
-        <section key={batch.id} className={styles.generationBatch}>
-          <aside className={styles.generationBatchMeta}>
-            <strong>{formatDateTime(batch.createdAt)}</strong>
-            <span>{batch.groups.reduce((count, group) => count + group.outputs.length, 0)} 张{batch.retryCount ? ` · 重新生成 ${batch.retryCount} 张` : ""}</span>
-            <i className={styles.timelineDot} aria-hidden="true" />
-          </aside>
-          <div className={styles.generationBatchBody}>
-            {batch.groups.map((group) => {
-              const label = itemDisplayName(group.item, templateNames);
-              const groupKey = `${batch.id}:${group.item.id}`;
-              const expanded = expandedGroups.has(groupKey);
-              // 折叠时优先展示最新 4 张（重试图生成时间靠后、最值得关注），按时间正序排列
-              const visibleOutputs = expanded ? group.outputs : group.outputs.slice(-4);
-              const overflowCount = group.outputs.length - visibleOutputs.length;
-              return (
-                <div key={group.item.id} className={styles.reviewGroup}>
-                  <h2 className={styles.reviewGroupTitle}>
-                    {label}
-                    <span>{group.outputs.length} 张</span>
-                    {expanded ? (
-                      <button type="button" className={styles.reviewCollapse} onClick={() => toggleExpanded(groupKey)}>收起</button>
-                    ) : null}
-                  </h2>
-                  <div className={styles.reviewGrid}>
-                    {visibleOutputs.map((output, index) => {
-                      return (
-                        <ReviewCard
-                          key={output.id}
-                          output={output}
-                          label={label}
-                          downloading={downloadingId === output.id}
-                          onDownload={() => void download(output, label)}
-                          onOpen={() => setLightboxId(output.id)}
-                          editedOutputs={editedByRoot.get(output.id) ?? []}
-                          onOpenVersions={() => setVersionRootId(output.id)}
-                          selected={selectedOutputIds.includes(output.id)}
-                          onToggleSelection={() => toggleSelection(output.id)}
-                          overflowCount={index === visibleOutputs.length - 1 ? overflowCount : 0}
-                          onExpand={() => toggleExpanded(groupKey)}
-                        />
-                      );
-                    })}
+      {/* 整页成图登记进同一个预览序列：点任意一张即可用 antd 预览层左右翻完全部成图 */}
+      <Image.PreviewGroup preview={{ onOpenChange: setPreviewOpen }}>
+        {batches.map((batch) => (
+          <section key={batch.id} className={styles.generationBatch}>
+            <aside className={styles.generationBatchMeta}>
+              <strong>{formatDateTime(batch.createdAt)}</strong>
+              <span>{batch.groups.reduce((count, group) => count + group.outputs.length, 0)} 张{batch.retryCount ? ` · 重新生成 ${batch.retryCount} 张` : ""}</span>
+              <i className={styles.timelineDot} aria-hidden="true" />
+            </aside>
+            <div className={styles.generationBatchBody}>
+              {batch.groups.map((group) => {
+                const label = itemDisplayName(group.item, templateNames);
+                const groupKey = `${batch.id}:${group.item.id}`;
+                const expanded = expandedGroups.has(groupKey);
+                // 折叠时优先展示最新 4 张（重试图生成时间靠后、最值得关注），按时间正序排列
+                const visibleOutputs = expanded ? group.outputs : group.outputs.slice(-4);
+                const overflowCount = group.outputs.length - visibleOutputs.length;
+                return (
+                  <div key={group.item.id} className={styles.reviewGroup}>
+                    <h2 className={styles.reviewGroupTitle}>
+                      {label}
+                      <span>{group.outputs.length} 张</span>
+                      {expanded ? (
+                        <button type="button" className={styles.reviewCollapse} onClick={() => toggleExpanded(groupKey)}>收起</button>
+                      ) : null}
+                    </h2>
+                    <div className={styles.reviewGrid}>
+                      {visibleOutputs.map((output, index) => {
+                        return (
+                          <ReviewCard
+                            key={output.id}
+                            output={output}
+                            label={label}
+                            downloading={downloadingId === output.id}
+                            onDownload={() => void download(output, label)}
+                            onOpen={() => setLightboxId(output.id)}
+                            editedOutputs={editedByRoot.get(output.id) ?? []}
+                            onOpenVersions={() => setVersionRootId(output.id)}
+                            selected={selectedOutputIds.includes(output.id)}
+                            onToggleSelection={() => toggleSelection(output.id)}
+                            overflowCount={index === visibleOutputs.length - 1 ? overflowCount : 0}
+                            onExpand={() => toggleExpanded(groupKey)}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </Image.PreviewGroup>
 
       <VersionTreeModal
         root={versionRootId ? detail.outputs.find((output) => output.id === versionRootId) : undefined}
@@ -164,6 +247,9 @@ export function ReviewStage({
         output={lightbox}
         item={lightboxItem}
         label={lightboxItem ? itemDisplayName(lightboxItem, templateNames) : ""}
+        position={positionOf(lightboxId)}
+        onPrev={() => stepLightbox(-1)}
+        onNext={() => stepLightbox(1)}
         onClose={() => setLightboxId(null)}
         downloading={lightbox ? downloadingId === lightbox.id : false}
         onDownload={() => {
@@ -196,6 +282,7 @@ function ReviewCard({
   label: string;
   downloading: boolean;
   onDownload: () => void;
+  /** 悬停操作条的灯箱入口：带 Prompt、重试与编辑；点图本身走 antd 预览看图 */
   onOpen: () => void;
   editedOutputs?: Output[];
   onOpenVersions?: () => void;
@@ -208,7 +295,21 @@ function ReviewCard({
   return (
     <article className={styles.reviewCard} title={label}>
       <div className={styles.reviewThumb}>
-        <img src={output.url} alt={label} className={styles.outputImage} loading="lazy" decoding="async" />
+        {/* 缩略图用 antd Image 是为了拿到它自带的预览层（点击看图 + 左右翻页）。
+            +N 遮罩卡例外：它整面点击是展开，不进预览序列。 */}
+        {overflowCount > 0 ? (
+          <img src={output.url} alt={label} className={styles.outputImage} loading="lazy" decoding="async" />
+        ) : (
+          <Image
+            rootClassName={styles.reviewImage}
+            className={styles.outputImage}
+            src={output.url}
+            alt={label}
+            loading="lazy"
+            decoding="async"
+            preview={{ cover: false }}
+          />
+        )}
         {/* +N 遮罩卡的唯一交互是展开：不渲染选择框和操作条，避免透过半透明遮罩露出来 */}
         {overflowCount > 0 ? null : (
           <label className={styles.outputSelect}>
@@ -243,7 +344,10 @@ function LightboxModal({
   output,
   item,
   label,
+  position,
   onClose,
+  onPrev,
+  onNext,
   downloading,
   onDownload,
   onRetry,
@@ -252,7 +356,11 @@ function LightboxModal({
   output: Output | undefined;
   item: StoryboardItem | undefined;
   label: string;
+  /** 当前图在灯箱序列中的位置；序列只有一张时为 undefined，此时不渲染翻页 */
+  position: { index: number; total: number } | undefined;
   onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
   downloading: boolean;
   onDownload: () => void;
   onRetry: (generationConfig: NonNullable<GenerationJobInput["generationConfig"]>) => void;
@@ -266,6 +374,9 @@ function LightboxModal({
   const [modelKey, setModelKey] = useState(item?.imageProviderId && item.imageModelId ? `${item.imageProviderId}::${item.imageModelId}` : undefined);
   const imageOptions = modelOptions(providers.data?.items ?? [], "image");
   const defaultModelKey = item?.imageProviderId && item.imageModelId ? `${item.imageProviderId}::${item.imageModelId}` : undefined;
+  const positionLabel = position ? `${position.index} / ${position.total}` : undefined;
+  // 重试配置弹层压在上面时不抢方向键
+  useArrowNavigation(Boolean(output && position && !retryOpen), onPrev, onNext);
 
   // 历史分镜可能仍引用已删除的 Provider；Select 找不到对应 option 时会直接显示原始 UUID。
   // Provider 列表加载完成后自动切换到第一个可用生图模型，避免提交失效引用。
@@ -290,10 +401,26 @@ function LightboxModal({
   };
   return (
     <>
-      <Modal open={Boolean(output)} onCancel={onClose} footer={null} width={920} title="灯箱">
+      <Modal
+        open={Boolean(output)}
+        onCancel={onClose}
+        footer={null}
+        width={920}
+        title={positionLabel ? <span className={styles.lightboxTitle}>灯箱<em>{positionLabel}</em></span> : "灯箱"}
+      >
         {output && item ? (
           <div className={styles.lightboxBody}>
-            <Image src={output.url} alt={label} />
+            <Image rootClassName={styles.lightboxImage} src={output.url} alt={label} />
+            {position ? (
+              <>
+                <button type="button" className={`${styles.overlayNav} ${styles.lightboxNavPrev}`} onClick={onPrev} aria-label="上一张">
+                  <ChevronLeft size={22} strokeWidth={1.75} aria-hidden />
+                </button>
+                <button type="button" className={`${styles.overlayNav} ${styles.lightboxNavNext}`} onClick={onNext} aria-label="下一张">
+                  <ChevronRight size={22} strokeWidth={1.75} aria-hidden />
+                </button>
+              </>
+            ) : null}
             <div className={styles.lightboxMeta}>
               <p className={styles.shotType}>{label}</p>
               <ModeBadge mode={item.mode} />
