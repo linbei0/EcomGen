@@ -966,10 +966,13 @@
 
 .assetTypeTag {
   margin: 0;
+  max-width: 100%;
+  overflow: hidden;
   border-color: var(--line-2);
   background: var(--bg-2);
   color: var(--text-2);
   font-size: 13px;
+  text-overflow: ellipsis;
 }
 
 .modalTitleButton {

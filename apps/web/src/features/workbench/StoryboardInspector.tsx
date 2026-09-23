@@ -3,13 +3,16 @@ import { ShieldCheck, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { StoryboardItem } from "../../api/adapters/projectDetail";
+import type { SuiteSummary } from "../../api/adapters/suites";
 import type { EcomTemplate } from "../../api/adapters/templates";
 import { useUpdateStoryboardItem, type UpdateStoryboardItemInput } from "../../api/hooks/useStoryboard";
 import { useProviders } from "../../api/hooks/useProviders";
+import { useSuiteSummaries } from "../../api/hooks/useSuites";
 import { errorText } from "../../lib/errorText";
 import { factClaimRows } from "../../lib/factClaims";
+import { splitSuiteAssetType } from "../../lib/itemName";
 import { modelOptions } from "../../lib/modelOptions";
-import { RESOLUTION_LABEL } from "../../lib/roles";
+import { RESOLUTION_LABEL, SHOT_ROLE_LABEL } from "../../lib/roles";
 import { ASPECT_SELECT_OPTIONS, renderAspectOption } from "./aspectOptions";
 import styles from "./workbench.module.css";
 
@@ -84,7 +87,11 @@ export function StoryboardInspector({
   const claims = factClaimRows(item.factClaims);
   const generationSettingsReadOnly = item.status === "GENERATING";
   const contentReadOnly = generationSettingsReadOnly || item.status === "GENERATED";
-  const templateName = templates.find((template) => template.id === draft.assetType)?.name ?? draft.assetType;
+  // 来源标签展示的是套图/模板的中文名；套图摘要按 assetType 里的套图 id 回读，未选中套图分镜时不发请求。
+  const suiteShot = splitSuiteAssetType(draft.assetType);
+  const suiteSummaries = useSuiteSummaries(suiteShot ? [suiteShot.suiteId] : []);
+  const suite = suiteShot ? suiteSummaries.data?.find((summary) => summary.id === suiteShot.suiteId) : undefined;
+  const sourceTag = sourceTagOf(draft.assetType, templates, suite, suiteShot, suiteSummaries.isPending);
   const imageOptions = modelOptions(providers.data?.items ?? [], "image");
   const imageModelKey = draft.imageProviderId && draft.imageModelId
     ? `${draft.imageProviderId}::${draft.imageModelId}`
@@ -100,10 +107,10 @@ export function StoryboardInspector({
             : saveState === "saving" ? "保存中" : saveState === "saved" ? "已保存" : "编辑后自动保存"}
       </p>
 
-      {templateName !== draft.displayName ? (
+      {sourceTag && sourceTag.label !== draft.displayName ? (
         <div className={styles.assetTypeRow}>
-          <Tag className={styles.assetTypeTag} title="规划模板">
-            {templateName}
+          <Tag className={styles.assetTypeTag} title={sourceTag.hint}>
+            {sourceTag.label}
           </Tag>
         </div>
       ) : null}
@@ -223,6 +230,30 @@ export function StoryboardInspector({
       ) : null}
     </div>
   );
+}
+
+/**
+ * 来源标签：套图分镜展示套图中文名与分镜角色，单图模板展示模板名。
+ * assetType（`<suiteId>::<shotId>` 或模板 id）是内部标识，任何情况下都不作为标签文案；
+ * 套图摘要在途时先不渲染，避免先闪出原始 id 再替换。
+ */
+function sourceTagOf(
+  assetType: string,
+  templates: readonly Pick<EcomTemplate, "id" | "name">[],
+  suite: SuiteSummary | undefined,
+  suiteShot: { suiteId: string; shotId: string } | undefined,
+  suitePending: boolean,
+): { label: string; hint: string } | undefined {
+  if (suiteShot) {
+    if (!suite) {
+      return suitePending ? undefined : { label: "套图分镜", hint: `套图库中已找不到该套图（${assetType}）` };
+    }
+    const shot = suite.shots.find((entry) => entry.shotId === suiteShot.shotId);
+    const role = shot ? SHOT_ROLE_LABEL[shot.shotRole as keyof typeof SHOT_ROLE_LABEL] : undefined;
+    const shotLabel = shot ? [role, shot.displayName].filter(Boolean).join("：") : undefined;
+    return { label: `套图 · ${suite.name}`, hint: shotLabel ? `套图分镜 · ${shotLabel}` : "套图分镜" };
+  }
+  return { label: templates.find((template) => template.id === assetType)?.name ?? assetType, hint: "规划模板" };
 }
 
 function toDraft(item: StoryboardItem): Draft {

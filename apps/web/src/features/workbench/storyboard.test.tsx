@@ -12,8 +12,9 @@ import {
   STORYBOARD_ITEM_FIXTURE,
   projectDetailPayload,
   storyboardPayload,
+  suiteFixtures,
 } from "../../test/msw/fixtures";
-import { BASE } from "../../test/msw/handlers";
+import { BASE, suiteStore } from "../../test/msw/handlers";
 import { server } from "../../test/msw/server";
 import { renderWithProviders } from "../../test/render";
 import { WorkbenchPage } from "./WorkbenchPage";
@@ -121,6 +122,28 @@ describe("工作台 · 分镜", () => {
     await waitFor(() => {
       expect(patchBody).toMatchObject({ candidateCount: 2 });
     });
+  });
+
+  it("套图分镜的来源标签显示套图中文名，不暴露内部 assetType", async () => {
+    const user = userEvent.setup();
+    suiteStore.push(...suiteFixtures(1));
+    const assetType = "suite-fixture-001::shot-01";
+    const suiteItem = { ...STORYBOARD_ITEM_FIXTURE, assetType, displayName: "白底坐姿正面主图" };
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () =>
+        HttpResponse.json(projectDetailPayload({ storyboard: STORYBOARD_FIXTURE, items: [suiteItem] })),
+      ),
+      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
+        HttpResponse.json(storyboardPayload(STORYBOARD_FIXTURE, [suiteItem])),
+      ),
+    );
+
+    renderBoard();
+    await user.click(await screen.findByRole("button", { name: "白底坐姿正面主图 分镜" }));
+
+    const tag = await screen.findByText("套图 · 夹具套图 001");
+    expect(tag).toHaveAttribute("title", "套图分镜 · 主图：主图 001");
+    expect(screen.queryByText(assetType)).not.toBeInTheDocument();
   });
 
   it("确认 409 时提示冲突并重新拉取分镜", async () => {
