@@ -110,7 +110,7 @@ describe("SuiteCatalog 分页与增量写入", () => {
     close();
   });
 
-  it("q/l1/l2 只影响返回项，total 与 l1Counts 始终是全库统计", async () => {
+  it("q/l1/l2 只影响返回项，total 与 l1Counts 保持来源区间口径", async () => {
     const { catalog, close } = await seeded();
     const all = catalog.listSuites();
     const target = all[0];
@@ -145,6 +145,47 @@ describe("SuiteCatalog 分页与增量写入", () => {
     expect(page.items.map((item) => item.id)).toEqual([all[0].id, all[1].id]);
     expect(page.nextCursor).toBeNull();
     expect(page.total).toBe(all.length);
+    close();
+  });
+
+  it("origin 收窄 total/l1Counts，originCounts 始终是全库按来源的计数", async () => {
+    const { catalog, close } = await seeded();
+    catalog.upsertUserSuite(userSuite("custom-suite-origin1", "增量测试品类"));
+    catalog.upsertUserSuite(userSuite("custom-suite-origin2", "增量测试品类"));
+
+    const all = catalog.pageSummaries();
+    expect(all.originCounts).toEqual({ builtin: all.total - 2, user: 2 });
+
+    const imported = catalog.pageSummaries({ origin: "user" });
+    expect(imported.total).toBe(2);
+    expect(imported.l1Counts).toEqual({ 增量测试品类: 2 });
+    expect(imported.items.every((item) => item.origin === "user")).toBe(true);
+
+    const builtin = catalog.pageSummaries({ origin: "builtin" });
+    expect(builtin.total).toBe(all.total - 2);
+    expect(builtin.l1Counts["增量测试品类"]).toBeUndefined();
+    // 来源区间与 q/l1/l2 正交：两者叠加时只返回同时满足的项（total 只跟 origin 走）
+    const scopedByL1 = catalog.pageSummaries({ origin: "user", l1: "增量测试品类" });
+    expect(scopedByL1.items).toHaveLength(2);
+    expect(scopedByL1.total).toBe(2);
+    expect(catalog.pageSummaries({ origin: "builtin", l1: "增量测试品类" }).items).toEqual([]);
+    close();
+  });
+
+  it("导入的套图排在全部内置套图之前，导入内部按最近导入优先", async () => {
+    const { catalog, close } = await seeded();
+    const before = catalog.pageSummaries({ limit: 3 });
+    const builtinHead = before.items.map((item) => item.id);
+
+    catalog.upsertUserSuite({ ...userSuite("custom-suite-first", "增量测试品类"), createdAt: "2024-01-01T00:00:00.000Z" });
+    catalog.upsertUserSuite({ ...userSuite("custom-suite-latest", "增量测试品类"), createdAt: "2025-06-01T00:00:00.000Z" });
+
+    const items = catalog.pageSummaries({ limit: 3 }).items;
+    expect(items.slice(0, 2).map((item) => item.id)).toEqual(["custom-suite-latest", "custom-suite-first"]);
+    // 导入项之后仍是内置套图，且内置之间的相对顺序不因导入而改变
+    expect(items.slice(2).map((item) => item.id)).toEqual(builtinHead.slice(0, 1));
+    expect(catalog.pageSummaries({ origin: "builtin", limit: 3 }).items.map((item) => item.id)).toEqual(builtinHead);
+    expect(catalog.pageSummaries().total).toBe(before.total + 2);
     close();
   });
 

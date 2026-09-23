@@ -7,7 +7,7 @@ import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type SuiteListQuery, type UserTemplateRecord, SUITE_PAGE_SIZE_DEFAULT, SUITE_PAGE_SIZE_MAX } from "@ecomgen/core";
 import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
-import { SUITE_TAXONOMY, type SuiteDocumentInput } from "@ecomgen/ecom-suite";
+import { SUITE_TAXONOMY, type SuiteDocumentInput, type SuiteOrigin } from "@ecomgen/ecom-suite";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
 import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
@@ -934,10 +934,17 @@ function parseSuiteListQuery(query: unknown): SuiteListQuery {
     q: text(source.q),
     l1: text(source.l1),
     l2: text(source.l2),
+    origin: parseSuiteOrigin(text(source.origin)),
     ids: ids.length ? [...new Set(ids)] : undefined,
     cursor: text(source.cursor) ?? null,
     limit: parsedLimit === undefined ? SUITE_PAGE_SIZE_DEFAULT : Math.min(Math.max(parsedLimit, 1), SUITE_PAGE_SIZE_MAX)
   };
+}
+/** 来源只接受契约枚举内的两个字面量；未知取值报 400，避免前端拼错参数时静默退化成“全部”。 */
+function parseSuiteOrigin(value: string | undefined): SuiteOrigin | undefined {
+  if (value === undefined) return undefined;
+  if (value !== "builtin" && value !== "user") throw new ApiError(400, "VALIDATION_ERROR", "origin must be builtin or user");
+  return value;
 }
 function publicReferenceAsset(value: AssetRecord | EditReferenceAssetRecord): object {
   const temporary = "sessionId" in value;

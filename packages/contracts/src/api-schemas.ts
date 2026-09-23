@@ -123,8 +123,12 @@ export type EcomSuiteSummary = Static<typeof EcomSuiteSummary>;
 export const EcomSuiteDetail = Type.Intersect([schemaRef(EcomSuiteFile), Type.Object({ origin: schemaRef(EcomSuiteOrigin), createdAt: Type.Optional(Type.String({ format: "date-time" })), updatedAt: Type.Optional(Type.String({ format: "date-time" })) })], { $id: "#/components/schemas/EcomSuiteDetail" });
 export type EcomSuiteDetail = Static<typeof EcomSuiteDetail>;
 
-// total 与 l1Counts 刻意不受 q/l1/l2/ids 影响：左侧品类导航用它们表示全库库存，与当前筛选范围无关。
-export const EcomSuitesResponse = Type.Object({ items: Type.Array(schemaRef(EcomSuiteSummary)), nextCursor: Type.Union([Type.String(), Type.Null()], { description: "Keyset cursor for the next page; null when the query is exhausted or no pagination applies." }), total: Type.Integer({ minimum: 0, description: "Suite count of the whole catalog, independent of query filters." }), l1Counts: Type.Record(Type.String(), Type.Integer({ minimum: 0 }), { description: "Per-L1 suite counts over the whole catalog, independent of query filters." }) }, { $id: "#/components/schemas/EcomSuitesResponse" });
+// total 与 l1Counts 跟随 origin 收窄（来源是库范围开关），但不随 q/l1/l2/ids 变化；
+// originCounts 反过来：它始终是全库按来源的库存，供来源切换控件在不改筛选的情况下显示计数。
+export const EcomSuiteOriginCounts = Type.Object({ builtin: Type.Integer({ minimum: 0 }), user: Type.Integer({ minimum: 0 }) }, { $id: "#/components/schemas/EcomSuiteOriginCounts" });
+export type EcomSuiteOriginCounts = Static<typeof EcomSuiteOriginCounts>;
+
+export const EcomSuitesResponse = Type.Object({ items: Type.Array(schemaRef(EcomSuiteSummary)), nextCursor: Type.Union([Type.String(), Type.Null()], { description: "Keyset cursor for the next page; null when the query is exhausted or no pagination applies." }), total: Type.Integer({ minimum: 0, description: "Suite count of the selected origin scope, independent of q/l1/l2." }), l1Counts: Type.Record(Type.String(), Type.Integer({ minimum: 0 }), { description: "Per-L1 suite counts within the selected origin scope, independent of q/l1/l2." }), originCounts: schemaRef(EcomSuiteOriginCounts) }, { $id: "#/components/schemas/EcomSuitesResponse" });
 export type EcomSuitesResponse = Static<typeof EcomSuitesResponse>;
 
 export const EcomSuiteCategoriesResponse = Type.Object({ l1: Type.Array(Type.String()), l2: Type.Record(Type.String(), Type.Array(Type.String())) }, { $id: "#/components/schemas/EcomSuiteCategoriesResponse" });

@@ -24,7 +24,9 @@ export interface SuiteListQuery {
   q?: string;
   l1?: string;
   l2?: string;
-  /** 精确 ID 查询；存在时忽略 q/l1/l2/cursor/limit，按目录顺序返回命中的套图。 */
+  /** 来源区间；省略表示内置与导入合并浏览。它是切换库范围的开关，因此 total/l1Counts 会跟着收窄。 */
+  origin?: SuiteOrigin;
+  /** 精确 ID 查询；存在时忽略 q/l1/l2/origin/cursor/limit，按目录顺序返回命中的套图。 */
   ids?: readonly string[];
   cursor?: string | null;
   limit?: number;
@@ -33,10 +35,12 @@ export interface SuiteListQuery {
 export interface SuiteSummaryPage {
   items: ReturnType<typeof suiteSummary>[];
   nextCursor: string | null;
-  /** 全库总数，与查询条件无关，供“全部”计数使用。 */
+  /** 当前来源区间内的总数，供“全部”计数使用；不含 origin 时即全库总数。 */
   total: number;
-  /** 全库各级品类计数，与查询条件无关，供品类导航使用。 */
+  /** 当前来源区间内的各级品类计数，供品类导航使用。 */
   l1Counts: Record<string, number>;
+  /** 全库按来源的计数，与 origin/q/l1/l2/ids 均无关，供来源切换控件显示库存。 */
+  originCounts: Record<SuiteOrigin, number>;
 }
 
 /** 目录条目：内置来源只持摘要列，完整定义首次命中时从内置库读取并回填 suite 字段。 */
@@ -54,6 +58,12 @@ interface CatalogEntry {
 
 interface CatalogIndex {
   ordered: CatalogEntry[];
+  /** 按来源区间缓存的库存统计；键 "all" 表示不区分来源。 */
+  scopes: Map<string, ScopeCounts>;
+  originCounts: Record<SuiteOrigin, number>;
+}
+
+interface ScopeCounts {
   total: number;
   l1Counts: Record<string, number>;
 }
@@ -179,11 +189,12 @@ export class SuiteCatalog {
 
   /**
    * 列表接口的唯一数据源：过滤 + 游标分页，只对当前页做摘要投影。
-   * total/l1Counts 始终是全库统计，与 q/l1/l2/ids 无关。
+   * total/l1Counts 跟随 origin 收窄（来源是库范围开关），但不随 q/l1/l2/ids 变化。
    */
   public pageSummaries(query: SuiteListQuery = {}): SuiteSummaryPage {
     const index = this.catalogIndex();
-    const meta = { total: index.total, l1Counts: index.l1Counts };
+    const scope = this.scopeCounts(query.origin);
+    const meta = { total: scope.total, l1Counts: scope.l1Counts, originCounts: index.originCounts };
     const limit = Math.min(Math.max(Math.trunc(query.limit ?? SUITE_PAGE_SIZE_DEFAULT), 1), SUITE_PAGE_SIZE_MAX);
 
     if (query.ids?.length) {
@@ -193,6 +204,7 @@ export class SuiteCatalog {
 
     const keyword = query.q?.trim().toLowerCase() ?? "";
     const matched = index.ordered.filter((entry) => {
+      if (query.origin && entry.origin !== query.origin) return false;
       if (query.l1 && entry.category.l1 !== query.l1) return false;
       if (query.l2 && entry.category.l2 !== query.l2) return false;
       return keyword ? suiteSearchText(entry).includes(keyword) : true;
@@ -222,11 +234,30 @@ export class SuiteCatalog {
   private catalogIndex(): CatalogIndex {
     if (!this.index) {
       const ordered = [...this.byId.values()].sort(compareSuites);
-      const l1Counts: Record<string, number> = {};
-      for (const entry of ordered) l1Counts[entry.category.l1] = (l1Counts[entry.category.l1] ?? 0) + 1;
-      this.index = { ordered, total: ordered.length, l1Counts };
+      const originCounts: Record<SuiteOrigin, number> = { builtin: 0, user: 0 };
+      for (const entry of ordered) originCounts[entry.origin] += 1;
+      this.index = { ordered, scopes: new Map(), originCounts };
     }
     return this.index;
+  }
+
+  /** 来源区间的库存统计按需计算并缓存，refresh 或增量写入后随索引一起失效。 */
+  private scopeCounts(origin: SuiteOrigin | undefined): ScopeCounts {
+    const index = this.catalogIndex();
+    const key = origin ?? "all";
+    const cached = index.scopes.get(key);
+    if (cached) return cached;
+
+    const l1Counts: Record<string, number> = {};
+    let total = 0;
+    for (const entry of index.ordered) {
+      if (origin && entry.origin !== origin) continue;
+      total += 1;
+      l1Counts[entry.category.l1] = (l1Counts[entry.category.l1] ?? 0) + 1;
+    }
+    const counts = { total, l1Counts };
+    index.scopes.set(key, counts);
+    return counts;
   }
 
   /** 只物化传入条目的完整定义再投影摘要，避免列表接口拉起全部内置套图。 */
@@ -261,19 +292,14 @@ function entryFromSuite(suite: SuiteDefinition): CatalogEntry {
   return { id: suite.id, origin: suite.origin, name: suite.name, description: suite.description, category: suite.category, createdAt: suite.createdAt, updatedAt: suite.updatedAt, suite };
 }
 
-/** 目录顺序不依赖写入路径：内置按内置库文件名顺序稳定保留，其次按导入时间，最后是无时间戳的投放文件。 */
+/**
+ * 目录顺序先看来源再看时间：导入的套图排在内置之前，否则用户自己转换的模板会淹没在千套内置库里。
+ * 同来源内，导入按最近导入优先（无时间戳的投放目录文件排最后），内置保持内置库文件名顺序（稳定排序交给 Map 插入顺序）。
+ */
 function compareSuites(left: CatalogEntry, right: CatalogEntry): number {
-  const leftWeight = sourceWeight(left);
-  const rightWeight = sourceWeight(right);
-  if (leftWeight !== rightWeight) return leftWeight - rightWeight;
-  // 权重相同时内置套图保持 Map 插入顺序（内置库文件名顺序），交给稳定排序；
-  // 其余按 createdAt 再按 id，保证增量 upsert 后位置可预期。
-  if (leftWeight === 0) return 0;
-  return (left.createdAt ?? "").localeCompare(right.createdAt ?? "") || left.id.localeCompare(right.id);
-}
-
-function sourceWeight(entry: CatalogEntry): number {
-  return entry.origin === "builtin" ? 0 : entry.createdAt ? 1 : 2;
+  if (left.origin !== right.origin) return left.origin === "user" ? -1 : 1;
+  if (left.origin === "builtin") return 0;
+  return (right.createdAt ?? "").localeCompare(left.createdAt ?? "") || left.id.localeCompare(right.id);
 }
 
 /** 与前端历史过滤行为逐字对齐：字符串拼接后整体小写做子串匹配。 */

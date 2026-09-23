@@ -106,10 +106,16 @@ paths:
           description: Exact category L2 filter, applied on top of l1.
           schema:
             type: string
+        - name: origin
+          in: query
+          required: false
+          description: Library scope switch. `builtin` returns only suites shipped with EcomGen, `user` only suites imported on this machine; omitted merges both. Unlike q/l1/l2, it also narrows total and l1Counts.
+          schema:
+            $ref: "#/components/schemas/EcomSuiteOrigin"
         - name: ids
           in: query
           required: false
-          description: Comma-separated suite IDs; when present the response returns exactly those suites and ignores q/l1/l2/cursor/limit.
+          description: Comma-separated suite IDs; when present the response returns exactly those suites and ignores q/l1/l2/origin/cursor/limit.
           schema:
             type: string
         - $ref: "#/components/parameters/Cursor"
@@ -2055,6 +2061,18 @@ components:
               type: boolean
             notes:
               type: string
+    EcomSuiteOriginCounts:
+      type: object
+      required:
+        - builtin
+        - user
+      properties:
+        builtin:
+          minimum: 0
+          type: integer
+        user:
+          minimum: 0
+          type: integer
     EcomSuiteShot:
       type: object
       required:
@@ -2168,6 +2186,7 @@ components:
         - nextCursor
         - total
         - l1Counts
+        - originCounts
       properties:
         items:
           type: array
@@ -2180,15 +2199,17 @@ components:
             - type: "null"
         total:
           minimum: 0
-          description: Suite count of the whole catalog, independent of query filters.
+          description: Suite count of the selected origin scope, independent of q/l1/l2.
           type: integer
         l1Counts:
-          description: Per-L1 suite counts over the whole catalog, independent of query filters.
+          description: Per-L1 suite counts within the selected origin scope, independent of q/l1/l2.
           type: object
           patternProperties:
             ^(.*)$:
               minimum: 0
               type: integer
+        originCounts:
+          $ref: "#/components/schemas/EcomSuiteOriginCounts"
     EditReferenceAsset:
       type: object
       required:

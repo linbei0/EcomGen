@@ -113,6 +113,32 @@
   border-bottom: 1px solid var(--line-1);
 }
 
+/* 来源是库范围开关，用 Segmented 与下方的品类 chips 区分控件类型 */
+.scopeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scopeLabel {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.originOption {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.originOption em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
 .l2Row {
   display: flex;
   flex-wrap: wrap;

@@ -34,11 +34,21 @@ export function resetStores(): void {
   suiteStore.length = 0;
 }
 
-/** 套图列表的游标语义与后端一致：游标是上一页最后一张套图的 ID，找不到即视为已到底。 */
+/**
+ * 套图列表的游标语义与后端一致：游标是上一页最后一张套图的 ID，找不到即视为已到底。
+ * origin 是库范围开关：它收窄 total/l1Counts，但 originCounts 始终按全库统计。
+ */
 export function suitesResponse(query: URLSearchParams) {
+  const originCounts = { builtin: 0, user: 0 };
+  for (const suite of suiteStore) originCounts[suite.origin] += 1;
+
+  const rawOrigin = query.get("origin");
+  const origin = rawOrigin === "builtin" || rawOrigin === "user" ? rawOrigin : undefined;
+  const scoped = origin ? suiteStore.filter((suite) => suite.origin === origin) : suiteStore;
+
   const l1Counts: Record<string, number> = {};
-  for (const suite of suiteStore) l1Counts[suite.category.l1] = (l1Counts[suite.category.l1] ?? 0) + 1;
-  const meta = { total: suiteStore.length, l1Counts };
+  for (const suite of scoped) l1Counts[suite.category.l1] = (l1Counts[suite.category.l1] ?? 0) + 1;
+  const meta = { total: scoped.length, l1Counts, originCounts };
 
   const ids = query.get("ids");
   if (ids) {
@@ -49,7 +59,7 @@ export function suitesResponse(query: URLSearchParams) {
   const l1 = query.get("l1");
   const l2 = query.get("l2");
   const keyword = (query.get("q") ?? "").trim().toLowerCase();
-  const matched = suiteStore.filter((suite) => {
+  const matched = scoped.filter((suite) => {
     if (l1 && suite.category.l1 !== l1) return false;
     if (l2 && suite.category.l2 !== l2) return false;
     if (!keyword) return true;

@@ -458,7 +458,7 @@ describe("GET /api/v1/suites 分页与筛选", () => {
     expect(new Set(seen).size).toBe(firstBody.total);
   });
 
-  it("q/l1 过滤只改变返回项，total 与 l1Counts 保持全库口径", async () => {
+  it("q/l1 过滤只改变返回项，total 与 l1Counts 保持来源区间口径", async () => {
     const all = (await app.inject({ method: "GET", url: "/api/v1/suites" }))
       .json<{ items: Array<{ id: string; name: string; category: { l1: string } }>; total: number; l1Counts: Record<string, number> }>();
     const target = all.items[0];
@@ -520,6 +520,34 @@ describe("GET /api/v1/suites 分页与筛选", () => {
     expect(stale.json<{ items: unknown[]; nextCursor: string | null }>()).toMatchObject({ items: [], nextCursor: null });
 
     expect((await app.inject({ method: "DELETE", url: `/api/v1/suites/${suiteId}` })).statusCode).toBe(409);
+  });
+
+  it("origin 收窄列表与品类计数，originCounts 报全库库存，未知取值报 400", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/v1/suites", payload: { ...importedSuite, name: "来源筛选导入套图" } });
+    expect(created.statusCode).toBe(201);
+    const suiteId = created.json<{ id: string }>().id;
+
+    try {
+      const all = (await app.inject({ method: "GET", url: "/api/v1/suites" }))
+        .json<{ total: number; originCounts: { builtin: number; user: number } }>();
+      expect(all.originCounts.builtin + all.originCounts.user).toBe(all.total);
+
+      const user = (await app.inject({ method: "GET", url: "/api/v1/suites", query: { origin: "user" } }))
+        .json<{ items: Array<{ id: string; origin: string }>; total: number; l1Counts: Record<string, number> }>();
+      expect(user.total).toBe(all.originCounts.user);
+      expect(user.items.every((item) => item.origin === "user")).toBe(true);
+      expect(user.items.some((item) => item.id === suiteId)).toBe(true);
+      expect(user.l1Counts["测试专用品类"]).toBeGreaterThanOrEqual(1);
+
+      const builtin = (await app.inject({ method: "GET", url: "/api/v1/suites", query: { origin: "builtin", limit: "5" } }))
+        .json<{ items: Array<{ origin: string }>; total: number }>();
+      expect(builtin.total).toBe(all.originCounts.builtin);
+      expect(builtin.items.every((item) => item.origin === "builtin")).toBe(true);
+
+      expect((await app.inject({ method: "GET", url: "/api/v1/suites?origin=USER" })).statusCode).toBe(400);
+    } finally {
+      await app.inject({ method: "DELETE", url: `/api/v1/suites/${suiteId}` });
+    }
   });
 
   it("POST /suites/refresh 返回首页且形状与列表一致", async () => {

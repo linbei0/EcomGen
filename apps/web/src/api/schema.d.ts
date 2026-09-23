@@ -1236,6 +1236,10 @@ export interface components {
                 notes?: string;
             };
         };
+        EcomSuiteOriginCounts: {
+            builtin: number;
+            user: number;
+        };
         EcomSuiteShot: {
             shotId: string;
             order: number;
@@ -1283,12 +1287,13 @@ export interface components {
             items: components["schemas"]["EcomSuiteSummary"][];
             /** @description Keyset cursor for the next page; null when the query is exhausted or no pagination applies. */
             nextCursor: string | null;
-            /** @description Suite count of the whole catalog, independent of query filters. */
+            /** @description Suite count of the selected origin scope, independent of q/l1/l2. */
             total: number;
-            /** @description Per-L1 suite counts over the whole catalog, independent of query filters. */
+            /** @description Per-L1 suite counts within the selected origin scope, independent of q/l1/l2. */
             l1Counts: {
                 [key: string]: number;
             };
+            originCounts: components["schemas"]["EcomSuiteOriginCounts"];
         };
         EditReferenceAsset: {
             /** Format: uuid */
@@ -2319,7 +2324,9 @@ export interface operations {
                 l1?: string;
                 /** @description Exact category L2 filter, applied on top of l1. */
                 l2?: string;
-                /** @description Comma-separated suite IDs; when present the response returns exactly those suites and ignores q/l1/l2/cursor/limit. */
+                /** @description Library scope switch. `builtin` returns only suites shipped with EcomGen, `user` only suites imported on this machine; omitted merges both. Unlike q/l1/l2, it also narrows total and l1Counts. */
+                origin?: components["schemas"]["EcomSuiteOrigin"];
+                /** @description Comma-separated suite IDs; when present the response returns exactly those suites and ignores q/l1/l2/origin/cursor/limit. */
                 ids?: string;
                 cursor?: components["parameters"]["Cursor"];
                 /** @description Page size, clamped to 1..100. */

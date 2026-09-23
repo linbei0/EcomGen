@@ -725,6 +725,18 @@ components:
               type: boolean
             notes:
               type: string
+    EcomSuiteOriginCounts:
+      type: object
+      required:
+        - builtin
+        - user
+      properties:
+        builtin:
+          minimum: 0
+          type: integer
+        user:
+          minimum: 0
+          type: integer
     EcomSuiteShot:
       type: object
       required:
@@ -838,6 +850,7 @@ components:
         - nextCursor
         - total
         - l1Counts
+        - originCounts
       properties:
         items:
           type: array
@@ -850,15 +863,17 @@ components:
             - type: "null"
         total:
           minimum: 0
-          description: Suite count of the whole catalog, independent of query filters.
+          description: Suite count of the selected origin scope, independent of q/l1/l2.
           type: integer
         l1Counts:
-          description: Per-L1 suite counts over the whole catalog, independent of query filters.
+          description: Per-L1 suite counts within the selected origin scope, independent of q/l1/l2.
           type: object
           patternProperties:
             ^(.*)$:
               minimum: 0
               type: integer
+        originCounts:
+          $ref: "#/components/schemas/EcomSuiteOriginCounts"
     EditReferenceAsset:
       type: object
       required:

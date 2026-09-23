@@ -1,3 +1,5 @@
+import type { SuitePageFilters } from "./adapters/suites";
+
 /** 统一 query key 工厂，SSE 事件失效映射也以此为准。 */
 export const qk = {
   health: ["health"] as const,
@@ -6,7 +8,7 @@ export const qk = {
   suites: ["suites"] as const,
   suiteCategories: ["suite-categories"] as const,
   /** 套图列表分页查询：筛选条件进 key，游标由服务端游标链维护。 */
-  suitePages: (filters: { q: string; l1?: string; l2?: string }) => ["suites", "page", filters] as const,
+  suitePages: (filters: SuitePageFilters) => ["suites", "page", filters] as const,
   /** 已选分镜所属套图的精确回读，用于解析名称而不拉全库。 */
   suiteSummaries: (idsKey: string) => ["suites", "summary", idsKey] as const,
   suite: (id: string) => ["suites", "detail", id] as const,

@@ -1,14 +1,17 @@
 import { MAX_REQUESTED_SUITE_SHOTS } from "@ecomgen/contracts";
-import { App, Button, Input, Modal, Popconfirm, Skeleton, Tag, Tooltip } from "antd";
+import { App, Button, Input, Modal, Popconfirm, Segmented, Skeleton, Tag, Tooltip } from "antd";
 import { Check, FileJson, Layers, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 
-import type { SuiteSummary } from "../../api/adapters/suites";
+import type { SuiteOrigin, SuitePageFilters, SuiteSummary } from "../../api/adapters/suites";
 import { useCreateUserSuite, useDeleteUserSuite, useRefreshSuites, useSuiteCategories, useSuitePage } from "../../api/hooks/useSuites";
 import { errorText } from "../../lib/errorText";
 import { SHOT_ROLE_LABEL, SHOT_ROLE_ORDER } from "../../lib/roles";
 import styles from "./SuitePickerDialog.module.css";
+
+/** 来源选项的取值：ALL 与合同里的“省略 origin”等价，用独立字面量避免把 undefined 塞进 Segmented。 */
+type OriginFilter = "ALL" | SuiteOrigin;
 
 function roleLabel(role: string): string {
   return SHOT_ROLE_LABEL[role as keyof typeof SHOT_ROLE_LABEL] ?? role;
@@ -20,6 +23,16 @@ function roleTone(role: string): number {
 
 function shotAssetType(suiteId: string, shotId: string): string {
   return `${suiteId}::${shotId}`;
+}
+
+/** 来源选项标签：计数可能尚未加载，此时只显示文字，避免先闪一个 0。 */
+function originOptionLabel(text: string, count: number | undefined) {
+  return (
+    <span className={styles.originOption}>
+      {text}
+      {typeof count === "number" ? <em>{count}</em> : null}
+    </span>
+  );
 }
 
 interface SuitePickerDialogProps {
@@ -124,12 +137,16 @@ export function SuitePickerDialog({ open, value, onChange, onClose }: SuitePicke
   const { notification } = App.useApp();
   const [activeL1, setActiveL1] = useState<string | undefined>();
   const [activeL2, setActiveL2] = useState<string | undefined>();
+  const [origin, setOrigin] = useState<OriginFilter>("ALL");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
 
-  const filters = useMemo(() => ({ q: query, l1: activeL1, l2: activeL2 }), [query, activeL1, activeL2]);
+  const filters = useMemo<SuitePageFilters>(
+    () => ({ q: query, l1: activeL1, l2: activeL2, origin: origin === "ALL" ? undefined : origin }),
+    [query, activeL1, activeL2, origin],
+  );
   // placeholderData 让切换品类/关键词时保留上一批结果与计数，避免整屏闪成骨架屏；真正的检索由服务端完成。
   const suites = useSuitePage(filters, open);
   const pages = suites.data?.pages;
@@ -153,6 +170,23 @@ export function SuitePickerDialog({ open, value, onChange, onClose }: SuitePicke
   useEffect(() => {
     if (activeL1 && !l1List.includes(activeL1)) setActiveL1(undefined);
   }, [l1List, activeL1]);
+
+  // 来源是全库范围开关：切换后品类计数整体换了一套，保留旧品类大概率直接落空，所以回到“全部品类”。
+  const changeOrigin = useCallback((next: OriginFilter) => {
+    setOrigin(next);
+    setActiveL1(undefined);
+    setActiveL2(undefined);
+  }, []);
+
+  const originCounts = firstPage?.originCounts;
+  const originOptions = useMemo(() => {
+    const total = originCounts ? originCounts.builtin + originCounts.user : undefined;
+    return [
+      { label: originOptionLabel("全部", total), value: "ALL" as const },
+      { label: originOptionLabel("内置", originCounts?.builtin), value: "builtin" as const },
+      { label: originOptionLabel("导入", originCounts?.user), value: "user" as const },
+    ];
+  }, [originCounts]);
 
   const atCap = value.length >= MAX_REQUESTED_SUITE_SHOTS;
   const selectedSuiteCount = useMemo(
@@ -249,12 +283,18 @@ export function SuitePickerDialog({ open, value, onChange, onClose }: SuitePicke
 
       <section className={styles.panel}>
         <header className={styles.panelHead}>
-          <div className={styles.l2Row}>
-            <button type="button" className={styles.l2Chip} data-on={activeL2 === undefined} onClick={() => setActiveL2(undefined)}>全部</button>
-            {l2List.map((l2) => (
-              <button key={l2} type="button" className={styles.l2Chip} data-on={activeL2 === l2} onClick={() => setActiveL2(l2)}>{l2}</button>
-            ))}
+          <div className={styles.scopeRow}>
+            <span className={styles.scopeLabel}>来源</span>
+            <Segmented size="small" options={originOptions} value={origin} onChange={(next) => changeOrigin(next as OriginFilter)} aria-label="按套图来源筛选" />
           </div>
+          {l2List.length > 0 ? (
+            <div className={styles.l2Row}>
+              <button type="button" className={styles.l2Chip} data-on={activeL2 === undefined} onClick={() => setActiveL2(undefined)}>全部</button>
+              {l2List.map((l2) => (
+                <button key={l2} type="button" className={styles.l2Chip} data-on={activeL2 === l2} onClick={() => setActiveL2(l2)}>{l2}</button>
+              ))}
+            </div>
+          ) : null}
           <div className={styles.panelTools}>
             <Input
               allowClear
@@ -286,12 +326,16 @@ export function SuitePickerDialog({ open, value, onChange, onClose }: SuitePicke
           ) : loaded.length === 0 ? (
             <div className={styles.state}>
               <Sparkles size={30} strokeWidth={1.25} aria-hidden />
-              <p>{query || activeL1 ? "没有匹配的套图" : "套图库还是空的"}</p>
-              <p className={styles.stateHint}>用 ecom-suite-forge 从爆款套图生成 .suite.json，或点右上角「导入」。</p>
+              <p>{query || activeL1 ? "没有匹配的套图" : origin === "user" ? "还没有导入的套图" : "套图库还是空的"}</p>
+              <p className={styles.stateHint}>
+                {origin === "user"
+                  ? "用套图工坊反推爆款套图，或点右上角「导入」粘贴 .suite.json。"
+                  : "用 ecom-suite-forge 从爆款套图生成 .suite.json，或点右上角「导入」。"}
+              </p>
             </div>
           ) : (
             <Virtuoso
-              key={`${query}|${activeL1 ?? ""}|${activeL2 ?? ""}`}
+              key={`${query}|${activeL1 ?? ""}|${activeL2 ?? ""}|${origin}`}
               className={styles.cardsScroller}
               style={{ position: "absolute", inset: 0 }}
               data={loaded}

@@ -273,7 +273,10 @@ export function projectDetailPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** 套图夹具：默认 1 张卡 2 个分镜，够验证分页、计数与名称回读，不引入真实套图内容。 */
+/**
+ * 套图夹具：默认 1 张卡 2 个分镜，够验证分页、计数与名称回读，不引入真实套图内容。
+ * 来源按 index % 4 划分，与 L1 的奇偶分配错开，保证两个来源区间在每个品类里都有样本。
+ */
 export function suiteFixtures(count: number): Array<{
   id: string;
   name: string;
@@ -294,7 +297,7 @@ export function suiteFixtures(count: number): Array<{
         { shotId: "shot-01", order: 1, shotRole: "HERO", displayName: `主图 ${ordinal}` },
         { shotId: "shot-02", order: 2, shotRole: "DETAIL", displayName: `细节 ${ordinal}` },
       ],
-      origin: "user" as const,
+      origin: index % 4 < 2 ? ("builtin" as const) : ("user" as const),
     };
   });
 }

@@ -9,7 +9,16 @@ export type SuiteFileInput = components["schemas"]["EcomSuiteFile"];
 export type SuiteShotRole = NonNullable<SuiteShot["shotRole"]>;
 export type SuiteOrigin = SuiteSummary["origin"];
 export type SuitesResponse = components["schemas"]["EcomSuitesResponse"];
+export type SuiteOriginCounts = components["schemas"]["EcomSuiteOriginCounts"];
 export type SuiteCategoriesResponse = components["schemas"]["EcomSuiteCategoriesResponse"];
+
+/** 套图列表的筛选条件；undefined 的 origin 表示内置与导入合并浏览，与省略查询参数等价。 */
+export interface SuitePageFilters {
+  q: string;
+  l1?: string;
+  l2?: string;
+  origin?: SuiteOrigin;
+}
 
 export function adaptSuites(payload: SuitesResponse): SuiteSummary[] {
   return payload.items;

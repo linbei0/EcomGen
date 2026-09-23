@@ -97,10 +97,16 @@ paths:
           description: Exact category L2 filter, applied on top of l1.
           schema:
             type: string
+        - name: origin
+          in: query
+          required: false
+          description: Library scope switch. `builtin` returns only suites shipped with EcomGen, `user` only suites imported on this machine; omitted merges both. Unlike q/l1/l2, it also narrows total and l1Counts.
+          schema:
+            $ref: "#/components/schemas/EcomSuiteOrigin"
         - name: ids
           in: query
           required: false
-          description: Comma-separated suite IDs; when present the response returns exactly those suites and ignores q/l1/l2/cursor/limit.
+          description: Comma-separated suite IDs; when present the response returns exactly those suites and ignores q/l1/l2/origin/cursor/limit.
           schema:
             type: string
         - $ref: "#/components/parameters/Cursor"

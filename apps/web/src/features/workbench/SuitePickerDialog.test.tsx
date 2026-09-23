@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { useState } from "react";
@@ -21,6 +21,11 @@ const FIXTURE_COUNT = 45;
 function Host() {
   const [value, setValue] = useState<string[]>([]);
   return <SuitePickerDialog open value={value} onChange={setValue} onClose={() => {}} />;
+}
+
+/** antd Segmented 的真实 radio 被隐藏且 pointer-events: none，user-event 会拒绝点击，直接派发 click。 */
+function pickOrigin(name: RegExp): void {
+  fireEvent.click(screen.getByRole("radio", { name }));
 }
 
 describe("SuitePickerDialog 分页与筛选", () => {
@@ -79,5 +84,39 @@ describe("SuitePickerDialog 分页与筛选", () => {
 
     // 搜索不改变全库计数
     expect(screen.getByRole("button", { name: /全部\s*45/ })).toBeInTheDocument();
+  });
+
+  it("按来源筛选只请求该来源的套图，并把品类计数换成该来源的库存", async () => {
+    renderWithProviders(<Host />);
+    expect(await screen.findByRole("button", { name: /全部\s*45/ })).toBeInTheDocument();
+
+    // 夹具里的来源与品类交错分布，来源选项上的计数来自全库统计
+    pickOrigin(/导入\s*22/);
+
+    await waitFor(() => expect(requests.some((url) => new URL(url).searchParams.get("origin") === "user")).toBe(true));
+    expect(await screen.findByRole("button", { name: /全部\s*22/ })).toBeInTheDocument();
+    // 品类计数换成导入区间的库存：两个品类各 11 套，与全库口径的 23/22 不同
+    expect(screen.getByRole("button", { name: /护肤个护\s*11/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /食品饮料\s*11/ })).toBeInTheDocument();
+
+    pickOrigin(/内置\s*23/);
+    await waitFor(() => expect(requests.some((url) => new URL(url).searchParams.get("origin") === "builtin")).toBe(true));
+    expect(await screen.findByRole("button", { name: /全部\s*23/ })).toBeInTheDocument();
+  });
+
+  it("切换来源后清空已选品类，避免停留在新来源下没有内容的品类里", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Host />);
+    expect(await screen.findByRole("button", { name: /食品饮料\s*22/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /食品饮料\s*22/ }));
+    await waitFor(() => expect(requests.some((url) => new URL(url).searchParams.get("l1") === "食品饮料")).toBe(true));
+
+    pickOrigin(/导入\s*22/);
+    await waitFor(() => {
+      const scoped = requests.filter((url) => new URL(url).searchParams.get("origin") === "user");
+      expect(scoped.length).toBeGreaterThan(0);
+      expect(scoped.every((url) => new URL(url).searchParams.get("l1") === null)).toBe(true);
+    });
   });
 });
