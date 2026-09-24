@@ -30,11 +30,18 @@ export const api = createClient<paths>({
 });
 api.use(errorMiddleware);
 
-/** 成功响应按契约必有 body；缺失说明契约漂移，显式失败而非静默 undefined。 */
-export async function unwrap<T>(promise: Promise<{ data?: T; error?: unknown }>): Promise<T> {
-  const { data } = await promise;
+/**
+ * 成功响应按契约必有 body；204/205 的空 body 是删除类端点的正常语义，其余缺失说明契约漂移，显式失败而非静默 undefined。
+ * 同时接受已 resolve 的结果对象：调用方需要在同一个结果上读 response.status（如区分「复用既有任务」与「新建任务」）时不必再包一层 Promise。
+ */
+export async function unwrap<T>(result: Promise<{ data?: T; error?: unknown; response: Response }> | { data?: T; error?: unknown; response: Response }): Promise<T> {
+  const { data, response } = await result;
   if (data === undefined) {
-    throw new ApiError({ code: "UNKNOWN", message: "响应缺少数据", status: 0 });
+    if (response.status !== 204 && response.status !== 205) {
+      throw new ApiError({ code: "UNKNOWN", message: "响应缺少数据", status: response.status });
+    }
+    // 204/205 无 body 属正常删除语义，调用方以 void 消费返回值。
+    return undefined as T;
   }
   return data;
 }

@@ -14,6 +14,7 @@ import styles from "./LibraryPage.module.css";
 
 function badgeLabel(source: string, kind: string): string {
   if (kind === "LAYER") return "分层";
+  if (kind === "MODEL") return "模特";
   if (source === "GENERATED") return "生成";
   return kind === "PRODUCT" ? "商品" : "参考";
 }
@@ -129,7 +130,7 @@ export function LibraryPage() {
         await copy.mutateAsync({
           projectId: targetProjectId,
           itemId,
-          kind: item.kind === "GENERATED" || item.kind === "LAYER" ? "REFERENCE" : item.kind,
+          kind: item.kind === "GENERATED" || item.kind === "LAYER" || item.kind === "MODEL" ? "REFERENCE" : item.kind,
         });
         succeeded += 1;
       } catch (error: unknown) {

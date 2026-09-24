@@ -1218,3 +1218,153 @@ paths:
             text/event-stream:
               schema:
                 type: string
+  /models:
+    get:
+      operationId: listModels
+      responses:
+        "200":
+          description: Global model cast library; each entry carries its selected master portrait when one was picked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelList"
+    post:
+      operationId: createModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModelInput"
+      responses:
+        "201":
+          description: Model spec saved; no generation is triggered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomModel"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /models/{modelId}:
+    parameters:
+      - $ref: "#/components/parameters/ModelId"
+    get:
+      operationId: getModel
+      responses:
+        "200":
+          description: Single model with its spec and selected portrait.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomModel"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateModelInput"
+      responses:
+        "200":
+          description: Updated model; changing the spec keeps existing portraits but future casts compile from the new spec.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomModel"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteModel
+      responses:
+        "204":
+          description: Model deleted together with its portraits and reference face files.
+  /models/{modelId}/reference-face:
+    parameters:
+      - $ref: "#/components/parameters/ModelId"
+    post:
+      operationId: uploadModelReferenceFace
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadModelReferenceFaceInput"
+      responses:
+        "201":
+          description: Reference face stored; replaces any previous one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomModel"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      operationId: deleteModelReferenceFace
+      responses:
+        "204":
+          description: Reference face removed; future casts fall back to text-only identity.
+  /models/{modelId}/cast-jobs:
+    parameters:
+      - $ref: "#/components/parameters/ModelId"
+    post:
+      operationId: createModelCastJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModelCastJobInput"
+      responses:
+        "202":
+          description: Cast job accepted (or an existing job reused for an identical request).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /models/{modelId}/portraits:
+    parameters:
+      - $ref: "#/components/parameters/ModelId"
+    get:
+      operationId: listModelPortraits
+      responses:
+        "200":
+          description: All portraits generated for the model, newest last.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelPortraitList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /model-portraits/{portraitId}:
+    parameters:
+      - $ref: "#/components/parameters/ModelPortraitId"
+    delete:
+      operationId: deleteModelPortrait
+      responses:
+        "204":
+          description: Portrait file and row removed.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /model-portraits/{portraitId}/select:
+    parameters:
+      - $ref: "#/components/parameters/ModelPortraitId"
+    post:
+      operationId: selectModelPortrait
+      responses:
+        "200":
+          description: Portrait marked as the model's master portrait; any previous selection is cleared. Returns the whole model so callers refresh selection state in one round trip.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcomModel"
+        "404":
+          $ref: "#/components/responses/NotFound"

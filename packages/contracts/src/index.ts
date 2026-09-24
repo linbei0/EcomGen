@@ -50,5 +50,6 @@ export * from "./legacy-schemas.js";
 
 export * from "./api-schemas.js";
 export * from "./api-requests.js";
+export * from "./model-schemas.js";
 export * from "./api-registry.js";
 export * from "./suite-validation.js";

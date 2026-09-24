@@ -16,6 +16,9 @@ const LibraryPage = lazy(() =>
 const SuiteForgePage = lazy(() =>
   import("../features/suite-forge/SuiteForgePage").then((module) => ({ default: module.SuiteForgePage })),
 );
+const ModelsPage = lazy(() =>
+  import("../features/models/ModelsPage").then((module) => ({ default: module.ModelsPage })),
+);
 
 function RouteFallback() {
   return (
@@ -55,6 +58,14 @@ export const router = createBrowserRouter([
     element: (
       <Suspense fallback={<RouteFallback />}>
         <SuiteForgePage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/models",
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <ModelsPage />
       </Suspense>
     ),
   },

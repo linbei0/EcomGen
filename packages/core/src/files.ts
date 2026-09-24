@@ -69,6 +69,22 @@ export class LocalAssetStore {
     return { path: relativePath, hash };
   }
 
+  /** 模特参考脸：每模特至多一张身份基准图，按 model 聚合；重复上传时旧文件由调用方覆盖语义（路径随 hash 变化，孤儿文件可容忍）。 */
+  public async putModelReferenceFace(modelId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const relativePath = join("models", modelId, `reference-${hash.slice(0, 12)}${this.safeExtension(originalName)}`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
+  /** 模选定妆照：不入项目，按模特与 job 聚合；文件随模特删除级联清理。 */
+  public async putModelPortrait(modelId: string, jobId: string, content: Buffer): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const relativePath = join("models", modelId, "casts", jobId, `${randomUUID()}-${hash.slice(0, 12)}.png`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
   /** 缩略图按内容 hash 寻址：同一张图跨项目共享一份，删除项目不影响派生缓存。 */
   public thumbnailPath(hash: string): string {
     return join("thumbs", `${hash}.webp`);

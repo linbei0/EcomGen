@@ -28,6 +28,7 @@ vi.mock("@ecomgen/jobs", async () => {
 
 import type { FastifyInstance } from "fastify";
 import { EcomRepository, LocalAssetStore, openDatabase } from "@ecomgen/core";
+import { MODEL_SPEC_DEFAULTS } from "@ecomgen/contracts";
 import { buildApi } from "./app.js";
 import { enqueue } from "@ecomgen/jobs";
 
@@ -421,6 +422,53 @@ describe("layer plan & layer exports", () => {
     const exportRetry = await app.inject({ method: "POST", url: `/api/v1/jobs/${exportJob.id}/retry` });
     expect(exportRetry.statusCode).toBe(202);
     expect(repository.getLayerExportByJobId(exportRetry.json<{ id: string }>().id)).toMatchObject({ planId: plan.id, includeBackground: false, status: "QUEUED" });
+  });
+});
+
+describe("POST /api/v1/models 规格互斥校验", () => {
+  it("接受自洽规格，拒绝互斥组合并回传字段路径", async () => {
+    const accepted = await app.inject({ method: "POST", url: "/api/v1/models", payload: { name: "小满", spec: MODEL_SPEC_DEFAULTS } });
+    expect(accepted.statusCode).toBe(201);
+
+    // 短发配高盘发：schema 形状合法，但编译出来会是自相矛盾的提示词。
+    const rejected = await app.inject({
+      method: "POST",
+      url: "/api/v1/models",
+      payload: { name: "矛盾", spec: { ...MODEL_SPEC_DEFAULTS, hairLength: "CROP", hairstyle: "HIGH_BUN" } },
+    });
+    expect(rejected.statusCode).toBe(400);
+    // 错误体统一为 { error: { code, message, details } }，details 带字段路径便于前端定位。
+    const { error } = rejected.json() as { error: { code: string; message: string; details: Array<{ path: string }> } };
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.message).toContain("互斥");
+    expect(error.details.map((detail) => detail.path)).toContain("/spec/hairstyle");
+    expect(repository.listModels()).toHaveLength(1);
+  });
+});
+
+describe("PATCH /api/v1/models/:modelId 局部更新", () => {
+  it("只改一个字段时其余字段原样保留", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/v1/models", payload: { name: "小满", spec: MODEL_SPEC_DEFAULTS, notes: "甜酷风" } });
+    const id = created.json<{ id: string }>().id;
+
+    // 只改名：漏传的 spec/notes 必须保留，不能被 undefined 覆盖成 NULL（会撞 NOT NULL 约束变 500）。
+    const renamed = await app.inject({ method: "PATCH", url: `/api/v1/models/${id}`, payload: { name: "小满 2.0" } });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json()).toMatchObject({ name: "小满 2.0", notes: "甜酷风", spec: MODEL_SPEC_DEFAULTS });
+
+    // 只清空备注：空串是合法的清空操作，名称与规格不受影响。
+    const cleared = await app.inject({ method: "PATCH", url: `/api/v1/models/${id}`, payload: { notes: "" } });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json()).toMatchObject({ name: "小满 2.0", notes: "", spec: MODEL_SPEC_DEFAULTS });
+
+    // 只改规格：互斥校验照旧生效，且失败不落库。
+    const conflicting = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/models/${id}`,
+      payload: { spec: { ...MODEL_SPEC_DEFAULTS, hairLength: "CROP", hairstyle: "HIGH_BUN" } },
+    });
+    expect(conflicting.statusCode).toBe(400);
+    expect(repository.getModel(id)).toMatchObject({ notes: "", spec: MODEL_SPEC_DEFAULTS });
   });
 });
 

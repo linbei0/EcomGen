@@ -148,10 +148,12 @@ try {
         observed.layerizeRequests.push(imageBody);
         // 火山方舟同步协议：data 下标 0 是已补绘底图（z_index 0）、后续是带 alpha 的图层
         response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ model: imageBody.model, data: [
-          { url: `data:image/png;base64,${solidPng(24, 32, 40).toString("base64")}`, z_index: 0 },
-          { url: whiteMaskDataUri, z_index: 1, name: "保温杯瓶身", bounding_box: { absolute: [0, 0, 1, 1], normalized: [0, 0, 1000, 1000] } }
-        ] }));
+        response.end(JSON.stringify({
+          model: imageBody.model, data: [
+            { url: `data:image/png;base64,${solidPng(24, 32, 40).toString("base64")}`, z_index: 0 },
+            { url: whiteMaskDataUri, z_index: 1, name: "保温杯瓶身", bounding_box: { absolute: [0, 0, 1, 1], normalized: [0, 0, 1000, 1000] } }
+          ]
+        }));
         return;
       }
       observed.imagePrompt = body.toString("utf8");
@@ -521,6 +523,66 @@ try {
   const committedSuiteSummary = suites.items.find((suite) => suite.id === committedForge.suiteId);
   assert.ok(committedSuiteSummary, "committed suite should be listed");
   assert.equal(committedSuiteSummary.name, editedForgeSuite.name);
+  // 全局模特库链路：建模 → 参考脸上传 → 选角生成（参考脸身份锚点进入生图 Prompt）→ 候选落库 → 选定切换
+  const ecomModel = await requestJson(`${base}/models`, "POST", {
+    name: "小满",
+    spec: {
+      gender: "FEMALE", age: "LATE_20S", heritage: "EAST_ASIAN", stature: "STANDARD_165", build: "SLENDER",
+      faceShape: "OVAL", eyeShape: "ALMOND", eyeColor: "DARK_BROWN", browShape: "STRAIGHT_SOFT", noseShape: "DELICATE", lipShape: "NATURAL",
+      hairLength: "SHOULDER", hairstyle: "SOFT_WAVE", hairColor: "INK_BLACK", hairTexture: "NATURAL_VOLUME", hairline: "ROUNDED",
+      complexion: "LIGHT_NEUTRAL", skinTexture: "NATURAL_PORES", facialHair: "NONE",
+      distinctiveMarks: ["DIMPLES"], expression: "SOFT_SMILE", gaze: "DIRECT_TO_CAMERA", aura: ["WARM_APPROACHABLE"], makeup: "MINIMAL_DEWY", baseWardrobe: "WHITE_TANK",
+      framing: "WAIST_UP", pose: "HANDS_RELAXED", backdrop: "SEAMLESS_GREY", lighting: "SOFTBOX_THREE_POINT", lens: "LENS_50"
+    },
+    notes: "e2e model cast"
+  });
+  assert.equal(ecomModel.hasReferenceFace, false);
+  assert.equal(ecomModel.portraitCount, 0);
+  // 参考脸可选；上传后即成为该模特后续生成的唯一身份基准
+  const faceForm = new FormData();
+  faceForm.append("file", new Blob([Buffer.from(onePixelReferencePng, "base64")], { type: "image/png" }), "face.png");
+  const faceResponse = await fetch(`${base}/models/${ecomModel.id}/reference-face`, { method: "POST", body: faceForm });
+  const faceText = await faceResponse.text();
+  assert.equal(faceResponse.status, 201, faceText);
+  const faceModel = JSON.parse(faceText);
+  assert.equal(faceModel.hasReferenceFace, true);
+  // 模特类 url 是含 /api/v1 前缀的浏览器直连路径，与 thumbnails 的约定一致
+  assert.equal((await fetch(new URL(faceModel.referenceFaceUrl, base))).status, 200);
+  const castBody = { providerId: provider.id, imageModelId: "mock-image", aspectRatio: "AUTO", candidateCount: 1 };
+  const modelCast = await requestJson(`${base}/models/${ecomModel.id}/cast-jobs`, "POST", castBody);
+  assert.equal(modelCast.type, "MODEL_CAST");
+  assert.equal(modelCast.projectId, null);
+  // 同 spec + 同参考脸 + 同参数命中请求指纹：任务在途时复用同一任务（202），不重复计费
+  const inFlightDuplicate = await fetch(`${base}/models/${ecomModel.id}/cast-jobs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(castBody) });
+  assert.equal(inFlightDuplicate.status, 202);
+  assert.equal((await inFlightDuplicate.json()).id, modelCast.id);
+  const castDone = await waitJob(base, modelCast.id);
+  assert.equal(castDone.status, "SUCCEEDED");
+  // 已成功后再提交同样参数：200 而非 202，表示「复用了结果、不会有新候选」，前端据此不再轮询也不再报“已生成”
+  const reusedCast = await fetch(`${base}/models/${ecomModel.id}/cast-jobs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(castBody) });
+  assert.equal(reusedCast.status, 200);
+  assert.equal((await reusedCast.json()).id, modelCast.id);
+  // 参考脸存在时，worker 在生图 Prompt 前置身份锚点
+  assert.match(observed.imagePrompt, /Identity reference/);
+  const castPortraits = await requestJson(`${base}/models/${ecomModel.id}/portraits`, "GET");
+  assert.equal(castPortraits.items.length, 1);
+  assert.equal((await fetch(new URL(castPortraits.items[0].url, base))).status, 200);
+  // 候选同样进资产库（MODEL 条目、模特名可检索）；此处只验证库视图与缩略图地址可用，
+  // 缩略图惰性兜底的「按 hash 反查模特候选」由 packages/core 的用例精确覆盖（e2e 里同 hash 的缩略图已被先生成的产物预热）。
+  const castLibraryItems = await requestJson(`${base}/library-assets?kind=MODEL&q=${encodeURIComponent("小满")}`, "GET");
+  assert.equal(castLibraryItems.items.length, 1);
+  assert.equal((await fetch(new URL(castLibraryItems.items[0].thumbnailUrl, base))).status, 200);
+  // 局部更新：只改名字时 spec/notes 必须原样保留（PATCH 曾把缺省字段写成 NULL）
+  const renamedModel = await requestJson(`${base}/models/${ecomModel.id}`, "PATCH", { name: "小满 v2" });
+  assert.equal(renamedModel.name, "小满 v2");
+  assert.equal(renamedModel.notes, "e2e model cast");
+  assert.equal(renamedModel.portraitCount, 1);
+  // 选定切换：select 返回带 selectedPortrait 的模特详情，列表视图同步可见
+  const selectedCastModel = await requestJson(`${base}/model-portraits/${castPortraits.items[0].id}/select`, "POST");
+  assert.equal(selectedCastModel.selectedPortrait.id, castPortraits.items[0].id);
+  assert.equal(selectedCastModel.portraitCount, 1);
+  const modelsAfterCast = await requestJson(`${base}/models`, "GET");
+  assert.equal(modelsAfterCast.items.find((item) => item.id === ecomModel.id)?.selectedPortrait.id, castPortraits.items[0].id);
   // 取消传播：上游永不返回时，取消必须真正断开在途请求，而不是等超时后再丢弃已计费的结果。
   // 已生成的分镜被服务端冻结 Prompt，因此这里用一个独立项目构造该请求，顺带不干扰主链路的产物计数。
   const cancelProject = await requestJson(`${base}/projects`, "POST", {
@@ -559,7 +621,7 @@ try {
   // 取消不是瞬时错误：重发一次就是再付一次费，因此上游只允许收到一次请求。
   assert.equal(cancellation.hangingRequests, 1);
   assert.equal((await requestJson(`${base}/projects/${cancelProject.id}/outputs`, "GET")).length, 0);
-  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge -> cancel aborts in-flight generation");
+  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge -> model cast & select -> cancel aborts in-flight generation");
 } finally {
   await Promise.all(children.map(stop));
   if (mock) await new Promise((resolveClose) => mock.close(resolveClose));

@@ -18,6 +18,9 @@ export const qk = {
   suiteForgeJobList: ["suite-forge-job-list"] as const,
   providers: ["providers"] as const,
   searchSources: ["search-sources"] as const,
+  /** 全局模特库：列表与单模特详情、候选列表按模特隔离。 */
+  models: ["models"] as const,
+  modelPortraits: (id: string) => ["models", id, "portraits"] as const,
   projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,
   project: (id: string) => ["projects", id] as const,
   libraryAssets: (filters: { kind: string; q: string }) => ["library-assets", filters] as const,

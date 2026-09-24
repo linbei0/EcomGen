@@ -58,6 +58,7 @@ components:
       enum:
         - UPLOADED
         - GENERATED
+        - MODEL
     LibraryItemKind:
       type: string
       enum:
@@ -65,6 +66,7 @@ components:
         - REFERENCE
         - GENERATED
         - LAYER
+        - MODEL
     ImageResolution:
       type: string
       enum:
@@ -107,6 +109,7 @@ components:
         - LAYER_PLAN
         - LAYER_EXPORT
         - SUITE_FORGE
+        - MODEL_CAST
     JobStatus:
       type: string
       enum:
@@ -1166,6 +1169,7 @@ components:
             - LAYER_PLAN
             - LAYER_EXPORT
             - SUITE_FORGE
+            - MODEL_CAST
         status:
           type: string
           enum:
@@ -3059,3 +3063,508 @@ components:
           type: string
         purpose:
           $ref: "#/components/schemas/ReferencePurpose"
+    UploadModelReferenceFaceInput:
+      type: object
+      required:
+        - file
+      properties:
+        file:
+          format: binary
+          description: 同一人正面清晰人像，仅支持图片文件。
+          type: string
+    ModelSpec:
+      description: 四层结构化模特规格：身份内核 / 容貌细节 / 表达层 / 镜头呈现。定妆照 prompt 由该规格确定性编译；维度之间存在互斥约束，判定单源在 packages/ecom-skill。
+      type: object
+      required:
+        - gender
+        - age
+        - heritage
+        - stature
+        - build
+        - faceShape
+        - eyeShape
+        - eyeColor
+        - browShape
+        - noseShape
+        - lipShape
+        - hairLength
+        - hairstyle
+        - hairColor
+        - hairTexture
+        - hairline
+        - complexion
+        - skinTexture
+        - facialHair
+        - distinctiveMarks
+        - expression
+        - gaze
+        - aura
+        - makeup
+        - baseWardrobe
+        - framing
+        - pose
+        - backdrop
+        - lighting
+        - lens
+      properties:
+        gender:
+          type: string
+          enum:
+            - FEMALE
+            - MALE
+            - ANDROGYNOUS
+        age:
+          type: string
+          enum:
+            - CHILD_7
+            - PRETEEN_11
+            - TEEN_16
+            - EARLY_20S
+            - LATE_20S
+            - EARLY_30S
+            - MID_30S
+            - MID_40S
+            - SENIOR
+        heritage:
+          type: string
+          enum:
+            - EAST_ASIAN
+            - SOUTHEAST_ASIAN
+            - SOUTH_ASIAN
+            - MIDDLE_EASTERN
+            - NORTHERN_EUROPEAN
+            - MEDITERRANEAN
+            - LATIN_AMERICAN
+            - AFRICAN
+            - MIXED
+        stature:
+          type: string
+          enum:
+            - PETITE_158
+            - STANDARD_165
+            - TALL_172
+            - RUNWAY_180
+        build:
+          type: string
+          enum:
+            - SLENDER
+            - BALANCED
+            - ATHLETIC
+            - MUSCULAR
+            - CURVY
+            - PLUS
+            - MATERNITY
+        faceShape:
+          type: string
+          enum:
+            - OVAL
+            - ROUND
+            - SQUARE_JAW
+            - HEART
+            - LONG
+            - DIAMOND
+        eyeShape:
+          type: string
+          enum:
+            - ALMOND
+            - ROUND
+            - MONOLID
+            - UPTURNED
+            - DOWNTURNED
+            - NARROW
+            - DEEP_SET
+            - PEACH_BLOSSOM
+            - INNER_DOUBLE
+        eyeColor:
+          type: string
+          enum:
+            - DARK_BROWN
+            - AMBER
+            - HAZEL
+            - GREEN
+            - BLUE
+            - GREY
+        browShape:
+          type: string
+          enum:
+            - STRAIGHT_SOFT
+            - ARCED
+            - FEATHERED
+            - BOLD
+            - THIN_ARCHED
+            - WILLOW
+            - THICK_STRAIGHT
+        noseShape:
+          type: string
+          enum:
+            - DELICATE
+            - STRAIGHT
+            - SCULPTED
+            - BROAD
+            - UPTURNED
+            - AQUILINE
+            - BULBOUS
+        lipShape:
+          type: string
+          enum:
+            - NATURAL
+            - FULL
+            - BOW
+            - WIDE
+            - THIN
+        hairLength:
+          type: string
+          enum:
+            - CROP
+            - CHIN_BOB
+            - SHOULDER
+            - LONG
+            - WAIST
+        hairstyle:
+          type: string
+          enum:
+            - SLEEK_STRAIGHT
+            - SOFT_WAVE
+            - DEEP_CURL
+            - HIGH_BUN
+            - PONYTAIL
+            - TEXTURED_FRINGE
+            - BRAIDED
+            - AFRO
+            - SHAVED
+            - PIXIE
+            - SLICKED_BACK
+            - LAYERED_LONG
+            - HIME_CUT
+            - HALF_UP
+            - TWIN_TAILS
+            - SPACE_BUNS
+            - LOW_BUN
+        hairColor:
+          type: string
+          enum:
+            - INK_BLACK
+            - ESPRESSO
+            - CHESTNUT
+            - LIGHT_BROWN
+            - HONEY_BLONDE
+            - STRAWBERRY_BLONDE
+            - ASH_BROWN
+            - COPPER
+            - BURGUNDY
+            - PLATINUM
+            - SILVER
+            - MILK_TEA
+            - ASH_BLONDE
+        hairTexture:
+          type: string
+          enum:
+            - SLEEK_GLOSSY
+            - NATURAL_VOLUME
+            - TOUSLED
+            - WET_LOOK
+        hairline:
+          type: string
+          enum:
+            - ROUNDED
+            - SQUARE
+            - WIDOWS_PEAK
+            - RECEDING
+            - HIGH_FOREHEAD
+        complexion:
+          type: string
+          enum:
+            - PORCELAIN
+            - FAIR_WARM
+            - LIGHT_NEUTRAL
+            - MEDIUM_OLIVE
+            - HONEY
+            - CARAMEL
+            - DEEP
+            - DEEP_EBONY
+        skinTexture:
+          type: string
+          enum:
+            - NATURAL_PORES
+            - DEWY
+            - MATTE_FINE
+            - FRECKLED
+            - MATURE_LINES
+        facialHair:
+          type: string
+          enum:
+            - NONE
+            - STUBBLE
+            - MUSTACHE
+            - GOATEE
+            - BEARD
+            - FULL_BEARD
+        distinctiveMarks:
+          maxItems: 2
+          type: array
+          items:
+            type: string
+            enum:
+              - FRECKLES_NOSE
+              - FRECKLES_CHEEKS
+              - MOLE_CHEEK
+              - TEAR_MOLE
+              - DIMPLES
+              - BEAUTY_MARK_LIP
+              - BIRTHMARK
+              - SUBTLE_ASYMMETRY
+              - AEGYO_SAL
+              - BROW_SCAR
+        expression:
+          type: string
+          enum:
+            - CALM_DIRECT
+            - SOFT_SMILE
+            - BRIGHT_GRIN
+            - WARM_LAUGH
+            - EDITORIAL_DISTANCE
+            - THOUGHTFUL
+            - TENDER
+            - SURPRISED
+        gaze:
+          type: string
+          enum:
+            - DIRECT_TO_CAMERA
+            - OFF_CAMERA
+            - LOWERED_LIDS
+            - HALF_LID_IDLE
+        aura:
+          maxItems: 3
+          type: array
+          items:
+            type: string
+            enum:
+              - WARM_APPROACHABLE
+              - QUIET_CONFIDENCE
+              - METROPOLITAN
+              - PLAYFUL
+              - SERENE
+              - ARTSY
+              - POLISHED
+              - FRESH
+        makeup:
+          type: string
+          enum:
+            - NONE
+            - MINIMAL_DEWY
+            - EVERYDAY
+            - SOFT_GLAM
+            - RED_LIP
+            - SMOKY
+            - MATURE
+        baseWardrobe:
+          type: string
+          enum:
+            - WHITE_TANK
+            - BLACK_TURTLENECK
+            - WHITE_SHIRT
+            - NEUTRAL_TEE
+            - BLAZER_SHIRT
+            - RIBBED_DRESS
+            - SLEEVELESS_KNIT
+            - HOODIE
+        framing:
+          type: string
+          enum:
+            - FULL_BODY
+            - THREE_QUARTER
+            - WAIST_UP
+            - BEAUTY_CLOSEUP
+        pose:
+          type: string
+          enum:
+            - WEIGHT_LEFT_HIP
+            - NATURAL_WALK
+            - LEANING_WALL
+            - SEATED_STOOL
+            - HANDS_RELAXED
+            - HANDS_ON_HIPS
+            - ARMS_CROSSED
+            - OVER_SHOULDER
+            - HANDS_IN_POCKETS
+            - HAIR_TOUCH
+        backdrop:
+          type: string
+          enum:
+            - SEAMLESS_GREY
+            - PURE_WHITE
+            - CREAM
+            - WARM_BEIGE
+            - OUTDOOR_BOKEH
+            - PALE_PINK
+            - SLATE_BLUE
+            - CHARCOAL
+        lighting:
+          type: string
+          enum:
+            - SOFTBOX_THREE_POINT
+            - WINDOW_DAYLIGHT
+            - OVERCAST_DIFFUSED
+            - GOLDEN_BACKLIT
+            - RING_LIGHT
+            - DRAMATIC_SIDE
+            - HIGH_KEY_STUDIO
+            - BUTTERFLY_LIGHT
+        lens:
+          type: string
+          enum:
+            - LENS_35
+            - LENS_50
+            - LENS_85
+            - LENS_105
+    ModelPortrait:
+      type: object
+      required:
+        - id
+        - modelId
+        - providerId
+        - imageModelId
+        - aspectRatio
+        - selected
+        - createdAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        modelId:
+          format: uuid
+          type: string
+        url:
+          description: 定妆照静态访问地址；仅列表与详情响应携带。
+          type: string
+        width:
+          anyOf:
+            - type: integer
+            - type: "null"
+        height:
+          anyOf:
+            - type: integer
+            - type: "null"
+        providerId:
+          format: uuid
+          type: string
+        imageModelId:
+          type: string
+        aspectRatio:
+          $ref: "#/components/schemas/ImageAspectRatio"
+        selected:
+          description: 定妆照标记；每个模特至多一张被选定。
+          type: boolean
+        createdAt:
+          format: date-time
+          type: string
+    EcomModel:
+      type: object
+      required:
+        - id
+        - name
+        - spec
+        - notes
+        - hasReferenceFace
+        - portraitCount
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        name:
+          type: string
+        spec:
+          $ref: "#/components/schemas/ModelSpec"
+        notes:
+          type: string
+        hasReferenceFace:
+          description: 是否已上传参考脸；有则该脸是后续生成的唯一身份基准。
+          type: boolean
+        referenceFaceUrl:
+          type: string
+        selectedPortrait:
+          anyOf:
+            - $ref: "#/components/schemas/ModelPortrait"
+            - type: "null"
+        portraitCount:
+          minimum: 0
+          type: integer
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    ModelList:
+      type: object
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EcomModel"
+        nextCursor:
+          anyOf:
+            - type: string
+            - type: "null"
+    ModelPortraitList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelPortrait"
+    CreateModelInput:
+      type: object
+      required:
+        - name
+        - spec
+      properties:
+        name:
+          minLength: 1
+          maxLength: 40
+          type: string
+        spec:
+          $ref: "#/components/schemas/ModelSpec"
+        notes:
+          maxLength: 2000
+          type: string
+    UpdateModelInput:
+      type: object
+      properties:
+        name:
+          minLength: 1
+          maxLength: 40
+          type: string
+        spec:
+          $ref: "#/components/schemas/ModelSpec"
+        notes:
+          maxLength: 2000
+          type: string
+    CreateModelCastJobInput:
+      description: 发起一次选角生成：按模特当前 spec 编译定妆照 prompt，产出 candidateCount 张候选。
+      type: object
+      required:
+        - providerId
+        - imageModelId
+        - aspectRatio
+      properties:
+        providerId:
+          format: uuid
+          type: string
+        imageModelId:
+          minLength: 1
+          type: string
+        aspectRatio:
+          $ref: "#/components/schemas/ImageAspectRatio"
+        candidateCount:
+          minimum: 1
+          maximum: 4
+          default: 1
+          type: integer

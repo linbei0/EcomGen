@@ -5,19 +5,19 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type SuiteListQuery, type UserTemplateRecord, SUITE_PAGE_SIZE_DEFAULT, SUITE_PAGE_SIZE_MAX } from "@ecomgen/core";
-import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
+import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ModelPortraitRecord, type ModelRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type SuiteListQuery, type UserTemplateRecord, SUITE_PAGE_SIZE_DEFAULT, SUITE_PAGE_SIZE_MAX } from "@ecomgen/core";
+import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, findModelSpecConflicts, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
 import { SUITE_TAXONOMY, type SuiteDocumentInput, type SuiteOrigin } from "@ecomgen/ecom-suite";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
-import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
+import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, ModelSpec, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
+import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreateModelCastJobInput, CreateModelInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateModelInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, createSegmentationProvider, probeReasoning, type PromptSegmentationProtocol } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
 import { applyModelFields, parseModelRef } from "./projectPatch.js";
 import { parseBody } from "./http-input.js";
 import { registerWebStatic } from "./web-static.js";
-import { enumArray, enumValue, normalizeModels, objectOfStrings, parameter, readBoolean, readJsonObject, readJsonTextArray, readObject, readOptionalText, readOptionalTextArray, readPriority, readText, readTextArray, searchSourceBaseUrl } from "./input-normalizers.js";
+import { enumArray, enumValue, normalizeModels, objectOfStrings, parameter, readBoolean, readJsonObject, readJsonTextArray, readObject, readOptionalText, readOptionalTextArray, readPatchText, readPriority, readText, readTextArray, searchSourceBaseUrl } from "./input-normalizers.js";
 
 export interface ApiOptions { dataDir: string; redisUrl: string; masterKey: string; }
 
@@ -190,6 +190,108 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const committed = repository.commitSuiteForgeResult(jobId, id) ?? record;
     return publicSuiteForgeResult(committed);
   });
+  // ---- 全局模特库：spec 即合约，API 只做校验、持久化与入队；定妆照 prompt 由 worker 按 spec 确定性编译。 ----
+  app.get("/api/v1/models", async () => {
+    // 候选一次批量取回按模特分组：列表长度决定查询次数会随库增长放大。
+    const portraitsByModel = new Map<string, ModelPortraitRecord[]>();
+    for (const portrait of repository.listAllModelPortraits()) {
+      const bucket = portraitsByModel.get(portrait.modelId);
+      if (bucket) bucket.push(portrait);
+      else portraitsByModel.set(portrait.modelId, [portrait]);
+    }
+    return { items: repository.listModels().map((record) => publicModel(record, portraitsByModel.get(record.id) ?? [])), nextCursor: null };
+  });
+  app.post("/api/v1/models", async (request, reply) => {
+    const body = parseBody(CreateModelInput, request.body);
+    assertModelSpecCoherent(body.spec);
+    const record = repository.createModel({ name: readText(body.name, "name"), spec: body.spec, notes: body.notes ?? "" });
+    // 新建模特必然没有候选，省掉一次查询。
+    return reply.code(201).send(publicModel(record, []));
+  });
+  app.get("/api/v1/models/:modelId", async (request) => {
+    const record = ensureModel(repository, parameter(request, "modelId"));
+    return publicModel(record, repository.listModelPortraits(record.id));
+  });
+  app.patch("/api/v1/models/:modelId", async (request) => {
+    const current = ensureModel(repository, parameter(request, "modelId"));
+    const body = parseBody(UpdateModelInput, request.body);
+    if (body.spec) assertModelSpecCoherent(body.spec);
+    // 只带显式传入的字段：patch 里值为 undefined 的键会覆盖当前值，并在写库时绑成 NULL。
+    const patch: { name?: string; spec?: ModelSpec; notes?: string } = {};
+    if (body.name !== undefined) patch.name = readText(body.name, "name");
+    if (body.spec !== undefined) patch.spec = body.spec;
+    if (body.notes !== undefined) patch.notes = readPatchText(body.notes, "notes");
+    const record = repository.updateModel(current.id, patch) ?? current;
+    return publicModel(record, repository.listModelPortraits(record.id));
+  });
+  app.delete("/api/v1/models/:modelId", async (request, reply) => {
+    const model = ensureModel(repository, parameter(request, "modelId"));
+    repository.deleteModel(model.id);
+    return reply.code(204).send();
+  });
+  // 参考脸是模特的唯一身份基准：multipart 单图上传，覆盖旧图（存储路径随 hash 变化，旧文件成为可容忍的孤儿）。
+  app.post("/api/v1/models/:modelId/reference-face", async (request, reply) => {
+    const model = ensureModel(repository, parameter(request, "modelId"));
+    let upload: { filename: string; buffer: Buffer } | null = null;
+    for await (const part of request.parts()) {
+      if (part.type !== "file") continue;
+      if (!part.mimetype.startsWith("image/")) throw new ApiError(400, "VALIDATION_ERROR", "Only image files are supported");
+      upload = { filename: part.filename || "reference-face", buffer: await part.toBuffer() };
+      break;
+    }
+    if (!upload) throw new ApiError(400, "VALIDATION_ERROR", "A reference face image is required");
+    const stored = await storage.putModelReferenceFace(model.id, upload.filename, upload.buffer);
+    const record = repository.setModelReferenceFace(model.id, stored.path, stored.hash) ?? model;
+    return reply.code(201).send(publicModel(record, repository.listModelPortraits(record.id)));
+  });
+  app.delete("/api/v1/models/:modelId/reference-face", async (request, reply) => {
+    const model = ensureModel(repository, parameter(request, "modelId"));
+    repository.setModelReferenceFace(model.id, null, null);
+    return reply.code(204).send();
+  });
+  // 选角生成：付费生图任务，不绑定项目。指纹含 spec、notes、参考脸 hash 与生成参数，
+  // 同 spec 重复提交复用既有 QUEUED/RUNNING/SUCCEEDED 任务。
+  app.post("/api/v1/models/:modelId/cast-jobs", async (request, reply) => {
+    const model = ensureModel(repository, parameter(request, "modelId"));
+    const body = parseBody(CreateModelCastJobInput, request.body);
+    verifyModel(repository, body.providerId, body.imageModelId, "image");
+    const candidateCount = body.candidateCount ?? 1;
+    const idempotencyKey = (request.headers["idempotency-key"] as string | undefined) ?? null;
+    const fingerprint = requestFingerprint({ type: "MODEL_CAST", modelId: model.id, spec: model.spec, notes: model.notes, referenceFaceHash: model.referenceFaceHash, providerId: body.providerId, imageModelId: body.imageModelId, aspectRatio: body.aspectRatio, candidateCount, idempotencyKey });
+    const existing = repository.findJobByFingerprint(null, fingerprint);
+    if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "MODEL_CAST", input: { modelId: model.id, aspectRatio: body.aspectRatio, candidateCount, spec: model.spec, notes: model.notes, referenceFacePath: model.referenceFacePath }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    await enqueue(queue, { jobId: job.id, kind: "model_cast" });
+    return reply.code(202).send(job);
+  });
+  app.get("/api/v1/models/:modelId/portraits", async (request) => {
+    const model = ensureModel(repository, parameter(request, "modelId"));
+    return { items: repository.listModelPortraits(model.id).map(publicModelPortrait) };
+  });
+  app.delete("/api/v1/model-portraits/:portraitId", async (request, reply) => {
+    const id = parameter(request, "portraitId");
+    if (!repository.getModelPortrait(id)) missing("model portrait", id);
+    repository.deleteModelPortrait(id);
+    return reply.code(204).send();
+  });
+  app.post("/api/v1/model-portraits/:portraitId/select", async (request) => {
+    const id = parameter(request, "portraitId");
+    const portrait = repository.getModelPortrait(id); if (!portrait) missing("model portrait", id);
+    repository.selectModelPortrait(portrait.modelId, id);
+    const model = ensureModel(repository, portrait.modelId);
+    return publicModel(model, repository.listModelPortraits(model.id));
+  });
+  app.get("/api/v1/files/models/:modelId/reference-face", async (request, reply) => {
+    const model = repository.getModel(parameter(request, "modelId"));
+    if (!model?.referenceFacePath) missing("reference face", parameter(request, "modelId"));
+    return sendStored(request, reply, storage, { storagePath: model.referenceFacePath, hash: model.referenceFaceHash ?? undefined }, "reference face");
+  });
+  app.get("/api/v1/files/model-portraits/:portraitId", async (request, reply) => {
+    const portrait = repository.getModelPortrait(parameter(request, "portraitId"));
+    if (!portrait) missing("model portrait", parameter(request, "portraitId"));
+    return sendStored(request, reply, storage, portrait, "model portrait");
+  });
+
   app.get("/api/v1/providers", async () => ({ items: repository.listProviders().map(publicProvider), nextCursor: null }));
   app.post("/api/v1/providers", async (request, reply) => {
     const body = parseBody(CreateProviderInput, request.body);
@@ -356,7 +458,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   // 资产库：assets/outputs 的全局只读视图，不复制文件、不落库；缩略图按内容 hash 共享。
   app.get("/api/v1/library-assets", async (request) => {
     const query = (request.query ?? {}) as Record<string, unknown>;
-    const kind = typeof query.kind === "string" && query.kind ? enumValue<LibraryItemKind>(query.kind, ["PRODUCT", "REFERENCE", "GENERATED", "LAYER"], "kind") : null;
+    const kind = typeof query.kind === "string" && query.kind ? enumValue<LibraryItemKind>(query.kind, ["PRODUCT", "REFERENCE", "GENERATED", "LAYER", "MODEL"], "kind") : null;
     const q = typeof query.q === "string" && query.q.trim() ? query.q.trim() : null;
     const cursor = typeof query.cursor === "string" && query.cursor ? query.cursor : null;
     const limit = typeof query.limit === "string" && query.limit ? Math.min(Math.max(Number.parseInt(query.limit, 10) || 40, 1), 100) : 40;
@@ -1045,6 +1147,7 @@ function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "LAYER_PLAN") return "layer_plan";
   if (type === "LAYER_EXPORT") return "layer_export";
   if (type === "SUITE_FORGE") return "suite_forge";
+  if (type === "MODEL_CAST") return "model_cast";
   return "export";
 }
 // ProviderId/modelId 为 null 表示项目尚未选择模型（Provider 被删除后置空），在入口拦截而不是打出一个注定失败的任务
@@ -1064,6 +1167,38 @@ function readSegmentationModel(repository: EcomRepository, value: unknown): { pr
 }
 function ensureProject(repository: EcomRepository, id: string): void { if (!repository.getProject(id)) missing("project", id); }
 function missing(resource: string, id: string): never { throw new ApiError(404, "NOT_FOUND", `${resource} not found: ${id}`); }
+
+function ensureModel(repository: EcomRepository, id: string): ModelRecord { const model = repository.getModel(id); if (!model) missing("model", id); return model; }
+function publicModelPortrait(portrait: ModelPortraitRecord) {
+  return {
+    id: portrait.id,
+    modelId: portrait.modelId,
+    url: `/api/v1/files/model-portraits/${portrait.id}`,
+    width: portrait.width,
+    height: portrait.height,
+    providerId: portrait.providerId,
+    imageModelId: portrait.imageModelId,
+    aspectRatio: portrait.aspectRatio,
+    selected: portrait.selected,
+    createdAt: portrait.createdAt,
+  };
+}
+/** 候选由调用方提供：列表接口批量取回后传入，单条路径传自己的候选，响应组装本身不碰存储。 */
+function publicModel(record: ModelRecord, portraits: ReadonlyArray<ModelPortraitRecord>) {
+  const selected = portraits.find((portrait) => portrait.selected) ?? null;
+  return {
+    id: record.id,
+    name: record.name,
+    spec: record.spec,
+    notes: record.notes,
+    hasReferenceFace: record.referenceFacePath !== null,
+    ...(record.referenceFacePath ? { referenceFaceUrl: `/api/v1/files/models/${record.id}/reference-face` } : {}),
+    selectedPortrait: selected ? publicModelPortrait(selected) : null,
+    portraitCount: portraits.length,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
 export function assertProjectAssetCapacity(repository: Pick<EcomRepository, "listAssets">, projectId: string, role: AssetRole): void {
   const assets = repository.listAssets(projectId).filter((asset) => asset.mimeType.startsWith("image/"));
   const limit = role === "PRODUCT_TRUTH" ? MAX_PRODUCT_IMAGE_ASSETS : MAX_REFERENCE_IMAGE_ASSETS;
@@ -1077,6 +1212,23 @@ export function assertProjectAssetHashUnique(repository: Pick<EcomRepository, "l
   if (repository.listAssets(projectId).some((asset) => asset.hash === hash)) {
     throw new ApiError(400, "VALIDATION_ERROR", "相同图片已上传到项目");
   }
+}
+
+/**
+ * 模特规格的互斥组合在入参处就拦下。
+ *
+ * 判定单源在 ecom-skill：设计器用同一份规则禁用不可选项，正常路径下这里不会触发；
+ * 这道闸是给脚本与第三方客户端留的，避免它们落库一份会编译出自相矛盾提示词的规格。
+ */
+export function assertModelSpecCoherent(spec: ModelSpec): void {
+  const conflicts = findModelSpecConflicts(spec);
+  if (conflicts.length === 0) return;
+  throw new ApiError(
+    400,
+    "VALIDATION_ERROR",
+    `模特规格存在互斥组合：${conflicts.map((conflict) => conflict.reason).join("；")}`,
+    conflicts.map((conflict) => ({ path: `/spec/${conflict.field}`, reason: conflict.reason })),
+  );
 }
 function contentHash(content: Buffer): string { return createHash("sha256").update(content).digest("hex"); }
 function parseReferenceSelections(value: string | undefined): ReferenceSelection[] {

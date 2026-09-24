@@ -2,6 +2,8 @@ import Database from "better-sqlite3";
 import { dirname } from "node:path";
 import { mkdirSync } from "node:fs";
 
+import { MODEL_SPEC_DEFAULTS } from "@ecomgen/contracts";
+
 export type SqliteDatabase = Database.Database;
 
 export function openDatabase(filename: string): SqliteDatabase {
@@ -513,6 +515,33 @@ function migrate(database: SqliteDatabase): void {
       updated_at TEXT NOT NULL,
       FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS models (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      spec_json TEXT NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      reference_face_path TEXT,
+      reference_face_hash TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS model_portraits (
+      id TEXT PRIMARY KEY,
+      model_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      storage_path TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      width INTEGER,
+      height INTEGER,
+      provider_id TEXT NOT NULL,
+      image_model_id TEXT NOT NULL,
+      aspect_ratio TEXT NOT NULL,
+      selected INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE,
+      FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_model_portraits_model_created ON model_portraits(model_id, created_at DESC);
   `);
   if (!columnNames(database, "projects").has("archived_at")) {
     database.exec("ALTER TABLE projects ADD COLUMN archived_at TEXT");
@@ -605,4 +634,32 @@ function migrate(database: SqliteDatabase): void {
   database.exec("CREATE INDEX IF NOT EXISTS idx_planning_config_snapshots_project_created ON planning_config_snapshots(project_id, created_at DESC)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_assets_created ON assets(created_at DESC)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_created ON outputs(created_at DESC)");
+  // 每个模特至多一张选定定妆照：先清后设的切换写法在事务内满足该唯一约束。
+  database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_model_portraits_selected ON model_portraits(model_id) WHERE selected = 1");
+  backfillModelSpecDimensions(database);
+}
+
+/**
+ * 补齐存量模特规格里缺失的维度。
+ *
+ * spec_json 是 JSON blob，契约新增维度后旧行缺键；编译层按契约直接取键
+ * （`FACIAL_HAIR.options[spec.facialHair].prompt`），缺键会抛 TypeError 而不是校验错误，
+ * 且会同时打崩 Worker 与前端预览。这里在开库时一次性补齐，读路径保持不做兜底分支。
+ *
+ * 幂等：只有真正缺键的行才会被写回；已对齐的行在内存里过滤掉，不产生写事务。
+ */
+function backfillModelSpecDimensions(database: SqliteDatabase): void {
+  const requiredKeys = Object.keys(MODEL_SPEC_DEFAULTS);
+  const rows = database.prepare("SELECT id, spec_json FROM models").all() as Array<{ id: string; spec_json: string }>;
+  const pending = rows.flatMap((row) => {
+    const spec = JSON.parse(row.spec_json) as Record<string, unknown>;
+    return requiredKeys.every((key) => key in spec) ? [] : [{ id: row.id, spec }];
+  });
+  if (pending.length === 0) return;
+  const update = database.prepare("UPDATE models SET spec_json=? WHERE id=?");
+  const backfill = database.transaction(() => {
+    // 缺失维度取基准值；已有取值原样保留，用户显式选择不会被迁移改写。
+    for (const row of pending) update.run(JSON.stringify({ ...MODEL_SPEC_DEFAULTS, ...row.spec }), row.id);
+  });
+  backfill();
 }

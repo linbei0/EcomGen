@@ -1,5 +1,5 @@
 import { Button } from "antd";
-import { Aperture, LayoutGrid, LibraryBig, Settings2, Sparkles } from "lucide-react";
+import { Aperture, LayoutGrid, LibraryBig, Settings2, Sparkles, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 
@@ -8,13 +8,14 @@ import { HealthBadge } from "./HealthBadge";
 import styles from "./AppTopbar.module.css";
 
 /** 顶栏可标记的页面分区；工作台不在导航项里，它必须携带项目 ID。 */
-export type AppTopbarSection = "home" | "forge" | "library" | "workbench";
+export type AppTopbarSection = "home" | "forge" | "library" | "models" | "workbench";
 
 /** 全局可达的分区入口，数组顺序即展示顺序。 */
 const NAV_SECTIONS: Array<{ section: AppTopbarSection; path: string; label: string; icon: ReactNode }> = [
   { section: "home", path: "/", label: "项目", icon: <LayoutGrid size={16} strokeWidth={1.75} /> },
   { section: "forge", path: "/suite-forge", label: "套图工坊", icon: <Sparkles size={16} strokeWidth={1.75} /> },
   { section: "library", path: "/library", label: "资产库", icon: <LibraryBig size={16} strokeWidth={1.75} /> },
+  { section: "models", path: "/models", label: "模特库", icon: <UserRound size={16} strokeWidth={1.75} /> },
 ];
 
 interface AppTopbarProps {

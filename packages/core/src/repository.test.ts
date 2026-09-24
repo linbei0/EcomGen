@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 import { openDatabase } from "./database.js";
 import { EcomRepository, EXTERNAL_REQUEST_STARTED } from "./repository.js";
 import type { SuiteDocumentInput } from "@ecomgen/ecom-suite";
+import { MODEL_SPEC_DEFAULTS, type ModelSpec } from "@ecomgen/contracts";
 
 function seedProvider(repository: EcomRepository) {
   return repository.saveProvider({
@@ -634,7 +635,92 @@ describe("EcomRepository", () => {
     expect(covers.get(empty.id)).toEqual({ productAssetId: null, coverOutputId: null, previewOutputIds: [], outputCount: 0 });
     database.close();
   });
+
+  it("模特库 CRUD 往返，选定切换保证每模特至多一张且同 hash 候选幂等", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const created = repository.createModel({ name: "小满", spec: makeModelSpec(), notes: "甜酷风" });
+    expect(repository.getModel(created.id)).toEqual(created);
+    expect(repository.listModels()).toEqual([created]);
+
+    const renamed = repository.updateModel(created.id, { name: "小满 2.0", notes: "清冷挂" });
+    expect(renamed).toMatchObject({ name: "小满 2.0", notes: "清冷挂" });
+    expect(renamed?.createdAt).toBe(created.createdAt);
+
+    const withFace = repository.setModelReferenceFace(created.id, "models/ref-face.png", "face-hash");
+    expect(withFace).toMatchObject({ referenceFacePath: "models/ref-face.png", referenceFaceHash: "face-hash" });
+    expect(repository.setModelReferenceFace(created.id, null, null)?.referenceFacePath).toBeNull();
+    expect(repository.setModelReferenceFace("missing-model", "x.png", "x")).toBeUndefined();
+
+    const job = repository.createJob({ id: "job-cast", projectId: null, storyboardItemId: null, type: "MODEL_CAST", input: { modelId: created.id } });
+    const portraitInput = { modelId: created.id, jobId: job.id, storagePath: "models/p1.png", hash: "portrait-1", width: 1024, height: 1536, providerId: "provider-1", imageModelId: "image-model", aspectRatio: "AUTO" as const };
+    const first = repository.createModelPortrait(portraitInput);
+    const second = repository.createModelPortrait({ ...portraitInput, storagePath: "models/p2.png", hash: "portrait-2" });
+    expect(repository.createModelPortrait(portraitInput)).toEqual(first);
+    expect(repository.listModelPortraits(created.id)).toHaveLength(2);
+
+    expect(repository.selectModelPortrait(created.id, first.id)).toBe("selected");
+    expect(repository.listModelPortraits(created.id).find((portrait) => portrait.id === first.id)?.selected).toBe(true);
+    expect(repository.selectModelPortrait(created.id, second.id)).toBe("selected");
+    const afterSwitch = repository.listModelPortraits(created.id);
+    expect(afterSwitch.find((portrait) => portrait.id === second.id)?.selected).toBe(true);
+    expect(afterSwitch.filter((portrait) => portrait.selected)).toHaveLength(1);
+    expect(repository.selectModelPortrait(created.id, "missing-portrait")).toBe("missing");
+
+    // 缩略图的惰性兜底按内容 hash 反查来源文件：模特候选必须查得到，否则库里的模特图缩略图必定 404。
+    expect(repository.findLibrarySourcePath(first.hash)).toBe("models/p1.png");
+    expect(repository.listAllModelPortraits()).toHaveLength(2);
+
+    expect(repository.deleteModelPortrait(first.id)).toBe(true);
+    expect(repository.deleteModel(created.id)).toBe(true);
+    expect(repository.getModel(created.id)).toBeUndefined();
+    expect(repository.listModelPortraits(created.id)).toHaveLength(0);
+    database.close();
+  });
+
+  it("spec_json 缺少契约新增维度时，开库迁移补齐缺失键且不动已有取值", () => {
+    const directory = mkdtempSync(join(tmpdir(), "ecomgen-model-spec-"));
+    const filename = join(directory, "ecomgen.sqlite");
+    try {
+      const database = openDatabase(filename);
+      const repository = new EcomRepository(database);
+      const created = repository.createModel({ name: "小满", spec: makeModelSpec(), notes: "" });
+      // 造一条历史行：删掉两个后加的维度，模拟契约演进前的存量数据。
+      const legacy = { ...makeModelSpec() } as Record<string, unknown>;
+      delete legacy.hairline;
+      delete legacy.facialHair;
+      database.prepare("UPDATE models SET spec_json=? WHERE id=?").run(JSON.stringify(legacy), created.id);
+      database.close();
+
+      // 重新开库即触发迁移；缺少的维度按基准值补齐，不能让编译层取到 undefined。
+      const reopened = openDatabase(filename);
+      const migrated = new EcomRepository(reopened).getModel(created.id)!;
+      expect(migrated.spec.hairline).toBe(MODEL_SPEC_DEFAULTS.hairline);
+      expect(migrated.spec.facialHair).toBe(MODEL_SPEC_DEFAULTS.facialHair);
+      expect(migrated.spec.browShape).toBe(legacy.browShape);
+      reopened.close();
+
+      // 幂等：再次开库不改变已对齐的行。
+      const again = openDatabase(filename);
+      expect(new EcomRepository(again).getModel(created.id)).toEqual(migrated);
+      again.close();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 });
+
+/** 覆盖 ModelSpec 全部维度的最小合法组合；用例只改与其断言相关的取值。 */
+function makeModelSpec(): ModelSpec {
+  return {
+    gender: "FEMALE", age: "LATE_20S", heritage: "EAST_ASIAN", stature: "STANDARD_165", build: "BALANCED",
+    faceShape: "OVAL", eyeShape: "ALMOND", eyeColor: "DARK_BROWN", browShape: "STRAIGHT_SOFT", noseShape: "STRAIGHT", lipShape: "NATURAL",
+    hairLength: "SHOULDER", hairstyle: "SOFT_WAVE", hairColor: "INK_BLACK", hairTexture: "NATURAL_VOLUME", hairline: "ROUNDED",
+    complexion: "FAIR_WARM", skinTexture: "NATURAL_PORES", facialHair: "NONE", distinctiveMarks: [],
+    expression: "CALM_DIRECT", gaze: "DIRECT_TO_CAMERA", aura: ["WARM_APPROACHABLE"], makeup: "MINIMAL_DEWY", baseWardrobe: "WHITE_TANK",
+    framing: "THREE_QUARTER", pose: "HANDS_RELAXED", backdrop: "SEAMLESS_GREY", lighting: "SOFTBOX_THREE_POINT", lens: "LENS_50",
+  };
+}
 
 describe("LayerPlan / LayerExport 持久化", () => {
   it("plan/export 记录 CRUD 往返，status 与产物字段可更新", () => {

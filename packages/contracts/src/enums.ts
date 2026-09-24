@@ -23,16 +23,16 @@ export const USER_ASSET_KIND_PRODUCT = "PRODUCT" as const;
 export const USER_ASSET_KIND_REFERENCE = "REFERENCE" as const;
 export const UserAssetKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE" }, { $id: "#/components/schemas/UserAssetKind" });
 /** 资产库条目的物理来源：项目上传或生成结果。 */
-export const LibraryItemSource = Type.Enum({ UPLOADED: "UPLOADED", GENERATED: "GENERATED" }, { $id: "#/components/schemas/LibraryItemSource" });
+export const LibraryItemSource = Type.Enum({ UPLOADED: "UPLOADED", GENERATED: "GENERATED", MODEL: "MODEL" }, { $id: "#/components/schemas/LibraryItemSource" });
 /** 资产库筛选类别：上传素材按用途分为商品/参考，生成结果单列。 */
-export const LibraryItemKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE", GENERATED: "GENERATED", LAYER: "LAYER" }, { $id: "#/components/schemas/LibraryItemKind" });
+export const LibraryItemKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE", GENERATED: "GENERATED", LAYER: "LAYER", MODEL: "MODEL" }, { $id: "#/components/schemas/LibraryItemKind" });
 export const ImageResolution = Type.Enum({ K1: "1K", K2: "2K", K4: "4K" }, { $id: "#/components/schemas/ImageResolution" });
 export const ImageAspectRatio = Type.Enum({ AUTO: "AUTO", SQUARE: "1:1", PORTRAIT_2_3: "2:3", LANDSCAPE_3_2: "3:2", PORTRAIT: "3:4", LANDSCAPE: "4:3", PORTRAIT_4_5: "4:5", LANDSCAPE_5_4: "5:4", PORTRAIT_9_16: "9:16", WIDE: "16:9", ULTRA_WIDE: "21:9" }, { $id: "#/components/schemas/ImageAspectRatio" });
 export const PlanningMode = Type.Enum({ AI: "AI", MANUAL: "MANUAL" }, { $id: "#/components/schemas/PlanningMode" });
 /** 套图来源：随仓库内置或由用户导入/目录投放。 */
 export const EcomSuiteOrigin = Type.Enum({ BUILTIN: "builtin", USER: "user" }, { $id: "#/components/schemas/EcomSuiteOrigin" });
 export const CopywritingTarget = Type.Enum({ PRODUCT_DESCRIPTION: "PRODUCT_DESCRIPTION", PLANNING_INSTRUCTION: "PLANNING_INSTRUCTION" }, { $id: "#/components/schemas/CopywritingTarget" });
-export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERATE: "GENERATE", EXPORT: "EXPORT", EDIT_PLAN: "EDIT_PLAN", EDIT_GENERATE: "EDIT_GENERATE", LAYER_PLAN: "LAYER_PLAN", LAYER_EXPORT: "LAYER_EXPORT", SUITE_FORGE: "SUITE_FORGE" }, { $id: "#/components/schemas/JobType" });
+export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERATE: "GENERATE", EXPORT: "EXPORT", EDIT_PLAN: "EDIT_PLAN", EDIT_GENERATE: "EDIT_GENERATE", LAYER_PLAN: "LAYER_PLAN", LAYER_EXPORT: "LAYER_EXPORT", SUITE_FORGE: "SUITE_FORGE", MODEL_CAST: "MODEL_CAST" }, { $id: "#/components/schemas/JobType" });
 export const JobStatus = Type.Enum({ QUEUED: "QUEUED", RUNNING: "RUNNING", SUCCEEDED: "SUCCEEDED", FAILED: "FAILED", CANCELLED: "CANCELLED" }, { $id: "#/components/schemas/JobStatus" });
 export const ReasoningProtocolProfile = Type.Enum({ OPENAI: "openai", DASHSCOPE_QWEN: "dashscope_qwen", OPENAI_RESPONSES: "openai_responses" }, { $id: "#/components/schemas/ReasoningProtocolProfile" });
 export const SearchSourceKind = Type.Enum({ BRAVE: "brave", TAVILY: "tavily", SEARXNG: "searxng" }, { $id: "#/components/schemas/SearchSourceKind" });

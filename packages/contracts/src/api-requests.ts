@@ -72,6 +72,10 @@ export type CreateLayerExportElement = Static<typeof CreateLayerExportElement>;
 export const CreateLayerExportInput = Type.Object({ elements: Type.Array(schemaRef(CreateLayerExportElement), { minItems: 1, maxItems: 32 }), includeBackground: Type.Optional(Type.Boolean({ default: true, description: "Generate a holed background layer under the element layers." })), planId: Type.Optional(Type.String({ format: "uuid", description: "The recognition plan the auto elements were selected from; rejected if the plan has since changed." })) }, { $id: "#/components/schemas/CreateLayerExportInput" });
 export type CreateLayerExportInput = Static<typeof CreateLayerExportInput>;
 
+// 模特选角：参考脸以 multipart 上传（可选身份基准）。有参考脸时它是后续定妆照生成的唯一身份锚点。
+export const UploadModelReferenceFaceInput = Type.Object({ file: Type.String({ format: "binary", description: "同一人正面清晰人像，仅支持图片文件。" }) }, { $id: "#/components/schemas/UploadModelReferenceFaceInput" });
+export type UploadModelReferenceFaceInput = Static<typeof UploadModelReferenceFaceInput>;
+
 // 套图工坊（suite forge）：一次运行把用户上传的爆款套图反推为可复用的套图模板。
 // 该任务不绑定项目，源图以 multipart 文件随请求上传；provider/model 由用户在页面自选，服务端校验视觉能力。
 export const CreateSuiteForgeJobInput = Type.Object({

@@ -994,6 +994,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listModels"];
+        put?: never;
+        post: operations["createModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/models/{modelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getModel"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteModel"];
+        options?: never;
+        head?: never;
+        patch: operations["updateModel"];
+        trace?: never;
+    };
+    "/models/{modelId}/reference-face": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["uploadModelReferenceFace"];
+        delete: operations["deleteModelReferenceFace"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/models/{modelId}/cast-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createModelCastJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/models/{modelId}/portraits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listModelPortraits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/model-portraits/{portraitId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portraitId: components["parameters"]["ModelPortraitId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteModelPortrait"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/model-portraits/{portraitId}/select": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portraitId: components["parameters"]["ModelPortraitId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["selectModelPortrait"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1011,9 +1135,9 @@ export interface components {
         /** @enum {string} */
         UserAssetKind: "PRODUCT" | "REFERENCE";
         /** @enum {string} */
-        LibraryItemSource: "UPLOADED" | "GENERATED";
+        LibraryItemSource: "UPLOADED" | "GENERATED" | "MODEL";
         /** @enum {string} */
-        LibraryItemKind: "PRODUCT" | "REFERENCE" | "GENERATED" | "LAYER";
+        LibraryItemKind: "PRODUCT" | "REFERENCE" | "GENERATED" | "LAYER" | "MODEL";
         /** @enum {string} */
         ImageResolution: "1K" | "2K" | "4K";
         /** @enum {string} */
@@ -1023,7 +1147,7 @@ export interface components {
         /** @enum {string} */
         CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION";
         /** @enum {string} */
-        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE";
+        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE" | "MODEL_CAST";
         /** @enum {string} */
         JobStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
         /** @enum {string} */
@@ -1413,7 +1537,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE";
+            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE" | "MODEL_CAST";
             /** @enum {string} */
             status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
             progress: number;
@@ -2114,6 +2238,134 @@ export interface components {
             file: string;
             purpose: components["schemas"]["ReferencePurpose"];
         };
+        UploadModelReferenceFaceInput: {
+            /**
+             * Format: binary
+             * @description 同一人正面清晰人像，仅支持图片文件。
+             */
+            file: string;
+        };
+        /** @description 四层结构化模特规格：身份内核 / 容貌细节 / 表达层 / 镜头呈现。定妆照 prompt 由该规格确定性编译；维度之间存在互斥约束，判定单源在 packages/ecom-skill。 */
+        ModelSpec: {
+            /** @enum {string} */
+            gender: "FEMALE" | "MALE" | "ANDROGYNOUS";
+            /** @enum {string} */
+            age: "CHILD_7" | "PRETEEN_11" | "TEEN_16" | "EARLY_20S" | "LATE_20S" | "EARLY_30S" | "MID_30S" | "MID_40S" | "SENIOR";
+            /** @enum {string} */
+            heritage: "EAST_ASIAN" | "SOUTHEAST_ASIAN" | "SOUTH_ASIAN" | "MIDDLE_EASTERN" | "NORTHERN_EUROPEAN" | "MEDITERRANEAN" | "LATIN_AMERICAN" | "AFRICAN" | "MIXED";
+            /** @enum {string} */
+            stature: "PETITE_158" | "STANDARD_165" | "TALL_172" | "RUNWAY_180";
+            /** @enum {string} */
+            build: "SLENDER" | "BALANCED" | "ATHLETIC" | "MUSCULAR" | "CURVY" | "PLUS" | "MATERNITY";
+            /** @enum {string} */
+            faceShape: "OVAL" | "ROUND" | "SQUARE_JAW" | "HEART" | "LONG" | "DIAMOND";
+            /** @enum {string} */
+            eyeShape: "ALMOND" | "ROUND" | "MONOLID" | "UPTURNED" | "DOWNTURNED" | "NARROW" | "DEEP_SET" | "PEACH_BLOSSOM" | "INNER_DOUBLE";
+            /** @enum {string} */
+            eyeColor: "DARK_BROWN" | "AMBER" | "HAZEL" | "GREEN" | "BLUE" | "GREY";
+            /** @enum {string} */
+            browShape: "STRAIGHT_SOFT" | "ARCED" | "FEATHERED" | "BOLD" | "THIN_ARCHED" | "WILLOW" | "THICK_STRAIGHT";
+            /** @enum {string} */
+            noseShape: "DELICATE" | "STRAIGHT" | "SCULPTED" | "BROAD" | "UPTURNED" | "AQUILINE" | "BULBOUS";
+            /** @enum {string} */
+            lipShape: "NATURAL" | "FULL" | "BOW" | "WIDE" | "THIN";
+            /** @enum {string} */
+            hairLength: "CROP" | "CHIN_BOB" | "SHOULDER" | "LONG" | "WAIST";
+            /** @enum {string} */
+            hairstyle: "SLEEK_STRAIGHT" | "SOFT_WAVE" | "DEEP_CURL" | "HIGH_BUN" | "PONYTAIL" | "TEXTURED_FRINGE" | "BRAIDED" | "AFRO" | "SHAVED" | "PIXIE" | "SLICKED_BACK" | "LAYERED_LONG" | "HIME_CUT" | "HALF_UP" | "TWIN_TAILS" | "SPACE_BUNS" | "LOW_BUN";
+            /** @enum {string} */
+            hairColor: "INK_BLACK" | "ESPRESSO" | "CHESTNUT" | "LIGHT_BROWN" | "HONEY_BLONDE" | "STRAWBERRY_BLONDE" | "ASH_BROWN" | "COPPER" | "BURGUNDY" | "PLATINUM" | "SILVER" | "MILK_TEA" | "ASH_BLONDE";
+            /** @enum {string} */
+            hairTexture: "SLEEK_GLOSSY" | "NATURAL_VOLUME" | "TOUSLED" | "WET_LOOK";
+            /** @enum {string} */
+            hairline: "ROUNDED" | "SQUARE" | "WIDOWS_PEAK" | "RECEDING" | "HIGH_FOREHEAD";
+            /** @enum {string} */
+            complexion: "PORCELAIN" | "FAIR_WARM" | "LIGHT_NEUTRAL" | "MEDIUM_OLIVE" | "HONEY" | "CARAMEL" | "DEEP" | "DEEP_EBONY";
+            /** @enum {string} */
+            skinTexture: "NATURAL_PORES" | "DEWY" | "MATTE_FINE" | "FRECKLED" | "MATURE_LINES";
+            /** @enum {string} */
+            facialHair: "NONE" | "STUBBLE" | "MUSTACHE" | "GOATEE" | "BEARD" | "FULL_BEARD";
+            distinctiveMarks: ("FRECKLES_NOSE" | "FRECKLES_CHEEKS" | "MOLE_CHEEK" | "TEAR_MOLE" | "DIMPLES" | "BEAUTY_MARK_LIP" | "BIRTHMARK" | "SUBTLE_ASYMMETRY" | "AEGYO_SAL" | "BROW_SCAR")[];
+            /** @enum {string} */
+            expression: "CALM_DIRECT" | "SOFT_SMILE" | "BRIGHT_GRIN" | "WARM_LAUGH" | "EDITORIAL_DISTANCE" | "THOUGHTFUL" | "TENDER" | "SURPRISED";
+            /** @enum {string} */
+            gaze: "DIRECT_TO_CAMERA" | "OFF_CAMERA" | "LOWERED_LIDS" | "HALF_LID_IDLE";
+            aura: ("WARM_APPROACHABLE" | "QUIET_CONFIDENCE" | "METROPOLITAN" | "PLAYFUL" | "SERENE" | "ARTSY" | "POLISHED" | "FRESH")[];
+            /** @enum {string} */
+            makeup: "NONE" | "MINIMAL_DEWY" | "EVERYDAY" | "SOFT_GLAM" | "RED_LIP" | "SMOKY" | "MATURE";
+            /** @enum {string} */
+            baseWardrobe: "WHITE_TANK" | "BLACK_TURTLENECK" | "WHITE_SHIRT" | "NEUTRAL_TEE" | "BLAZER_SHIRT" | "RIBBED_DRESS" | "SLEEVELESS_KNIT" | "HOODIE";
+            /** @enum {string} */
+            framing: "FULL_BODY" | "THREE_QUARTER" | "WAIST_UP" | "BEAUTY_CLOSEUP";
+            /** @enum {string} */
+            pose: "WEIGHT_LEFT_HIP" | "NATURAL_WALK" | "LEANING_WALL" | "SEATED_STOOL" | "HANDS_RELAXED" | "HANDS_ON_HIPS" | "ARMS_CROSSED" | "OVER_SHOULDER" | "HANDS_IN_POCKETS" | "HAIR_TOUCH";
+            /** @enum {string} */
+            backdrop: "SEAMLESS_GREY" | "PURE_WHITE" | "CREAM" | "WARM_BEIGE" | "OUTDOOR_BOKEH" | "PALE_PINK" | "SLATE_BLUE" | "CHARCOAL";
+            /** @enum {string} */
+            lighting: "SOFTBOX_THREE_POINT" | "WINDOW_DAYLIGHT" | "OVERCAST_DIFFUSED" | "GOLDEN_BACKLIT" | "RING_LIGHT" | "DRAMATIC_SIDE" | "HIGH_KEY_STUDIO" | "BUTTERFLY_LIGHT";
+            /** @enum {string} */
+            lens: "LENS_35" | "LENS_50" | "LENS_85" | "LENS_105";
+        };
+        ModelPortrait: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            modelId: string;
+            /** @description 定妆照静态访问地址；仅列表与详情响应携带。 */
+            url?: string;
+            width?: number | null;
+            height?: number | null;
+            /** Format: uuid */
+            providerId: string;
+            imageModelId: string;
+            aspectRatio: components["schemas"]["ImageAspectRatio"];
+            /** @description 定妆照标记；每个模特至多一张被选定。 */
+            selected: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        EcomModel: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            spec: components["schemas"]["ModelSpec"];
+            notes: string;
+            /** @description 是否已上传参考脸；有则该脸是后续生成的唯一身份基准。 */
+            hasReferenceFace: boolean;
+            referenceFaceUrl?: string;
+            selectedPortrait?: components["schemas"]["ModelPortrait"] | null;
+            portraitCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ModelList: {
+            items: components["schemas"]["EcomModel"][];
+            nextCursor: string | null;
+        };
+        ModelPortraitList: {
+            items: components["schemas"]["ModelPortrait"][];
+        };
+        CreateModelInput: {
+            name: string;
+            spec: components["schemas"]["ModelSpec"];
+            notes?: string;
+        };
+        UpdateModelInput: {
+            name?: string;
+            spec?: components["schemas"]["ModelSpec"];
+            notes?: string;
+        };
+        /** @description 发起一次选角生成：按模特当前 spec 编译定妆照 prompt，产出 candidateCount 张候选。 */
+        CreateModelCastJobInput: {
+            /** Format: uuid */
+            providerId: string;
+            imageModelId: string;
+            aspectRatio: components["schemas"]["ImageAspectRatio"];
+            /** @default 1 */
+            candidateCount: number;
+        };
     };
     responses: {
         /** @description Request does not match the schema. */
@@ -2172,6 +2424,8 @@ export interface components {
         ExportId: string;
         LayerExportId: string;
         UserTemplateId: string;
+        ModelId: string;
+        ModelPortraitId: string;
         SuiteId: string;
         Cursor: string;
     };
@@ -3980,6 +4234,264 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
+        };
+    };
+    listModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Global model cast library; each entry carries its selected master portrait when one was picked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelList"];
+                };
+            };
+        };
+    };
+    createModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateModelInput"];
+            };
+        };
+        responses: {
+            /** @description Model spec saved; no generation is triggered. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomModel"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+        };
+    };
+    getModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Single model with its spec and selected portrait. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomModel"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Model deleted together with its portraits and reference face files. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateModelInput"];
+            };
+        };
+        responses: {
+            /** @description Updated model; changing the spec keeps existing portraits but future casts compile from the new spec. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomModel"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    uploadModelReferenceFace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadModelReferenceFaceInput"];
+            };
+        };
+        responses: {
+            /** @description Reference face stored; replaces any previous one. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomModel"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+        };
+    };
+    deleteModelReferenceFace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reference face removed; future casts fall back to text-only identity. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createModelCastJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateModelCastJobInput"];
+            };
+        };
+        responses: {
+            /** @description Cast job accepted (or an existing job reused for an identical request). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    listModelPortraits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelId: components["parameters"]["ModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All portraits generated for the model, newest last. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelPortraitList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteModelPortrait: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portraitId: components["parameters"]["ModelPortraitId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Portrait file and row removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    selectModelPortrait: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portraitId: components["parameters"]["ModelPortraitId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Portrait marked as the model's master portrait; any previous selection is cleared. Returns the whole model so callers refresh selection state in one round trip. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcomModel"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
 }

@@ -9,6 +9,7 @@ import type {
   LibraryItemKind,
   LibraryItemSource,
   ModelDefinition,
+  ModelSpec,
   PlatformTarget,
   ReasoningProtocolProfile,
   SearchSourceKind,
@@ -80,6 +81,34 @@ export interface SuiteForgeResultRecord {
   suiteId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** 全局模特库条目；spec 是定妆照 prompt 的唯一持久化真相，不绑定项目。 */
+export interface ModelRecord {
+  id: string;
+  name: string;
+  spec: ModelSpec;
+  notes: string;
+  referenceFacePath: string | null;
+  referenceFaceHash: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 模选定妆照；selected 在事务内先清后设，保证每模特至多一张。 */
+export interface ModelPortraitRecord {
+  id: string;
+  modelId: string;
+  jobId: string;
+  storagePath: string;
+  hash: string;
+  width: number | null;
+  height: number | null;
+  providerId: string;
+  imageModelId: string;
+  aspectRatio: ImageAspectRatio;
+  selected: boolean;
+  createdAt: string;
 }
 
 export interface ProjectRecord {
@@ -561,6 +590,78 @@ export class EcomRepository {
     return { ...current, status: "COMMITTED", suiteId, updatedAt };
   }
 
+  // ---- 全局模特库 ----
+
+  public listModels(): ModelRecord[] { return (this.db.prepare("SELECT * FROM models ORDER BY updated_at DESC").all() as Row[]).map(mapModel); }
+  public getModel(id: string): ModelRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM models WHERE id=?").get(id);
+    return row ? mapModel(row as Row) : undefined;
+  }
+  public createModel(input: { name: string; spec: ModelSpec; notes: string }): ModelRecord {
+    const record: ModelRecord = { id: randomUUID(), name: input.name, spec: input.spec, notes: input.notes, referenceFacePath: null, referenceFaceHash: null, createdAt: now(), updatedAt: now() };
+    this.writeModel(record);
+    return record;
+  }
+  public updateModel(id: string, patch: { name?: string; spec?: ModelSpec; notes?: string }): ModelRecord | undefined {
+    const current = this.getModel(id);
+    if (!current) return undefined;
+    const record: ModelRecord = { ...current, ...patch, updatedAt: now() };
+    this.writeModel(record);
+    return record;
+  }
+  /** 上传/清除参考脸共用：path 与 hash 同时置空即清除；参考脸是模特的唯一身份基准。 */
+  public setModelReferenceFace(id: string, path: string | null, hash: string | null): ModelRecord | undefined {
+    const current = this.getModel(id);
+    if (!current) return undefined;
+    const record: ModelRecord = { ...current, referenceFacePath: path, referenceFaceHash: hash, updatedAt: now() };
+    this.writeModel(record);
+    return record;
+  }
+  public deleteModel(id: string): boolean {
+    return this.db.prepare("DELETE FROM models WHERE id=?").run(id).changes > 0;
+  }
+  private writeModel(record: ModelRecord): void {
+    this.db.prepare(`INSERT INTO models (id,name,spec_json,notes,reference_face_path,reference_face_hash,created_at,updated_at)
+      VALUES (@id,@name,@spec,@notes,@referenceFacePath,@referenceFaceHash,@createdAt,@updatedAt)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,spec_json=excluded.spec_json,notes=excluded.notes,reference_face_path=excluded.reference_face_path,reference_face_hash=excluded.reference_face_hash,updated_at=excluded.updated_at`)
+      .run({ ...record, spec: json(record.spec) });
+  }
+
+  public listModelPortraits(modelId: string): ModelPortraitRecord[] {
+    return (this.db.prepare("SELECT * FROM model_portraits WHERE model_id=? ORDER BY created_at DESC, id DESC").all(modelId) as Row[]).map(mapModelPortrait);
+  }
+  public getModelPortrait(portraitId: string): ModelPortraitRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM model_portraits WHERE id=?").get(portraitId);
+    return row ? mapModelPortrait(row as Row) : undefined;
+  }
+  /** Worker 落库一张候选定妆照；同 hash 已存在时幂等返回既有行，避免重试产生重复图。 */
+  public createModelPortrait(input: Omit<ModelPortraitRecord, "id" | "selected" | "createdAt">): ModelPortraitRecord {
+    const existing = this.db.prepare("SELECT * FROM model_portraits WHERE model_id=? AND hash=? LIMIT 1").get(input.modelId, input.hash) as Row | undefined;
+    if (existing) return mapModelPortrait(existing);
+    const record: ModelPortraitRecord = { ...input, id: randomUUID(), selected: false, createdAt: now() };
+    this.db.prepare(`INSERT INTO model_portraits (id,model_id,job_id,storage_path,hash,width,height,provider_id,image_model_id,aspect_ratio,selected,created_at)
+      VALUES (@id,@modelId,@jobId,@storagePath,@hash,@width,@height,@providerId,@imageModelId,@aspectRatio,0,@createdAt)`).run(record);
+    return record;
+  }
+  /** 选定切换必须在事务内先清后设，配合部分唯一索引保证每模特至多一张选定。 */
+  public selectModelPortrait(modelId: string, portraitId: string): "selected" | "missing" {
+    const portrait = this.getModelPortrait(portraitId);
+    if (!portrait || portrait.modelId !== modelId) return "missing";
+    const write = this.db.transaction(() => {
+      this.db.prepare("UPDATE model_portraits SET selected=0 WHERE model_id=? AND selected=1").run(modelId);
+      this.db.prepare("UPDATE model_portraits SET selected=1 WHERE id=?").run(portraitId);
+    });
+    write();
+    return "selected";
+  }
+  public deleteModelPortrait(portraitId: string): boolean {
+    return this.db.prepare("DELETE FROM model_portraits WHERE id=?").run(portraitId).changes > 0;
+  }
+  /** 全部定妆照：模特列表一次取回后按模特分组，避免逐个模特各查一次。 */
+  public listAllModelPortraits(): ModelPortraitRecord[] {
+    return (this.db.prepare("SELECT * FROM model_portraits ORDER BY created_at DESC, id DESC").all() as Row[]).map(mapModelPortrait);
+  }
+
   public listProjects(archived = false): ProjectRecord[] {
     const order = archived ? "archived_at DESC, updated_at DESC" : "updated_at DESC";
     return (this.db.prepare(`SELECT * FROM projects WHERE archived_at IS ${archived ? "NOT " : ""}NULL ORDER BY ${order}`).all() as Row[]).map(mapProject);
@@ -643,6 +744,15 @@ export class EcomRepository {
       FROM outputs o JOIN projects p ON p.id = o.project_id
       LEFT JOIN storyboard_items si ON si.id = o.storyboard_item_id
     `).all() as Row[];
+
+    // 模特定妆照不属于任何项目（模特是全局资产），projectName 用「模特库」占位供筛选与检索。
+    const modelPortraitRows = this.db.prepare(`
+      SELECT 'model:' || mp.id AS id, 'MODEL' AS source, NULL AS role, '' AS project_id,
+             '模特库' AS project_name, mp.storage_path AS storage_path, mp.hash AS hash,
+             m.name AS name, NULL AS mime_type, mp.width AS width, mp.height AS height, mp.created_at AS created_at
+      FROM model_portraits mp JOIN models m ON m.id = mp.model_id
+    `).all() as Row[];
+    rows.push(...modelPortraitRows);
 
     const all: LibraryItemRecord[] = rows.map((row) => {
       const source = String(row.source) as LibraryItemSource;
@@ -740,7 +850,10 @@ export class EcomRepository {
     const layer = this.db.prepare(
       "SELECT json_extract(je.value, '$.storagePath') AS storage_path FROM layer_exports le, json_each(le.layer_files_json) je WHERE json_extract(je.value, '$.hash')=? LIMIT 1",
     ).get(hash) as Row | undefined;
-    return layer?.storage_path ? String(layer.storage_path) : undefined;
+    if (layer?.storage_path) return String(layer.storage_path);
+    // 模特定妆照同样进资产库：漏掉这一步，MODEL 条目的缩略图在惰性生成时会 404。
+    const portrait = this.db.prepare("SELECT storage_path FROM model_portraits WHERE hash=? LIMIT 1").get(hash) as Row | undefined;
+    return portrait?.storage_path ? String(portrait.storage_path) : undefined;
   }
 
   /** 解析合成库 ID 指向的真实文件；返回 undefined 表示条目已不存在。 */
@@ -766,6 +879,19 @@ export class EcomRepository {
       const file = Number.isInteger(index) && index >= 0 ? this.getLayerExport(exportId)?.layerFiles?.[index] : undefined;
       if (!file || file.kind === "composite") return undefined;
       return { source: "GENERATED", storagePath: file.storagePath, hash: file.hash, mimeType: "image/png", originalName: file.name, role: null };
+    }
+    if (prefix === "model") {
+      const portrait = this.getModelPortrait(id);
+      if (!portrait) return undefined;
+      const castModel = this.getModel(portrait.modelId);
+      return {
+        source: "MODEL",
+        storagePath: portrait.storagePath,
+        hash: portrait.hash,
+        mimeType: mimeTypeForPath(portrait.storagePath),
+        originalName: castModel ? `${castModel.name} 定妆照` : "model-portrait",
+        role: null,
+      };
     }
     return undefined;
   }
@@ -1049,6 +1175,8 @@ function mapSearchSource(row: Row): SearchSourceRecord { return { id: String(row
 function mapUserTemplate(row: Row): UserTemplateRecord { return { id: String(row.id), name: String(row.name), prompt: String(row.prompt), defaultSize: row.default_size === "1024x1536" ? "1024x1536" : "1024x1024", supportsImageReference: Boolean(row.supports_image_reference), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapUserSuite(row: Row): UserSuiteRecord { return { id: String(row.id), name: String(row.name), l1: String(row.l1), l2: String(row.l2), leaf: String(row.leaf), productFamily: row.product_family == null ? null : String(row.product_family), payload: JSON.parse(String(row.payload_json)) as SuiteDocumentInput, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapSuiteForgeResult(row: Row): SuiteForgeResultRecord { return { jobId: String(row.job_id), payload: JSON.parse(String(row.payload_json)) as SuiteDocumentInput, status: row.status as SuiteForgeStatus, suiteId: row.suite_id == null ? null : String(row.suite_id), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapModel(row: Row): ModelRecord { return { id: String(row.id), name: String(row.name), spec: parse(row.spec_json), notes: String(row.notes ?? ""), referenceFacePath: row.reference_face_path == null ? null : String(row.reference_face_path), referenceFaceHash: row.reference_face_hash == null ? null : String(row.reference_face_hash), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapModelPortrait(row: Row): ModelPortraitRecord { return { id: String(row.id), modelId: String(row.model_id), jobId: String(row.job_id), storagePath: String(row.storage_path), hash: String(row.hash), width: row.width == null ? null : Number(row.width), height: row.height == null ? null : Number(row.height), providerId: String(row.provider_id), imageModelId: String(row.image_model_id), aspectRatio: row.aspect_ratio as ImageAspectRatio, selected: Boolean(row.selected), createdAt: String(row.created_at) }; }
 function mapProject(row: Row): ProjectRecord {
   return {
     id: String(row.id),
@@ -1090,9 +1218,10 @@ function mapAsset(row: Row): AssetRecord {
     createdAt: String(row.created_at)
   };
 }
-/** 上传素材按用途归入商品/参考；生成结果单列，不参与用途映射。 */
+/** 上传素材按用途归入商品/参考；生成结果与模特定妆照单列，不参与用途映射。 */
 function libraryKind(source: LibraryItemSource, role: AssetRole | null): LibraryItemKind {
   if (source === "GENERATED") return "GENERATED";
+  if (source === "MODEL") return "MODEL";
   return role === "PRODUCT_TRUTH" || role === "PACKAGING" ? "PRODUCT" : "REFERENCE";
 }
 function basename(storagePath: string): string {

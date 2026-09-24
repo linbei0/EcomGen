@@ -25,3 +25,18 @@ export const MAX_SUITE_FORGE_NAME_LENGTH = 60;
 
 /** 额外反推要求长度上限；同上，避免前端已截断、后端却静默接受超长输入。 */
 export const MAX_SUITE_FORGE_INSTRUCTION_LENGTH = 4000;
+
+/** 模特名称长度上限。 */
+export const MAX_MODEL_NAME_LENGTH = 40;
+
+/** 模特补充描述长度上限；进入定妆照 prompt 的 "Additional requirements" 段。 */
+export const MAX_MODEL_NOTES_LENGTH = 2000;
+
+/** 模特特色标记多选上限：超过两条会把「 memorable but not distracting 」的人脸推向猎奇。 */
+export const MODEL_MARKS_MAX = 2;
+
+/** 气质关键词多选上限：表达层段落超载会让模型注意力稀释。 */
+export const MODEL_AURA_MAX = 3;
+
+/** 单次选角生成的候选张数上限，与项目生成批次语义一致。 */
+export const MODEL_CAST_CANDIDATES_MAX = 4;

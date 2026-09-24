@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ecomgen/contracts": "workspace:*",
+    "@ecomgen/ecom-skill": "workspace:*",
     "@tanstack/react-query": "^5.101.4",
     "ag-psd": "^31.0.2",
     "antd": "^6.6.0",

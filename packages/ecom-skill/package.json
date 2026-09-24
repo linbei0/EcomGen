@@ -10,5 +10,8 @@
     "gen:templates": "node scripts/generate-manifest.mjs",
     "gen:templates:check": "node scripts/generate-manifest.mjs --check",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@ecomgen/contracts": "workspace:*"
   }
 }

@@ -1,0 +1,1093 @@
+/* 模特库页面。约束：不做卡片式分块，左列与详情区用一条竖线 + 间距层级区分，
+   区域内用发丝分隔线与字重层级组织，候选图不靠缩小图幅解决布局。 */
+
+.page {
+  /* 顶栏由页面自身渲染，所以用弹性列而非减高度：顶栏占 53px，内容区吃掉剩余视口。 */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-0);
+}
+
+.content {
+  /* 确定高度是下面所有独立滚动窗口的起点；行也收成 minmax(0,1fr)，子项才有权收缩。 */
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 288px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* ---- 左列：人物列表 ---- */
+
+.listPane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 22px 18px 22px 24px;
+  border-right: 1px solid var(--line-1);
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+.listTools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+/* 计数行做小字距标签而不是说明文字：它是列表的工具条，不是页头的一部分。 */
+.listCount {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.listSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+/* 列表空态与筛选空态共用：图标、结论、下一步三段，左对齐与列表行同一条起跑线。 */
+.listEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px 2px 0;
+}
+
+.emptyGlyph {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line-1);
+  border-radius: 50%;
+  color: var(--text-3);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+.emptyHint {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--text-3);
+}
+
+.modelList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  /* 列表自己滚：页面不再滚动后，min-height 不收口的话长列表会溢出到不可达区域。 */
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.modelItem,
+.modelItemActive {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 10px 10px 12px;
+  border: none;
+  border-bottom: 1px solid var(--line-1);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+
+.modelItem:hover,
+.modelItemActive:hover {
+  background: var(--bg-1);
+}
+
+/* 选中态不用色块底，用左侧 2px 强调线 + 缩略图描边表达，与套图工坊的层级语言一致。 */
+.modelItemActive {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.modelThumb {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  color: var(--text-3);
+  background: var(--bg-1);
+}
+
+.modelItemActive .modelThumb {
+  border-color: var(--accent);
+}
+
+.modelThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 已锁定参考脸是「这个模特可以放心复用」的强信号，值得在列表里一眼看见。 */
+.faceLockDot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--bg-0);
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.modelMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.modelName {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelSummary {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 右侧：详情 ---- */
+
+.detailPane {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  /* 高度锁在视口内：顶部信息带常驻，下方两栏各自滚动，整页不再整体上下翻。 */
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  /* 超宽屏上限：不定宽的话 1:1 的编辑器会被拉成一条横带，图幅反而更小。 */
+  max-width: 1320px;
+  padding: 22px 32px 26px;
+}
+
+/*
+ * 顶部信息带：左侧生成控制条、右侧身份基准。两列与下方 .stage 用同一套网格与间距，
+ * 竖线才会对齐；分隔线由这一层统一提供，避免两侧各自收边而在高度上错开。
+ */
+.detailBand {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 32px;
+  align-items: start;
+  flex-shrink: 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.anchorCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.detailPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 60vh;
+  text-align: center;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  /* 与信息带同属常驻区：视口再矮也不压缩，把可伸缩的高度全部留给下方两栏。 */
+  flex-shrink: 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.detailIdent {
+  min-width: 0;
+}
+
+.detailTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.detailMeta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.detailActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+/* 主区（定妆照）与侧栏（身份规格）同屏：横向留白用来放「这个人是谁」，
+   而不是让单张候选图旁边空出一大片。 */
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: stretch;
+  gap: 32px;
+  /* 吃掉信息带以下的全部高度，两条子栏才有确定的滚动窗口。 */
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- 生成定妆照控制条 ---- */
+
+/* 分隔线由 .detailBand 统一提供：两侧各自收边会在高度上错开，看着像没对齐。 */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.castBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* 每个控件自带小字标签：一排没有说明的下拉框让人看不出哪个是模型、哪个是画幅。 */
+.castField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.castFieldModel {
+  flex: 1 1 220px;
+}
+
+.castFieldRatio {
+  flex: 0 0 104px;
+}
+
+.castFieldCount {
+  flex: 0 0 88px;
+}
+
+.castLabel {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.castSubmit {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.castHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+
+.castProgress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.castProgress :global(.ant-progress) {
+  flex: 1;
+  margin: 0;
+}
+
+/* ---- 定妆照候选 ---- */
+
+/* 定妆照栏独立滚动：滚它不影响右侧规格栏，选图时顶部控制条始终可见。 */
+.portraits {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sectionHeadMain {
+  min-width: 0;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+.sectionCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.portraitEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 24px 22px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-m);
+  color: var(--text-3);
+}
+
+.portraitEmpty svg {
+  margin-bottom: 2px;
+}
+
+/* 项目记忆约定：组内 minmax(168px, 1fr) + 10px 间距，不靠缩小图幅适配。 */
+.portraitGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 10px;
+}
+
+.portrait,
+.portraitSelected {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-1);
+}
+
+.portrait:hover {
+  border-color: var(--line-2);
+}
+
+.portraitSelected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+
+.portrait img,
+.portraitSelected img {
+  display: block;
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  object-fit: cover;
+}
+
+/* 操作条常驻底部渐变上，避免 hover 才出现导致的可发现性问题。 */
+.portraitActions {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px;
+  background: linear-gradient(transparent, rgb(0 0 0 / 68%));
+}
+
+.selectedBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--bg-0) 78%, transparent);
+}
+
+/* ---- 身份规格侧栏 ---- */
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* 与定妆照栏并列的第二条独立滚动：翻规格不再把定妆照顶出视野。 */
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* 侧栏不做卡片：区块之间只留一条发丝线，靠间距和 eyebrow 分层。 */
+.identity > * + * {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-1);
+}
+
+.identityBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.faceRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 圆圈与角标共用定位上下文：角标要压在圆边上，不能进到可点击圆圈内部（按钮不能嵌套按钮）。 */
+.facePick {
+  position: relative;
+  flex-shrink: 0;
+  display: grid;
+}
+
+.faceAvatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px dashed var(--line-2);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-3);
+  background: var(--bg-1);
+  transition: border-color 140ms ease;
+}
+
+.faceAvatar:hover,
+.faceAvatar:focus-visible {
+  border-color: var(--accent);
+}
+
+.faceAvatar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.faceAvatar[data-locked="true"] {
+  border-style: solid;
+  border-color: var(--accent-line);
+}
+
+.faceAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 悬停才浮出「上传/更换」：常驻标签会盖住参考脸本身，而这个圆圈的主要信息就是那张脸。 */
+.facePickHint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--text-1);
+  background: color-mix(in srgb, var(--bg-0) 72%, transparent);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.faceAvatar:hover .facePickHint,
+.faceAvatar:focus-visible .facePickHint {
+  opacity: 1;
+}
+
+/* 清除做成角标：它是低频且带破坏性的动作，不该再占一行与「上传」并列。 */
+.faceClear {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-3);
+  background: var(--bg-0);
+  transition: border-color 140ms ease, color 140ms ease;
+}
+
+.faceClear:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.faceMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.faceMeta strong {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+.faceMeta span {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+.specList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+}
+
+.specRow {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.specRow dt {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.specRow dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-1);
+}
+
+.specUnset {
+  color: var(--text-3) !important;
+}
+
+.notesText {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
+.specMore summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  cursor: pointer;
+  list-style: none;
+}
+
+.specMore summary::-webkit-details-marker {
+  display: none;
+}
+
+.specMore summary:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.specMore[open] .chevron {
+  transform: rotate(180deg);
+}
+
+.chevron {
+  flex-shrink: 0;
+  transition: transform 140ms ease;
+}
+
+.specMoreBody {
+  margin-top: 14px;
+}
+
+.promptBlock {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  /* 侧栏在 bg-0 上，提示词块用 bg-1 才不会和抽屉里那种「面板同色」的坑一样消失。 */
+  background: var(--bg-1);
+}
+
+/* ---- 设计器抽屉 ---- */
+
+.designerFooter {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 计数提示推到 footer 左侧，与右侧操作按钮分离。 */
+.designerCounter {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/*
+ * 抽屉正文分两栏：左边编辑 30 个维度，右边是编译结果。
+ * 结果不再随规格层往下漂——用户不需要「改一处 → 翻到底看提示词 → 再翻回来」，
+ * 视线里始终同时有「我改了什么」和「它变成了什么」。
+ */
+.designerLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 30px;
+  align-items: start;
+}
+
+.designerColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.designerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 段落头：标题与层操作同一行，说明另起一行——长说明夹在中间会把按钮顶到远端，看着散。 */
+.designerHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* 设计器段落标题与详情面板的 .sectionTitle 分开命名：同名会让后定义的那份静默覆盖前者。 */
+.designerTitle {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+/* 层操作钉在标题行行尾；按钮组按中线对齐，不跟着标题的基线一起漂。 */
+.sectionActions {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+/* 层序号与套图工坊的参数区块编号同一套语言：让四层结构在长抽屉里可数。 */
+.layerIndex {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  opacity: 0.7;
+}
+
+.sectionHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+/*
+ * 预设改成下拉：十几个人设平铺成三行按钮会占掉抽屉顶部、把真正的编辑区挤出首屏，
+ * 而这一块是「起手」用的低频动作。名称留在输入框、描述在下拉里展开，
+ * 选中态由规格逐维比对得出，改过任意一维就回落成「自定义」，界面不冒认。
+ */
+.presetSelect {
+  width: 100%;
+}
+
+.presetOption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+}
+
+.presetOptionName {
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.presetOptionDesc {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+/* 下拉项默认单行省略，两行结构会被截断，这里放开换行。 */
+.presetDropdown :global(.ant-select-item-option-content) {
+  white-space: normal;
+}
+
+.presetDropdown :global(.ant-select-item) {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/*
+ * 字段列表：字段名定宽在左、选项在右，每个维度独占一行。
+ * 之前的两列网格靠内容高度收缩，年龄、族裔这类长选项换行后会把同列的相邻字段推低，
+ * 两列各自错位，整片看起来就是乱的；行内左右分栏后换行只影响自己这一行。
+ */
+.fieldList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.fieldName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  /* 与胶囊文字基线对齐：胶囊自身有 1px 边框 + 4px 内边距。 */
+  padding-top: 5px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.fieldHint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/*
+ * 未选项压到最轻：整套规格有上百个胶囊，全部同权重时既分不出已选，也看不出分组。
+ * 选中项保留琥珀描边与浅底，扫一眼就能数出这个模特定了哪些维度。
+ */
+.chip,
+.chipActive {
+  padding: 4px 11px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-3);
+  background: none;
+  transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
+}
+
+.chip:hover {
+  border-color: var(--line-2);
+  color: var(--text-1);
+  background: var(--bg-2);
+}
+
+.chipActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+/* 互斥项保持可见但降级：直接隐藏会让用户以为这个维度没有这一档。
+   虚线描边而不是删除线——中文加删除线会糊成一团，虚线已足够表达「不可选」。 */
+.chipBlocked,
+.chipBlocked:hover {
+  border-style: dashed;
+  border-color: var(--line-2);
+  color: var(--text-3);
+  background: none;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 选项侧容器：维度级说明（如童模的身高锚点不参与编译）与选项同列成行。 */
+.fieldOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fieldNote {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+/*
+ * 规格层：默认展开，可整层收起。四层摊开是一屏多的长度，收掉已定好的层
+ * 能把滚动长度直接砍半；层头保留「已选/总」计数，收起不等于失忆。
+ */
+.layer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layerHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 层头下加一道极淡的分隔：四层在同一列表里靠线分段，比靠间距更省高度。 */
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+/* 整行可点：只有标题文字是热区时，用户会以为点行头没反应。 */
+.layerToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  border: none;
+  cursor: pointer;
+  background: none;
+  /* 箭头走 currentColor：这里定弱色即可，层号与层名各自有显式颜色不受牵连。 */
+  color: var(--text-3);
+}
+
+.layerToggle:hover .designerTitle {
+  color: var(--accent);
+}
+
+.layerToggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-s);
+}
+
+/* 收起态复用详情面板那套 .chevron（箭头转向即开合状态），只补一个修饰类。 */
+.chevronCollapsed {
+  transform: rotate(-90deg);
+}
+
+.layerCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/*
+ * 预览栏钉在右列：抽屉正文是滚动容器，sticky 相对它生效，长规格也不会把结果推出视野。
+ * 预览自身给高度上限并内部滚动，避免右栏撑出视口后连标题都看不见。
+ */
+.previewPane {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.previewPane .promptPreview {
+  max-height: max(220px, calc(100vh - 420px));
+  overflow: auto;
+}
+
+/* 抽屉正文底色是 bg-1，预览块必须退到 bg-0，否则与面板同色、看起来像没渲染。 */
+.promptPreview {
+  padding: 12px 14px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  background: var(--bg-0);
+}
+
+.promptNote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+/* ---- 断点 ---- */
+
+/* 抽屉里的两栏在这个宽度下并排会挤扁选项行，改为上下排布、预览不再吸附。 */
+@media (max-width: 1080px) {
+  .designerLayout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .previewPane {
+    position: static;
+  }
+}
+
+/* 侧栏先退到下方：定妆照是主工作区，窄屏下不能先被挤掉。 */
+@media (max-width: 1180px) {
+  /* 竖向空间不够并排放两段独立滚动，退回整页滚动：信息带与两栏随页面一起走。 */
+  .page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .content {
+    flex: none;
+    height: auto;
+    grid-template-rows: none;
+    align-items: start;
+  }
+
+  /* 左列恢复吸附：页面重新可滚，列表要跟着视口留在原地。 */
+  .listPane {
+    position: sticky;
+    top: var(--topbar-h);
+    height: calc(100vh - var(--topbar-h));
+  }
+
+  .detailPane {
+    height: auto;
+    overflow: visible;
+    max-width: none;
+    padding-bottom: 56px;
+  }
+
+  .detailBand,
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detailBand {
+    gap: 20px;
+  }
+
+  .stage {
+    flex: none;
+    gap: 26px;
+  }
+
+  .portraits,
+  .identity {
+    overflow: visible;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .listPane {
+    position: static;
+    height: auto;
+    max-height: 46vh;
+    border-right: none;
+    border-bottom: 1px solid var(--line-1);
+  }
+
+  .detailPane {
+    padding: 20px 20px 48px;
+  }
+}

@@ -77,6 +77,9 @@ importers:
       '@ecomgen/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ecomgen/ecom-skill':
+        specifier: workspace:*
+        version: link:../../packages/ecom-skill
       '@tanstack/react-query':
         specifier: ^5.101.4
         version: 5.101.4(react@19.2.8)
@@ -240,7 +243,11 @@ importers:
         specifier: ^7.6.13
         version: 7.6.13
 
-  packages/ecom-skill: {}
+  packages/ecom-skill:
+    dependencies:
+      '@ecomgen/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/ecom-suite:
     dependencies:

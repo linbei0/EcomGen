@@ -23,6 +23,13 @@ export function readOptionalText(value: unknown): string | undefined {
   return value === undefined || value === null || value === "" ? undefined : readText(value, "value");
 }
 
+/** PATCH 可选文本字段：undefined 表示不修改；显式传值允许空串（清空备注是合法操作）。 */
+export function readPatchText(value: unknown, path: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") throw new ApiError(400, "VALIDATION_ERROR", `${path} must be a string`);
+  return value.trim();
+}
+
 export function readBoolean(value: unknown, path: string): boolean {
   if (typeof value !== "boolean") throw new ApiError(400, "VALIDATION_ERROR", `${path} must be a boolean`);
   return value;

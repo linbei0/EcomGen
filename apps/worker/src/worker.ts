@@ -7,9 +7,9 @@ import sharp from "sharp";
 import { writePsdBuffer } from "ag-psd";
 import { forgeSuite, planImageEdit, planLayerElements, planStoryboard, reviseImagePrompt, writeCopywriting, type SuiteForgeHints } from "@ecomgen/agent";
 import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
-import { compileUserTemplate, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
+import { compileUserTemplate, compileModelCastPrompt, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
 import { normalizeSuiteDocument, type SuiteDocumentInput } from "@ecomgen/ecom-suite";
-import { resolveImageSize, userAssetKindForRole, EDIT_OPERATION_CAPABILITIES, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, validateEcomSuiteFile, type CompositePolicy, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type PlanningMode } from "@ecomgen/contracts";
+import { resolveImageSize, userAssetKindForRole, EDIT_OPERATION_CAPABILITIES, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, validateEcomSuiteFile, type CompositePolicy, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type ModelSpec, type PlanningMode } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, buildReasoningModel, createSegmentationProvider, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { createPsdLayerAccumulator, extractAlpha, invertMask, multiplyAlpha, unionOfMasks } from "./layer-composite.js";
@@ -57,6 +57,7 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
     else if (queueJob.data.kind === "layer_plan") await executeLayerPlan(job);
     else if (queueJob.data.kind === "layer_export") await executeLayerExport(job, cancellation.signal);
     else if (queueJob.data.kind === "suite_forge") await executeSuiteForge(job);
+    else if (queueJob.data.kind === "model_cast") await executeModelCast(job, cancellation.signal);
     else await executeExport(job);
     // 终态与清空外部请求标记在同一条 UPDATE 内原子完成：标记一旦设置就只在终态消失，
     // 避免终态写入前进程崩溃时恢复层误判任务仍在付费请求窗口内。
@@ -227,6 +228,52 @@ async function executeSuiteForge(job: JobRecord): Promise<void> {
   });
 }
 
+/**
+ * 模特选角：按入队时快照的 spec 与参考脸确定性编译定妆照 prompt，产出 candidateCount 张候选。
+ * 参考脸是唯一身份基准：有图时前置身份锚点并附参考图；候选按 (jobId, candidateIndex) 幂等，
+ * 重跑只补缺失的候选。全局模特库无项目 SSE 通道，前端依赖轮询任务状态。
+ */
+async function executeModelCast(job: JobRecord, signal: AbortSignal): Promise<void> {
+  throwIfCancelled(job);
+  const input = job.input as { modelId?: unknown; aspectRatio?: unknown; candidateCount?: unknown; spec?: unknown; notes?: unknown; referenceFacePath?: unknown };
+  const castModel = repository.getModel(typeof input.modelId === "string" ? input.modelId : "");
+  if (!castModel) throw new Error(`Model not found for job ${job.id}`);
+  // spec 使用入队快照而非当前库值：用户改 spec 不影响已在排队的任务，重试可复现同一 prompt
+  if (!input.spec || typeof input.spec !== "object") throw new Error(`Job ${job.id} has no model spec snapshot`);
+  const spec = input.spec as ModelSpec;
+  const notes = typeof input.notes === "string" ? input.notes : "";
+  const candidateCount = typeof input.candidateCount === "number" ? Math.min(4, Math.max(1, Math.round(input.candidateCount))) : 1;
+  const aspectRatio = (typeof input.aspectRatio === "string" ? input.aspectRatio : "AUTO") as ImageAspectRatio;
+  const provider = providerFor(job.providerId);
+  const model = provider.models.find((candidate) => candidate.id === job.modelId);
+  if (!model || (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini")) throw new Error("Selected image model has no executable image API");
+  const generator = imageGeneratorFor(provider, model);
+  const size = resolveImageSize("1K", aspectRatio, "1024x1536");
+  // 参考脸也取快照：任务指纹按入队时的参考脸 hash 计算，读实时库值会让实发 prompt 与指纹脱钩
+  // （入队后换脸会用新脸生成，重试还会因换脸产出与前次不同的身份基准）。
+  const referenceFacePath = typeof input.referenceFacePath === "string" ? input.referenceFacePath : null;
+  const referenceFace = referenceFacePath
+    ? { data: await storage.read(referenceFacePath), filename: "reference-face.png", mimeType: mimeForStoragePath(referenceFacePath) }
+    : undefined;
+  const prompt = compileModelCastPrompt(spec, notes, Boolean(referenceFace));
+  const completed = repository.listModelPortraits(castModel.id).filter((portrait) => portrait.jobId === job.id).length;
+  for (let candidateIndex = completed + 1; candidateIndex <= candidateCount; candidateIndex += 1) {
+    throwIfCancelled(job);
+    await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED, progress: 20 + Math.round(((candidateIndex - 1) / candidateCount) * 60) });
+    const idempotencyKey = generationKeyFor(job.id, candidateIndex);
+    const images = referenceFace ? [referenceFace] : undefined;
+    const result = await generator.generate(model.imageApiKind === "gemini"
+      ? { model: model.id, prompt, imageAspectRatio: aspectRatio, imageResolution: "1K" as ImageResolution, images, idempotencyKey, signal }
+      : { model: model.id, prompt, size, quality: "high", images, idempotencyKey, signal });
+    throwIfCancelled(job);
+    const stored = await storage.putModelPortrait(castModel.id, job.id, result.image);
+    const { width, height } = await outputDerivatives(storage, stored.hash, result.image);
+    repository.createModelPortrait({ modelId: castModel.id, jobId: job.id, storagePath: stored.path, hash: stored.hash, width, height, providerId: provider.id, imageModelId: model.id, aspectRatio });
+    await updateJob(job, { progress: 20 + Math.round((candidateIndex / candidateCount) * 60), providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED });
+  }
+  await updateJob(job, { providerTaskId: null });
+}
+
 async function executeCopywriting(job: JobRecord): Promise<void> {
   throwIfCancelled(job);
   const project = projectFor(job);
@@ -321,9 +368,7 @@ async function executeGeneration(job: JobRecord, signal: AbortSignal): Promise<v
   }
   repository.updateStoryboardItem(item.id, { status: "GENERATING", compiledPrompt }); await updateJob(job, { progress: 30 });
   const images = await Promise.all(generationInputs.map(async (asset) => ({ data: await storage.read(asset.storagePath), filename: asset.originalName, mimeType: asset.mimeType })));
-  const generator = model.imageApiKind === "gemini"
-    ? new GeminiImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) })
-    : new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+  const generator = imageGeneratorFor(provider, model);
   await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED });
   const inputFidelity = model.imageApiKind === "openai_images" && generationInputs.some((asset) => asset.role === "PRODUCT_TRUTH")
     ? highInputFidelityForOpenAiImageModel(model.id)
@@ -434,9 +479,7 @@ async function executeEditGeneration(job: JobRecord, signal: AbortSignal): Promi
   const sourceImage = await storage.read(source.storagePath);
   const mask = turn.editMaskPath ? await storage.read(turn.editMaskPath) : undefined;
   if (mask) await assertMaskDimensions(sourceImage, mask);
-  const generator = model.imageApiKind === "gemini"
-    ? new GeminiImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) })
-    : new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+  const generator = imageGeneratorFor(provider, model);
   const assets = repository.listAssets(project.id);
   const temporaryAssets = repository.listEditReferenceAssets(turn.sessionId).filter((asset) => asset.expiresAt > new Date().toISOString());
   const references = await Promise.all(turn.referenceSelections.slice().sort((left, right) => left.order - right.order).map(async (selection) => {
@@ -538,7 +581,7 @@ async function executeLayerPlan(job: JobRecord): Promise<void> {
     // 元素 id 在方案内稳定（el-N）；前端勾选后原样回传，manual 元素由前端自带 id。
     const records = elements.map((element, index) => ({ id: `el-${index + 1}`, name: element.name, promptEn: element.promptEn, source: "auto" as const, bbox: null }));
     const updated = repository.updateLayerPlan(plan.id, { status: "SUCCEEDED", elements: records, error: null });
-      if (updated) await events.publish(projectIdFor(job), "layer-plan.updated", { plan: updated });
+    if (updated) await events.publish(projectIdFor(job), "layer-plan.updated", { plan: updated });
   } catch (error) {
     // 失败/取消必须同步到方案记录：REST 是状态真相，SSE 只负责通知前端失效重查。
     if (error instanceof JobCancelled) {
@@ -546,7 +589,7 @@ async function executeLayerPlan(job: JobRecord): Promise<void> {
       if (cancelled) await events.publish(projectIdFor(job), "layer-plan.updated", { plan: cancelled });
     } else {
       const updated = repository.updateLayerPlan(plan.id, { status: "FAILED", error: { message: error instanceof Error ? error.message : String(error) } });
-    if (updated) await events.publish(projectIdFor(job), "layer-plan.updated", { plan: updated });
+      if (updated) await events.publish(projectIdFor(job), "layer-plan.updated", { plan: updated });
     }
     throw error;
   }
@@ -747,6 +790,12 @@ function providerFor(id: string | null) {
   const provider = repository.getProvider(id);
   if (!provider) throw new Error(`Configured provider not found: ${id}`);
   return provider;
+}
+/** 按模型声明的 image API 选择适配器；生成/编辑/选角三条链路共用，避免适配器选择逻辑漂移。 */
+function imageGeneratorFor(provider: ReturnType<typeof providerFor>, model: { id: string; imageApiKind: string | null }) {
+  if (model.imageApiKind === "gemini") return new GeminiImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+  if (model.imageApiKind === "openai_images") return new OpenAiCompatibleImageProvider({ baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+  throw new Error("Selected image model has no executable image API");
 }
 /** 一个 Job 的每个候选使用独立稳定键，重试不会再次落库或写出另一份文件。 */
 function generationKeyFor(jobId: string, candidateIndex: number): string { return `ecomgen:generation:${jobId}:candidate:${candidateIndex}`; }
