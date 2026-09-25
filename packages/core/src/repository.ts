@@ -21,6 +21,7 @@ import type {
 import type { CompositePolicy, EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
 import type { SuiteDocumentInput } from "@ecomgen/ecom-suite";
 import type { SqliteDatabase } from "./database.js";
+import { normalize } from "./fingerprint.js";
 
 /** 写入 jobs.provider_task_id 的内部标记：请求已发出但 Provider 尚未返回结果。 */
 export const EXTERNAL_REQUEST_STARTED = "__EXTERNAL_REQUEST_STARTED__";
@@ -136,6 +137,11 @@ export interface ProjectRecord {
   candidatesPerType: number;
   webResearchEnabled: boolean;
   archivedAt: string | null;
+  /**
+   * 规划修订号：规划相关项目事实（事实、品牌、平台、模型配置等）每次变化单调递增。
+   * 规划任务指纹纳入该值，保证项目更新后不会复用基于旧事实的规划结果。
+   */
+  planningRevision: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -701,17 +707,17 @@ export class EcomRepository {
     return covers;
   }
   public getProject(id: string): ProjectRecord | undefined { const row = this.db.prepare("SELECT * FROM projects WHERE id = ?").get(id); return row ? mapProject(row as Row) : undefined; }
-  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled" | "archivedAt" | "segmentationModel"> & Partial<Pick<ProjectRecord, "webResearchEnabled" | "archivedAt">> & { segmentationModel?: { providerId: string; modelId: string; protocol?: NonNullable<SegmentationModelRef["protocol"]> } | null }): ProjectRecord {
-    const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, archivedAt: input.archivedAt ?? null, segmentationModel: input.segmentationModel ? { ...input.segmentationModel, protocol: input.segmentationModel.protocol ?? "fal" } : null, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,segmentation_provider_id,segmentation_model_id,segmentation_protocol,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,created_at,updated_at)
-      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@segmentationProviderId,@segmentationModelId,@segmentationProtocol,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@archivedAt,@createdAt,@updatedAt)`)
+  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled" | "archivedAt" | "planningRevision" | "segmentationModel"> & Partial<Pick<ProjectRecord, "webResearchEnabled" | "archivedAt">> & { segmentationModel?: { providerId: string; modelId: string; protocol?: NonNullable<SegmentationModelRef["protocol"]> } | null }): ProjectRecord {
+    const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, archivedAt: input.archivedAt ?? null, planningRevision: 0, segmentationModel: input.segmentationModel ? { ...input.segmentationModel, protocol: input.segmentationModel.protocol ?? "fal" } : null, id: randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,segmentation_provider_id,segmentation_model_id,segmentation_protocol,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,planning_revision,created_at,updated_at)
+      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@segmentationProviderId,@segmentationModelId,@segmentationProtocol,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@archivedAt,@planningRevision,@createdAt,@updatedAt)`)
       .run({ ...record, webResearchEnabled: record.webResearchEnabled ? 1 : 0, platformTargets: json(record.platformTargets), verifiedFacts: json(record.verifiedFacts), prohibitedClaims: json(record.prohibitedClaims), brandGuidelines: json(record.brandGuidelines), segmentationProviderId: record.segmentationModel?.providerId ?? null, segmentationModelId: record.segmentationModel?.modelId ?? null, segmentationProtocol: record.segmentationModel?.protocol ?? null });
     return record;
   }
   public updateProject(id: string, patch: Partial<Omit<ProjectRecord, "id" | "createdAt">>): ProjectRecord | undefined {
     const current = this.getProject(id); if (!current) return undefined;
-    const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,segmentation_provider_id=@segmentationProviderId,segmentation_model_id=@segmentationModelId,segmentation_protocol=@segmentationProtocol,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,archived_at=@archivedAt,updated_at=@updatedAt WHERE id=@id`)
+    const next = { ...current, ...patch, planningRevision: nextPlanningRevision(current, patch), updatedAt: now() };
+    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,segmentation_provider_id=@segmentationProviderId,segmentation_model_id=@segmentationModelId,segmentation_protocol=@segmentationProtocol,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,archived_at=@archivedAt,planning_revision=@planningRevision,updated_at=@updatedAt WHERE id=@id`)
       .run({ ...next, webResearchEnabled: next.webResearchEnabled ? 1 : 0, platformTargets: json(next.platformTargets), verifiedFacts: json(next.verifiedFacts), prohibitedClaims: json(next.prohibitedClaims), brandGuidelines: json(next.brandGuidelines), segmentationProviderId: next.segmentationModel?.providerId ?? null, segmentationModelId: next.segmentationModel?.modelId ?? null, segmentationProtocol: next.segmentationModel?.protocol ?? null });
     return next;
   }
@@ -726,40 +732,85 @@ export class EcomRepository {
 
   public listAssets(projectId: string): AssetRecord[] { return (this.db.prepare("SELECT * FROM assets WHERE project_id=? ORDER BY created_at").all(projectId) as Row[]).map(mapAsset); }
 
-  /** 资产库视图：assets 与 outputs 合并、跨项目按内容 hash 去重（同图只保留最新一条），
-   * 按创建时间倒序。分页用 (createdAt,id) 合成游标，避免 offset 在增量入库时跳条。 */
+  /**
+   * 资产库视图：assets、outputs、model_portraits 与 layer_exports 逐元素切图合并为一张派生表，
+   * 跨来源按内容 hash 去重（同图只保留最新一条）。过滤、去重、排序、游标分页全部下推 SQLite，
+   * 只把当前页物化到 JS——列表查询的成本不随库存总量线性增长。
+   * 分页用 (createdAt,id) 合成游标（keyset），避免 offset 在增量入库时跳条。
+   */
   public listLibraryItems(query: LibraryItemQuery = {}): LibraryItemPage {
     const limit = Math.min(Math.max(query.limit ?? 40, 1), 100);
-    const rows = this.db.prepare(`
-      SELECT 'asset:' || a.id AS id, 'UPLOADED' AS source, a.role AS role, a.project_id AS project_id,
-             p.name AS project_name, a.storage_path AS storage_path, a.hash AS hash,
-             a.original_name AS name, a.mime_type AS mime_type, a.width AS width, a.height AS height,
-             a.created_at AS created_at
+    const kind = query.kind ?? null;
+    const needle = query.q?.trim().toLowerCase() ?? "";
+    const cursor = decodeLibraryCursor(query.cursor ?? null);
+
+    // 分层导出把每个元素/背景切图作为独立生成产物纳入库；PSD 复合层（composite）二进制不可预览，排除。
+    const librarySql = `
+      SELECT 'asset:' || a.id AS id, 'UPLOADED' AS source,
+             CASE WHEN a.role IN ('PRODUCT_TRUTH','PACKAGING') THEN 'PRODUCT' ELSE 'REFERENCE' END AS kind,
+             a.project_id AS project_id, p.name AS project_name, a.original_name AS name,
+             a.mime_type AS mime_type, a.storage_path AS storage_path, a.hash AS hash,
+             a.width AS width, a.height AS height, a.role AS role, a.created_at AS created_at
       FROM assets a JOIN projects p ON p.id = a.project_id
       UNION ALL
-      SELECT 'output:' || o.id AS id, 'GENERATED' AS source, NULL AS role, o.project_id AS project_id,
-             p.name AS project_name, o.storage_path AS storage_path, o.hash AS hash,
-             COALESCE(si.display_name, si.asset_type, '生成图') AS name, NULL AS mime_type,
-             o.width AS width, o.height AS height, o.created_at AS created_at
+      SELECT 'output:' || o.id, 'GENERATED', 'GENERATED',
+             o.project_id, p.name, COALESCE(si.display_name, si.asset_type, '生成图'),
+             NULL, o.storage_path, o.hash, o.width, o.height, NULL, o.created_at
       FROM outputs o JOIN projects p ON p.id = o.project_id
       LEFT JOIN storyboard_items si ON si.id = o.storyboard_item_id
-    `).all() as Row[];
-
-    // 模特定妆照不属于任何项目（模特是全局资产），projectName 用「模特库」占位供筛选与检索。
-    const modelPortraitRows = this.db.prepare(`
-      SELECT 'model:' || mp.id AS id, 'MODEL' AS source, NULL AS role, '' AS project_id,
-             '模特库' AS project_name, mp.storage_path AS storage_path, mp.hash AS hash,
-             m.name AS name, NULL AS mime_type, mp.width AS width, mp.height AS height, mp.created_at AS created_at
+      UNION ALL
+      SELECT 'model:' || mp.id, 'MODEL', 'MODEL',
+             '', '模特库', m.name,
+             NULL, mp.storage_path, mp.hash, mp.width, mp.height, NULL, mp.created_at
       FROM model_portraits mp JOIN models m ON m.id = mp.model_id
-    `).all() as Row[];
-    rows.push(...modelPortraitRows);
+      UNION ALL
+      SELECT 'layer:' || le.id || ':' || je.key, 'GENERATED', 'LAYER',
+             le.project_id, p.name,
+             COALESCE(si.display_name, si.asset_type, '生成图') || ' · ' || json_extract(je.value, '$.name'),
+             'image/png', json_extract(je.value, '$.storagePath'), json_extract(je.value, '$.hash'),
+             o.width, o.height, NULL, le.created_at
+      FROM layer_exports le
+      JOIN projects p ON p.id = le.project_id
+      LEFT JOIN outputs o ON o.id = le.output_id
+      LEFT JOIN storyboard_items si ON si.id = o.storyboard_item_id
+      CROSS JOIN json_each(le.layer_files_json) je
+      WHERE le.status = 'SUCCEEDED' AND le.layer_files_json IS NOT NULL
+        AND json_extract(je.value, '$.hash') IS NOT NULL
+        AND json_extract(je.value, '$.storagePath') IS NOT NULL
+        AND (json_extract(je.value, '$.kind') IS NULL OR json_extract(je.value, '$.kind') <> 'composite')
+    `;
 
-    const all: LibraryItemRecord[] = rows.map((row) => {
+    const filters: string[] = ["rn = 1"];
+    const params: Record<string, string | number> = { limit: limit + 1 };
+    if (kind) { filters.push("kind = @kind"); params.kind = kind; }
+    if (needle) {
+      // LIKE 通配符转义保持与"子串包含"语义一致；LOWER 与前端既有的 ASCII 折叠口径相同
+      params.needle = `%${needle.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+      filters.push("(LOWER(name) LIKE @needle ESCAPE '\\' OR LOWER(project_name) LIKE @needle ESCAPE '\\')");
+    }
+    if (cursor) {
+      params.cursorCreatedAt = cursor.createdAt;
+      params.cursorId = cursor.id;
+      filters.push("(created_at < @cursorCreatedAt OR (created_at = @cursorCreatedAt AND id < @cursorId))");
+    }
+    const where = filters.join(" AND ");
+
+    // COUNT(*) OVER () 在 LIMIT 之前统计过滤后总数，一次查询同时得到当前页与稳定 total
+    const rows = this.db.prepare(`
+      WITH library AS (${librarySql}),
+      ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY hash ORDER BY created_at DESC, id DESC) AS rn FROM library)
+      SELECT *, COUNT(*) OVER () AS total_count FROM ranked
+      WHERE ${where}
+      ORDER BY created_at DESC, id DESC
+      LIMIT @limit
+    `).all(params) as Row[];
+
+    const items = rows.slice(0, limit).map((row) => {
       const source = String(row.source) as LibraryItemSource;
       return {
         id: String(row.id),
         source,
-        kind: libraryKind(source, row.role ? (String(row.role) as AssetRole) : null),
+        kind: String(row.kind) as LibraryItemKind,
         name: String(row.name ?? ""),
         projectId: String(row.project_id),
         projectName: String(row.project_name ?? ""),
@@ -772,73 +823,8 @@ export class EcomRepository {
         createdAt: String(row.created_at),
       };
     });
-
-    // 分层导出把每个元素/背景切图作为独立生成产物纳入库；PSD 复合层（composite）二进制不可预览，排除。
-    const layerRows = this.db.prepare(`
-      SELECT le.id AS layer_export_id, le.project_id AS project_id, p.name AS project_name,
-             le.layer_files_json AS layer_files_json, le.created_at AS created_at,
-             o.width AS width, o.height AS height,
-             COALESCE(si.display_name, si.asset_type, '生成图') AS output_name
-      FROM layer_exports le
-      JOIN projects p ON p.id = le.project_id
-      LEFT JOIN outputs o ON o.id = le.output_id
-      LEFT JOIN storyboard_items si ON si.id = o.storyboard_item_id
-      WHERE le.status = 'SUCCEEDED' AND le.layer_files_json IS NOT NULL
-    `).all() as Row[];
-    for (const row of layerRows) {
-      const files = parse(String(row.layer_files_json)) as LayerExportLayerFileRecord[];
-      const outputName = String(row.output_name ?? "生成图");
-      const width = row.width === null || row.width === undefined ? null : Number(row.width);
-      const height = row.height === null || row.height === undefined ? null : Number(row.height);
-      files.forEach((file, index) => {
-        if (!file || file.kind === "composite" || !file.hash || !file.storagePath) return;
-        all.push({
-          id: `layer:${String(row.layer_export_id)}:${index}`,
-          source: "GENERATED",
-          kind: "LAYER",
-          name: `${outputName} · ${file.name}`,
-          projectId: String(row.project_id),
-          projectName: String(row.project_name ?? ""),
-          mimeType: "image/png",
-          hash: file.hash,
-          width,
-          height,
-          storagePath: file.storagePath,
-          role: null,
-          createdAt: String(row.created_at),
-        });
-      });
-    }
-
-    all.sort((a, b) => (a.createdAt === b.createdAt ? (a.id < b.id ? 1 : a.id > b.id ? -1 : 0) : a.createdAt < b.createdAt ? 1 : -1));
-
-    const seen = new Set<string>();
-    const deduped: LibraryItemRecord[] = [];
-    for (const record of all) {
-      if (seen.has(record.hash)) continue;
-      seen.add(record.hash);
-      deduped.push(record);
-    }
-
-    const kind = query.kind ?? null;
-    const needle = query.q?.trim().toLowerCase() ?? "";
-    const filtered = deduped.filter((item) => {
-      if (kind && item.kind !== kind) return false;
-      if (needle && !`${item.name}\n${item.projectName}`.toLowerCase().includes(needle)) return false;
-      return true;
-    });
-
-    let startIndex = 0;
-    const cursor = decodeLibraryCursor(query.cursor ?? null);
-    if (cursor) {
-      const index = filtered.findIndex((item) => item.createdAt < cursor.createdAt || (item.createdAt === cursor.createdAt && item.id < cursor.id));
-      startIndex = index < 0 ? filtered.length : index;
-    }
-    const items = filtered.slice(startIndex, startIndex + limit);
-    const nextCursor = startIndex + limit < filtered.length && items.length > 0
-      ? encodeLibraryCursor(items[items.length - 1])
-      : null;
-    return { items, nextCursor, total: filtered.length };
+    const nextCursor = rows.length > limit && items.length > 0 ? encodeLibraryCursor(items[items.length - 1]) : null;
+    return { items, nextCursor, total: rows.length > 0 ? Number(rows[0].total_count) : 0 };
   }
 
   /** 按内容 hash 找到任一来源文件的存储路径，供缩略图惰性生成。 */
@@ -1177,8 +1163,29 @@ function mapUserSuite(row: Row): UserSuiteRecord { return { id: String(row.id), 
 function mapSuiteForgeResult(row: Row): SuiteForgeResultRecord { return { jobId: String(row.job_id), payload: JSON.parse(String(row.payload_json)) as SuiteDocumentInput, status: row.status as SuiteForgeStatus, suiteId: row.suite_id == null ? null : String(row.suite_id), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapModel(row: Row): ModelRecord { return { id: String(row.id), name: String(row.name), spec: parse(row.spec_json), notes: String(row.notes ?? ""), referenceFacePath: row.reference_face_path == null ? null : String(row.reference_face_path), referenceFaceHash: row.reference_face_hash == null ? null : String(row.reference_face_hash), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapModelPortrait(row: Row): ModelPortraitRecord { return { id: String(row.id), modelId: String(row.model_id), jobId: String(row.job_id), storagePath: String(row.storage_path), hash: String(row.hash), width: row.width == null ? null : Number(row.width), height: row.height == null ? null : Number(row.height), providerId: String(row.provider_id), imageModelId: String(row.image_model_id), aspectRatio: row.aspect_ratio as ImageAspectRatio, selected: Boolean(row.selected), createdAt: String(row.created_at) }; }
-function mapProject(row: Row): ProjectRecord {
-  return {
+/**
+ * 计算项目更新后的规划修订号：仅当 patch 中实际改变了规划相关事实时递增。
+ * 规划提示词由这些字段派生，改名与归档不影响规划结果，因此不计入。
+ */
+const PLANNING_REVISION_FIELDS = [
+  "category", "productDescription", "verifiedFacts", "prohibitedClaims", "brandGuidelines",
+  "platformTargets", "targetMarket", "copyLanguage",
+  "reasoningProviderId", "reasoningModelId", "imageProviderId", "imageModelId", "segmentationModel",
+  "defaultMode", "imageResolution", "imageAspectRatio", "candidatesPerType", "webResearchEnabled",
+] as const;
+
+function nextPlanningRevision(current: ProjectRecord, patch: Partial<Omit<ProjectRecord, "id" | "createdAt">>): number {
+  const changed = PLANNING_REVISION_FIELDS.some((field) => field in patch && !stableEquals(current[field], patch[field]));
+  return changed ? current.planningRevision + 1 : current.planningRevision;
+}
+
+/** 结构化等值比较：对象键序无关，避免同内容的 brandGuidelines 触发误递增。 */
+function stableEquals(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+}
+
+function mapProject(row: Row): ProjectRecord {  return {
     id: String(row.id),
     name: String(row.name),
     category: row.category ? String(row.category) : null,
@@ -1200,6 +1207,7 @@ function mapProject(row: Row): ProjectRecord {
     candidatesPerType: Number(row.candidates_per_type ?? 1),
     webResearchEnabled: Boolean(row.web_research_enabled),
     archivedAt: row.archived_at ? String(row.archived_at) : null,
+    planningRevision: Number(row.planning_revision ?? 0),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at)
   };
@@ -1219,11 +1227,6 @@ function mapAsset(row: Row): AssetRecord {
   };
 }
 /** 上传素材按用途归入商品/参考；生成结果与模特定妆照单列，不参与用途映射。 */
-function libraryKind(source: LibraryItemSource, role: AssetRole | null): LibraryItemKind {
-  if (source === "GENERATED") return "GENERATED";
-  if (source === "MODEL") return "MODEL";
-  return role === "PRODUCT_TRUTH" || role === "PACKAGING" ? "PRODUCT" : "REFERENCE";
-}
 function basename(storagePath: string): string {
   const slash = storagePath.lastIndexOf("/");
   return slash < 0 ? storagePath : storagePath.slice(slash + 1);

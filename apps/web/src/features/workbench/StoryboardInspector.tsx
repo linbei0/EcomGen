@@ -45,44 +45,83 @@ export function StoryboardInspector({
   const providers = useProviders();
   const persist = update.mutateAsync;
   const [draft, setDraft] = useState<Draft>(toDraft(item));
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const snapshot = useRef(item);
-  const saveVersion = useRef(0);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  // base 是草稿的来源快照；dirty 记录用户真正改过且尚未保存的字段。
+  // 后台 refetch 改变 item 时，只同步干净字段，不覆盖未保存的编辑。
+  const baseRef = useRef(item);
+  const dirtyRef = useRef(new Set<keyof Draft>());
+  const itemRef = useRef(item);
+  const draftRef = useRef(draft);
   const saveQueue = useRef(Promise.resolve());
 
+  itemRef.current = item;
+  draftRef.current = draft;
+
+  /** 把 UI 编辑写入草稿并维护 dirty 集合：改回基线值即视为不再有未保存修改。 */
+  const setDraftField = (patch: Partial<Draft>) => {
+    setDraft((current) => {
+      const next = { ...current, ...patch };
+      for (const key of Object.keys(patch) as Array<keyof Draft>) {
+        if (next[key] === baseRef.current[key]) dirtyRef.current.delete(key);
+        else dirtyRef.current.add(key);
+      }
+      return next;
+    });
+  };
+
+  /** 保存成功后以服务端记录为新基线，按当前草稿重新对齐 dirty 集合（生图模型两个字段作为一个整体）。 */
+  const resyncDirty = (saved: StoryboardItem) => {
+    baseRef.current = saved;
+    const baseline = toDraft(saved);
+    const current = draftRef.current;
+    for (const key of ["assetType", "displayName", "candidateCount", "imageResolution", "imageAspectRatio", "mode", "promptInstruction"] as const) {
+      if (current[key] === baseline[key]) dirtyRef.current.delete(key);
+      else dirtyRef.current.add(key);
+    }
+    const modelDirty = current.imageProviderId !== baseline.imageProviderId || current.imageModelId !== baseline.imageModelId;
+    if (modelDirty) { dirtyRef.current.add("imageProviderId"); dirtyRef.current.add("imageModelId"); }
+    else { dirtyRef.current.delete("imageProviderId"); dirtyRef.current.delete("imageModelId"); }
+  };
+
+  const runSave = () => {
+    setSaveState("saving");
+    saveQueue.current = saveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        // 执行时重算补丁：队列里前一次保存会先更新基线，已保存字段不会重复提交
+        const body = patchFrom(baseRef.current, dirtyRef.current, draftRef.current);
+        if (!body) return;
+        const saved = await persist({ itemId: itemRef.current.id, body });
+        resyncDirty(saved);
+        if (dirtyRef.current.size === 0) setSaveState("saved");
+      })
+      .catch((error: unknown) => {
+        // 保留用户输入，标记失败等待下一次编辑或关闭前的 flush；不静默回滚草稿
+        setSaveState("failed");
+        notification.error({ title: "分镜未保存", description: errorText(error) });
+      });
+  };
+
   useEffect(() => {
-    snapshot.current = item;
-    setDraft(toDraft(item));
-    setSaveState("idle");
+    if (dirtyRef.current.size === 0) {
+      baseRef.current = item;
+      setDraft(toDraft(item));
+      setSaveState("idle");
+    }
   }, [item]);
 
   useEffect(() => {
     if (item.status === "GENERATING") return;
-    const next = patchFrom(snapshot.current, draft);
-    if (!next) return;
-    const version = ++saveVersion.current;
-    const timer = window.setTimeout(() => {
-      setSaveState("saving");
-      saveQueue.current = saveQueue.current
-        .catch(() => undefined)
-        .then(async () => {
-          try {
-            const saved = await persist({ itemId: item.id, body: next });
-            if (saveVersion.current === version) {
-              snapshot.current = saved;
-              setSaveState("saved");
-            }
-          } catch (error: unknown) {
-            if (saveVersion.current === version) {
-              setDraft(toDraft(snapshot.current));
-              setSaveState("idle");
-              notification.error({ title: "分镜未保存", description: errorText(error) });
-            }
-          }
-        });
-    }, DEBOUNCE_MS);
+    if (dirtyRef.current.size === 0) return;
+    const timer = window.setTimeout(runSave, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [draft, item.id, item.status, notification, persist]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, item.status]);
+
+  // 卸载（关闭弹窗或切换分镜）时防抖可能尚未到期：立即 flush 未保存字段，避免静默丢失
+  const flushRef = useRef(() => {});
+  flushRef.current = () => { if (dirtyRef.current.size > 0) runSave(); };
+  useEffect(() => () => flushRef.current(), []);
 
   const claims = factClaimRows(item.factClaims);
   const generationSettingsReadOnly = item.status === "GENERATING";
@@ -103,8 +142,8 @@ export function StoryboardInspector({
         {generationSettingsReadOnly
           ? "生成中，暂不可修改"
           : item.status === "GENERATED"
-            ? saveState === "saving" ? "保存中" : saveState === "saved" ? "已保存" : "已生成，配置仅影响下次生图"
-            : saveState === "saving" ? "保存中" : saveState === "saved" ? "已保存" : "编辑后自动保存"}
+            ? saveState === "saving" ? "保存中" : saveState === "saved" ? "已保存" : saveState === "failed" ? "保存失败，可重试编辑" : "已生成，配置仅影响下次生图"
+            : saveState === "saving" ? "保存中" : saveState === "saved" ? "已保存" : saveState === "failed" ? "保存失败，可重试编辑" : "编辑后自动保存"}
       </p>
 
       {sourceTag && sourceTag.label !== draft.displayName ? (
@@ -123,7 +162,7 @@ export function StoryboardInspector({
           { label: "创意", value: "CREATIVE" },
           { label: "像素保护", value: "PIXEL_PROTECTED" },
         ]}
-        onChange={(value) => setDraft((current) => ({ ...current, mode: value as Draft["mode"] }))}
+        onChange={(value) => setDraftField({ mode: value as Draft["mode"] })}
       />
       {draft.mode === "PIXEL_PROTECTED" ? (
         <p className={styles.protectHint}>
@@ -143,7 +182,7 @@ export function StoryboardInspector({
               disabled={generationSettingsReadOnly}
               options={ASPECT_SELECT_OPTIONS}
               optionRender={renderAspectOption}
-              onChange={(imageAspectRatio) => setDraft((current) => ({ ...current, imageAspectRatio }))}
+              onChange={(imageAspectRatio) => setDraftField({ imageAspectRatio })}
             />
           </label>
           <label className={styles.fieldLabel}>
@@ -153,7 +192,7 @@ export function StoryboardInspector({
               value={draft.imageResolution}
               disabled={generationSettingsReadOnly}
               options={Object.entries(RESOLUTION_LABEL).map(([value, label]) => ({ value, label }))}
-              onChange={(imageResolution) => setDraft((current) => ({ ...current, imageResolution }))}
+              onChange={(imageResolution) => setDraftField({ imageResolution })}
             />
           </label>
           <div className={styles.inspectorCandidate}>
@@ -163,7 +202,7 @@ export function StoryboardInspector({
                 type="button"
                 aria-label="减少分镜候选数"
                 disabled={generationSettingsReadOnly || draft.candidateCount <= 1}
-                onClick={() => setDraft((current) => ({ ...current, candidateCount: current.candidateCount - 1 }))}
+                onClick={() => setDraftField({ candidateCount: draft.candidateCount - 1 })}
               >
                 −
               </button>
@@ -172,7 +211,7 @@ export function StoryboardInspector({
                 type="button"
                 aria-label="增加分镜候选数"
                 disabled={generationSettingsReadOnly || draft.candidateCount >= 4}
-                onClick={() => setDraft((current) => ({ ...current, candidateCount: current.candidateCount + 1 }))}
+                onClick={() => setDraftField({ candidateCount: draft.candidateCount + 1 })}
               >
                 +
               </button>
@@ -188,7 +227,7 @@ export function StoryboardInspector({
               placeholder="选择生图模型"
               onChange={(value) => {
                 const [imageProviderId, imageModelId] = value.split("::");
-                if (imageProviderId && imageModelId) setDraft((current) => ({ ...current, imageProviderId, imageModelId }));
+                if (imageProviderId && imageModelId) setDraftField({ imageProviderId, imageModelId });
               }}
             />
           </label>
@@ -204,7 +243,7 @@ export function StoryboardInspector({
         value={draft.promptInstruction}
         disabled={contentReadOnly}
         autoSize={{ minRows: 5, maxRows: 12 }}
-        onChange={(event) => setDraft((current) => ({ ...current, promptInstruction: event.target.value }))}
+        onChange={(event) => setDraftField({ promptInstruction: event.target.value })}
       />
 
       {claims.length > 0 ? (
@@ -270,17 +309,21 @@ function toDraft(item: StoryboardItem): Draft {
   };
 }
 
-function patchFrom(item: StoryboardItem, draft: Draft): UpdateStoryboardItemInput | null {
+/**
+ * 只把 dirty 字段与基线的差异写进补丁：后台 refetch 更新了其他字段时，
+ * 未编辑字段不会被本地旧值覆盖。生图模型两个字段作为一个整体判断。
+ */
+function patchFrom(base: StoryboardItem, dirty: Set<keyof Draft>, draft: Draft): UpdateStoryboardItemInput | null {
   const body: UpdateStoryboardItemInput = {};
-  if (draft.assetType !== item.assetType) body.assetType = draft.assetType;
-  if (draft.displayName !== item.displayName) body.displayName = draft.displayName;
-  if (draft.candidateCount !== item.candidateCount) body.candidateCount = draft.candidateCount;
-  if (draft.imageProviderId && draft.imageModelId && (draft.imageProviderId !== item.imageProviderId || draft.imageModelId !== item.imageModelId)) {
+  if (dirty.has("assetType") && draft.assetType !== base.assetType) body.assetType = draft.assetType;
+  if (dirty.has("displayName") && draft.displayName !== base.displayName) body.displayName = draft.displayName;
+  if (dirty.has("candidateCount") && draft.candidateCount !== base.candidateCount) body.candidateCount = draft.candidateCount;
+  if ((dirty.has("imageProviderId") || dirty.has("imageModelId")) && draft.imageProviderId && draft.imageModelId && (draft.imageProviderId !== base.imageProviderId || draft.imageModelId !== base.imageModelId)) {
     body.imageModel = { providerId: draft.imageProviderId, modelId: draft.imageModelId };
   }
-  if (draft.imageResolution && draft.imageResolution !== item.imageResolution) body.imageResolution = draft.imageResolution;
-  if (draft.imageAspectRatio && draft.imageAspectRatio !== item.imageAspectRatio) body.imageAspectRatio = draft.imageAspectRatio;
-  if (draft.mode !== item.mode) body.mode = draft.mode;
-  if (draft.promptInstruction !== item.promptInstruction) body.promptInstruction = draft.promptInstruction;
+  if (dirty.has("imageResolution") && draft.imageResolution !== base.imageResolution) body.imageResolution = draft.imageResolution;
+  if (dirty.has("imageAspectRatio") && draft.imageAspectRatio !== base.imageAspectRatio) body.imageAspectRatio = draft.imageAspectRatio;
+  if (dirty.has("mode") && draft.mode !== base.mode) body.mode = draft.mode;
+  if (dirty.has("promptInstruction") && draft.promptInstruction !== base.promptInstruction) body.promptInstruction = draft.promptInstruction;
   return Object.keys(body).length > 0 ? body : null;
 }

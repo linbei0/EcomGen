@@ -42,4 +42,18 @@ describe("LocalAssetStore", () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
+
+  // 回归保护：projectId 直接拼路径，穿越形态会把 rm 的删除目标移出数据目录
+  it.each(["../", "..\\escape", "a/b", "a\\b", "..", "", "C:\\Windows"])("拒绝路径穿越形态的项目 ID：%j", async (projectId) => {
+    const directory = mkdtempSync(join(tmpdir(), "ecomgen-project-files-"));
+    try {
+      const store = new LocalAssetStore(directory);
+      await store.initialize();
+      const retained = await store.putAsset("archived", "product.png", Buffer.from("asset"));
+      await expect(store.deleteProject(projectId)).rejects.toThrow();
+      await expect(store.exists(retained.path)).resolves.toBe(true);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 });

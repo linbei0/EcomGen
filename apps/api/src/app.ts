@@ -5,12 +5,12 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ModelPortraitRecord, type ModelRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type SuiteListQuery, type UserTemplateRecord, SUITE_PAGE_SIZE_DEFAULT, SUITE_PAGE_SIZE_MAX } from "@ecomgen/core";
+import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type JobRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ModelPortraitRecord, type ModelRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type SuiteListQuery, type UserTemplateRecord, SUITE_PAGE_SIZE_DEFAULT, SUITE_PAGE_SIZE_MAX } from "@ecomgen/core";
 import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, findModelSpecConflicts, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
 import { SUITE_TAXONOMY, type SuiteDocumentInput, type SuiteOrigin } from "@ecomgen/ecom-suite";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, ModelSpec, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreateModelCastJobInput, CreateModelInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateModelInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
+import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreateModelCastJobInput, CreateModelInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, ConfirmStoryboardInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateModelInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, createSegmentationProvider, probeReasoning, type PromptSegmentationProtocol } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -19,7 +19,29 @@ import { parseBody } from "./http-input.js";
 import { registerWebStatic } from "./web-static.js";
 import { enumArray, enumValue, normalizeModels, objectOfStrings, parameter, readBoolean, readJsonObject, readJsonTextArray, readObject, readOptionalText, readOptionalTextArray, readPatchText, readPriority, readText, readTextArray, searchSourceBaseUrl } from "./input-normalizers.js";
 
-export interface ApiOptions { dataDir: string; redisUrl: string; masterKey: string; }
+export interface ApiOptions { dataDir: string; redisUrl: string; masterKey: string; corsOrigins?: string[]; }
+
+/** 未显式配置时的默认允许来源：本机 web dev server。API 自托管前端时为同源请求，不依赖 CORS。 */
+export const DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
+
+/**
+ * 校验 CORS 允许列表：项目没有认证层，允许任意来源等于把读写接口开放给任意站点。
+ * 拒绝通配符、空值和非 origin 形态（带路径、查询或非 http/https 协议），让配置错误在启动时暴露。
+ */
+export function resolveCorsOrigins(configured?: string[]): string[] {
+  const origins = configured ?? DEFAULT_CORS_ORIGINS;
+  if (origins.length === 0) throw new Error("CORS origins must not be empty");
+  for (const origin of origins) {
+    if (origin.trim() !== origin || origin === "") throw new Error(`Invalid CORS origin: "${origin}"`);
+    if (origin === "*") throw new Error("CORS origin must not be a wildcard; list explicit origins instead");
+    let parsed: URL;
+    try { parsed = new URL(origin); } catch { throw new Error(`Invalid CORS origin: "${origin}"`); }
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.pathname !== "/" || parsed.search || parsed.hash || parsed.username || parsed.password) {
+      throw new Error(`Invalid CORS origin (must be scheme://host[:port]): "${origin}"`);
+    }
+  }
+  return origins;
+}
 
 export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: true, genReqId: () => randomUUID() });
@@ -32,11 +54,41 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   const redis = createRedisConnection(options.redisUrl);
   const queue = createJobQueue(redis);
   const events = new RedisProjectEventBus(redis.duplicate(), redis.duplicate());
-  await app.register(cors, { origin: true });
+  await app.register(cors, { origin: resolveCorsOrigins(options.corsOrigins) });
   // 全局 multipart 上限作用于所有上传路由；files 取套图源图上限，因为它是唯一的批量多文件入口。
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_FILE_BYTES, files: MAX_SUITE_FORGE_SOURCES } });
   await app.register(fastifySSE, { heartbeatInterval: 20_000 });
   app.addHook("onClose", async () => { await events.close(); await queue.close(); database.close(); });
+  /**
+   * 入队是持久化之后的第二步：数据库已落 QUEUED 而入队失败时，任务永远不会执行，
+   * 且相同指纹会继续复用这个坏状态。这里把尚未入队的任务统一落为 FAILED(QUEUE_UNAVAILABLE)
+   * 并发布状态事件；顺序入队保证只回滚真正未入队的任务，已入队的照常执行。
+   */
+  /**
+   * pending 全部尝试入队；失败时只把 markable（默认即 pending，生成批次要传“本次新建”子集）
+   * 及其后未入队者统一落为 FAILED(QUEUE_UNAVAILABLE) 并发布事件——按指纹复用的既有任务
+   * 不属于本请求的失败面，不能被改写状态。顺序入队保证只回滚真正未入队的任务，已入队的照常执行。
+   */
+  async function enqueueOrMarkFailed(pending: JobRecord | JobRecord[], kind: EcomJobKind, options: { onFail?: (jobId: string) => void; markable?: JobRecord[] } = {}): Promise<void> {
+    const jobs = Array.isArray(pending) ? pending : [pending];
+    const markable = new Set((options.markable ?? jobs).map((job) => job.id));
+    for (let index = 0; index < jobs.length; index++) {
+      const job = jobs[index];
+      try {
+        await enqueue(queue, { jobId: job.id, kind });
+      } catch (error) {
+        app.log.error(error, "enqueue failed for job %s", job.id);
+        const message = "任务已创建但队列暂不可用，请稍后重试";
+        for (const remaining of jobs.slice(index)) {
+          if (!markable.has(remaining.id)) continue;
+          options.onFail?.(remaining.id);
+          const failed = repository.updateJob(remaining.id, { status: "FAILED", progress: 100, error: { code: "QUEUE_UNAVAILABLE", message } });
+          if (failed && failed.projectId) await events.publish(failed.projectId, "job.updated", failed);
+        }
+        throw new ApiError(503, "QUEUE_UNAVAILABLE", message);
+      }
+    }
+  }
   app.setErrorHandler((error, request, reply) => {
     const known = error instanceof ApiError;
     const status = known ? error.statusCode : 500;
@@ -143,7 +195,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       sources.push({ storagePath: stored.path, hash: stored.hash, originalName: upload.filename, mimeType: upload.mimeType, width: dimensions.width, height: dimensions.height });
     }
     const job = repository.createJob({ id: jobId, projectId: null, storyboardItemId: null, type: "SUITE_FORGE", input: { providerId, modelId, sources, hints }, requestFingerprint: fingerprint, providerId, modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
-    await enqueue(queue, { jobId: job.id, kind: "suite_forge" });
+    await enqueueOrMarkFailed(job, "suite_forge");
     return reply.code(202).send(job);
   });
   // 最近反推：草稿只落在 suite_forge_results，没有这个列表前端就无法回到历史反推结果 ——
@@ -261,7 +313,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const existing = repository.findJobByFingerprint(null, fingerprint);
     if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
     const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "MODEL_CAST", input: { modelId: model.id, aspectRatio: body.aspectRatio, candidateCount, spec: model.spec, notes: model.notes, referenceFacePath: model.referenceFacePath }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
-    await enqueue(queue, { jobId: job.id, kind: "model_cast" });
+    await enqueueOrMarkFailed(job, "model_cast");
     return reply.code(202).send(job);
   });
   app.get("/api/v1/models/:modelId/portraits", async (request) => {
@@ -426,6 +478,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.delete("/api/v1/projects/:projectId", async (request, reply) => {
     const id = parameter(request, "projectId");
+    // 项目 ID 同时是存储目录名：这里只接受 UUID，杜绝 `../` 等穿越参数进入存储层删除越界目录
+    if (!UUID_PATTERN.test(id)) throw new ApiError(400, "VALIDATION_ERROR", "projectId must be a UUID");
     const project = repository.getProject(id);
     if (!project) {
       // DELETE 保持幂等，并补清上一次数据库已删除但文件清理失败留下的目录。
@@ -495,6 +549,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       ? body.targetImageCount === undefined ? DEFAULT_TARGET_IMAGE_COUNT : planningImageCount(body.targetImageCount)
       : undefined;
     const input = {
+      // 规划修订号参与指纹：项目事实变化后旧规划任务不再被复用，避免结果基于过期内容
+      planningRevision: project.planningRevision,
       planningMode,
       requestedTypes,
       requestedSuiteShots: requestedSuiteShots.length ? requestedSuiteShots : undefined,
@@ -508,7 +564,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const fingerprint = requestFingerprint({ type: "PLAN", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
     verifyModel(repository, project.reasoningProviderId, project.reasoningModelId, "reasoning");
     const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "PLAN", input, requestFingerprint: fingerprint, providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
-    await enqueue(queue, { jobId: job.id, kind: "plan" }); return reply.code(202).send(job);
+    await enqueueOrMarkFailed(job, "plan"); return reply.code(202).send(job);
   });
   app.get("/api/v1/projects/:projectId/planning-config-snapshots", async (request) => {
     const projectId = parameter(request, "projectId"); ensureProject(repository, projectId);
@@ -553,7 +609,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       id: randomUUID(), projectId, storyboardItemId: null, type: "COPYWRITE", input, requestFingerprint: fingerprint,
       providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" },
     });
-    await enqueue(queue, { jobId: job.id, kind: "copywrite" });
+    await enqueueOrMarkFailed(job, "copywrite");
     return reply.code(202).send(job);
   });
   app.get("/api/v1/projects/:projectId/storyboard", async (request) => {
@@ -607,7 +663,16 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     repository.deleteStoryboardItem(itemId);
     return reply.code(204).send();
   });
-  app.post("/api/v1/projects/:projectId/storyboard/confirm", async (request) => { const projectId = parameter(request, "projectId"); const result = repository.confirmStoryboard(projectId); if (!result) throw new ApiError(409, "CONFLICT", "A draft storyboard must exist before confirmation"); return result; });
+  app.post("/api/v1/projects/:projectId/storyboard/confirm", async (request) => {
+    const projectId = parameter(request, "projectId");
+    const storyboard = repository.getStoryboard(projectId); if (!storyboard) throw new ApiError(409, "CONFLICT", "A draft storyboard must exist before confirmation");
+    // 确认携带发起编辑时看到的版本：与当前版本不一致即并发冲突，拒绝并带回当前版本，防止旧页面覆盖新页面
+    const body = parseBody(ConfirmStoryboardInput, request.body ?? {});
+    if (body.version !== storyboard.version) {
+      throw new ApiError(409, "CONFLICT", `分镜已被其他修改更新（当前版本 ${storyboard.version}），请刷新后重试`, [{ path: "/version", reason: `expected ${storyboard.version}` }]);
+    }
+    return repository.confirmStoryboard(projectId) as object;
+  });
   app.post("/api/v1/projects/:projectId/generation-jobs", async (request, reply) => {
     const projectId = parameter(request, "projectId"); const storyboard = repository.getStoryboard(projectId); if (!storyboard || storyboard.status !== "CONFIRMED") throw new ApiError(409, "CONFLICT", "Confirm the storyboard before generation");
     const body = parseBody(CreateGenerationJobInput, request.body); const itemIds = readTextArray(body.storyboardItemIds, "storyboardItemIds"); if (itemIds.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "At least one storyboardItemId is required");
@@ -625,26 +690,40 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const overrideModelId = overrideModel ? readText(overrideModel.modelId, "generationConfig.imageModel.modelId") : undefined;
     if (overrideProviderId && overrideModelId) verifyModel(repository, overrideProviderId, overrideModelId, "image");
     const project = repository.getProject(projectId); if (!project) missing("project", projectId);
-    const jobs = itemIds.flatMap((itemId) => {
+    // 先完整校验全部 item，再在单个事务里创建任务：部分写入后返回 400 会留下不可执行的孤儿任务
+    const plans = itemIds.map((itemId) => {
       const item = repository.getStoryboardItem(itemId); if (!item || item.projectId !== projectId) throw new ApiError(400, "VALIDATION_ERROR", "Storyboard item does not belong to this project");
       if (!overrideProviderId || !overrideModelId) verifyModel(repository, item.imageProviderId, item.imageModelId, "image");
-      const candidateCount = overrideCandidates ?? clampCandidates(item.candidateCount);
-      return Array.from({ length: candidateCount }, (_, index) => {
-        const input = {
-          revision,
-          generationBatchId,
-          candidateIndex: index + 1,
-          imageResolution: overrideResolution ?? item.imageResolution,
-          imageAspectRatio: overrideAspect ?? item.imageAspectRatio
-        };
-        const { generationBatchId: _generationBatchId, ...fingerprintInput } = input;
-        const fingerprint = requestFingerprint({ type: "GENERATE", projectId, itemId, storyboardVersion: storyboard.version, itemUpdatedAt: item.updatedAt, input: fingerprintInput, idempotencyKey: request.headers["idempotency-key"] ?? null });
-        const existing = repository.findJobByFingerprint(projectId, fingerprint);
-        if (existing) return existing;
-        return repository.createJob({ id: randomUUID(), projectId, storyboardItemId: itemId, type: "GENERATE", input, requestFingerprint: fingerprint, providerId: overrideProviderId ?? item.imageProviderId, modelId: overrideModelId ?? item.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
-      });
+      return { item, candidateCount: overrideCandidates ?? clampCandidates(item.candidateCount) };
     });
-    await Promise.all(jobs.map((job) => enqueue(queue, { jobId: job.id, kind: "generate" }))); return reply.code(202).send({ jobs });
+    const jobs: JobRecord[] = [];
+    const created: JobRecord[] = [];
+    const writeJobs = database.transaction(() => {
+      for (const { item, candidateCount } of plans) {
+        // 有效 Provider/模型参与指纹：切换 Provider 或模型必须产生新任务，不能复用旧结果
+        const effectiveProviderId = overrideProviderId ?? item.imageProviderId;
+        const effectiveModelId = overrideModelId ?? item.imageModelId;
+        for (let index = 0; index < candidateCount; index++) {
+          const input = {
+            revision,
+            generationBatchId,
+            candidateIndex: index + 1,
+            imageResolution: overrideResolution ?? item.imageResolution,
+            imageAspectRatio: overrideAspect ?? item.imageAspectRatio
+          };
+          const { generationBatchId: _generationBatchId, ...fingerprintInput } = input;
+          const fingerprint = requestFingerprint({ type: "GENERATE", projectId, itemId: item.id, storyboardVersion: storyboard.version, itemUpdatedAt: item.updatedAt, providerId: effectiveProviderId, modelId: effectiveModelId, input: fingerprintInput, idempotencyKey: request.headers["idempotency-key"] ?? null });
+          const existing = repository.findJobByFingerprint(projectId, fingerprint);
+          if (existing) { jobs.push(existing); continue; }
+          const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: item.id, type: "GENERATE", input, requestFingerprint: fingerprint, providerId: effectiveProviderId, modelId: effectiveModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+          jobs.push(job); created.push(job);
+        }
+      }
+    });
+    writeJobs();
+    // 入队失败只回滚本次新建的任务：按指纹复用的既有任务不属于本请求的失败面
+    await enqueueOrMarkFailed(jobs, "generate", { markable: created });
+    return reply.code(202).send({ jobs });
   });
   app.post("/api/v1/projects/:projectId/outputs/:outputId/edit-sessions", async (request, reply) => {
     const projectId = parameter(request, "projectId"); const outputId = parameter(request, "outputId"); ensureProject(repository, projectId);
@@ -758,7 +837,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const turn = repository.createEditTurn({ id: turnId, sessionId: session.id, projectId: session.projectId, baseOutputId, status: "PLANNING", message, annotations, editMaskPath: editStored?.path ?? null, editMaskHash: editStored?.hash ?? null, protectMaskPath: protectStored?.path ?? null, protectMaskHash: protectStored?.hash ?? null, referenceAssetIds, referenceSelections, plan: null, error: null });
     repository.attachEditReferenceAssets(session.id, turn.id, referenceSelections.filter((selection) => selection.source === "TEMPORARY").map((selection) => selection.id));
     const job = repository.createJob({ id: randomUUID(), projectId: session.projectId, storyboardItemId: null, type: "EDIT_PLAN", input: { editTurnId: turn.id }, requestFingerprint: fingerprint, providerId: generationConfig.reasoningProviderId, modelId: generationConfig.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
-    await enqueue(queue, { jobId: job.id, kind: "edit_plan" }); return reply.code(202).send({ turnId: turn.id, planJobId: job.id, status: turn.status });
+    await enqueueOrMarkFailed(job, "edit_plan"); return reply.code(202).send({ turnId: turn.id, planJobId: job.id, status: turn.status });
   });
   app.get("/api/v1/edit-turns/:turnId", async (request) => { const turn = repository.getEditTurn(parameter(request, "turnId")); if (!turn) missing("edit turn", parameter(request, "turnId")); return turn; });
   app.post("/api/v1/edit-turns/:turnId/approve", async (request, reply) => {
@@ -770,7 +849,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const existing = repository.findJobByFingerprint(turn.projectId, fingerprint); if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, turn: repository.getEditTurn(turn.id) });
     repository.updateEditTurn(turn.id, { status: "GENERATING", error: null });
     const job = repository.createJob({ id: randomUUID(), projectId: turn.projectId, storyboardItemId: null, type: "EDIT_GENERATE", input: { editTurnId: turn.id }, requestFingerprint: fingerprint, providerId: generationConfig.imageProviderId, modelId: generationConfig.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
-    await enqueue(queue, { jobId: job.id, kind: "edit_generate" }); return reply.code(202).send({ job, turn: repository.getEditTurn(turn.id) });
+    await enqueueOrMarkFailed(job, "edit_generate"); return reply.code(202).send({ job, turn: repository.getEditTurn(turn.id) });
   });
   app.post("/api/v1/edit-sessions/:sessionId/select-output", async (request) => {
     const session = repository.getEditSession(parameter(request, "sessionId")); if (!session) missing("edit session", parameter(request, "sessionId"));
@@ -806,7 +885,14 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     return repository.updateJob(id, { cancelRequested: true });
   });
   app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => {
-    const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id); if (!job.retryable) throw new ApiError(409, "CONFLICT", "This job cannot be retried"); const input = job.type === "GENERATE" ? { ...job.input, revision: "retry" } : job.input;
+    const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id);
+    // 只有失败任务可重试：重试 QUEUED/RUNNING 会叠加 Provider 调用产生重复计费，
+    // SUCCEEDED 无需重试，CANCELLED 是用户主动终结的终态；retryable=false 保留 Worker 对
+    // 外部请求不确定状态的非重试判断，API 不绕过该不变量。
+    if (job.status !== "FAILED" || !job.retryable) {
+      throw new ApiError(409, "CONFLICT", `只有失败的任务可以重试，当前状态：${job.status}`);
+    }
+    const input = job.type === "GENERATE" ? { ...job.input, revision: "retry" } : job.input;
     // 分层任务重试必须同时重建分层记录，否则 Worker 按新 jobId 找不到对应记录会立即失败。
     let createLayerRecord: ((retryJobId: string) => void) | undefined;
     if (job.type === "LAYER_PLAN" || job.type === "LAYER_EXPORT") {
@@ -823,10 +909,10 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     }
     // 重试即替代原任务：先终结原失败任务再入队新任务，前端结果区不再残留旧卡片；retryable 在此关闭使并发双击得到 409。
     repository.updateJob(id, { status: "CANCELLED", cancelRequested: true, retryable: false });
-    const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); createLayerRecord?.(retry.id); await enqueue(queue, { jobId: retry.id, kind: queueKindForJobType(retry.type) }); return reply.code(202).send(retry);
+    const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); createLayerRecord?.(retry.id); await enqueueOrMarkFailed(retry, queueKindForJobType(retry.type), { onFail: (jobId) => markLayerRecordFailed(repository, retry.type, jobId) }); return reply.code(202).send(retry);
   });
   app.get("/api/v1/projects/:projectId/outputs", async (request) => repository.listOutputs(parameter(request, "projectId")));
-  app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = parseBody(CreateExportJobRequest, request.body ?? {}); const input = { outputIds: body.outputIds, filenamePrefix: body.filenamePrefix }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueue(queue, { jobId: job.id, kind: "export" }); return reply.code(202).send({ job, export: exportRecord }); });
+  app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = parseBody(CreateExportJobRequest, request.body ?? {}); const input = { outputIds: body.outputIds, filenamePrefix: body.filenamePrefix }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueueOrMarkFailed(job, "export", { onFail: (failedJobId) => { const pendingExport = repository.getExportByJobId(failedJobId); if (pendingExport) repository.updateExport(pendingExport.id, { status: "FAILED" }); } }); return reply.code(202).send({ job, export: exportRecord }); });
   app.get("/api/v1/exports/:exportId", async (request) => { const result = repository.getExport(parameter(request, "exportId")); if (!result) missing("export", parameter(request, "exportId")); return result; });
   app.get("/api/v1/files/assets/:assetId", async (request, reply) => sendStored(request, reply, storage, repository.getAsset(parameter(request, "assetId")), "asset"));
   app.get("/api/v1/files/edit-reference-assets/:referenceAssetId", async (request, reply) => sendStored(request, reply, storage, repository.getEditReferenceAsset(parameter(request, "referenceAssetId")), "reference asset"));
@@ -867,7 +953,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (duplicate) { const duplicatePlan = repository.getLayerPlanByJobId(duplicate.id); if (duplicatePlan) return reply.code(duplicate.status === "SUCCEEDED" ? 200 : 202).send(publicLayerPlan(duplicatePlan)); }
     const job = repository.createJob({ id: randomUUID(), projectId: output.projectId, storyboardItemId: null, type: "LAYER_PLAN", input, requestFingerprint: fingerprint, providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     const plan = repository.createLayerPlan({ projectId: output.projectId, outputId: output.id, jobId: job.id, outputHash: output.hash, status: "QUEUED", elements: [], error: null });
-    await enqueue(queue, { jobId: job.id, kind: "layer_plan" });
+    await enqueueOrMarkFailed(job, "layer_plan", { onFail: (failedJobId) => markLayerRecordFailed(repository, "LAYER_PLAN", failedJobId) });
     return reply.code(202).send(publicLayerPlan(plan));
   });
   app.get("/api/v1/outputs/:outputId/layer-exports", async (request) => {
@@ -917,7 +1003,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (duplicate) { const duplicateExport = repository.getLayerExportByJobId(duplicate.id); if (duplicateExport) return reply.code(duplicate.status === "SUCCEEDED" ? 200 : 202).send({ job: duplicate, layerExport: publicLayerExport(duplicateExport) }); }
     const job = repository.createJob({ id: randomUUID(), projectId: output.projectId, storyboardItemId: null, type: "LAYER_EXPORT", input, requestFingerprint: fingerprint, providerId: project.segmentationModel.providerId, modelId: project.segmentationModel.modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     const layerExport = repository.createLayerExport({ projectId: output.projectId, outputId: output.id, jobId: job.id, planId, status: "QUEUED", includeBackground, psdStoragePath: null, layerFiles: null, error: null });
-    await enqueue(queue, { jobId: job.id, kind: "layer_export" });
+    await enqueueOrMarkFailed(job, "layer_export", { onFail: (failedJobId) => markLayerRecordFailed(repository, "LAYER_EXPORT", failedJobId) });
     return reply.code(202).send({ job, layerExport: publicLayerExport(layerExport) });
   });
   app.get("/api/v1/files/layer-exports/:layerExportId", async (request, reply) => {
@@ -955,6 +1041,7 @@ function publicUserTemplate(value: UserTemplateRecord): object { return { ...val
 /** 规划校验与 Worker 共用同一编译口径；表极小，按请求读取即可保证最新。 */
 function compiledUserTemplates(repository: EcomRepository): ReturnType<typeof compileUserTemplate>[] { return repository.listUserTemplates().map((record) => compileUserTemplate({ id: record.id, name: record.name, prompt: record.prompt, defaultSize: record.defaultSize, supportsImageReference: record.supportsImageReference })); }
 const SUITE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** 导入套图必须落在 custom-suite- 命名空间，避免覆盖内置或目录投放套图。 */
 function suiteIdForImport(requested: string | undefined, catalog: SuiteCatalog): string {
   if (requested) {
@@ -1149,6 +1236,18 @@ function queueKindForJobType(type: JobType): EcomJobKind {
   if (type === "SUITE_FORGE") return "suite_forge";
   if (type === "MODEL_CAST") return "model_cast";
   return "export";
+}
+/** 入队失败时同步把任务的分层伴随记录推进到终态，避免前端看到永远 QUEUED 的记录。 */
+function markLayerRecordFailed(repository: EcomRepository, type: JobType, jobId: string): void {
+  const error = { code: "QUEUE_UNAVAILABLE", message: "任务已创建但队列暂不可用，请稍后重试" };
+  if (type === "LAYER_PLAN") {
+    const plan = repository.getLayerPlanByJobId(jobId);
+    if (plan) repository.updateLayerPlan(plan.id, { status: "FAILED", error });
+  }
+  if (type === "LAYER_EXPORT") {
+    const layerExport = repository.getLayerExportByJobId(jobId);
+    if (layerExport) repository.updateLayerExport(layerExport.id, { status: "FAILED", error });
+  }
 }
 // ProviderId/modelId 为 null 表示项目尚未选择模型（Provider 被删除后置空），在入口拦截而不是打出一个注定失败的任务
 function verifyModel(repository: EcomRepository, providerId: string | null, modelId: string | null, kind: "reasoning" | "image"): void { if (!providerId || !modelId) throw new ApiError(422, "PROVIDER_NOT_CONFIGURED", "请先在项目设置中选择推理与图片模型"); const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId); const model = provider.models.find((candidate) => candidate.id === modelId); if (!model) throw new ApiError(400, "VALIDATION_ERROR", `${kind} model is not declared by the selected provider`); if (kind === "image" && !model.imageApiKind) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected image model has no image API configured"); }

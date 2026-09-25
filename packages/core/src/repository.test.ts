@@ -286,6 +286,24 @@ describe("EcomRepository", () => {
     database.close();
   });
 
+  // planningRevision 是规划指纹的一部分：只有改变规划事实的更新才递增，否则旧规划会被错误失效
+  it("规划相关事实变化时递增 planningRevision，改名与归档不递增", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject(makeProjectInput(provider));
+    expect(project.planningRevision).toBe(0);
+    expect(repository.updateProject(project.id, { name: "renamed" })?.planningRevision).toBe(0);
+    expect(repository.updateProject(project.id, { archivedAt: "2026-08-01T01:00:00.000Z" })?.planningRevision).toBe(0);
+    expect(repository.updateProject(project.id, { verifiedFacts: ["304 不锈钢"] })?.planningRevision).toBe(1);
+    // brandGuidelines 内容相同、键序不同：不递增
+    const guidelines = { tone: "专业", scene: "厨房" };
+    expect(repository.updateProject(project.id, { brandGuidelines: guidelines })?.planningRevision).toBe(2);
+    expect(repository.updateProject(project.id, { brandGuidelines: { scene: "厨房", tone: "专业" } })?.planningRevision).toBe(2);
+    expect(repository.updateProject(project.id, { brandGuidelines: { scene: "客厅", tone: "专业" } })?.planningRevision).toBe(3);
+    database.close();
+  });
+
   it("migrates existing projects with empty market and copy language while preserving platform selection", () => {
     const directory = mkdtempSync(join(tmpdir(), "ecomgen-migration-"));
     const filename = join(directory, "ecomgen.db");

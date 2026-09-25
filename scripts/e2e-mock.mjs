@@ -312,7 +312,9 @@ try {
   assert.equal(storyboard.items[0].assetType, "hero-image");
   assert.equal(storyboard.items[0].templateVariant, "luxury");
   assert.equal(storyboard.items[0].displayName, "通勤杯质感首图");
-  await requestJson(`${base}/projects/${project.id}/storyboard/confirm`, "POST", {});
+  // 确认携带当前版本；过期版本必须被 409 拒绝（乐观并发控制）
+  await assert.rejects(requestJson(`${base}/projects/${project.id}/storyboard/confirm`, "POST", { version: storyboard.storyboard.version + 1 }), /failed \(409\)/);
+  await requestJson(`${base}/projects/${project.id}/storyboard/confirm`, "POST", { version: storyboard.storyboard.version });
   const generation = await requestJson(`${base}/projects/${project.id}/generation-jobs`, "POST", { storyboardItemIds: [storyboard.items[0].id], revision: "initial" });
   const duplicateGeneration = await requestJson(`${base}/projects/${project.id}/generation-jobs`, "POST", { storyboardItemIds: [storyboard.items[0].id], revision: "initial" });
   assert.equal(duplicateGeneration.jobs[0].id, generation.jobs[0].id);
@@ -463,7 +465,7 @@ try {
   assert.equal(customStoryboard.items.length, 1);
   assert.equal(customStoryboard.items[0].assetType, customTemplate.id);
   assert.equal(customStoryboard.items[0].displayName, "礼盒丝绒氛围图");
-  await requestJson(`${base}/projects/${customProject.id}/storyboard/confirm`, "POST", {});
+  await requestJson(`${base}/projects/${customProject.id}/storyboard/confirm`, "POST", { version: customStoryboard.storyboard.version });
   const customGeneration = await requestJson(`${base}/projects/${customProject.id}/generation-jobs`, "POST", { storyboardItemIds: [customStoryboard.items[0].id] });
   const customGenerationJob = await waitJob(base, customGeneration.jobs[0].id);
   assert.equal(customGenerationJob.status, "SUCCEEDED");
@@ -608,7 +610,7 @@ try {
   const cancelPlanJob = await waitForJob(base, cancelProject.id, "PLAN");
   assert.equal(cancelPlanJob.status, "SUCCEEDED");
   const cancelStoryboard = await requestJson(`${base}/projects/${cancelProject.id}/storyboard`, "GET");
-  await requestJson(`${base}/projects/${cancelProject.id}/storyboard/confirm`, "POST", {});
+  await requestJson(`${base}/projects/${cancelProject.id}/storyboard/confirm`, "POST", { version: cancelStoryboard.storyboard.version });
   const cancelGeneration = await requestJson(`${base}/projects/${cancelProject.id}/generation-jobs`, "POST", { storyboardItemIds: [cancelStoryboard.items[0].id] });
   const cancelJobId = cancelGeneration.jobs[0].id;
   await waitFor(() => cancellation.hangingRequests === 1, 15_000, "hanging generation request");

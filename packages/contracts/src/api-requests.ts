@@ -42,7 +42,8 @@ export const UploadAssetInput = Type.Object({ file: Type.String({ format: "binar
 export const CopyLibraryAssetToProjectInput = Type.Object({ itemId: Type.String({ description: "Library item ID: 'asset:<uuid>' or 'output:<uuid>'." }), role: Type.Optional(schemaRef(AssetRole)), kind: Type.Optional(schemaRef(UserAssetKind)) }, { $id: "#/components/schemas/CopyLibraryAssetToProjectInput" });
 export type CopyLibraryAssetToProjectInput = Static<typeof CopyLibraryAssetToProjectInput>;
 export const UpdateAssetInput = Type.Object({ role: Type.Optional(schemaRef(AssetRole)), kind: Type.Optional(schemaRef(UserAssetKind)) }, { $id: "#/components/schemas/UpdateAssetInput" });
-export const ConfirmStoryboardInput = Type.Object({ version: Type.Optional(Type.Integer({ minimum: 1 })) }, { $id: "#/components/schemas/ConfirmStoryboardInput" });
+// version 必填：确认是并发敏感操作，缺少版本就失去乐观并发控制意义（旧页面可能覆盖新页面）。
+export const ConfirmStoryboardInput = Type.Object({ version: Type.Integer({ minimum: 1, description: "The storyboard version the client confirmed; must match the current version or the request is rejected with 409." }) }, { $id: "#/components/schemas/ConfirmStoryboardInput" });
 export const GenerationJobsResponse = Type.Object({ jobs: Type.Array(schemaRef(Job)) }, { $id: "#/components/schemas/GenerationJobsResponse" });
 export const EcomTemplateItem = Type.Object({
   id: Type.String(), upstreamNumber: Type.Integer(), name: Type.String(), keywords: Type.Array(Type.String()), trigger_phrases: Type.Array(Type.String()),

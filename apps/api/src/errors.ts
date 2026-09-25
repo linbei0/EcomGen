@@ -6,7 +6,8 @@ export type ApiErrorCode =
   | "PROVIDER_NOT_CONFIGURED"
   | "RATE_LIMITED"
   | "INTERNAL_ERROR"
-  | "PROVIDER_ERROR";
+  | "PROVIDER_ERROR"
+  | "QUEUE_UNAVAILABLE";
 
 export class ApiError extends Error {
   public constructor(

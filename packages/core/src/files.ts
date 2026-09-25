@@ -125,12 +125,30 @@ export class LocalAssetStore {
     await unlink(this.absolute(relativePath)).catch(() => undefined);
   }
 
-  /** 永久删除项目的全部本地产物；路径仍通过 absolute 校验，不能越出数据根目录。 */
+  /**
+   * 永久删除项目的全部本地产物。
+   *
+   * projectId 来自 URL 参数并直接参与拼路径，是路径穿越的高危入口：`../`、反斜杠或
+   * 绝对路径都会改变删除目标，而 `rm recursive + force` 会把误伤静默放大。这里强制
+   * projectId 为单段目录名，并要求解析后的目标位于对应资源目录（<root>/<part>/）之下。
+   */
   public async deleteProject(projectId: string): Promise<void> {
+    if (
+      projectId.length === 0 ||
+      projectId.includes("/") ||
+      projectId.includes("\\") ||
+      projectId.includes("..") ||
+      isAbsolute(projectId)
+    ) {
+      throw new Error("Project id must be a single path segment");
+    }
     await Promise.all(
-      ["assets", "outputs", "exports", "edits", "layers"].map((part) =>
-        rm(this.absolute(join(part, projectId)), { recursive: true, force: true }),
-      ),
+      ["assets", "outputs", "exports", "edits", "layers"].map((part) => {
+        const target = this.absolute(join(part, projectId));
+        const pathFromPart = relative(this.absolute(part), target);
+        if (pathFromPart.startsWith("..") || isAbsolute(pathFromPart)) throw new Error("Asset path escapes storage root");
+        return rm(target, { recursive: true, force: true });
+      }),
     );
   }
 

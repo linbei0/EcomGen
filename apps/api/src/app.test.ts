@@ -29,7 +29,7 @@ vi.mock("@ecomgen/jobs", async () => {
 import type { FastifyInstance } from "fastify";
 import { EcomRepository, LocalAssetStore, openDatabase } from "@ecomgen/core";
 import { MODEL_SPEC_DEFAULTS } from "@ecomgen/contracts";
-import { buildApi } from "./app.js";
+import { buildApi, resolveCorsOrigins } from "./app.js";
 import { enqueue } from "@ecomgen/jobs";
 
 let dataDir = "";
@@ -43,8 +43,9 @@ beforeEach(async () => {
   // 与 buildApi 共享同一个文件库，保证端点操作和断言看到相同的状态真相
   database = openDatabase(join(dataDir, "ecomgen.sqlite"));
   repository = new EcomRepository(database);
-  // enqueue 是模块级共享 mock：逐用例清零，断言不依赖文件内的执行顺序
-  vi.mocked(enqueue).mockClear();
+  // enqueue 是模块级共享 mock：逐用例重置到成功实现（once 行为会跨用例排队，只 clear 调用计数不够），
+  // 断言不依赖文件内的执行顺序
+  vi.mocked(enqueue).mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(async () => {
@@ -122,6 +123,21 @@ describe("POST /api/v1/jobs/:jobId/retry", () => {
     expect(first.statusCode).toBe(202);
     const second = await app.inject({ method: "POST", url: `/api/v1/jobs/${failed.id}/retry` });
     expect(second.statusCode).toBe(409);
+  });
+
+  it("运行中与已成功的任务不可重试，避免叠加 Provider 调用", async () => {
+    const provider = saveProvider();
+    const project = makeProject(provider.id);
+    const running = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "PLAN", input: {}, providerId: provider.id, modelId: "reasoner" });
+    repository.updateJob(running.id, { status: "RUNNING" });
+    const runningRetry = await app.inject({ method: "POST", url: `/api/v1/jobs/${running.id}/retry` });
+    expect(runningRetry.statusCode).toBe(409);
+    expect(enqueue).not.toHaveBeenCalled();
+
+    const succeeded = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "PLAN", input: {}, providerId: provider.id, modelId: "reasoner" });
+    repository.updateJob(succeeded.id, { status: "SUCCEEDED", progress: 100 });
+    const succeededRetry = await app.inject({ method: "POST", url: `/api/v1/jobs/${succeeded.id}/retry` });
+    expect(succeededRetry.statusCode).toBe(409);
   });
 });
 
@@ -652,5 +668,220 @@ describe("segmentation model declarations & refs", () => {
 
     const unknown = await app.inject({ method: "POST", url: `/api/v1/providers/${provider.id}/test`, payload: { modelId: "ghost", kind: "segmentation" } });
     expect(unknown.statusCode).toBe(400);
+  });
+});
+
+describe("DELETE /api/v1/projects/:projectId 路径穿越防御", () => {
+  it.each(["..", encodeURIComponent("../evil"), encodeURIComponent("C:\Windows")])("拒绝非 UUID 的项目 ID：%s", async (encoded) => {
+    // 与被测 API 共享 dataDir：穿越参数若抵达存储层会删除目录内容，这里预置一个受害者文件
+    const store = new LocalAssetStore(dataDir);
+    await store.initialize();
+    const victim = await store.putAsset("victim", "keep.png", Buffer.from("victim"));
+    const response = await app.inject({ method: "DELETE", url: `/api/v1/projects/${encoded}` });
+    // 字面 ".." 段在路由层就被 404 掉，其余形态到达处理器后返回 400；不变量都是不触达存储层
+    expect([400, 404]).toContain(response.statusCode);
+    await expect(store.exists(victim.path)).resolves.toBe(true);
+  });
+});
+
+describe("CORS 来源白名单", () => {
+  it("未配置时只允许本机 dev server 来源，任意站点不带 allow-origin", async () => {
+    const trusted = await app.inject({ method: "GET", url: "/health", headers: { origin: "http://localhost:5173" } });
+    expect(trusted.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    const untrusted = await app.inject({ method: "GET", url: "/health", headers: { origin: "https://untrusted.example" } });
+    expect(untrusted.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("通配符与非 origin 形态在启动时失败", () => {
+    expect(() => resolveCorsOrigins(["*"])).toThrow();
+    expect(() => resolveCorsOrigins(["https://untrusted.example/path"])).toThrow();
+    expect(() => resolveCorsOrigins(["ftp://untrusted.example"])).toThrow();
+    expect(() => resolveCorsOrigins([])).toThrow();
+    expect(resolveCorsOrigins(["https://console.example.com"])).toEqual(["https://console.example.com"]);
+  });
+});
+
+describe("入队失败的任务状态", () => {
+  it("入队抛错时任务落为 FAILED(QUEUE_UNAVAILABLE)，相同请求不再复用坏任务", async () => {
+    const project = seedProject("queue-down");
+    vi.mocked(enqueue).mockRejectedValueOnce(new Error("redis down"));
+    const failed = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/planning-jobs`, payload: {} });
+    expect(failed.statusCode).toBe(503);
+    expect(failed.json<{ error: { code: string } }>().error.code).toBe("QUEUE_UNAVAILABLE");
+    const failedJob = repository.listJobs(project.id)[0];
+    expect(failedJob).toMatchObject({ status: "FAILED", retryable: true });
+    expect(failedJob.error).toMatchObject({ code: "QUEUE_UNAVAILABLE" });
+
+    const retried = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/planning-jobs`, payload: {} });
+    expect(retried.statusCode).toBe(202);
+    expect(retried.json<{ id: string }>().id).not.toBe(failedJob.id);
+  });
+
+  it("入队失败不波及按指纹复用的既有任务", async () => {
+    // 生成批次里新旧任务混合：入队失败只允许落终态本次新建的任务
+    const project = seedProject("reuse-safe");
+    repository.saveStoryboard(project.id, "", "CONFIRMED", [
+      {
+        assetType: "hero-image",
+        displayName: "首图",
+        shotRole: null,
+        templateVariant: null,
+        candidateCount: 1,
+        referencedAssets: [],
+        mode: "CREATIVE",
+        status: "DRAFT",
+        promptInstruction: "hero",
+        compiledPrompt: null,
+        factClaims: [],
+        riskFlags: [],
+        sortOrder: 0,
+      },
+      {
+        assetType: "lifestyle-scene",
+        displayName: "场景图",
+        shotRole: null,
+        templateVariant: null,
+        candidateCount: 1,
+        referencedAssets: [],
+        mode: "CREATIVE",
+        status: "DRAFT",
+        promptInstruction: "scene",
+        compiledPrompt: null,
+        factClaims: [],
+        riskFlags: [],
+        sortOrder: 1,
+      },
+    ]);
+    const itemsAll = repository.listStoryboardItems(project.id);
+
+    const first = await app.inject({
+      method: "POST",
+      url: `/api/v1/projects/${project.id}/generation-jobs`,
+      payload: { storyboardItemIds: [itemsAll[0].id], revision: "initial" },
+    });
+    expect(first.statusCode).toBe(202);
+    const reusedJobId = first.json<{ jobs: Array<{ id: string }> }>().jobs[0].id;
+
+    vi.mocked(enqueue).mockRejectedValueOnce(new Error("redis down"));
+    const second = await app.inject({
+      method: "POST",
+      url: `/api/v1/projects/${project.id}/generation-jobs`,
+      payload: { storyboardItemIds: [itemsAll[0].id, itemsAll[1].id], revision: "initial" },
+    });
+    expect(second.statusCode).toBe(503);
+    // 复用的既有任务保持 QUEUED，新任务落 FAILED(QUEUE_UNAVAILABLE)
+    expect(repository.getJob(reusedJobId)).toMatchObject({ status: "QUEUED" });
+    const jobs = repository.listJobs(project.id);
+    expect(jobs).toHaveLength(2);
+    const newJob = jobs.find((job) => job.id !== reusedJobId);
+    expect(newJob).toMatchObject({ status: "FAILED" });
+    expect(newJob?.error).toMatchObject({ code: "QUEUE_UNAVAILABLE" });
+  });
+});
+
+/** 确认态分镜：生成入口要求 storyboard.status=CONFIRMED。 */
+function seedConfirmedStoryboard(projectId: string) {
+  repository.saveStoryboard(projectId, "", "CONFIRMED", [{
+    assetType: "hero-image",
+    displayName: "首图",
+    shotRole: null,
+    templateVariant: null,
+    candidateCount: 1,
+    referencedAssets: [],
+    mode: "CREATIVE",
+    status: "DRAFT",
+    promptInstruction: "hero",
+    compiledPrompt: null,
+    factClaims: [],
+    riskFlags: [],
+    sortOrder: 0,
+  }]);
+  return repository.listStoryboardItems(projectId);
+}
+
+describe("POST /api/v1/projects/:projectId/generation-jobs 批次与指纹", () => {
+  it("部分 item 无效时整体返回 400 且不留下孤儿任务", async () => {
+    const project = seedProject("batch");
+    const items = seedConfirmedStoryboard(project.id);
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/v1/projects/${project.id}/generation-jobs`,
+      payload: { storyboardItemIds: [items[0].id, randomUUID()], revision: "initial" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(repository.listJobs(project.id)).toHaveLength(0);
+  });
+
+  it("生成指纹纳入有效 Provider/模型：切换 Provider 产生新任务而非复用旧结果", async () => {
+    const providerA = saveProvider();
+    const project = makeProject(providerA.id);
+    const items = seedConfirmedStoryboard(project.id);
+    const providerB = saveProvider();
+
+    const initial = await app.inject({
+      method: "POST",
+      url: `/api/v1/projects/${project.id}/generation-jobs`,
+      payload: { storyboardItemIds: [items[0].id], revision: "initial" },
+    });
+    expect(initial.statusCode).toBe(202);
+    const initialJob = initial.json<{ jobs: Array<{ id: string; providerId: string }> }>().jobs[0];
+    expect(initialJob.providerId).toBe(providerA.id);
+
+    const override = await app.inject({
+      method: "POST",
+      url: `/api/v1/projects/${project.id}/generation-jobs`,
+      payload: { storyboardItemIds: [items[0].id], revision: "initial", generationConfig: { imageModel: { providerId: providerB.id, modelId: "image" } } },
+    });
+    const overrideJob = override.json<{ jobs: Array<{ id: string; providerId: string }> }>().jobs[0];
+    expect(override.statusCode).toBe(202);
+    expect(overrideJob.providerId).toBe(providerB.id);
+    expect(overrideJob.id).not.toBe(initialJob.id);
+
+    // 相同 Provider 覆盖请求仍按指纹复用，不重复计费
+    const repeat = await app.inject({
+      method: "POST",
+      url: `/api/v1/projects/${project.id}/generation-jobs`,
+      payload: { storyboardItemIds: [items[0].id], revision: "initial", generationConfig: { imageModel: { providerId: providerB.id, modelId: "image" } } },
+    });
+    expect(repeat.json<{ jobs: Array<{ id: string }> }>().jobs[0].id).toBe(overrideJob.id);
+  });
+});
+
+describe("POST /api/v1/projects/:projectId/planning-jobs 规划指纹", () => {
+  it("项目规划事实变化后相同请求创建新任务，不复用旧规划", async () => {
+    const project = seedProject("revision");
+    const first = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/planning-jobs`, payload: { planningMode: "AI", requestedTypes: ["hero-image"] } });
+    expect(first.statusCode).toBe(202);
+    const firstJob = first.json<{ id: string; input: { planningRevision: number } }>();
+    expect(firstJob.input.planningRevision).toBe(0);
+
+    repository.updateProject(project.id, { verifiedFacts: ["304 不锈钢"] });
+
+    const second = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/planning-jobs`, payload: { planningMode: "AI", requestedTypes: ["hero-image"] } });
+    expect(second.statusCode).toBe(202);
+    const secondJob = second.json<{ id: string; input: { planningRevision: number } }>();
+    expect(secondJob.id).not.toBe(firstJob.id);
+    expect(secondJob.input.planningRevision).toBe(1);
+  });
+});
+
+describe("POST /api/v1/projects/:projectId/storyboard/confirm 版本校验", () => {
+  it("过期版本返回 409 并带回当前版本，当前版本可确认", async () => {
+    const project = seedProject("confirm");
+    seedConfirmedStoryboard(project.id);
+    const storyboard = repository.getStoryboard(project.id);
+    expect(storyboard).toBeDefined();
+    const version = storyboard!.version;
+
+    const stale = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/storyboard/confirm`, payload: { version: version + 1 } });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json<{ error: { details: Array<{ reason: string }> } }>().error.details).toEqual([{ path: "/version", reason: `expected ${version}` }]);
+
+    const missing = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/storyboard/confirm`, payload: {} });
+    expect(missing.statusCode).toBe(400);
+
+    const current = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/storyboard/confirm`, payload: { version } });
+    expect(current.statusCode).toBe(200);
+    expect(repository.getStoryboard(project.id)).toMatchObject({ status: "CONFIRMED", version });
   });
 });

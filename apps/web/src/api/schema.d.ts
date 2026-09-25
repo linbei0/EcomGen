@@ -1171,7 +1171,7 @@ export interface components {
         /** @enum {string} */
         EditSessionStatus: "ACTIVE" | "ARCHIVED";
         /** @enum {string} */
-        ErrorCode: "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT" | "CAPABILITY_UNSUPPORTED" | "PROVIDER_NOT_CONFIGURED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "PROVIDER_ERROR";
+        ErrorCode: "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT" | "CAPABILITY_UNSUPPORTED" | "PROVIDER_NOT_CONFIGURED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "PROVIDER_ERROR" | "QUEUE_UNAVAILABLE";
         EventEnvelope: {
             /** Format: uuid */
             id: string;
@@ -1756,6 +1756,8 @@ export interface components {
             /** @description Enable restricted visual-direction web research during Agent planning. */
             webResearchEnabled: boolean;
             archivedAt?: string | null;
+            /** @description Monotonic revision bumped whenever planning-relevant project facts change; planning jobs embed it in their fingerprint so stale plans are never reused. */
+            planningRevision?: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2008,7 +2010,8 @@ export interface components {
             turn: components["schemas"]["EditTurn"];
         };
         ConfirmStoryboardInput: {
-            version?: number;
+            /** @description The storyboard version the client confirmed; must match the current version or the request is rejected with 409. */
+            version: number;
         };
         CopyLibraryAssetToProjectInput: {
             /** @description Library item ID: 'asset:<uuid>' or 'output:<uuid>'. */

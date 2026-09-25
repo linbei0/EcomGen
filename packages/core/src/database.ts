@@ -282,6 +282,7 @@ function migrate(database: SqliteDatabase): void {
       candidates_per_type INTEGER NOT NULL DEFAULT 1,
       web_research_enabled INTEGER NOT NULL DEFAULT 0,
       archived_at TEXT,
+      planning_revision INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (reasoning_provider_id) REFERENCES providers(id),
@@ -555,6 +556,10 @@ function migrate(database: SqliteDatabase): void {
   if (!columnNames(database, "projects").has("segmentation_protocol")) {
     database.exec("ALTER TABLE projects ADD COLUMN segmentation_protocol TEXT");
   }
+  // 规划修订号：项目规划相关事实变化时单调递增，旧规划任务按指纹失效；旧行从 0 起算
+  if (!columnNames(database, "projects").has("planning_revision")) {
+    database.exec("ALTER TABLE projects ADD COLUMN planning_revision INTEGER NOT NULL DEFAULT 0");
+  }
   if (!columnNames(database, "outputs").has("generation_key")) {
     database.exec("ALTER TABLE outputs ADD COLUMN generation_key TEXT");
   }
@@ -634,6 +639,9 @@ function migrate(database: SqliteDatabase): void {
   database.exec("CREATE INDEX IF NOT EXISTS idx_planning_config_snapshots_project_created ON planning_config_snapshots(project_id, created_at DESC)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_assets_created ON assets(created_at DESC)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_created ON outputs(created_at DESC)");
+  // 资产库按内容 hash 去重取最新一条，索引让去重扫描不必全表排序
+  database.exec("CREATE INDEX IF NOT EXISTS idx_assets_hash ON assets(hash)");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_outputs_hash ON outputs(hash)");
   // 每个模特至多一张选定定妆照：先清后设的切换写法在事务内满足该唯一约束。
   database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_model_portraits_selected ON model_portraits(model_id) WHERE selected = 1");
   backfillModelSpecDimensions(database);

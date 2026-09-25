@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { Route, Routes } from "react-router";
@@ -178,5 +178,67 @@ describe("工作台 · 分镜", () => {
     await waitFor(() => {
       expect(storyboardGets).toBeGreaterThan(before);
     });
+  });
+});
+
+
+describe("工作台 · 分镜编辑自动保存", () => {
+  it("编辑后未等防抖即关闭弹窗，关闭时会立即保存未保存修改", async () => {
+    const user = userEvent.setup();
+    const patchBodies: Array<Record<string, unknown>> = [];
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () => HttpResponse.json(detailWithBoard)),
+      http.get(`${BASE}/projects/:projectId/storyboard`, () => HttpResponse.json(storyboardPayload())),
+      http.patch(`${BASE}/storyboard-items/:itemId`, async ({ request, params }) => {
+        patchBodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ ...STORYBOARD_ITEM_FIXTURE, promptInstruction: "白底主图，突出金属质感X", id: params.itemId as string });
+      }),
+    );
+
+    renderBoard();
+    await user.click(await screen.findByRole("button", { name: "白底/纯色底产品主图 分镜" }));
+    const area = await screen.findByDisplayValue("白底主图，突出金属质感");
+    await user.type(area, "X");
+    // 600ms 防抖尚未到期即关闭弹窗：卸载 flush 必须补上这次保存
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(patchBodies).toHaveLength(1), { timeout: 3_000 });
+    expect(patchBodies[0]).toMatchObject({ promptInstruction: "白底主图，突出金属质感X" });
+  });
+
+  it("后台 refetch 不覆盖未保存草稿，补丁只包含脏字段", async () => {
+    const user = userEvent.setup();
+    const patchBodies: Array<Record<string, unknown>> = [];
+    let remoteItem = STORYBOARD_ITEM_FIXTURE;
+    server.use(
+      http.get(`${BASE}/projects/:projectId`, () =>
+        HttpResponse.json(projectDetailPayload({ storyboard: STORYBOARD_FIXTURE, items: [remoteItem, STORYBOARD_ITEM_B_FIXTURE] })),
+      ),
+      http.get(`${BASE}/projects/:projectId/storyboard`, () =>
+        HttpResponse.json(storyboardPayload(STORYBOARD_FIXTURE, [remoteItem, STORYBOARD_ITEM_B_FIXTURE])),
+      ),
+      http.patch(`${BASE}/storyboard-items/:itemId`, async ({ request, params }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        patchBodies.push(body);
+        return HttpResponse.json({ ...remoteItem, ...body, id: params.itemId as string });
+      }),
+    );
+
+    renderBoard();
+    await user.click(await screen.findByRole("button", { name: "白底/纯色底产品主图 分镜" }));
+    const area = await screen.findByDisplayValue("白底主图，突出金属质感");
+    await user.type(area, "X");
+
+    // 模拟其他端改了 displayName 后前端 refetch（react-query 默认窗口聚焦即重取）
+    remoteItem = { ...STORYBOARD_ITEM_FIXTURE, displayName: "别人改过的名字", updatedAt: "2026-08-01T00:13:00.000Z" };
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
+    // 用户输入仍在，没有被 refetch 的旧值覆盖
+    expect(screen.getByDisplayValue("白底主图，突出金属质感X")).toBeInTheDocument();
+    await waitFor(() => expect(patchBodies).toHaveLength(1), { timeout: 3_000 });
+    expect(patchBodies[0]).toMatchObject({ promptInstruction: "白底主图，突出金属质感X" });
+    // displayName 不是脏字段，本地旧值不得进入补丁
+    expect(patchBodies[0]).not.toHaveProperty("displayName");
   });
 });

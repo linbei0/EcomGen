@@ -5,7 +5,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "dev": "concurrently -n api,worker,web -c cyan,magenta,green \"pnpm dev:api\" \"pnpm dev:worker\" \"pnpm dev:web\"",
-    "dev:api": "pnpm --filter @ecomgen/api dev",
+    "dev:api": "node scripts/dev-api.mjs",
     "dev:worker": "pnpm --filter @ecomgen/worker dev",
     "dev:web": "pnpm --filter @ecomgen/web dev",
     "test": "pnpm -r test",

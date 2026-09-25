@@ -155,7 +155,9 @@ export function StoryboardStage({
         destroyOnHidden
       >
         {editing ? (
+          // key 按分镜 ID 重建实例：切换分镜视为卸载，Inspector 关闭前的未保存修改走 flush
           <StoryboardInspector
+            key={editing.id}
             projectId={detail.id}
             item={editing}
             templates={templateNames}

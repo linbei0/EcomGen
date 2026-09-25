@@ -198,6 +198,7 @@ components:
         - RATE_LIMITED
         - INTERNAL_ERROR
         - PROVIDER_ERROR
+        - QUEUE_UNAVAILABLE
     EventEnvelope:
       type: object
       required:
@@ -1796,6 +1797,10 @@ components:
             - format: date-time
               type: string
             - type: "null"
+        planningRevision:
+          minimum: 0
+          description: Monotonic revision bumped whenever planning-relevant project facts change; planning jobs embed it in their fingerprint so stale plans are never reused.
+          type: integer
         createdAt:
           format: date-time
           type: string
@@ -2499,9 +2504,12 @@ components:
           $ref: "#/components/schemas/EditTurn"
     ConfirmStoryboardInput:
       type: object
+      required:
+        - version
       properties:
         version:
           minimum: 1
+          description: The storyboard version the client confirmed; must match the current version or the request is rejected with 409.
           type: integer
     CopyLibraryAssetToProjectInput:
       type: object
