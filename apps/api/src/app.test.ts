@@ -204,6 +204,57 @@ describe("asset library", () => {
     expect(layerListing.statusCode).toBe(200);
   });
 
+  it("库列表按来源项目与创建时间筛选，非法参数返回 400", async () => {
+    const projectA = seedProject("Alpha");
+    const projectB = seedProject("Beta");
+    const productShot = await seedSourceAsset(repository, projectA.id, await samplePng(), "PRODUCT_TRUTH");
+    await seedSourceAsset(repository, projectB.id, await samplePng({ r: 20, g: 180, b: 90 }), "STYLE_REFERENCE");
+
+    const byProject = await app.inject({ method: "GET", url: `/api/v1/library-assets?projectId=${projectA.id}` });
+    expect(byProject.statusCode).toBe(200);
+    expect(byProject.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id)).toEqual([`asset:${productShot.id}`]);
+
+    // 时间条件接受只有日期的一侧（规范化为当天 UTC 零点）；项目与时间取交集，互不相容时结果为空。
+    expect((await app.inject({ method: "GET", url: "/api/v1/library-assets?createdFrom=2000-01-01" })).json<{ total: number }>().total).toBe(2);
+    const combined = await app.inject({ method: "GET", url: `/api/v1/library-assets?projectId=${projectB.id}&createdFrom=2000-01-01&createdTo=2000-12-31` });
+    expect(combined.statusCode).toBe(200);
+    expect(combined.json<{ total: number }>().total).toBe(0);
+
+    // 非法 UUID、无法解析的时间与非法枚举都明确报 400，不静默忽略。
+    expect((await app.inject({ method: "GET", url: "/api/v1/library-assets?projectId=../escape" })).statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", url: "/api/v1/library-assets?createdTo=2026-13-45T00:00:00Z" })).statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", url: "/api/v1/library-assets?modelHeritage=ATLANTIS" })).statusCode).toBe(400);
+  });
+
+  it("模特定妆照作为 MODEL 条目进库：无项目归属，按模特身份维度筛选", async () => {
+    const project = seedProject("Alpha");
+    const model = repository.createModel({ name: "小满", spec: MODEL_SPEC_DEFAULTS, notes: "" });
+    const nordic = repository.createModel({ name: "阿岚", spec: { ...MODEL_SPEC_DEFAULTS, gender: "MALE", heritage: "NORTHERN_EUROPEAN" }, notes: "" });
+    // 与 buildApi 共享同一 dataDir：测试侧直接落盘候选图，绕开生图流程。
+    const portraitOf = async (target: typeof model, color: { r: number; g: number; b: number }) => {
+      // model_portraits.job_id 有外键：定妆照落库前先建真实任务行。
+      const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "MODEL_CAST", input: { modelId: target.id }, providerId: "provider-x", modelId: "image-x" });
+      const stored = await new LocalAssetStore(dataDir).putModelPortrait(target.id, job.id, await samplePng(color));
+      return repository.createModelPortrait({ modelId: target.id, jobId: job.id, storagePath: stored.path, hash: stored.hash, width: null, height: null, providerId: "provider-x", imageModelId: "image-x", aspectRatio: "1:1" });
+    };
+    const portrait = await portraitOf(model, { r: 200, g: 120, b: 40 });
+    const nordicPortrait = await portraitOf(nordic, { r: 40, g: 120, b: 200 });
+
+    const listing = await app.inject({ method: "GET", url: "/api/v1/library-assets?kind=MODEL" });
+    const listed = listing.json<{ items: Array<{ id: string; source: string; projectId: string; projectName: string; url: string }> }>().items.find((item) => item.id === `model:${portrait.id}`);
+    expect(listed).toMatchObject({ source: "MODEL", projectId: "", projectName: "模特库", url: `/api/v1/files/model-portraits/${portrait.id}` });
+    // 定妆照的图片地址必须可下载；名字取模特名，因此资产库能用模特姓名搜到它。
+    expect((await app.inject({ method: "GET", url: listed!.url })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/api/v1/library-assets?q=小满" })).json<{ total: number }>().total).toBe(1);
+    expect((await app.inject({ method: "GET", url: `/api/v1/library-assets?projectId=${project.id}` })).json<{ total: number }>().total).toBe(0);
+
+    // 身份维度在定妆照行上成立：单维命中、多维取交集；不加 kind=MODEL 也不会带出上传/生成行。
+    const byHeritage = await app.inject({ method: "GET", url: "/api/v1/library-assets?kind=MODEL&modelHeritage=NORTHERN_EUROPEAN" });
+    expect(byHeritage.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id)).toEqual([`model:${nordicPortrait.id}`]);
+    expect((await app.inject({ method: "GET", url: "/api/v1/library-assets?kind=MODEL&modelHeritage=EAST_ASIAN&modelGender=MALE" })).json<{ total: number }>().total).toBe(0);
+    expect((await app.inject({ method: "GET", url: "/api/v1/library-assets?modelHeritage=EAST_ASIAN" })).json<{ items: Array<{ id: string }> }>().items.map((item) => item.id)).toEqual([`model:${portrait.id}`]);
+  });
+
   it("库条目不存在或源文件缺失时返回 404 且不产生新记录", async () => {
     const sourceProject = seedProject("source");
     const targetProject = seedProject("target");
@@ -253,8 +304,9 @@ describe("asset library", () => {
 });
 
 /** 缩略图/尺寸路径需要能解码的真实图片；固定尺寸让断言稳定。 */
-async function samplePng(): Promise<Buffer> {
-  return sharp({ create: { width: 16, height: 12, channels: 3, background: { r: 200, g: 120, b: 40 } } }).png().toBuffer();
+/** 默认纯色小图；换背景色即为不同内容 hash，用于构造需要区分的跨项目素材。 */
+async function samplePng(background: { r: number; g: number; b: number } = { r: 200, g: 120, b: 40 }): Promise<Buffer> {
+  return sharp({ create: { width: 16, height: 12, channels: 3, background } }).png().toBuffer();
 }
 
 function seedLayerProject(segmentationModelId: string | null) {

@@ -1465,7 +1465,7 @@ components:
         - createdAt
       properties:
         id:
-          description: "Synthetic library item ID: 'asset:<uuid>' or 'output:<uuid>'."
+          description: "Synthetic library item ID: 'asset:<uuid>', 'output:<uuid>', 'model:<portraitUuid>' or 'layer:<layerExportUuid>:<index>'."
           type: string
         source:
           $ref: "#/components/schemas/LibraryItemSource"
@@ -1474,7 +1474,7 @@ components:
         name:
           type: string
         projectId:
-          format: uuid
+          description: Owning project UUID; empty for model portraits, which belong to no project and are therefore excluded by the projectId filter.
           type: string
         projectName:
           type: string
@@ -1498,6 +1498,7 @@ components:
           format: date-time
           type: string
         role:
+          description: AssetRole of uploaded assets; null for generated results, layer slices and model portraits.
           anyOf:
             - $ref: "#/components/schemas/AssetRole"
             - type: "null"
@@ -1518,6 +1519,7 @@ components:
             - type: "null"
         total:
           minimum: 0
+          description: Item count after applying filters to source rows and deduplicating by content hash; independent of the current page cursor.
           type: integer
     ModelCapability:
       type: object
@@ -3425,6 +3427,53 @@ components:
             - LENS_50
             - LENS_85
             - LENS_105
+    ModelGender:
+      type: string
+      enum:
+        - FEMALE
+        - MALE
+        - ANDROGYNOUS
+    ModelAge:
+      type: string
+      enum:
+        - CHILD_7
+        - PRETEEN_11
+        - TEEN_16
+        - EARLY_20S
+        - LATE_20S
+        - EARLY_30S
+        - MID_30S
+        - MID_40S
+        - SENIOR
+    ModelHeritage:
+      type: string
+      enum:
+        - EAST_ASIAN
+        - SOUTHEAST_ASIAN
+        - SOUTH_ASIAN
+        - MIDDLE_EASTERN
+        - NORTHERN_EUROPEAN
+        - MEDITERRANEAN
+        - LATIN_AMERICAN
+        - AFRICAN
+        - MIXED
+    ModelStature:
+      type: string
+      enum:
+        - PETITE_158
+        - STANDARD_165
+        - TALL_172
+        - RUNWAY_180
+    ModelBuild:
+      type: string
+      enum:
+        - SLENDER
+        - BALANCED
+        - ATHLETIC
+        - MUSCULAR
+        - CURVY
+        - PLUS
+        - MATERNITY
     ModelPortrait:
       type: object
       required:

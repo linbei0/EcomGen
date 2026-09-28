@@ -351,6 +351,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Global asset library view over uploads, generated results, layer slices and model portraits. Filters apply to source rows before content-hash deduplication, so when a matching row is not the newest row of its hash, that row becomes the representative item. `total` counts the filtered and deduplicated result and does not shrink as the cursor advances. */
         get: operations["listLibraryAssets"];
         put?: never;
         post?: never;
@@ -1647,12 +1648,12 @@ export interface components {
             bbox?: components["schemas"]["LayerBbox"] | null;
         };
         LibraryAsset: {
-            /** @description Synthetic library item ID: 'asset:<uuid>' or 'output:<uuid>'. */
+            /** @description Synthetic library item ID: 'asset:<uuid>', 'output:<uuid>', 'model:<portraitUuid>' or 'layer:<layerExportUuid>:<index>'. */
             id: string;
             source: components["schemas"]["LibraryItemSource"];
             kind: components["schemas"]["LibraryItemKind"];
             name: string;
-            /** Format: uuid */
+            /** @description Owning project UUID; empty for model portraits, which belong to no project and are therefore excluded by the projectId filter. */
             projectId: string;
             projectName: string;
             mimeType: string;
@@ -1663,11 +1664,13 @@ export interface components {
             thumbnailUrl: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description AssetRole of uploaded assets; null for generated results, layer slices and model portraits. */
             role?: components["schemas"]["AssetRole"] | null;
         };
         LibraryAssetList: {
             items: components["schemas"]["LibraryAsset"][];
             nextCursor: string | null;
+            /** @description Item count after applying filters to source rows and deduplicating by content hash; independent of the current page cursor. */
             total: number;
         };
         ModelCapability: {
@@ -2309,6 +2312,16 @@ export interface components {
             /** @enum {string} */
             lens: "LENS_35" | "LENS_50" | "LENS_85" | "LENS_105";
         };
+        /** @enum {string} */
+        ModelGender: "FEMALE" | "MALE" | "ANDROGYNOUS";
+        /** @enum {string} */
+        ModelAge: "CHILD_7" | "PRETEEN_11" | "TEEN_16" | "EARLY_20S" | "LATE_20S" | "EARLY_30S" | "MID_30S" | "MID_40S" | "SENIOR";
+        /** @enum {string} */
+        ModelHeritage: "EAST_ASIAN" | "SOUTHEAST_ASIAN" | "SOUTH_ASIAN" | "MIDDLE_EASTERN" | "NORTHERN_EUROPEAN" | "MEDITERRANEAN" | "LATIN_AMERICAN" | "AFRICAN" | "MIXED";
+        /** @enum {string} */
+        ModelStature: "PETITE_158" | "STANDARD_165" | "TALL_172" | "RUNWAY_180";
+        /** @enum {string} */
+        ModelBuild: "SLENDER" | "BALANCED" | "ATHLETIC" | "MUSCULAR" | "CURVY" | "PLUS" | "MATERNITY";
         ModelPortrait: {
             /** Format: uuid */
             id: string;
@@ -3275,7 +3288,24 @@ export interface operations {
         parameters: {
             query?: {
                 kind?: components["schemas"]["LibraryItemKind"];
+                /** @description Case-insensitive substring match on item name and owning project name; `%` and `_` are literal characters. */
                 q?: string;
+                /** @description Keep only items owned by this project. Model portraits belong to no project and are excluded. Invalid UUID returns 400. */
+                projectId?: string;
+                /** @description Inclusive lower bound on source row creation time (ISO 8601 date-time in any offset). Unparseable values return 400. */
+                createdFrom?: string;
+                /** @description Inclusive upper bound on source row creation time (ISO 8601 date-time in any offset). Unparseable values return 400. */
+                createdTo?: string;
+                /** @description Keep only model portraits whose model takes this identity-core value; rows without a model spec (uploads, outputs, layer slices) are excluded, so combine with kind=MODEL. */
+                modelGender?: components["schemas"]["ModelGender"];
+                /** @description Identity-core filter on the portrait model's age band; see modelGender for applicability. */
+                modelAge?: components["schemas"]["ModelAge"];
+                /** @description Identity-core filter on the portrait model's heritage; see modelGender for applicability. */
+                modelHeritage?: components["schemas"]["ModelHeritage"];
+                /** @description Identity-core filter on the portrait model's stature; see modelGender for applicability. */
+                modelStature?: components["schemas"]["ModelStature"];
+                /** @description Identity-core filter on the portrait model's build; see modelGender for applicability. */
+                modelBuild?: components["schemas"]["ModelBuild"];
                 cursor?: components["parameters"]["Cursor"];
                 limit?: number;
             };
@@ -3285,7 +3315,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Global asset library view over uploads and generated results, deduplicated by content hash. */
+            /** @description Filtered asset library page; filtered source rows are deduplicated by content hash before sorting, paging and counting. */
             200: {
                 headers: {
                     [name: string]: unknown;

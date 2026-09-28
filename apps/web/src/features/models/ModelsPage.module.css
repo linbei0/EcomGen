@@ -59,11 +59,38 @@
   padding-top: 4px;
 }
 
+/* 搜索与筛选入口并排成一行：筛选按钮收起五个身份维度，侧栏默认只剩一行工具。 */
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.searchRow > :global(.ant-input-affix-wrapper) {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 展开的身份面板：抬升面容器让五个维度读作「一个筛选工具」，而不是五只散落的输入框。 */
+.filterPanel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--bg-2) 60%, transparent);
+}
+
 /* 计数行做小字距标签而不是说明文字：它是列表的工具条，不是页头的一部分。 */
 .listCount {
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--text-3);
+}
+
+.filterSelect {
+  width: 100%;
 }
 
 .listSkeleton {

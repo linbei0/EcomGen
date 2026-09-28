@@ -1,5 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { ImageAspectRatio } from "./enums.js";
+import { ImageAspectRatio, stringEnumSchema } from "./enums.js";
 import { schemaRef } from "./ref.js";
 import { MAX_MODEL_NAME_LENGTH, MAX_MODEL_NOTES_LENGTH, MODEL_AURA_MAX, MODEL_CAST_CANDIDATES_MAX, MODEL_MARKS_MAX } from "./limits.js";
 
@@ -55,6 +55,17 @@ export const MODEL_LIGHTINGS = ["SOFTBOX_THREE_POINT", "WINDOW_DAYLIGHT", "OVERC
 export const MODEL_LENSES = ["LENS_35", "LENS_50", "LENS_85", "LENS_105"] as const;
 
 const specValue = <T extends string>(values: readonly T[]) => Type.Union(values.map((value) => Type.Literal(value)));
+
+/**
+ * 身份内核五个维度的单维 schema：资产库按模特身份筛选定妆照时逐维传参，
+ * 单独暴露是为了让查询契约引用维度本身，而不是在别处再抄一份取值列表。
+ * ModelSpec 内部仍内联这些取值（同一份元组派生），生成的取值集合不会漂移。
+ */
+export const ModelGender = stringEnumSchema(MODEL_GENDERS, "#/components/schemas/ModelGender");
+export const ModelAge = stringEnumSchema(MODEL_AGES, "#/components/schemas/ModelAge");
+export const ModelHeritage = stringEnumSchema(MODEL_HERITAGES, "#/components/schemas/ModelHeritage");
+export const ModelStature = stringEnumSchema(MODEL_STATURES, "#/components/schemas/ModelStature");
+export const ModelBuild = stringEnumSchema(MODEL_BUILDS, "#/components/schemas/ModelBuild");
 
 export const ModelSpec = Type.Object({
   gender: specValue(MODEL_GENDERS),

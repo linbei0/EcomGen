@@ -851,6 +851,33 @@
   flex: 1;
 }
 
+.historyFilterRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.historyFilterSelect {
+  min-width: 172px;
+}
+
+/* 身份筛选一行五个维度：均分宽度而不是各自最小宽度，避免把弹窗撑出横向滚动。 */
+.historyIdentitySelect {
+  flex: 1;
+  min-width: 0;
+}
+
+.historyCount {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* 匹配数靠右：它不是筛选控件，放在行尾不打断从左到右的筛选顺序。 */
+.historyFilterRow .historyCount {
+  margin-left: auto;
+}
+
 .missing {
   display: flex;
   flex-direction: column;

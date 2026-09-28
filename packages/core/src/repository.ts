@@ -159,7 +159,7 @@ export interface AssetRecord {
   createdAt: string;
 }
 
-/** 资产库视图行：由 assets 与 outputs 合并派生，不落库。 */
+/** 资产库视图行：由 assets、outputs、model_portraits 与 layer_exports 合并派生，不落库。 */
 export interface LibraryItemRecord {
   id: string;
   source: LibraryItemSource;
@@ -176,9 +176,25 @@ export interface LibraryItemRecord {
   createdAt: string;
 }
 
+/** 资产库按模特身份内核筛选定妆照；维度取值与 ModelSpec 的身份层同一份枚举。 */
+export interface LibraryModelSpecFilter {
+  gender?: ModelSpec["gender"] | null;
+  age?: ModelSpec["age"] | null;
+  heritage?: ModelSpec["heritage"] | null;
+  stature?: ModelSpec["stature"] | null;
+  build?: ModelSpec["build"] | null;
+}
+
 export interface LibraryItemQuery {
   kind?: LibraryItemKind | null;
   q?: string | null;
+  /** 只看该项目的来源行；模特定妆照没有项目归属，因此不会命中。 */
+  projectId?: string | null;
+  /** 只看创建时间落在 [from, to] 内的来源行；ISO 日期时间字符串，两端都包含。 */
+  createdFrom?: string | null;
+  createdTo?: string | null;
+  /** 只看所属模特在该身份维度上取该值的定妆照；其余来源行没有模特规格，因此不会命中。 */
+  modelSpec?: LibraryModelSpecFilter | null;
   cursor?: string | null;
   limit?: number;
 }
@@ -186,7 +202,7 @@ export interface LibraryItemQuery {
 export interface LibraryItemPage {
   items: LibraryItemRecord[];
   nextCursor: string | null;
-  /** 当前 kind/q 过滤后、去重后的完整数量，与已加载页数无关，供前端显示稳定总数。 */
+  /** 当前筛选条件过滤来源行、再按 hash 去重后的完整数量，与游标位置无关，供前端显示稳定总数。 */
   total: number;
 }
 
@@ -733,42 +749,50 @@ export class EcomRepository {
   public listAssets(projectId: string): AssetRecord[] { return (this.db.prepare("SELECT * FROM assets WHERE project_id=? ORDER BY created_at").all(projectId) as Row[]).map(mapAsset); }
 
   /**
-   * 资产库视图：assets、outputs、model_portraits 与 layer_exports 逐元素切图合并为一张派生表，
-   * 跨来源按内容 hash 去重（同图只保留最新一条）。过滤、去重、排序、游标分页全部下推 SQLite，
-   * 只把当前页物化到 JS——列表查询的成本不随库存总量线性增长。
-   * 分页用 (createdAt,id) 合成游标（keyset），避免 offset 在增量入库时跳条。
+   * 资产库视图：assets、outputs、model_portraits 与 layer_exports 逐元素切图合并为一张派生表。
+   * **先按条件筛选来源行，再按内容 hash 去重**：同图在多个项目/来源重复时，命中的那条就是代表项，
+   * 而不是「先选出最新行、再把它过滤掉」——后者会让卡片显示不符合筛选条件的旧图。
+   * 过滤、去重、排序、游标分页全部下推 SQLite，只把当前页物化到 JS。
+   * 分页用 (createdAt,id) 合成游标（keyset），且游标只作用在去重后的代表项上，
+   * 否则上一页的代表项会把同 hash 的旧行顶成新代表项，同一张图跨页重复出现。
    */
   public listLibraryItems(query: LibraryItemQuery = {}): LibraryItemPage {
     const limit = Math.min(Math.max(query.limit ?? 40, 1), 100);
     const kind = query.kind ?? null;
+    const projectId = query.projectId ?? null;
     const needle = query.q?.trim().toLowerCase() ?? "";
     const cursor = decodeLibraryCursor(query.cursor ?? null);
 
     // 分层导出把每个元素/背景切图作为独立生成产物纳入库；PSD 复合层（composite）二进制不可预览，排除。
+    // model_spec_json 只为定妆照行提供模特规格，供按身份维度筛选；其余来源行为 NULL，天然不命中身份筛选。
     const librarySql = `
       SELECT 'asset:' || a.id AS id, 'UPLOADED' AS source,
              CASE WHEN a.role IN ('PRODUCT_TRUTH','PACKAGING') THEN 'PRODUCT' ELSE 'REFERENCE' END AS kind,
              a.project_id AS project_id, p.name AS project_name, a.original_name AS name,
              a.mime_type AS mime_type, a.storage_path AS storage_path, a.hash AS hash,
-             a.width AS width, a.height AS height, a.role AS role, a.created_at AS created_at
+             a.width AS width, a.height AS height, a.role AS role, a.created_at AS created_at,
+             NULL AS model_spec_json
       FROM assets a JOIN projects p ON p.id = a.project_id
       UNION ALL
       SELECT 'output:' || o.id, 'GENERATED', 'GENERATED',
              o.project_id, p.name, COALESCE(si.display_name, si.asset_type, '生成图'),
-             NULL, o.storage_path, o.hash, o.width, o.height, NULL, o.created_at
+             NULL, o.storage_path, o.hash, o.width, o.height, NULL, o.created_at,
+             NULL
       FROM outputs o JOIN projects p ON p.id = o.project_id
       LEFT JOIN storyboard_items si ON si.id = o.storyboard_item_id
       UNION ALL
       SELECT 'model:' || mp.id, 'MODEL', 'MODEL',
              '', '模特库', m.name,
-             NULL, mp.storage_path, mp.hash, mp.width, mp.height, NULL, mp.created_at
+             NULL, mp.storage_path, mp.hash, mp.width, mp.height, NULL, mp.created_at,
+             m.spec_json
       FROM model_portraits mp JOIN models m ON m.id = mp.model_id
       UNION ALL
       SELECT 'layer:' || le.id || ':' || je.key, 'GENERATED', 'LAYER',
              le.project_id, p.name,
              COALESCE(si.display_name, si.asset_type, '生成图') || ' · ' || json_extract(je.value, '$.name'),
              'image/png', json_extract(je.value, '$.storagePath'), json_extract(je.value, '$.hash'),
-             o.width, o.height, NULL, le.created_at
+             o.width, o.height, NULL, le.created_at,
+             NULL
       FROM layer_exports le
       JOIN projects p ON p.id = le.project_id
       LEFT JOIN outputs o ON o.id = le.output_id
@@ -780,27 +804,47 @@ export class EcomRepository {
         AND (json_extract(je.value, '$.kind') IS NULL OR json_extract(je.value, '$.kind') <> 'composite')
     `;
 
-    const filters: string[] = ["rn = 1"];
-    const params: Record<string, string | number> = { limit: limit + 1 };
-    if (kind) { filters.push("kind = @kind"); params.kind = kind; }
+    const sourceFilters: string[] = [];
+    const sourceParams: Record<string, string | number> = {};
+    if (kind) { sourceFilters.push("kind = @kind"); sourceParams.kind = kind; }
+    // 模特定妆照的项目归属是空串：按项目筛选时它不命中，也不会被伪造成某个真实项目。
+    if (projectId) { sourceFilters.push("project_id = @projectId"); sourceParams.projectId = projectId; }
+    // created_at 统一是 canonical ISO（now() 产出），与规范化后的入参做字典序比较即时间序比较。
+    if (query.createdFrom) { sourceFilters.push("created_at >= @createdFrom"); sourceParams.createdFrom = query.createdFrom; }
+    if (query.createdTo) { sourceFilters.push("created_at <= @createdTo"); sourceParams.createdTo = query.createdTo; }
+    // 身份维度取自模特实体的 spec；非定妆照行的 model_spec_json 为 NULL，与等值比较天然为假。
+    for (const dimension of LIBRARY_MODEL_SPEC_DIMENSIONS) {
+      const value = query.modelSpec?.[dimension];
+      if (!value) continue;
+      sourceFilters.push(`json_extract(model_spec_json, '$.${dimension}') = @modelSpec_${dimension}`);
+      sourceParams[`modelSpec_${dimension}`] = value;
+    }
     if (needle) {
       // LIKE 通配符转义保持与"子串包含"语义一致；LOWER 与前端既有的 ASCII 折叠口径相同
-      params.needle = `%${needle.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
-      filters.push("(LOWER(name) LIKE @needle ESCAPE '\\' OR LOWER(project_name) LIKE @needle ESCAPE '\\')");
+      sourceParams.needle = `%${needle.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+      sourceFilters.push("(LOWER(name) LIKE @needle ESCAPE '\\' OR LOWER(project_name) LIKE @needle ESCAPE '\\')");
     }
+    const sourceWhere = sourceFilters.length > 0 ? `WHERE ${sourceFilters.join(" AND ")}` : "";
+
+    const pageFilters: string[] = [];
+    const params: Record<string, string | number> = { ...sourceParams, limit: limit + 1 };
     if (cursor) {
       params.cursorCreatedAt = cursor.createdAt;
       params.cursorId = cursor.id;
-      filters.push("(created_at < @cursorCreatedAt OR (created_at = @cursorCreatedAt AND id < @cursorId))");
+      pageFilters.push("(created_at < @cursorCreatedAt OR (created_at = @cursorCreatedAt AND id < @cursorId))");
     }
-    const where = filters.join(" AND ");
+    const pageWhere = pageFilters.length > 0 ? `WHERE ${pageFilters.join(" AND ")}` : "";
 
-    // COUNT(*) OVER () 在 LIMIT 之前统计过滤后总数，一次查询同时得到当前页与稳定 total
-    const rows = this.db.prepare(`
+    const ctes = `
       WITH library AS (${librarySql}),
-      ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY hash ORDER BY created_at DESC, id DESC) AS rn FROM library)
-      SELECT *, COUNT(*) OVER () AS total_count FROM ranked
-      WHERE ${where}
+      filtered AS (SELECT * FROM library ${sourceWhere}),
+      ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY hash ORDER BY created_at DESC, id DESC) AS rn FROM filtered),
+      deduped AS (SELECT * FROM ranked WHERE rn = 1)
+    `;
+    const rows = this.db.prepare(`
+      ${ctes}
+      SELECT *, (SELECT COUNT(*) FROM deduped) AS total_count FROM deduped
+      ${pageWhere}
       ORDER BY created_at DESC, id DESC
       LIMIT @limit
     `).all(params) as Row[];
@@ -824,7 +868,11 @@ export class EcomRepository {
       };
     });
     const nextCursor = rows.length > limit && items.length > 0 ? encodeLibraryCursor(items[items.length - 1]) : null;
-    return { items, nextCursor, total: rows.length > 0 ? Number(rows[0].total_count) : 0 };
+    // 游标越过末尾时当前页为空，但 total 仍要反映完整筛选结果，因此单独兜一次计数。
+    const total = rows.length > 0
+      ? Number(rows[0].total_count)
+      : Number((this.db.prepare(`${ctes} SELECT COUNT(*) AS total_count FROM deduped`).get(sourceParams) as Row | undefined)?.total_count ?? 0);
+    return { items, nextCursor, total };
   }
 
   /** 按内容 hash 找到任一来源文件的存储路径，供缩略图惰性生成。 */
@@ -1239,6 +1287,9 @@ function mimeTypeForPath(storagePath: string): string {
   if (ext === ".gif") return "image/gif";
   return "image/png";
 }
+/** 身份内核里可参与资产库筛选的维度；顺序固定，SQL 条件与参数名由它派生。 */
+const LIBRARY_MODEL_SPEC_DIMENSIONS = ["gender", "age", "heritage", "stature", "build"] as const;
+
 function encodeLibraryCursor(item: LibraryItemRecord): string {
   return Buffer.from(`${item.createdAt}\u0000${item.id}`, "utf8").toString("base64url");
 }

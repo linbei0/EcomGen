@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { adaptLibraryItem, type LibraryFilters, type LibraryItem } from "../adapters/library";
+import { adaptLibraryItem, modelIdentityQuery, type LibraryFilters, type LibraryItem } from "../adapters/library";
 import { adaptAsset, type UserAssetKind } from "../adapters/projectDetail";
 import { api, unwrap } from "../client";
 import { ApiError } from "../errors";
@@ -8,7 +8,7 @@ import { qk } from "../queryKeys";
 
 const PAGE_SIZE = 40;
 
-/** 资产库分页查询：kind/q 变化即新查询；游标由服务端 (createdAt,id) 合成。 */
+/** 资产库分页查询：类型/关键词/来源项目/时间区间/模特身份变化即新查询；游标由服务端 (createdAt,id) 合成。 */
 export function useLibraryItems(filters: LibraryFilters, enabled = true) {
   return useInfiniteQuery({
     queryKey: qk.libraryAssets(filters),
@@ -21,6 +21,11 @@ export function useLibraryItems(filters: LibraryFilters, enabled = true) {
             query: {
               ...(filters.kind !== "ALL" ? { kind: filters.kind } : {}),
               ...(filters.q.trim() ? { q: filters.q.trim() } : {}),
+              ...(filters.projectId ? { projectId: filters.projectId } : {}),
+              ...(filters.createdFrom ? { createdFrom: filters.createdFrom } : {}),
+              ...(filters.createdTo ? { createdTo: filters.createdTo } : {}),
+              // 身份维度只传已选中的维度；未选中的维度在服务端不参与筛选。
+              ...modelIdentityQuery(filters.modelIdentity),
               ...(pageParam ? { cursor: pageParam } : {}),
               limit: PAGE_SIZE,
             },

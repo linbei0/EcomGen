@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { App, Button, Image, Input, Progress, Select, Skeleton } from "antd";
+import { App, Badge, Button, Image, Input, Progress, Select, Skeleton } from "antd";
 import {
   Camera,
   ChevronDown,
@@ -9,6 +9,7 @@ import {
   Plus,
   ScanFace,
   Search,
+  SlidersHorizontal,
   Trash2,
   UserRound,
   X,
@@ -42,6 +43,7 @@ import { useProviders } from "../../api/hooks/useProviders";
 import { AppTopbar } from "../../components/AppTopbar";
 import { errorText } from "../../lib/errorText";
 import { formatShortDate } from "../../lib/format";
+import { MODEL_IDENTITY_FILTERS, matchesModelIdentity, type ModelIdentityFilters, type ModelIdentityKey } from "../../lib/modelIdentityFilters";
 import { modelOptions } from "../../lib/modelOptions";
 import { ModelDesigner } from "./ModelDesigner";
 import styles from "./ModelsPage.module.css";
@@ -53,9 +55,6 @@ function jobMessage(job: { error?: unknown } | undefined): string | null {
 
 /** 模特定妆照是人像摄影，只保留竖构图与方形画幅；横版（3:2/4:3/16:9/21:9）没有业务意义。 */
 const MODEL_ASPECT_RATIOS: ReadonlyArray<string> = ["AUTO", "2:3", "3:4", "4:5", "9:16", "1:1"];
-
-/** 少于该数量时列表短到一眼看完，搜索框只会占地方。 */
-const SEARCH_THRESHOLD = 6;
 
 /**
  * 展示层字段视图：MODEL_SPEC_FIELDS 的泛型键在渲染层统一放宽为 string。
@@ -104,21 +103,42 @@ export function ModelsPage() {
   const [creating, setCreating] = useState(false);
   const [castJobId, setCastJobId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [identityFilters, setIdentityFilters] = useState<ModelIdentityFilters>({});
+  // 身份维度面板默认收起：侧栏常驻的只有一行搜索，筛选是按需展开的工具而不是常驻噪音。
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const models = useMemo(() => modelsQuery.data?.items ?? [], [modelsQuery.data]);
-  const selected = models.find((model) => model.id === selectedId) ?? models[0] ?? null;
+  // 名称与身份摘要都能命中：用户记得住的是「北欧那个高个」而不一定是名字。
+  const filteredModels = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    return models.filter((model) => {
+      if (!matchesModelIdentity(model.spec, identityFilters)) return false;
+      if (!keyword) return true;
+      return `${model.name} ${modelSpecSummary(model.spec)}`.toLowerCase().includes(keyword);
+    });
+  }, [models, query, identityFilters]);
+  // 详情只在筛选结果里解析：被筛掉的模特不会继续占着右侧详情，零结果时也不再展示旧详情；
+  // selectedId 本身不被改写，因此清空筛选后原模特会自己回来。
+  const selected = filteredModels.find((model) => model.id === selectedId) ?? filteredModels[0] ?? null;
+  const filterActive = query.trim() !== "" || Object.keys(identityFilters).length > 0;
+  const activeDimensions = Object.keys(identityFilters).length;
   const portraitsQuery = useModelPortraits(selected?.id);
   const portraits = useMemo(() => portraitsQuery.data?.items ?? [], [portraitsQuery.data]);
   const castJob = useModelCastJob(castJobId ?? undefined);
 
-  // 名称与身份摘要都能命中：用户记得住的是「北欧那个高个」而不一定是名字。
-  const filteredModels = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return models;
-    return models.filter((model) =>
-      `${model.name} ${modelSpecSummary(model.spec)}`.toLowerCase().includes(keyword),
-    );
-  }, [models, query]);
+  const setIdentityFilter = (key: ModelIdentityKey, value: string | null) => {
+    setIdentityFilters((current) => {
+      const next = { ...current };
+      if (value) next[key] = value;
+      else delete next[key];
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setQuery("");
+    setIdentityFilters({});
+  };
 
   const providers = providersQuery.data?.items ?? [];
   const imageOptions = useMemo(() => modelOptions(providers, "image"), [providers]);
@@ -240,19 +260,49 @@ export function ModelsPage() {
 
           {models.length > 0 ? (
             <div className={styles.listTools}>
-              {models.length >= SEARCH_THRESHOLD ? (
+              <div className={styles.searchRow}>
                 <Input
                   allowClear
                   size="small"
                   value={query}
-                  placeholder="按名字或身份筛选"
-                  aria-label="筛选模特"
+                  placeholder="按名字或身份摘要搜索"
+                  aria-label="搜索模特"
                   prefix={<Search size={13} strokeWidth={1.75} />}
                   onChange={(event) => setQuery(event.target.value)}
                 />
+                <Badge count={activeDimensions} size="small">
+                  <Button
+                    size="small"
+                    icon={<SlidersHorizontal size={13} strokeWidth={1.75} />}
+                    aria-label="身份筛选"
+                    aria-expanded={filterOpen}
+                    onClick={() => setFilterOpen((open) => !open)}
+                  >
+                    筛选
+                  </Button>
+                </Badge>
+              </div>
+              {/* 身份维度默认收起：少位数模特时侧栏只留一行搜索，展开后五个维度取交集，留空即「全部」。 */}
+              {filterOpen ? (
+                <div className={styles.filterPanel}>
+                  {MODEL_IDENTITY_FILTERS.map((filter) => (
+                    <Select
+                      key={filter.key}
+                      allowClear
+                      size="small"
+                      className={styles.filterSelect}
+                      placeholder={filter.label}
+                      aria-label={filter.label}
+                      value={identityFilters[filter.key]}
+                      onChange={(value) => setIdentityFilter(filter.key, value ?? null)}
+                      options={filter.options}
+                      popupMatchSelectWidth={false}
+                    />
+                  ))}
+                </div>
               ) : null}
               <span className={styles.listCount}>
-                {query.trim() ? `${filteredModels.length} / ${models.length} 位` : `共 ${models.length} 位`}
+                {filterActive ? `${filteredModels.length} / ${models.length} 位` : `共 ${models.length} 位`}
               </span>
             </div>
           ) : null}
@@ -276,8 +326,9 @@ export function ModelsPage() {
             </div>
           ) : filteredModels.length === 0 ? (
             <div className={styles.listEmpty}>
-              <p className={styles.emptyTitle}>没有匹配「{query.trim()}」的模特</p>
-              <Button size="small" onClick={() => setQuery("")}>清除筛选</Button>
+              <p className={styles.emptyTitle}>没有符合筛选的模特</p>
+              <p className={styles.emptyHint}>名称、身份摘要与五个身份维度之间取交集，放宽条件即可看到更多模特。</p>
+              <Button size="small" onClick={clearFilters}>清除筛选</Button>
             </div>
           ) : (
             <ul className={styles.modelList} aria-label="模特列表">
@@ -532,8 +583,12 @@ export function ModelsPage() {
         ) : (
           <section className={styles.detailPlaceholder}>
             <span className={styles.emptyGlyph}><UserRound size={26} strokeWidth={1.25} /></span>
-            <p className={styles.emptyTitle}>从左侧选择一位模特</p>
-            <p className={styles.emptyHint}>右侧会显示身份规格、参考脸与全部定妆照候选。</p>
+            <p className={styles.emptyTitle}>{filterActive ? "没有符合筛选的模特" : "从左侧选择一位模特"}</p>
+            <p className={styles.emptyHint}>
+              {filterActive
+                ? "左侧列表已按名称与身份内核筛选，清除筛选即可恢复全部模特。"
+                : "右侧会显示身份规格、参考脸与全部定妆照候选。"}
+            </p>
           </section>
         )}
       </div>

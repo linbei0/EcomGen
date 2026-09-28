@@ -1,3 +1,6 @@
+import type { ModelIdentityFilters } from "../../lib/modelIdentityFilters";
+
+import type { operations } from "../schema.d.ts";
 import type { components } from "../schema.d.ts";
 
 export type LibraryItemSource = components["schemas"]["LibraryItemSource"];
@@ -36,6 +39,50 @@ export interface LibraryItem {
 export interface LibraryFilters {
   kind: LibraryKindFilter;
   q: string;
+  /** 来源项目；null 表示不限。模特定妆照没有项目归属，限定项目后不会出现在结果里。 */
+  projectId: string | null;
+  /** 创建时间下界（含），ISO 日期时间；null 表示不限。 */
+  createdFrom: string | null;
+  /** 创建时间上界（含），ISO 日期时间；null 表示不限。 */
+  createdTo: string | null;
+  /** 模特身份内核五维；只在「模特」类型下生效，按定妆照所属模特的身份筛选。 */
+  modelIdentity: ModelIdentityFilters;
+}
+
+/**
+ * 各类别下筛选控件的适用范围：与当前类型无关的维度在界面上禁用或隐藏并清空，
+ * 而不是保留一个必然为空的取值，让用户以为筛选在生效。
+ * 身份筛选查的是模特实体的规格，因此只对定妆照（MODEL）成立。
+ */
+export function libraryFilterScope(kind: LibraryKindFilter): { project: boolean; identity: boolean } {
+  return {
+    project: kind !== "MODEL",
+    identity: kind === "MODEL",
+  };
+}
+
+/** 是否有生效中的筛选条件：空状态文案与「清空筛选」入口据此判断，避免把「库是空的」说成「没有匹配」。 */
+export function hasActiveLibraryFilters(filters: LibraryFilters): boolean {
+  return filters.kind !== "ALL"
+    || filters.q.trim() !== ""
+    || filters.projectId !== null
+    || filters.createdFrom !== null
+    || filters.createdTo !== null
+    || Object.keys(filters.modelIdentity).length > 0;
+}
+
+/** 身份维度查询参数：键名与契约参数一一对应，取值来自 MODEL_IDENTITY_FILTERS（契约元组派生），因此此处收窄是安全的。 */
+export function modelIdentityQuery(filters: ModelIdentityFilters) {
+  return {
+    ...(filters.gender ? { modelGender: filters.gender } : {}),
+    ...(filters.age ? { modelAge: filters.age } : {}),
+    ...(filters.heritage ? { modelHeritage: filters.heritage } : {}),
+    ...(filters.stature ? { modelStature: filters.stature } : {}),
+    ...(filters.build ? { modelBuild: filters.build } : {}),
+  } as Pick<
+    NonNullable<operations["listLibraryAssets"]["parameters"]["query"]>,
+    "modelGender" | "modelAge" | "modelHeritage" | "modelStature" | "modelBuild"
+  >;
 }
 
 function asString(value: unknown): string | undefined {

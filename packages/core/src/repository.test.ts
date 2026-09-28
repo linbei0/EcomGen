@@ -151,7 +151,30 @@ describe("EcomRepository", () => {
     expect(repository.listLibraryItems({ kind: "GENERATED" }).items.map((entry) => entry.hash)).toEqual(["gen"]);
     expect(repository.listLibraryItems({ kind: "PRODUCT" }).items.map((entry) => entry.hash)).toEqual(["dup"]);
     expect(repository.listLibraryItems({ kind: "REFERENCE" }).items.map((entry) => entry.hash)).toEqual(["unique"]);
-    expect(repository.listLibraryItems({ q: "Alpha" }).items.map((entry) => entry.hash)).toEqual(["gen"]);
+    // "Alpha" 同时命中项目 A 的生成结果与项目 A 里的旧重复行：筛选先于去重，旧行成为该 hash 的代表项，
+    // 而不是先选出项目 B 的最新行、再按项目名把它过滤掉。
+    const alpha = repository.listLibraryItems({ q: "Alpha" });
+    expect(alpha.items.map((entry) => entry.hash)).toEqual(["gen", "dup"]);
+    expect(alpha.items.find((entry) => entry.hash === "dup")).toMatchObject({ id: `asset:${oldDuplicate.id}`, projectName: "Alpha 店铺", name: "old.png" });
+
+    // 来源项目筛选：同 hash 在不同项目下返回各项目自己的那条；两个条件互不相容时结果为空。
+    const inProjectA = repository.listLibraryItems({ projectId: projectA.id });
+    expect(inProjectA.items.map((entry) => entry.hash)).toEqual(["gen", "dup"]);
+    expect(inProjectA.items.find((entry) => entry.hash === "dup")?.id).toBe(`asset:${oldDuplicate.id}`);
+    const inProjectB = repository.listLibraryItems({ projectId: projectB.id });
+    expect(inProjectB.items.map((entry) => entry.hash)).toEqual(["unique", "dup"]);
+    expect(inProjectB.items.find((entry) => entry.hash === "dup")?.id).toBe(`asset:${newDuplicate.id}`);
+    expect(repository.listLibraryItems({ projectId: projectB.id, q: "old" }).total).toBe(0);
+
+    // 时间区间与类型/项目一样作用在来源行上：只命中旧行时，旧行成为该 hash 的代表项。
+    const recent = repository.listLibraryItems({ createdFrom: "2026-02-15T00:00:00.000Z" });
+    expect(recent.items.map((entry) => entry.hash)).toEqual(["gen", "unique"]);
+    // 区间只覆盖旧行时，旧行成为该 hash 的代表项（同 hash 的新行被时间条件筛掉）。
+    const older = repository.listLibraryItems({ createdTo: "2026-01-15T00:00:00.000Z" });
+    expect(older.items.map((entry) => entry.hash)).toEqual(["dup"]);
+    expect(older.items[0]).toMatchObject({ id: `asset:${oldDuplicate.id}`, projectName: "Alpha 店铺", name: "old.png" });
+    // 两端都含：单日区间恰好只命中当天那条。
+    expect(repository.listLibraryItems({ createdFrom: "2026-04-01T00:00:00.000Z", createdTo: "2026-04-01T00:00:00.000Z" }).items.map((entry) => entry.hash)).toEqual(["gen"]);
 
     const firstPage = repository.listLibraryItems({ limit: 2 });
     expect(firstPage.items.map((entry) => entry.hash)).toEqual(["gen", "unique"]);
@@ -160,12 +183,55 @@ describe("EcomRepository", () => {
     const secondPage = repository.listLibraryItems({ limit: 2, cursor: firstPage.nextCursor });
     expect(secondPage.items.map((entry) => entry.hash)).toEqual(["dup"]);
     expect(secondPage.nextCursor).toBeNull();
+    // total 是筛选去重后的完整数量，不随游标推进缩小。
+    expect(secondPage.total).toBe(3);
+    // 游标越过末尾（比全部行都旧）时当前页为空，total 仍要反映完整筛选结果，而不是退化成 0。
+    const beyondEnd = repository.listLibraryItems({ cursor: Buffer.from("2000-01-01T00:00:00.000Z\u0000asset:zzz", "utf8").toString("base64url") });
+    expect(beyondEnd.items).toEqual([]);
+    expect(beyondEnd.total).toBe(3);
 
     const assetSource = repository.resolveLibrarySource(`asset:${newDuplicate.id}`);
     expect(assetSource).toMatchObject({ source: "UPLOADED", hash: "dup", role: "PRODUCT_TRUTH" });
     const outputSource = repository.resolveLibrarySource(`output:${generated.id}`);
     expect(outputSource).toMatchObject({ source: "GENERATED", storagePath: "outputs/gen.png", mimeType: "image/png" });
     expect(repository.resolveLibrarySource("asset:missing")).toBeUndefined();
+    database.close();
+  });
+  it("listLibraryItems 按定妆照所属模特的身份维度筛选，其余来源行不参与", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject(makeProjectInput(provider));
+    const eastAsian = repository.createModel({ name: "小满", spec: { ...MODEL_SPEC_DEFAULTS, gender: "FEMALE", heritage: "EAST_ASIAN", stature: "STANDARD_165" }, notes: "" });
+    const nordic = repository.createModel({ name: "阿岚", spec: { ...MODEL_SPEC_DEFAULTS, gender: "MALE", heritage: "NORTHERN_EUROPEAN", stature: "TALL_172" }, notes: "" });
+    const portraits = [eastAsian, nordic].map((model, index) => {
+      const job = repository.createJob({ id: `cast-${index}`, projectId: null, storyboardItemId: null, type: "MODEL_CAST", input: { modelId: model.id }, providerId: provider.id, modelId: "image" });
+      return repository.createModelPortrait({ modelId: model.id, jobId: job.id, storagePath: `models/${model.id}/portrait.png`, hash: `portrait-${index}`, width: null, height: null, providerId: provider.id, imageModelId: "image", aspectRatio: "1:1" });
+    });
+    repository.createAsset({ projectId: project.id, role: "STYLE_REFERENCE", storagePath: "assets/style.png", hash: "style", originalName: "style.png", mimeType: "image/png", width: null, height: null });
+
+    // 身份维度只在定妆照行上有值：不加 kind=MODEL 也只会返回定妆照。
+    expect(repository.listLibraryItems({ modelSpec: { heritage: "EAST_ASIAN" } }).items.map((entry) => entry.id)).toEqual([`model:${portraits[0]!.id}`]);
+    // 维度之间取交集：性别 + 身高只命中同时成立的那位，跨维度不成立的组合为空。
+    expect(repository.listLibraryItems({ modelSpec: { gender: "MALE", stature: "TALL_172" } }).items.map((entry) => entry.id)).toEqual([`model:${portraits[1]!.id}`]);
+    expect(repository.listLibraryItems({ modelSpec: { gender: "MALE", heritage: "EAST_ASIAN" } }).total).toBe(0);
+    database.close();
+  });
+  it("listLibraryItems 把 LIKE 通配符当普通字符，特殊字符名称仍可被搜到", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const provider = seedProvider(repository);
+    const project = repository.createProject(makeProjectInput(provider, { name: "折扣店" }));
+    const storagePath = "assets/sale.png";
+    const special = repository.createAsset({ projectId: project.id, role: "PRODUCT_TRUTH", storagePath, hash: "sale", originalName: "50%_off.png", mimeType: "image/png", width: null, height: null });
+    repository.createAsset({ projectId: project.id, role: "PRODUCT_TRUTH", storagePath, hash: "plain", originalName: "cover.png", mimeType: "image/png", width: null, height: null });
+
+    // 未转义时 "%" 会命中全部、"x_" 会命中任意单字符；两条断言同时锁住转义行为。
+    expect(repository.listLibraryItems({ q: "%" })).toMatchObject({ total: 1 });
+    expect(repository.listLibraryItems({ q: "_" }).items.map((entry) => entry.hash)).toEqual(["sale"]);
+    expect(repository.listLibraryItems({ q: "\\" }).total).toBe(0);
+    // 前后空格忽略、大小写不敏感：与页面搜索框的口径一致。
+    expect(repository.listLibraryItems({ q: "  50%_OFF  " }).items.map((entry) => entry.id)).toEqual([`asset:${special.id}`]);
     database.close();
   });
   it("listLibraryItems 纳入分层导出的元素/背景切图，排除 PSD 复合层", () => {

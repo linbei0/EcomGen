@@ -1,3 +1,4 @@
+import type { LibraryFilters } from "./adapters/library";
 import type { SuitePageFilters } from "./adapters/suites";
 
 /** 统一 query key 工厂，SSE 事件失效映射也以此为准。 */
@@ -23,7 +24,8 @@ export const qk = {
   modelPortraits: (id: string) => ["models", id, "portraits"] as const,
   projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,
   project: (id: string) => ["projects", id] as const,
-  libraryAssets: (filters: { kind: string; q: string }) => ["library-assets", filters] as const,
+  /** 资产库分页查询：类型/关键词/来源项目/素材用途全部进 key，筛选变化即从首个游标重新查询。 */
+  libraryAssets: (filters: LibraryFilters) => ["library-assets", filters] as const,
   storyboard: (id: string) => ["projects", id, "storyboard"] as const,
   planningSnapshots: (id: string) => ["projects", id, "planning-config-snapshots"] as const,
   job: (id: string) => ["jobs", id] as const,

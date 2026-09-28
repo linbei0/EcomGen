@@ -38,8 +38,56 @@
   margin-bottom: 20px;
 }
 
+/* 类型分段与筛选控件同排：筛选列吃掉剩余宽度，窄窗口时在列内换行而不是整行堆叠。 */
+.typeRow {
+  display: flex;
+  align-items: center;
+}
+
+.filterRow {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 搜索框弹性占满筛选列的空闲宽度：时间/项目保持固定可读宽度，整行不换行。 */
 .search {
-  max-width: 320px;
+  flex: 1 1 220px;
+  min-width: 200px;
+  max-width: 420px;
+}
+
+.projectSelect {
+  width: 180px;
+}
+
+.dateSelect {
+  width: 280px;
+}
+
+/* 模特身份筛选行：五个维度均分一行，放不下再换行。 */
+.identityRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.filterSelect {
+  flex: 1 1 150px;
+  min-width: 150px;
+}
+
+/* 生效筛选条件的回显行：与工具条同一视觉层级，可逐项关闭。 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -8px 0 18px;
 }
 
 .state {

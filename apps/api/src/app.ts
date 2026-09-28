@@ -10,7 +10,7 @@ import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, findMod
 import { SUITE_TAXONOMY, type SuiteDocumentInput, type SuiteOrigin } from "@ecomgen/ecom-suite";
 import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
 import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, ModelSpec, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreateModelCastJobInput, CreateModelInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, ConfirmStoryboardInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateModelInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
+import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreateModelCastJobInput, CreateModelInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, ConfirmStoryboardInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateModelInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, ASSET_ROLES, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, MODEL_AGES, MODEL_BUILDS, MODEL_GENDERS, MODEL_HERITAGES, MODEL_STATURES, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, createSegmentationProvider, probeReasoning, type PromptSegmentationProtocol } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -344,12 +344,12 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.get("/api/v1/files/models/:modelId/reference-face", async (request, reply) => {
     const model = repository.getModel(parameter(request, "modelId"));
     if (!model?.referenceFacePath) missing("reference face", parameter(request, "modelId"));
-    return sendStored(request, reply, storage, { storagePath: model.referenceFacePath, hash: model.referenceFaceHash ?? undefined }, "reference face");
+    return sendStored(request, reply, storage, { storagePath: model.referenceFacePath, hash: model.referenceFaceHash ?? undefined }, "reference face", parameter(request, "modelId"));
   });
   app.get("/api/v1/files/model-portraits/:portraitId", async (request, reply) => {
     const portrait = repository.getModelPortrait(parameter(request, "portraitId"));
     if (!portrait) missing("model portrait", parameter(request, "portraitId"));
-    return sendStored(request, reply, storage, portrait, "model portrait");
+    return sendStored(request, reply, storage, portrait, "model portrait", parameter(request, "portraitId"));
   });
 
   app.get("/api/v1/providers", async () => ({ items: repository.listProviders().map(publicProvider), nextCursor: null }));
@@ -517,14 +517,27 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   // 先删文件再删行：行删了就找不到 storagePath；不级联分镜/输出/任务（契约 deleteAsset）
   app.delete("/api/v1/assets/:assetId", async (request, reply) => { const id = parameter(request, "assetId"); const asset = repository.getAsset(id); if (!asset) missing("asset", id); await storage.delete(asset.storagePath); repository.deleteAsset(id); return reply.code(204).send(); });
-  // 资产库：assets/outputs 的全局只读视图，不复制文件、不落库；缩略图按内容 hash 共享。
+  // 资产库：assets/outputs/model_portraits/layer_exports 的全局只读视图，不复制文件、不落库；缩略图按内容 hash 共享。
   app.get("/api/v1/library-assets", async (request) => {
     const query = (request.query ?? {}) as Record<string, unknown>;
     const kind = typeof query.kind === "string" && query.kind ? enumValue<LibraryItemKind>(query.kind, ["PRODUCT", "REFERENCE", "GENERATED", "LAYER", "MODEL"], "kind") : null;
     const q = typeof query.q === "string" && query.q.trim() ? query.q.trim() : null;
+    // 项目 ID 与路径参数同口径只接受 UUID：非法值返回 400，不静默当作没传。
+    const projectId = typeof query.projectId === "string" && query.projectId.trim() ? query.projectId.trim() : null;
+    if (projectId && !UUID_PATTERN.test(projectId)) throw new ApiError(400, "VALIDATION_ERROR", "projectId must be a UUID");
+    const createdFrom = dateTimeParameter(query.createdFrom, "createdFrom");
+    const createdTo = dateTimeParameter(query.createdTo, "createdTo");
+    // 身份维度逐维收紧：任一维度非法即 400，不做「忽略该维度」的降级。
+    const modelSpec = {
+      gender: modelSpecParameter(query.modelGender, MODEL_GENDERS, "modelGender"),
+      age: modelSpecParameter(query.modelAge, MODEL_AGES, "modelAge"),
+      heritage: modelSpecParameter(query.modelHeritage, MODEL_HERITAGES, "modelHeritage"),
+      stature: modelSpecParameter(query.modelStature, MODEL_STATURES, "modelStature"),
+      build: modelSpecParameter(query.modelBuild, MODEL_BUILDS, "modelBuild"),
+    };
     const cursor = typeof query.cursor === "string" && query.cursor ? query.cursor : null;
     const limit = typeof query.limit === "string" && query.limit ? Math.min(Math.max(Number.parseInt(query.limit, 10) || 40, 1), 100) : 40;
-    const page = repository.listLibraryItems({ kind, q, cursor, limit });
+    const page = repository.listLibraryItems({ kind, q, projectId, createdFrom, createdTo, modelSpec, cursor, limit });
     return { items: page.items.map(publicLibraryAsset), nextCursor: page.nextCursor, total: page.total };
   });
   // 复制而非共享 storage_path：DELETE 资产会删物理文件、deleteProject 按项目目录清理，共享路径会互相破坏
@@ -922,9 +935,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   app.get("/api/v1/projects/:projectId/outputs", async (request) => repository.listOutputs(parameter(request, "projectId")));
   app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = parseBody(CreateExportJobRequest, request.body ?? {}); const input = { outputIds: body.outputIds, filenamePrefix: body.filenamePrefix }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueueOrMarkFailed(job, "export", { onFail: (failedJobId) => { const pendingExport = repository.getExportByJobId(failedJobId); if (pendingExport) repository.updateExport(pendingExport.id, { status: "FAILED" }); } }); return reply.code(202).send({ job, export: exportRecord }); });
   app.get("/api/v1/exports/:exportId", async (request) => { const result = repository.getExport(parameter(request, "exportId")); if (!result) missing("export", parameter(request, "exportId")); return result; });
-  app.get("/api/v1/files/assets/:assetId", async (request, reply) => sendStored(request, reply, storage, repository.getAsset(parameter(request, "assetId")), "asset"));
-  app.get("/api/v1/files/edit-reference-assets/:referenceAssetId", async (request, reply) => sendStored(request, reply, storage, repository.getEditReferenceAsset(parameter(request, "referenceAssetId")), "reference asset"));
-  app.get("/api/v1/files/outputs/:outputId", async (request, reply) => sendStored(request, reply, storage, repository.getOutput(parameter(request, "outputId")), "output"));
+  app.get("/api/v1/files/assets/:assetId", async (request, reply) => sendStored(request, reply, storage, repository.getAsset(parameter(request, "assetId")), "asset", parameter(request, "assetId")));
+  app.get("/api/v1/files/edit-reference-assets/:referenceAssetId", async (request, reply) => sendStored(request, reply, storage, repository.getEditReferenceAsset(parameter(request, "referenceAssetId")), "reference asset", parameter(request, "referenceAssetId")));
+  app.get("/api/v1/files/outputs/:outputId", async (request, reply) => sendStored(request, reply, storage, repository.getOutput(parameter(request, "outputId")), "output", parameter(request, "outputId")));
   // 缩略图按内容 hash 寻址，跨项目共享；命中缓存直接流式返回，未命中（含历史图片）现场生成后落盘。
   app.get("/api/v1/files/thumbnails/:hash", async (request, reply) => {
     const hash = parameter(request, "hash");
@@ -934,9 +947,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       if (!sourcePath) missing("library image", hash);
       await storage.putThumbnail(hash, await renderThumbnail(await storage.read(sourcePath)));
     }
-    return sendStored(request, reply, storage, { storagePath: thumbnailPath, mimeType: "image/webp", hash }, "thumbnail");
+    return sendStored(request, reply, storage, { storagePath: thumbnailPath, mimeType: "image/webp", hash }, "thumbnail", hash);
   });
-  app.get("/api/v1/files/exports/:exportId", async (request, reply) => sendStored(request, reply, storage, repository.getExport(parameter(request, "exportId")), "export"));
+  app.get("/api/v1/files/exports/:exportId", async (request, reply) => sendStored(request, reply, storage, repository.getExport(parameter(request, "exportId")), "export", parameter(request, "exportId")));
   app.get("/api/v1/outputs/:outputId/layer-plan", async (request) => {
     const output = repository.getOutput(parameter(request, "outputId"));
     if (!output) missing("output", parameter(request, "outputId"));
@@ -1016,14 +1029,14 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.get("/api/v1/files/layer-exports/:layerExportId", async (request, reply) => {
     const record = repository.getLayerExport(parameter(request, "layerExportId"));
-    return sendStored(request, reply, storage, record?.psdStoragePath ? { storagePath: record.psdStoragePath } : undefined, "layer export");
+    return sendStored(request, reply, storage, record?.psdStoragePath ? { storagePath: record.psdStoragePath } : undefined, "layer export", parameter(request, "layerExportId"));
   });
   app.get("/api/v1/files/layer-exports/:layerExportId/layers/:layerIndex", async (request, reply) => {
     const layerExportId = parameter(request, "layerExportId");
     const index = Number(parameter(request, "layerIndex"));
     const file = repository.getLayerExport(layerExportId)?.layerFiles?.[index];
     if (!file || !Number.isInteger(index) || index < 0) missing("layer file", `${layerExportId}#${parameter(request, "layerIndex")}`);
-    return sendStored(request, reply, storage, { storagePath: file.storagePath, hash: file.hash }, "layer file");
+    return sendStored(request, reply, storage, { storagePath: file.storagePath, hash: file.hash }, "layer file", `${layerExportId}#${parameter(request, "layerIndex")}`);
   });
   app.get("/api/v1/events", { sse: "only" }, async (request, reply) => {
     const projectId = typeof request.query === "object" && request.query && "projectId" in request.query ? String((request.query as Record<string, unknown>).projectId) : ""; if (!projectId) throw new ApiError(400, "VALIDATION_ERROR", "projectId query parameter is required"); ensureProject(repository, projectId);
@@ -1190,7 +1203,19 @@ function effectiveEditMemory(repository: EcomRepository, session: EditSessionRec
 }
 function parseAssetRole(value: unknown): AssetRole {
   if (value === "PRODUCT" || value === "REFERENCE") return roleForUserAssetKind(value as UserAssetKind);
-  return enumValue<AssetRole>(value, ["PRODUCT_TRUTH", "PACKAGING", "STYLE_REFERENCE", "LAYOUT_REFERENCE"], "role");
+  return enumValue<AssetRole>(value, ASSET_ROLES, "role");
+}
+/** 可选日期时间查询参数：解析失败返回 400，不把非法值静默当成「不限时间」；统一规范化为 UTC ISO 以便与 created_at 字典序比较。 */
+function dateTimeParameter(value: unknown, path: string): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  const text = typeof value === "string" ? value.trim() : "";
+  const parsed = text ? Date.parse(text) : Number.NaN;
+  if (Number.isNaN(parsed)) throw new ApiError(400, "VALIDATION_ERROR", `${path} must be an ISO 8601 date-time`);
+  return new Date(parsed).toISOString();
+}
+/** 可选身份维度查询参数：取值必须落在对应契约元组内；空串表示该维度不筛选。 */
+function modelSpecParameter<T extends string>(value: unknown, allowed: readonly T[], path: string): T | null {
+  return value === undefined || value === null || value === "" ? null : enumValue<T>(value, allowed, path);
 }
 function candidatesPerType(value: unknown): number {
   const count = typeof value === "number" ? value : Number(value);
@@ -1372,8 +1397,9 @@ function copyLanguageValue(value: unknown): string | null {
   if (language.length > 64) throw new ApiError(400, "VALIDATION_ERROR", "copyLanguage must contain 1 to 64 characters");
   return language;
 }
-async function sendStored(request: FastifyRequest, reply: FastifyReply, storage: LocalAssetStore, record: { storagePath: string | null; mimeType?: string; hash?: string } | undefined, name: string): Promise<unknown> {
-  if (!record || !record.storagePath) missing(name, "unknown");
+// requestedId 用于 404 文案带上真实请求标识：sendStored 不知道路由参数名，由各端点自行传入。
+async function sendStored(request: FastifyRequest, reply: FastifyReply, storage: LocalAssetStore, record: { storagePath: string | null; mimeType?: string; hash?: string } | undefined, name: string, requestedId: string): Promise<unknown> {
+  if (!record || !record.storagePath) missing(name, requestedId);
   const etag = record.hash ? `"${record.hash}"` : undefined;
   if (etag && request.headers["if-none-match"] === etag) return reply.code(304).send();
   const size = await storage.size(record.storagePath);
@@ -1392,9 +1418,11 @@ function publicLibraryAsset(item: LibraryItemRecord): Record<string, unknown> {
   // 分层条目 ID 为 layer:<layerExportId>:<index>，下载走分层文件端点。
   const url = item.id.startsWith("layer:")
     ? `/api/v1/files/layer-exports/${idBody.slice(0, idBody.lastIndexOf(":"))}/layers/${idBody.slice(idBody.lastIndexOf(":") + 1)}`
-    : item.source === "UPLOADED"
-      ? `/api/v1/files/assets/${idBody}`
-      : `/api/v1/files/outputs/${idBody}`;
+    : item.id.startsWith("model:")
+      ? `/api/v1/files/model-portraits/${idBody}`
+      : item.source === "UPLOADED"
+        ? `/api/v1/files/assets/${idBody}`
+        : `/api/v1/files/outputs/${idBody}`;
   return {
     id: item.id,
     source: item.source,

@@ -1,14 +1,26 @@
-import { App, Button, Input, Modal, Segmented, Spin } from "antd";
+import { App, Button, DatePicker, Input, Modal, Segmented, Select, Spin } from "antd";
 import { Check, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type { UserAssetKind } from "../../api/adapters/projectDetail";
-import { LIBRARY_KIND_OPTIONS, type LibraryKindFilter } from "../../api/adapters/library";
+import {
+  LIBRARY_KIND_OPTIONS,
+  hasActiveLibraryFilters,
+  libraryFilterScope,
+  type LibraryKindFilter,
+} from "../../api/adapters/library";
 import { useCopyLibraryAssetToProject, useLibraryItems } from "../../api/hooks/useLibrary";
+import { useProjects } from "../../api/hooks/useProjects";
 import { errorText } from "../../lib/errorText";
-import { formatShortDate } from "../../lib/format";
+import { dayRangeBounds, formatShortDate } from "../../lib/format";
+import { MODEL_IDENTITY_FILTERS, type ModelIdentityFilters, type ModelIdentityKey } from "../../lib/modelIdentityFilters";
 import { USER_ASSET_KIND_META } from "../../lib/roles";
 import styles from "../workbench/workbench.module.css";
+
+const { RangePicker } = DatePicker;
+
+/** 日期范围控件的受控值类型：antd 内部用 dayjs，应用不直接依赖它，因此从属性类型反推。 */
+type LibraryDateRange = Parameters<NonNullable<React.ComponentProps<typeof RangePicker>["onChange"]>>[0];
 
 /** 资产库选择器：跨项目素材/生成结果，勾选后由服务端复制为当前项目素材。 */
 export function LibraryPickerDialog({
@@ -29,7 +41,11 @@ export function LibraryPickerDialog({
   const [kindFilter, setKindFilter] = useState<LibraryKindFilter>("ALL");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<LibraryDateRange>(null);
+  const [modelIdentity, setModelIdentity] = useState<ModelIdentityFilters>({});
   const copy = useCopyLibraryAssetToProject();
+  const projects = useProjects();
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery(search), 300);
@@ -42,20 +58,54 @@ export function LibraryPickerDialog({
       setKindFilter("ALL");
       setSearch("");
       setQuery("");
+      setProjectFilter(null);
+      setDateRange(null);
+      setModelIdentity({});
     }
   }, [open]);
 
-  const filters = useMemo(() => ({ kind: kindFilter, q: query }), [kindFilter, query]);
+  const scope = libraryFilterScope(kindFilter);
+  const timeBounds = useMemo(() => dayRangeBounds(dateRange?.[0]?.valueOf(), dateRange?.[1]?.valueOf()), [dateRange]);
+  const filters = useMemo(
+    () => ({
+      kind: kindFilter,
+      q: query,
+      projectId: projectFilter,
+      createdFrom: timeBounds.createdFrom,
+      createdTo: timeBounds.createdTo,
+      modelIdentity,
+    }),
+    [kindFilter, query, projectFilter, timeBounds, modelIdentity],
+  );
   const library = useLibraryItems(filters, open);
+  const filterActive = hasActiveLibraryFilters(filters);
   // 项目内已有 hash 直接隐藏，避免选到必然被项目内 hash 唯一性拒绝的图片。
   const items = useMemo(
     () => (library.data?.pages.flatMap((page) => page.items) ?? []).filter((item) => !excludeHashes.has(item.hash)),
     [library.data, excludeHashes],
   );
+  // 服务端 total 是「筛选后去重」的匹配数，不扣除项目内已有的图片，因此只能当匹配数展示，不能当可添加数。
+  const matched = library.data?.pages[0]?.total ?? 0;
+
+  // 搜索或筛选变化后旧选择可能已不可见，清空避免把看不见的图片带进「添加」。
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filters]);
 
   const changeKind = (value: LibraryKindFilter) => {
+    const next = libraryFilterScope(value);
     setKindFilter(value);
-    setSelectedIds(new Set());
+    if (!next.project) setProjectFilter(null);
+    if (!next.identity) setModelIdentity({});
+  };
+
+  const setIdentityFilter = (key: ModelIdentityKey, value: string | null) => {
+    setModelIdentity((current) => {
+      const next = { ...current };
+      if (value) next[key] = value;
+      else delete next[key];
+      return next;
+    });
   };
 
   const toggle = (itemId: string) => {
@@ -117,6 +167,53 @@ export function LibraryPickerDialog({
           aria-label="搜索资产库"
         />
       </div>
+      <div className={styles.historyFilterRow}>
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          className={styles.historyFilterSelect}
+          placeholder={scope.project ? "全部项目" : "定妆照不属于项目"}
+          aria-label="按来源项目筛选"
+          value={projectFilter ?? undefined}
+          onChange={(value) => setProjectFilter(value ?? null)}
+          options={(projects.data?.items ?? []).map((project) => ({ label: project.name, value: project.id }))}
+          loading={projects.isPending}
+          disabled={!scope.project}
+          popupMatchSelectWidth={false}
+        />
+        <RangePicker
+          allowClear
+          className={styles.historyFilterSelect}
+          value={dateRange}
+          onChange={setDateRange}
+          placeholder={["开始日期", "结束日期"]}
+          aria-label="按创建时间筛选"
+        />
+        {library.isSuccess ? (
+          <span className={styles.historyCount}>
+            {matched} 张匹配{matched > 0 ? " · 项目内已有的自动隐藏" : ""}
+          </span>
+        ) : null}
+      </div>
+      {/* 身份维度查的是模特实体的规格，只对定妆照成立：切到其他类型时隐藏并清空。 */}
+      {scope.identity ? (
+        <div className={styles.historyFilterRow}>
+          {MODEL_IDENTITY_FILTERS.map((filter) => (
+            <Select
+              key={filter.key}
+              allowClear
+              className={styles.historyIdentitySelect}
+              placeholder={filter.label}
+              aria-label={filter.label}
+              value={modelIdentity[filter.key]}
+              onChange={(value) => setIdentityFilter(filter.key, value ?? null)}
+              options={filter.options}
+              popupMatchSelectWidth={false}
+            />
+          ))}
+        </div>
+      ) : null}
       {library.isLoading ? (
         <div className={styles.historyState}>
           <Spin />
@@ -124,7 +221,13 @@ export function LibraryPickerDialog({
       ) : library.isError ? (
         <p className={styles.historyState}>资产库加载失败：{errorText(library.error)}</p>
       ) : items.length === 0 ? (
-        <p className={styles.historyState}>资产库还没有可添加的图片。</p>
+        <p className={styles.historyState}>
+          {matched > 0
+            ? "当前筛选结果的图片都已经在本项目里。"
+            : filterActive
+              ? "没有匹配的图片，换个关键词或放宽筛选条件。"
+              : "资产库还没有可添加的图片。"}
+        </p>
       ) : (
         <div className={styles.historyGrid}>
           {items.map((item) => (
@@ -153,11 +256,15 @@ export function LibraryPickerDialog({
           ))}
         </div>
       )}
-      {library.hasNextPage ? (
+      {items.length > 0 ? (
         <div className={styles.historyMore}>
-          <Button type="text" loading={library.isFetchingNextPage} onClick={() => void library.fetchNextPage()}>
-            加载更多
-          </Button>
+          {library.hasNextPage ? (
+            <Button type="text" loading={library.isFetchingNextPage} onClick={() => void library.fetchNextPage()}>
+              加载更多
+            </Button>
+          ) : (
+            <span className={styles.historyCount}>已经到底了</span>
+          )}
         </div>
       ) : null}
     </Modal>

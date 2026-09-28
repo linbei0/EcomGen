@@ -539,6 +539,7 @@ paths:
   /library-assets:
     get:
       operationId: listLibraryAssets
+      description: Global asset library view over uploads, generated results, layer slices and model portraits. Filters apply to source rows before content-hash deduplication, so when a matching row is not the newest row of its hash, that row becomes the representative item. `total` counts the filtered and deduplicated result and does not shrink as the cursor advances.
       parameters:
         - name: kind
           in: query
@@ -548,8 +549,60 @@ paths:
         - name: q
           in: query
           required: false
+          description: Case-insensitive substring match on item name and owning project name; `%` and `_` are literal characters.
           schema:
             type: string
+        - name: projectId
+          in: query
+          required: false
+          description: Keep only items owned by this project. Model portraits belong to no project and are excluded. Invalid UUID returns 400.
+          schema:
+            type: string
+            format: uuid
+        - name: createdFrom
+          in: query
+          required: false
+          description: Inclusive lower bound on source row creation time (ISO 8601 date-time in any offset). Unparseable values return 400.
+          schema:
+            type: string
+            format: date-time
+        - name: createdTo
+          in: query
+          required: false
+          description: Inclusive upper bound on source row creation time (ISO 8601 date-time in any offset). Unparseable values return 400.
+          schema:
+            type: string
+            format: date-time
+        - name: modelGender
+          in: query
+          required: false
+          description: Keep only model portraits whose model takes this identity-core value; rows without a model spec (uploads, outputs, layer slices) are excluded, so combine with kind=MODEL.
+          schema:
+            $ref: "#/components/schemas/ModelGender"
+        - name: modelAge
+          in: query
+          required: false
+          description: Identity-core filter on the portrait model's age band; see modelGender for applicability.
+          schema:
+            $ref: "#/components/schemas/ModelAge"
+        - name: modelHeritage
+          in: query
+          required: false
+          description: Identity-core filter on the portrait model's heritage; see modelGender for applicability.
+          schema:
+            $ref: "#/components/schemas/ModelHeritage"
+        - name: modelStature
+          in: query
+          required: false
+          description: Identity-core filter on the portrait model's stature; see modelGender for applicability.
+          schema:
+            $ref: "#/components/schemas/ModelStature"
+        - name: modelBuild
+          in: query
+          required: false
+          description: Identity-core filter on the portrait model's build; see modelGender for applicability.
+          schema:
+            $ref: "#/components/schemas/ModelBuild"
         - $ref: "#/components/parameters/Cursor"
         - name: limit
           in: query
@@ -560,7 +613,7 @@ paths:
             maximum: 100
       responses:
         "200":
-          description: Global asset library view over uploads and generated results, deduplicated by content hash.
+          description: Filtered asset library page; filtered source rows are deduplicated by content hash before sorting, paging and counting.
           content:
             application/json:
               schema:
