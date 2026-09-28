@@ -61,7 +61,7 @@ export class LocalAssetStore {
     return { path: relativePath, hash };
   }
 
-  /** 套图反推来源图：不入项目，按 job 聚合到 suite-forge 命名空间，任务失败时随清理一并删除。 */
+  /** 套图反推来源图：不入项目，按 job 聚合到 suite-forge 命名空间；失败重试需重读源图，故不随任务终态删除，当前无自动回收。 */
   public async putSuiteForgeSource(jobId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
     const hash = createHash("sha256").update(content).digest("hex");
     const relativePath = join("suite-forge", jobId, `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(originalName)}`);
@@ -133,23 +133,29 @@ export class LocalAssetStore {
    * projectId 为单段目录名，并要求解析后的目标位于对应资源目录（<root>/<part>/）之下。
    */
   public async deleteProject(projectId: string): Promise<void> {
-    if (
-      projectId.length === 0 ||
-      projectId.includes("/") ||
-      projectId.includes("\\") ||
-      projectId.includes("..") ||
-      isAbsolute(projectId)
-    ) {
-      throw new Error("Project id must be a single path segment");
+    this.assertSingleSegment(projectId, "Project id");
+    await Promise.all(["assets", "outputs", "exports", "edits", "layers"].map((part) => this.deleteNamespaceChild(part, projectId)));
+  }
+
+  /** 永久删除模特的全部本地文件：参考脸与按 job 聚合的全部定妆照（models/<modelId>/ 整目录）。 */
+  public async deleteModel(modelId: string): Promise<void> {
+    this.assertSingleSegment(modelId, "Model id");
+    await this.deleteNamespaceChild("models", modelId);
+  }
+
+  /** id 来自 URL 参数并直接参与拼路径，是路径穿越的高危入口：强制单段目录名，杜绝 `../` 等形态进入递归删除。 */
+  private assertSingleSegment(id: string, label: string): void {
+    if (id.length === 0 || id.includes("/") || id.includes("\\") || id.includes("..") || isAbsolute(id)) {
+      throw new Error(`${label} must be a single path segment`);
     }
-    await Promise.all(
-      ["assets", "outputs", "exports", "edits", "layers"].map((part) => {
-        const target = this.absolute(join(part, projectId));
-        const pathFromPart = relative(this.absolute(part), target);
-        if (pathFromPart.startsWith("..") || isAbsolute(pathFromPart)) throw new Error("Asset path escapes storage root");
-        return rm(target, { recursive: true, force: true });
-      }),
-    );
+  }
+
+  /** 删除 <root>/<namespace>/<id>/ 整目录：目标必须解析回对应资源目录之下，防止越界递归删除。 */
+  private async deleteNamespaceChild(namespace: string, id: string): Promise<void> {
+    const target = this.absolute(join(namespace, id));
+    const pathFromNamespace = relative(this.absolute(namespace), target);
+    if (pathFromNamespace.startsWith("..") || isAbsolute(pathFromNamespace)) throw new Error("Asset path escapes storage root");
+    await rm(target, { recursive: true, force: true });
   }
 
   public absolute(relativePath: string): string {

@@ -56,4 +56,39 @@ describe("LocalAssetStore", () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
+
+  it("永久删除模特的参考脸与全部定妆照且不影响其他模特", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "ecomgen-model-files-"));
+    try {
+      const store = new LocalAssetStore(directory);
+      await store.initialize();
+      const face = await store.putModelReferenceFace("model-a", "face.png", Buffer.from("face"));
+      const cast = await store.putModelPortrait("model-a", "job-1", Buffer.from("cast"));
+      const otherFace = await store.putModelReferenceFace("model-b", "face.png", Buffer.from("other"));
+      const otherCast = await store.putModelPortrait("model-b", "job-2", Buffer.from("other-cast"));
+
+      await store.deleteModel("model-a");
+
+      await expect(store.exists(face.path)).resolves.toBe(false);
+      await expect(store.exists(cast.path)).resolves.toBe(false);
+      await expect(store.exists(otherFace.path)).resolves.toBe(true);
+      await expect(store.exists(otherCast.path)).resolves.toBe(true);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  // 回归保护：modelId 与 projectId 一样直接拼路径，穿越形态会把 rm 的删除目标移出数据目录
+  it.each(["../", "..\\escape", "a/b", "a\\b", "..", "", "C:\\Windows"])("拒绝路径穿越形态的模特 ID：%j", async (modelId) => {
+    const directory = mkdtempSync(join(tmpdir(), "ecomgen-model-files-"));
+    try {
+      const store = new LocalAssetStore(directory);
+      await store.initialize();
+      const retained = await store.putModelReferenceFace("model-a", "face.png", Buffer.from("face"));
+      await expect(store.deleteModel(modelId)).rejects.toThrow();
+      await expect(store.exists(retained.path)).resolves.toBe(true);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 });

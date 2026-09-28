@@ -278,6 +278,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.delete("/api/v1/models/:modelId", async (request, reply) => {
     const model = ensureModel(repository, parameter(request, "modelId"));
+    // 先清文件再删行：模特行级联清定妆照记录，models/<id>/ 目录由 deleteModel 一并删除；
+    // 文件清理失败时保留模特记录，前端可准确重试。
+    await storage.deleteModel(model.id);
     repository.deleteModel(model.id);
     return reply.code(204).send();
   });
@@ -298,6 +301,8 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.delete("/api/v1/models/:modelId/reference-face", async (request, reply) => {
     const model = ensureModel(repository, parameter(request, "modelId"));
+    // 先删文件再清字段：字段置空后 storagePath 无处可查（与资产删除同理）。
+    if (model.referenceFacePath) await storage.delete(model.referenceFacePath);
     repository.setModelReferenceFace(model.id, null, null);
     return reply.code(204).send();
   });
@@ -322,7 +327,10 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   });
   app.delete("/api/v1/model-portraits/:portraitId", async (request, reply) => {
     const id = parameter(request, "portraitId");
-    if (!repository.getModelPortrait(id)) missing("model portrait", id);
+    const portrait = repository.getModelPortrait(id);
+    if (!portrait) missing("model portrait", id);
+    // 先删文件再删行：行删了就找不到 storagePath。
+    await storage.delete(portrait.storagePath);
     repository.deleteModelPortrait(id);
     return reply.code(204).send();
   });

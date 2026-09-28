@@ -488,6 +488,55 @@ describe("PATCH /api/v1/models/:modelId 局部更新", () => {
   });
 });
 
+describe("模特删除的文件级联清理", () => {
+  // 与 buildApi 共享同一 dataDir：端点与断言看到同一份磁盘真相
+  const store = () => new LocalAssetStore(dataDir);
+
+  async function seedModelWithFiles(name: string) {
+    const model = repository.createModel({ name, spec: MODEL_SPEC_DEFAULTS, notes: "" });
+    const face = await store().putModelReferenceFace(model.id, "face.png", Buffer.from(`face:${model.id}`));
+    repository.setModelReferenceFace(model.id, face.path, face.hash);
+    // model_portraits.job_id 有外键：定妆照落库前先建真实任务行
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "MODEL_CAST", input: { modelId: model.id }, providerId: "provider-x", modelId: "image-x" });
+    const cast = await store().putModelPortrait(model.id, job.id, Buffer.from(`cast:${model.id}`));
+    const portrait = repository.createModelPortrait({ modelId: model.id, jobId: job.id, storagePath: cast.path, hash: cast.hash, width: null, height: null, providerId: "provider-x", imageModelId: "image-x", aspectRatio: "1:1" });
+    return { model, face, portrait };
+  }
+
+  it("删除模特时级联清除参考脸与全部定妆照文件，且不影响其他模特", async () => {
+    const first = await seedModelWithFiles("小满");
+    const second = await seedModelWithFiles("小杏");
+
+    const response = await app.inject({ method: "DELETE", url: `/api/v1/models/${first.model.id}` });
+    expect(response.statusCode).toBe(204);
+
+    expect(repository.getModel(first.model.id)).toBeUndefined();
+    expect(repository.listModelPortraits(first.model.id)).toHaveLength(0);
+    const disk = store();
+    await expect(disk.exists(first.face.path)).resolves.toBe(false);
+    await expect(disk.exists(first.portrait.storagePath)).resolves.toBe(false);
+    await expect(disk.exists(second.face.path)).resolves.toBe(true);
+    await expect(disk.exists(second.portrait.storagePath)).resolves.toBe(true);
+  });
+
+  it("清除参考脸时同时删除文件并置空模特记录", async () => {
+    const { model, face } = await seedModelWithFiles("小满");
+    const response = await app.inject({ method: "DELETE", url: `/api/v1/models/${model.id}/reference-face` });
+    expect(response.statusCode).toBe(204);
+    expect(repository.getModel(model.id)).toMatchObject({ referenceFacePath: null, referenceFaceHash: null });
+    await expect(store().exists(face.path)).resolves.toBe(false);
+  });
+
+  it("删除单张定妆照时同时删除其 PNG 文件", async () => {
+    const { model, portrait } = await seedModelWithFiles("小满");
+    const response = await app.inject({ method: "DELETE", url: `/api/v1/model-portraits/${portrait.id}` });
+    expect(response.statusCode).toBe(204);
+    expect(repository.getModelPortrait(portrait.id)).toBeUndefined();
+    await expect(store().exists(portrait.storagePath)).resolves.toBe(false);
+    expect(repository.getModel(model.id)).toBeDefined();
+  });
+});
+
 describe("GET /api/v1/suites 分页与筛选", () => {
   const importedSuite = {
     name: "接口导入套图",
