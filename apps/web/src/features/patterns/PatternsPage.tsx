@@ -35,6 +35,7 @@ import {
   type Pattern,
   type PatternBackgroundMode,
   type PodPrintLayout,
+  type PodRepeatLayout,
 } from "../../api/hooks/usePatterns";
 import { useJobStatus } from "../../api/hooks/useJobs";
 import { useProviders } from "../../api/hooks/useProviders";
@@ -44,7 +45,7 @@ import { errorText } from "../../lib/errorText";
 import { jobErrorText } from "../../lib/jobError";
 import { parseModelKey, segmentationModelOptions } from "../../lib/modelOptions";
 import { panelBackdrop, placeholderBackdrop } from "./heroPatterns";
-import { BackgroundModeSelect, EMPTY_PIPELINE_ANSWERS, ImageModelSelect, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, PipelineAnswersBlock, missingPipelineAnswer, podSpecOptionLabel, SOURCE_FILTERS, SOURCE_LABELS, stageText, StatusPill, statusLabel, statusTone, tileableBadge, toPipelineAnswers, useImageModelOptions, type PipelineAnswerDraft } from "./shared";
+import { BackgroundModeSelect, EMPTY_PIPELINE_ANSWERS, ImageModelSelect, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, PipelineAnswersBlock, missingPipelineAnswer, podSpecOptionLabel, RepeatLayoutChipRow, SOURCE_FILTERS, SOURCE_LABELS, stageText, StatusPill, statusLabel, statusTone, tileableBadge, toPipelineAnswers, useImageModelOptions, type PipelineAnswerDraft } from "./shared";
 import styles from "./PatternsPage.module.css";
 
 /** 起稿可选底版：契约把起稿的 background 收窄掉了 SOURCE（没有源图），这里与之对齐。 */
@@ -1025,6 +1026,7 @@ function BatchPackDialog({ open, patterns, onClose }: { open: boolean; patterns:
   const createPack = useCreatePrintPackJob();
   const [specId, setSpecId] = useState<string | null>(null);
   const [layout, setLayout] = useState<PodPrintLayout>("CENTERED");
+  const [repeatLayout, setRepeatLayout] = useState<PodRepeatLayout>("STRAIGHT");
   const [jobs, setJobs] = useState<Array<{ patternId: string; name: string; jobId: string }>>([]);
   const [running, setRunning] = useState(false);
 
@@ -1037,7 +1039,7 @@ function BatchPackDialog({ open, patterns, onClose }: { open: boolean; patterns:
     const collected: Array<{ patternId: string; name: string; jobId: string }> = [];
     for (const pattern of patterns) {
       try {
-        const { job } = await createPack.mutateAsync({ patternId: pattern.id, body: { specId, layout } });
+        const { job } = await createPack.mutateAsync({ patternId: pattern.id, body: { specId, layout, ...(layout === "TILE" ? { repeatLayout } : {}) } });
         collected.push({ patternId: pattern.id, name: pattern.name, jobId: job.id });
         setJobs([...collected]);
       } catch (error) {
@@ -1064,6 +1066,11 @@ function BatchPackDialog({ open, patterns, onClose }: { open: boolean; patterns:
       {jobs.length === 0 ? (
         <>
           <LayoutChipRow value={layout} onChange={setLayout} />
+          {layout === "TILE" ? (
+            <div style={{ marginTop: 10 }}>
+              <RepeatLayoutChipRow value={repeatLayout} onChange={setRepeatLayout} ariaLabel="平铺排列" />
+            </div>
+          ) : null}
           <Select
             style={{ width: "100%", marginTop: 10 }}
             placeholder="品类规格"

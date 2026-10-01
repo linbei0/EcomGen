@@ -704,14 +704,30 @@ try {
   const reusedRecolor = await fetch(`${base}/patterns/${pattern.id}/derive-jobs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hueShift: 40, saturationPct: 120 }) });
   assert.equal(reusedRecolor.status, 200);
   assert.equal((await reusedRecolor.json()).id, recolorJob.id);
-  // 平铺满印版式：对改色产物成 TILE 包，产物仍为 PRINT_FILE + MOCKUP + MANIFEST 三件
+  // 平铺满印版式：对改色产物成 TILE 包，产物为 PRINT_FILE + MOCKUP + SEAMLESS_TILE + MANIFEST 四件；
+  // 再以半落排列成包：文件四件齐全，manifest 记录 repeatLayout 与无缝单元尺寸，无缝单元可下载。
   const tilePack = await requestJson(`${base}/patterns/${recolorPattern.id}/print-pack-jobs`, "POST", { specId: "tshirt-front-12x16", layout: "TILE" });
   const tilePackJob = await waitJob(base, tilePack.job.id);
   assert.equal(tilePackJob.status, "SUCCEEDED");
   const tilePacks = await requestJson(`${base}/patterns/${recolorPattern.id}/print-packs`, "GET");
-  assert.deepEqual(tilePacks.items[0].files.map((file) => file.kind), ["PRINT_FILE", "MOCKUP", "MANIFEST"]);
+  assert.deepEqual(tilePacks.items[0].files.map((file) => file.kind), ["PRINT_FILE", "MOCKUP", "SEAMLESS_TILE", "MANIFEST"]);
   assert.equal((await fetch(new URL(tilePacks.items[0].files[0].url, base))).status, 200);
   assert.equal((await fetch(new URL(tilePacks.items[0].files[1].url, base))).status, 200);
+  const dropPack = await requestJson(`${base}/patterns/${recolorPattern.id}/print-pack-jobs`, "POST", { specId: "tshirt-front-12x16", layout: "TILE", repeatLayout: "HALF_DROP" });
+  const dropPackJob = await waitJob(base, dropPack.job.id);
+  assert.equal(dropPackJob.status, "SUCCEEDED");
+  const dropPacks = await requestJson(`${base}/patterns/${recolorPattern.id}/print-packs`, "GET");
+  const dropFiles = dropPacks.items.find((pack) => pack.jobId === dropPack.job.id).files;
+  assert.deepEqual(dropFiles.map((file) => file.kind), ["PRINT_FILE", "MOCKUP", "SEAMLESS_TILE", "MANIFEST"]);
+  const dropManifestFile = dropFiles.find((file) => file.kind === "MANIFEST");
+  const dropManifest = JSON.parse(await (await fetch(new URL(dropManifestFile.url, base))).text());
+  assert.equal(dropManifest.repeatLayout, "HALF_DROP");
+  assert.equal(dropManifest.seam, "depends-on-source-tileability");
+  // 无缝单元尺寸在源图原生分辨率下（与印刷画布无关），几何由 worker 单测锁定，这里只验非零与可下载。
+  assert.ok(dropManifest.seamlessTile.width > 0);
+  assert.ok(dropManifest.seamlessTile.height > 0);
+  const dropTileFile = dropFiles.find((file) => file.kind === "SEAMLESS_TILE");
+  assert.equal((await fetch(new URL(dropTileFile.url, base))).status, 200);
   // 成包流水线（满印链跑完）：三问只答一次，worker 按 position 把「验缝 → 规格包 → 文案」推到底。
   // 均匀底花型的验缝判定是确定性的 VERIFIED，所以这条链不该在任何一步停下。
   const pipelineForm = new FormData();
@@ -736,7 +752,7 @@ try {
   // 规格包与文案两步的产物都能按步骤 jobId 取回（收据不是空壳）
   const pipelinePacks = await requestJson(`${base}/patterns/${pipelinePattern.id}/print-packs`, "GET");
   assert.equal(pipelinePacks.items.length, 1);
-  assert.deepEqual(pipelinePacks.items[0].files.map((file) => file.kind), ["PRINT_FILE", "MOCKUP", "MANIFEST"]);
+  assert.deepEqual(pipelinePacks.items[0].files.map((file) => file.kind), ["PRINT_FILE", "MOCKUP", "SEAMLESS_TILE", "MANIFEST"]);
   const listingStep = sealedPipeline.steps.find((step) => step.step === "LISTING");
   const pipelineListing = await requestJson(`${base}/patterns/${pipelinePattern.id}/listing-jobs/${listingStep.jobId}/result`, "GET");
   assert.equal(pipelineListing.platform, "ETSY");
@@ -754,6 +770,26 @@ try {
   const waitingPackStep = waiting.steps.find((step) => step.step === "PRINT_PACK");
   assert.equal(waitingPackStep.status, "PENDING");
   assert.equal(waitingPackStep.jobId, null);
+  // 裁决零（换镜像）：镜像排列构造性无缝，闸门对它放行——版式保持满印、排列改写为 MIRROR，
+  // 规格包带 SEAMLESS_TILE，manifest 标注 seam=by-construction。
+  // sellingPoints 进流水线指纹：不带区分字段会复用上面停在 AWAITING_INPUT 的同参数流水线，而不是新建一条。
+  const mirrorPipeline = await requestJson(`${base}/patterns/${uploadedPattern.id}/pipelines`, "POST", { specId: "tshirt-front-12x16", layout: "TILE", sellingPoints: "mirror verdict case", listingPlatform: "ETSY", listingProviderId: provider.id, listingModelId: "mock-reasoner" });
+  await waitPipeline(base, mirrorPipeline.id, "AWAITING_INPUT");
+  const mirrored = await requestJson(`${base}/pattern-pipelines/${mirrorPipeline.id}/continue`, "POST", { resolution: "USE_MIRROR" });
+  assert.equal(mirrored.layout, "TILE");
+  assert.equal(mirrored.repeatLayout, "MIRROR");
+  const mirroredDone = await waitPipeline(base, mirrorPipeline.id);
+  assert.equal(mirroredDone.status, "SUCCEEDED");
+  const mirrorPackStep = mirroredDone.steps.find((step) => step.step === "PRINT_PACK");
+  const mirrorPackJob = await requestJson(`${base}/jobs/${mirrorPackStep.jobId}`, "GET");
+  assert.equal(mirrorPackJob.input.repeatLayout, "MIRROR");
+  const mirrorPacks = await requestJson(`${base}/patterns/${uploadedPattern.id}/print-packs`, "GET");
+  const mirrorPack = mirrorPacks.items.find((pack) => pack.jobId === mirrorPackStep.jobId);
+  assert.ok(mirrorPack.files.some((file) => file.kind === "SEAMLESS_TILE"), `mirror pack files: ${JSON.stringify(mirrorPack.files.map((file) => file.kind))}`);
+  const mirrorManifest = JSON.parse(await (await fetch(new URL(mirrorPack.files.find((file) => file.kind === "MANIFEST").url, base))).text());
+  assert.equal(mirrorManifest.repeatLayout, "MIRROR");
+  assert.equal(mirrorManifest.seam, "by-construction");
+
   // 裁决一：改用居中继续 → 版式落库后规格包按新版式出图，链跑完
   const resolved = await requestJson(`${base}/pattern-pipelines/${seamPipeline.id}/continue`, "POST", { resolution: "USE_CENTERED" });
   assert.equal(resolved.layout, "CENTERED");

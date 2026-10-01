@@ -55,7 +55,7 @@ docker compose up -d --build
 
 - 使用 TypeScript ESM、NodeNext 模块解析和严格类型检查；新增跨应用数据结构优先放入 `packages/contracts`。
 - 包之间通过 workspace 依赖引用，不在应用中复制领域类型或数据库 SQL。
-- 项目处于开发初期时，以当前 API 和领域契约为唯一规范；未经明确需求，不保留历史状态、字段或行为的运行时兼容分支。需要处理开发数据时，优先采用一次性迁移或显式版本化方案，并补充验证。
+- 以当前 API 和领域契约为唯一规范；未经明确需求，不保留历史状态、字段或行为的运行时兼容分支。需要处理开发数据时，优先采用一次性迁移或显式版本化方案，并补充验证。
 - API 只负责校验、持久化和入队；耗时的模型调用、文件处理和导出必须在 Worker 中执行。
 - REST 是状态真相；SSE 只用于通知前端失效并重新查询，不在前端依赖事件历史恢复状态。
 - 任务创建应提供稳定请求指纹；重复请求应复用 `QUEUED`、`RUNNING` 或 `SUCCEEDED` 任务。
@@ -94,13 +94,13 @@ pnpm build:affected   # 改动包 + 上游依赖（构建要先有上游 dist）
 
 ### 验证层级
 
-| 改动 | 必须运行 |
-| --- | --- |
-| 任意改动 | `pnpm test:affected` |
-| 领域逻辑或持久化 | 对应 package 的用例，由 `test:affected` 覆盖 |
+| 改动                       | 必须运行                                                      |
+| ------------------------ | --------------------------------------------------------- |
+| 任意改动                     | `pnpm test:affected`                                      |
+| 领域逻辑或持久化                 | 对应 package 的用例，由 `test:affected` 覆盖                       |
 | `packages/contracts/src` | `pnpm gen:openapi && pnpm gen:check && pnpm lint:openapi` |
-| 任务编排、Provider 或导出 | `pnpm test:e2e:mock` |
-| 合并前 / 推送前 | `pnpm build && pnpm test` |
+| 任务编排、Provider 或导出        | `pnpm test:e2e:mock`                                      |
+| 合并前 / 推送前                | `pnpm build && pnpm test`                                 |
 
 契约对账（`gen:check`、`lint:openapi`）只在 contracts 或 `openapi.yaml` 真正改动时才有意义，不作为无关改动的固定步骤。
 
@@ -137,3 +137,4 @@ pnpm build:affected   # 改动包 + 上游依赖（构建要先有上游 dist）
 - [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html)
 - [API 契约](openapi.yaml)
 - [运行时架构与不变量](ARCHITECTURE.md)
+

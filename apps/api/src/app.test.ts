@@ -1032,6 +1032,20 @@ describe("POST /api/v1/patterns/:patternId/print-pack-jobs 场景版本复用", 
     expect(reuse.json<{ job: { id: string } }>().job.id).toBe(newJobId);
   });
 
+  it("平铺排列仅满印生效：居中携带拒绝，满印进入任务快照，缺省直排", async () => {
+    const pattern = seedPattern("repeat-pack");
+    const centered = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/print-pack-jobs`, payload: { specId: "tshirt-front-12x16", layout: "CENTERED", repeatLayout: "MIRROR" } });
+    expect(centered.statusCode).toBe(400);
+
+    const tiled = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/print-pack-jobs`, payload: { specId: "tshirt-front-12x16", layout: "TILE", repeatLayout: "HALF_DROP" } });
+    expect(tiled.statusCode).toBe(202);
+    expect(repository.getJob(tiled.json<{ job: { id: string } }>().job.id)?.input).toMatchObject({ layout: "TILE", repeatLayout: "HALF_DROP" });
+
+    const implicit = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/print-pack-jobs`, payload: { specId: "tshirt-front-12x16", layout: "TILE" } });
+    expect(implicit.statusCode).toBe(202);
+    expect(repository.getJob(implicit.json<{ job: { id: string } }>().job.id)?.input).toMatchObject({ repeatLayout: "STRAIGHT" });
+  });
+
   it("FAILED 任务不放行复用，同指纹重提走新建", async () => {
     const pattern = seedPattern("failed-pack");
     const first = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/print-pack-jobs`, payload: { specId: "poster-18x24" } });
@@ -1184,6 +1198,54 @@ describe("成包流水线（三问一跑）", () => {
     // 裁决只在 AWAITING_INPUT 时有意义，重复裁决要挡住
     const again = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/continue`, payload: { resolution: "ALLOW_SEAM" } });
     expect(again.statusCode).toBe(409);
+  });
+
+  it("平铺排列随答案落库并随收据下发；居中携带排列在建链前拒绝", async () => {
+    const pattern = seedPattern("pipe-repeat");
+    const answers = pipelineAnswers();
+
+    const rejected = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "CENTERED", repeatLayout: "MIRROR", listingPlatform: "ETSY", ...answers },
+    });
+    expect(rejected.statusCode).toBe(400);
+
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "TILE", repeatLayout: "HALF_DROP", listingPlatform: "ETSY", ...answers },
+    });
+    expect(created.statusCode).toBe(202);
+    expect(created.json<{ repeatLayout: string }>().repeatLayout).toBe("HALF_DROP");
+    // 缺省直排：旧客户端不带该字段也能建链
+    const implicit = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "TILE", listingPlatform: "ETSY", ...answers },
+    });
+    expect(implicit.json<{ repeatLayout: string }>().repeatLayout).toBe("STRAIGHT");
+  });
+
+  it("换镜像出口：版式保持满印、排列改写为 MIRROR 并带进规格包任务", async () => {
+    const pattern = seedPattern("pipe-mirror");
+    const answers = pipelineAnswers();
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "TILE", listingPlatform: "ETSY", ...answers },
+    });
+    const pipeline = created.json<{ id: string; steps: Array<{ step: string }> }>();
+    const tileStep = repository.getPatternPipeline(pipeline.id)!.steps.find((entry) => entry.step === "TILE_CHECK")!;
+    repository.updatePatternPipelineStep(tileStep.id, { status: "SUCCEEDED", detail: { tileable: "FAILED" } });
+    repository.updatePatternPipeline(pipeline.id, { status: "AWAITING_INPUT", blockReason: "SEAM_RISK" });
+
+    const mirrored = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/continue`, payload: { resolution: "USE_MIRROR" } });
+    expect(mirrored.statusCode).toBe(202);
+    expect(mirrored.json<{ layout: string; repeatLayout: string; status: string }>()).toMatchObject({ layout: "TILE", repeatLayout: "MIRROR", status: "RUNNING" });
+    const packStep = repository.getPatternPipeline(pipeline.id)!.steps.find((entry) => entry.step === "PRINT_PACK")!;
+    expect(packStep).toMatchObject({ status: "QUEUED" });
+    expect(repository.getJob(packStep.jobId!)?.input).toMatchObject({ layout: "TILE", repeatLayout: "MIRROR" });
   });
 
   it("仍出满印出口保留 TILE 版式；单步重跑重置下游并拒绝在途步骤与 SOURCE 步骤", async () => {

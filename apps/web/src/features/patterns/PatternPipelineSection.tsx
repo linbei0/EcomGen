@@ -15,16 +15,18 @@ import {
   type ListingPlatform,
   type Pattern,
   type PatternPipeline,
+  type PatternPipelineResolution,
   type PatternPipelineStep,
   type PatternPipelineStepName,
   type PodPrintLayout,
   type PodPrintSpec,
+  type PodRepeatLayout,
 } from "../../api/hooks/usePatterns";
 import { errorText } from "../../lib/errorText";
 import { jobErrorText } from "../../lib/jobError";
 import { formatDateTime, formatShortDate } from "../../lib/format";
 import { parseModelKey } from "../../lib/modelOptions";
-import { CopyRow, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, podSpecOptionLabel, SectionHead, StatusPill, statusLabel, statusTone } from "./shared";
+import { CopyRow, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, podSpecOptionLabel, RepeatLayoutChipRow, SectionHead, StatusPill, statusLabel, statusTone } from "./shared";
 import styles from "./PatternWorkspacePage.module.css";
 
 /** 步骤阶段文案：进度不确定时用阶段标签表达，与花型墙的 stageText 同一纪律（不编造匀速进度）。 */
@@ -69,6 +71,7 @@ export function PatternPipelineSection({ pattern, specs }: { pattern: Pattern; s
   const [activeId, setActiveId] = useState<string | null>(null);
   const [specId, setSpecId] = useState<string | null>(null);
   const [layout, setLayout] = useState<PodPrintLayout>("CENTERED");
+  const [repeatLayout, setRepeatLayout] = useState<PodRepeatLayout>("STRAIGHT");
   const [platform, setPlatform] = useState<ListingPlatform>("ETSY");
   const [listingModelKey, setListingModelKey] = useState<string | null>(null);
 
@@ -86,7 +89,7 @@ export function PatternPipelineSection({ pattern, specs }: { pattern: Pattern; s
     }
     const { providerId, modelId } = parseModelKey(listingModelKey);
     createPipeline.mutate(
-      { specId, layout, listingPlatform: platform, listingProviderId: providerId, listingModelId: modelId },
+      { specId, layout, ...(layout === "TILE" ? { repeatLayout } : {}), listingPlatform: platform, listingProviderId: providerId, listingModelId: modelId },
       {
         onSuccess: ({ pipeline, reused }) => {
           if (reused) message.info("相同答案的流水线正在进行中，已为你复用");
@@ -118,7 +121,16 @@ export function PatternPipelineSection({ pattern, specs }: { pattern: Pattern; s
         />
         <LayoutChipRow value={layout} onChange={setLayout} variant="rail" ariaLabel="流水线版式" />
         {/* 满印的风险提示与规格包节同源：验缝给过判定才算数，所以这里也说清判定状态。 */}
-        {layout === "TILE" ? <p className={styles.wsHint}>满印要求四边能对上；验缝未通过时流水线会停下来等你决定，不会静默改成居中。</p> : null}
+        {layout === "TILE" ? (
+          <>
+            <RepeatLayoutChipRow value={repeatLayout} onChange={setRepeatLayout} variant="rail" ariaLabel="流水线平铺排列" />
+            <p className={styles.wsHint}>
+              {repeatLayout === "MIRROR"
+                ? "镜像排列按构造无缝，无需验缝通过；图案会上下左右翻转对称，含文字或明显朝向的花型慎用。"
+                : "满印要求四边能对上；验缝未通过时流水线会停下来等你决定（改居中 / 换镜像 / 仍出满印），不会静默降级。"}
+            </p>
+          </>
+        ) : null}
         <Select size="small" style={{ width: "100%" }} aria-label="流水线目标平台" value={platform} onChange={setPlatform} options={LISTING_PLATFORM_OPTIONS} />
         <ListingModelSelect size="small" value={listingModelKey} onChange={setListingModelKey} />
         <Button type="primary" block loading={createPipeline.isPending} onClick={submit}>
@@ -175,7 +187,7 @@ function PipelineReceipt({ pipeline, pattern }: { pipeline: PatternPipeline; pat
       { onError: (error) => message.error(errorText(error)) },
     );
   };
-  const onResolve = (resolution: "USE_CENTERED" | "ALLOW_SEAM") => {
+  const onResolve = (resolution: PatternPipelineResolution) => {
     continuePipeline.mutate(
       { pipelineId: pipeline.id, resolution },
       { onError: (error) => message.error(errorText(error)) },
@@ -230,7 +242,7 @@ function PipelineReceipt({ pipeline, pattern }: { pipeline: PatternPipeline; pat
  * 三种情况刻意不给出重跑入口：
  * - SOURCE：它的任务由来源入口创建，重跑要走那条路；
  * - 尚未跑过的步骤（PENDING）：没有东西可"重"跑，而给出这个入口就等于在 AWAITING_INPUT 时
- *   绕过裁决直接出满印——唯一的放行方式是那两颗明确的出口按钮；
+ *   绕过裁决直接出满印——唯一的放行方式是那三颗明确的出口按钮；
  * - 在途步骤与已取消的流水线：前者会与正在执行的 worker 争抢同一份领域记录，后者是终态。
  * 服务端同样拒绝这些情况，这里只是不给出注定失败的入口。
  */
@@ -255,7 +267,7 @@ function PipelineStepCard({
   jobStatus: string | null;
   busy: boolean;
   onRetry: () => void;
-  onResolve: (resolution: "USE_CENTERED" | "ALLOW_SEAM") => void;
+  onResolve: (resolution: PatternPipelineResolution) => void;
 }) {
   const settled = step.status === "SUCCEEDED" || step.status === "FAILED" || step.status === "CANCELLED";
   const retryable = settled && step.step !== "SOURCE" && pipeline.status !== "AWAITING_INPUT" && pipeline.status !== "CANCELLED";
@@ -291,11 +303,14 @@ function PipelineStepCard({
         <span className={styles.wsHint}>中缝相似度 {Math.round(tileableScore * 100)}%</span>
       ) : null}
 
-      {/* AWAITING_INPUT 的两个出口就地给出：用户的裁决只对这一条流水线有意义，跳去别处做决定只会丢失上下文。 */}
+      {/* AWAITING_INPUT 的三个出口就地给出：用户的裁决只对这一条流水线有意义，跳去别处做决定只会丢失上下文。 */}
       {pipeline.status === "AWAITING_INPUT" && pipeline.blockReason === "SEAM_RISK" && step.step === "TILE_CHECK" ? (
         <div className={styles.pipelineExits}>
           <Button size="small" type="primary" disabled={busy} onClick={() => onResolve("USE_CENTERED")}>
             改为居中继续
+          </Button>
+          <Button size="small" disabled={busy} onClick={() => onResolve("USE_MIRROR")}>
+            换镜像出满印
           </Button>
           <Button size="small" disabled={busy} onClick={() => onResolve("ALLOW_SEAM")}>
             仍出满印

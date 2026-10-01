@@ -977,6 +977,7 @@ describe("花型库 / 规格包持久化", () => {
       specId: "tshirt-front-12x16",
       specVersion: "2026.09",
       layout: "TILE",
+      repeatLayout: "STRAIGHT",
       listingPlatform: "ETSY",
       listingProviderId: "provider-1",
       listingModelId: "vision-1",

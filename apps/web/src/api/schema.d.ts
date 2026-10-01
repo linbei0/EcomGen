@@ -2762,6 +2762,8 @@ export interface components {
         PodPrintCategory: "TSHIRT" | "HOODIE" | "MUG_11OZ" | "POSTER" | "TOTE_BAG" | "PHONE_CASE";
         /** @enum {string} */
         PodPrintLayout: "CENTERED" | "TILE";
+        /** @enum {string} */
+        PodRepeatLayout: "STRAIGHT" | "HALF_DROP" | "ONE_THIRD_DROP" | "HALF_BRICK" | "MIRROR";
         PodPrintSpec: {
             /** @description 稳定规格 ID（非 uuid），进入规格包 manifest；目录修订时保持不变。 */
             id: string;
@@ -2819,10 +2821,10 @@ export interface components {
         PrintPackFile: {
             name: string;
             /**
-             * @description PRINT_FILE 为印刷图稿 PNG，MOCKUP 为品类示意图 PNG（高级插画风场景渲染，非实拍），MANIFEST 为溯源清单 JSON。
+             * @description PRINT_FILE 为印刷图稿 PNG，MOCKUP 为品类示意图 PNG（高级插画风场景渲染，非实拍），MANIFEST 为溯源清单 JSON，SEAMLESS_TILE 为满印重复单元的透明底 PNG（源图原生分辨率，供第三方平台二次平铺）；仅满印版式产出。
              * @enum {string}
              */
-            kind: "PRINT_FILE" | "MOCKUP" | "MANIFEST";
+            kind: "PRINT_FILE" | "MOCKUP" | "MANIFEST" | "SEAMLESS_TILE";
             url: string;
             hash: string;
         };
@@ -2925,6 +2927,8 @@ export interface components {
             specId: string;
             /** @description 版式；缺省 CENTERED。TILE 为满印平铺，未验缝的花型可能出现接缝。 */
             layout?: components["schemas"]["PodPrintLayout"];
+            /** @description 平铺排列（仅 layout=TILE 生效）；缺省直排。排列只改摆放几何不改像素：镜像构造性无缝，错位类的接缝风险与直排相同。 */
+            repeatLayout?: components["schemas"]["PodRepeatLayout"];
             idempotencyKey?: string;
         };
         CreatePatternListingJobInput: {
@@ -2969,7 +2973,7 @@ export interface components {
         /** @enum {string} */
         PatternVariantAxis: "STYLE" | "COMPOSITION";
         /** @enum {string} */
-        PatternVariantPreset: "WATERCOLOR" | "LINE_ART" | "FLAT_VECTOR" | "GOUACHE" | "PAPER_CUT" | "SCATTER" | "GRID" | "BORDER" | "CENTER_MOTIF" | "HALF_DROP";
+        PatternVariantPreset: "WATERCOLOR" | "LINE_ART" | "FLAT_VECTOR" | "GOUACHE" | "PAPER_CUT" | "SCATTER" | "GRID" | "BORDER" | "CENTER_MOTIF" | "REARRANGE_HALF_DROP";
         /** @enum {string} */
         PatternBackgroundMode: "SOURCE" | "WHITE" | "TRANSPARENT";
         PatternPipeline: {
@@ -2980,6 +2984,8 @@ export interface components {
             specId: string;
             specVersion: string;
             layout: components["schemas"]["PodPrintLayout"];
+            /** @description 平铺排列（仅 layout=TILE 生效）；创建时缺省直排。裁决出口「换镜像出满印」会把它改写为 MIRROR。 */
+            repeatLayout: components["schemas"]["PodRepeatLayout"];
             listingPlatform: components["schemas"]["ListingPlatform"];
             /** Format: uuid */
             listingProviderId: string;
@@ -3020,12 +3026,14 @@ export interface components {
         /** @constant */
         PatternPipelineBlockReason: "SEAM_RISK";
         /** @enum {string} */
-        PatternPipelineResolution: "USE_CENTERED" | "ALLOW_SEAM";
+        PatternPipelineResolution: "USE_CENTERED" | "USE_MIRROR" | "ALLOW_SEAM";
         PatternPipelineAnswers: {
             /** @description pod-print-specs 目录中的规格 ID。 */
             specId: string;
             /** @description 版式；缺省 CENTERED。 */
             layout?: components["schemas"]["PodPrintLayout"];
+            /** @description 平铺排列（仅 layout=TILE 生效）；缺省直排。携带本字段而版式非 TILE 时拒绝。 */
+            repeatLayout?: components["schemas"]["PodRepeatLayout"];
             listingPlatform: components["schemas"]["ListingPlatform"];
             /**
              * Format: uuid
@@ -3043,6 +3051,8 @@ export interface components {
             specId: string;
             /** @description 版式；缺省 CENTERED。 */
             layout?: components["schemas"]["PodPrintLayout"];
+            /** @description 平铺排列（仅 layout=TILE 生效）；缺省直排。携带本字段而版式非 TILE 时拒绝。 */
+            repeatLayout?: components["schemas"]["PodRepeatLayout"];
             listingPlatform: components["schemas"]["ListingPlatform"];
             /**
              * Format: uuid

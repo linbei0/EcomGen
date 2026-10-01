@@ -230,8 +230,12 @@
 .tileStage {
   flex: 1;
   min-height: 0;
-  background-repeat: repeat;
-  background-position: center;
+}
+
+.tileStageSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .tileControls {

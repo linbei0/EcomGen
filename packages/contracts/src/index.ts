@@ -54,6 +54,7 @@ export * from "./api-requests.js";
 export * from "./model-schemas.js";
 export * from "./pod-schemas.js";
 export * from "./pod-print-specs.js";
+export * from "./pod-repeat.js";
 export * from "./pod-tileability.js";
 export * from "./api-registry.js";
 export * from "./suite-validation.js";

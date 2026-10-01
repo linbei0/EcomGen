@@ -11,6 +11,7 @@ export type PodPrintSpecList = components["schemas"]["PodPrintSpecList"];
 export type PatternListingResult = components["schemas"]["PatternListingResult"];
 export type ListingPlatform = components["schemas"]["ListingPlatform"];
 export type PodPrintLayout = components["schemas"]["PodPrintLayout"];
+export type PodRepeatLayout = components["schemas"]["PodRepeatLayout"];
 export type CreatePatternExtractBody = components["schemas"]["CreatePatternExtractJobInput"];
 export type CreatePatternForgeBody = components["schemas"]["CreatePatternForgeJobInput"];
 export type CreatePrintPackBody = components["schemas"]["CreatePrintPackJobInput"];

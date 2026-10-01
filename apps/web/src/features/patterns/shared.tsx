@@ -6,10 +6,11 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { App, Button, Checkbox, Select } from "antd";
 import { Copy } from "lucide-react";
 
+import { POD_REPEAT_LAYOUT_LABELS } from "@ecomgen/contracts";
 import { PATTERN_BACKGROUND_MODE_LABELS } from "@ecomgen/ecom-skill";
 import { usePodPrintSpecs } from "../../api/hooks/usePatterns";
 import { useProviders } from "../../api/hooks/useProviders";
-import type { ListingPlatform, Pattern, PatternBackgroundMode, PatternPipelineAnswers, PodPrintLayout, PodPrintSpec } from "../../api/hooks/usePatterns";
+import type { ListingPlatform, Pattern, PatternBackgroundMode, PatternPipelineAnswers, PodPrintLayout, PodPrintSpec, PodRepeatLayout } from "../../api/hooks/usePatterns";
 import { modelOptions, parseModelKey, type ModelOption } from "../../lib/modelOptions";
 import styles from "./PatternsPage.module.css";
 // 版式 chips 在工作区（rail 密度）与花型墙（默认密度）各有一套类；共享组件按 variant 取用。
@@ -40,6 +41,9 @@ export const POD_PRINT_LAYOUT_OPTIONS: Array<{ value: PodPrintLayout; label: str
   { value: "TILE", label: "平铺满印" },
 ];
 
+/** 平铺排列（仅满印生效）：标签唯一来源是 contracts/pod-repeat.ts，这里只把记录摊成选项数组。 */
+export const POD_REPEAT_LAYOUT_OPTIONS: Array<{ value: PodRepeatLayout; label: string }> = (Object.entries(POD_REPEAT_LAYOUT_LABELS) as Array<[PodRepeatLayout, string]>).map(([value, label]) => ({ value, label }));
+
 /** 规格目录选项的统一标签：尺寸与 DPI 是选规格时真正要看的两个数，四处下拉共用一份拼法。 */
 export function podSpecOptionLabel(spec: PodPrintSpec): string {
   return `${spec.label}（${spec.widthPx}×${spec.heightPx} · ${spec.dpi}DPI）`;
@@ -55,12 +59,32 @@ export function LayoutChipRow({ value, onChange, variant = "wall", ariaLabel = "
   variant?: "wall" | "rail";
   ariaLabel?: string;
 }) {
+  return <OptionChipRow value={value} onChange={onChange} variant={variant} ariaLabel={ariaLabel} options={POD_PRINT_LAYOUT_OPTIONS} />;
+}
+
+/** 平铺排列 chips：与版式 chips 同一件外套，仅选项清单不同。仅在满印版式下渲染。 */
+export function RepeatLayoutChipRow({ value, onChange, variant = "wall", ariaLabel = "平铺排列" }: {
+  value: PodRepeatLayout;
+  onChange: (repeatLayout: PodRepeatLayout) => void;
+  variant?: "wall" | "rail";
+  ariaLabel?: string;
+}) {
+  return <OptionChipRow value={value} onChange={onChange} variant={variant} ariaLabel={ariaLabel} options={POD_REPEAT_LAYOUT_OPTIONS} />;
+}
+
+function OptionChipRow<V extends string>({ value, onChange, variant, ariaLabel, options }: {
+  value: V;
+  onChange: (value: V) => void;
+  variant: "wall" | "rail";
+  ariaLabel: string;
+  options: Array<{ value: V; label: string }>;
+}) {
   const row = variant === "rail" ? railStyles.wsChipRow : styles.chipRow;
   const chip = variant === "rail" ? railStyles.wsChip : styles.chip;
   const chipActive = variant === "rail" ? railStyles.wsChipActive : styles.chipActive;
   return (
     <div className={row} role="group" aria-label={ariaLabel}>
-      {POD_PRINT_LAYOUT_OPTIONS.map((option) => (
+      {options.map((option) => (
         <button
           key={option.value}
           type="button"
@@ -328,11 +352,12 @@ export interface PipelineAnswerDraft {
   enabled: boolean;
   specId: string | null;
   layout: PodPrintLayout;
+  repeatLayout: PodRepeatLayout;
   platform: ListingPlatform;
   modelKey: string | null;
 }
 
-export const EMPTY_PIPELINE_ANSWERS: PipelineAnswerDraft = { enabled: false, specId: null, layout: "CENTERED", platform: "ETSY", modelKey: null };
+export const EMPTY_PIPELINE_ANSWERS: PipelineAnswerDraft = { enabled: false, specId: null, layout: "CENTERED", repeatLayout: "STRAIGHT", platform: "ETSY", modelKey: null };
 
 /** 缺失项的用户提示；返回 null 表示可以提交。缺项不让提交，而不是发一份会被服务端拒绝的半份答案。 */
 export function missingPipelineAnswer(draft: PipelineAnswerDraft): string | null {
@@ -342,11 +367,18 @@ export function missingPipelineAnswer(draft: PipelineAnswerDraft): string | null
   return null;
 }
 
-/** 草稿 → 请求体；未勾选返回 undefined，调用方据此决定要不要带这个字段。 */
+/** 草稿 → 请求体；未勾选返回 undefined，调用方据此决定要不要带这个字段。排列仅满印携带，居中带排列会被服务端拒绝。 */
 export function toPipelineAnswers(draft: PipelineAnswerDraft): PatternPipelineAnswers | undefined {
   if (!draft.enabled || !draft.specId || !draft.modelKey) return undefined;
   const { providerId, modelId } = parseModelKey(draft.modelKey);
-  return { specId: draft.specId, layout: draft.layout, listingPlatform: draft.platform, listingProviderId: providerId, listingModelId: modelId };
+  return {
+    specId: draft.specId,
+    layout: draft.layout,
+    ...(draft.layout === "TILE" ? { repeatLayout: draft.repeatLayout } : {}),
+    listingPlatform: draft.platform,
+    listingProviderId: providerId,
+    listingModelId: modelId,
+  };
 }
 
 /**
@@ -379,6 +411,13 @@ export function PipelineAnswersBlock({ draft, onChange }: { draft: PipelineAnswe
             onChange={(layout) => onChange({ ...draft, layout })}
             ariaLabel="接着成包版式"
           />
+          {draft.layout === "TILE" ? (
+            <RepeatLayoutChipRow
+              value={draft.repeatLayout}
+              onChange={(repeatLayout) => onChange({ ...draft, repeatLayout })}
+              ariaLabel="接着成包平铺排列"
+            />
+          ) : null}
           <Select
             style={{ width: "100%" }}
             aria-label="接着成包目标平台"

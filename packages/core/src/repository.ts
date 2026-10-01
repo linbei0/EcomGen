@@ -19,6 +19,7 @@ import type {
   PatternPipelineStepStatus,
   PlatformTarget,
   PodPrintLayout,
+  PodRepeatLayout,
   ReasoningProtocolProfile,
   SearchSourceKind,
   SegmentationModelRef,
@@ -144,10 +145,10 @@ export interface PatternRecord {
   updatedAt: string;
 }
 
-/** 规格包产物文件；PRINT_FILE 为可投产 PNG，MOCKUP 为品类示意图，MANIFEST 为溯源清单。 */
+/** 规格包产物文件；PRINT_FILE 为可投产 PNG，MOCKUP 为品类示意图，SEAMLESS_TILE 为满印无缝单元，MANIFEST 为溯源清单。 */
 export interface PrintPackFileRecord {
   name: string;
-  kind: "PRINT_FILE" | "MOCKUP" | "MANIFEST";
+  kind: "PRINT_FILE" | "MOCKUP" | "MANIFEST" | "SEAMLESS_TILE";
   storagePath: string;
   hash: string;
 }
@@ -184,6 +185,8 @@ export interface PatternPipelineRecord {
   specId: string;
   specVersion: string;
   layout: PodPrintLayout;
+  /** 平铺排列（仅 layout=TILE 生效）；创建时缺省直排，裁决出口 USE_MIRROR 改写为 MIRROR。 */
+  repeatLayout: PodRepeatLayout;
   listingPlatform: ListingPlatform;
   listingProviderId: string;
   listingModelId: string;
@@ -905,8 +908,8 @@ export class EcomRepository {
   public createPatternPipeline(input: Omit<PatternPipelineRecord, "id" | "createdAt" | "updatedAt" | "status" | "blockReason"> & { steps: Array<Pick<PatternPipelineStepRecord, "step" | "position">> }): PatternPipelineWithSteps {
     const record: PatternPipelineRecord = { ...input, status: "QUEUED", blockReason: null, id: randomUUID(), createdAt: now(), updatedAt: now() };
     const steps: PatternPipelineStepRecord[] = input.steps.map((step) => ({ ...step, id: randomUUID(), pipelineId: record.id, status: "PENDING", jobId: null, detail: null, error: null, createdAt: record.createdAt, updatedAt: record.updatedAt }));
-    const insertPipeline = this.db.prepare(`INSERT INTO pattern_pipelines (id,pattern_id,spec_id,spec_version,layout,listing_platform,listing_provider_id,listing_model_id,listing_hints_json,status,block_reason,request_fingerprint,created_at,updated_at)
-      VALUES (@id,@patternId,@specId,@specVersion,@layout,@listingPlatform,@listingProviderId,@listingModelId,@listingHints,@status,@blockReason,@requestFingerprint,@createdAt,@updatedAt)`);
+    const insertPipeline = this.db.prepare(`INSERT INTO pattern_pipelines (id,pattern_id,spec_id,spec_version,layout,repeat_layout,listing_platform,listing_provider_id,listing_model_id,listing_hints_json,status,block_reason,request_fingerprint,created_at,updated_at)
+      VALUES (@id,@patternId,@specId,@specVersion,@layout,@repeatLayout,@listingPlatform,@listingProviderId,@listingModelId,@listingHints,@status,@blockReason,@requestFingerprint,@createdAt,@updatedAt)`);
     const insertStep = this.db.prepare(`INSERT INTO pattern_pipeline_steps (id,pipeline_id,step,position,status,job_id,detail_json,error_json,created_at,updated_at)
       VALUES (@id,@pipelineId,@step,@position,@status,@jobId,@detail,@error,@createdAt,@updatedAt)`);
     const write = this.db.transaction(() => {
@@ -929,13 +932,13 @@ export class EcomRepository {
     const row = this.db.prepare("SELECT * FROM pattern_pipelines WHERE request_fingerprint=? AND status IN ('QUEUED','RUNNING','AWAITING_INPUT') ORDER BY created_at DESC, id DESC LIMIT 1").get(fingerprint);
     return row ? this.withSteps(mapPatternPipeline(row as Row)) : undefined;
   }
-  public updatePatternPipeline(id: string, patch: Partial<Pick<PatternPipelineRecord, "status" | "blockReason" | "patternId" | "layout">>): PatternPipelineWithSteps | undefined {
+  public updatePatternPipeline(id: string, patch: Partial<Pick<PatternPipelineRecord, "status" | "blockReason" | "patternId" | "layout" | "repeatLayout">>): PatternPipelineWithSteps | undefined {
     const current = this.getPatternPipeline(id);
     if (!current) return undefined;
     const record = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE pattern_pipelines SET pattern_id=@patternId,layout=@layout,status=@status,block_reason=@blockReason,updated_at=@updatedAt WHERE id=@id")
-      .run({ id, patternId: record.patternId, layout: record.layout, status: record.status, blockReason: record.blockReason, updatedAt: record.updatedAt });
-    return { ...current, patternId: record.patternId, layout: record.layout, status: record.status, blockReason: record.blockReason, updatedAt: record.updatedAt };
+    this.db.prepare("UPDATE pattern_pipelines SET pattern_id=@patternId,layout=@layout,repeat_layout=@repeatLayout,status=@status,block_reason=@blockReason,updated_at=@updatedAt WHERE id=@id")
+      .run({ id, patternId: record.patternId, layout: record.layout, repeatLayout: record.repeatLayout, status: record.status, blockReason: record.blockReason, updatedAt: record.updatedAt });
+    return { ...current, patternId: record.patternId, layout: record.layout, repeatLayout: record.repeatLayout, status: record.status, blockReason: record.blockReason, updatedAt: record.updatedAt };
   }
   /** worker 从完成的任务反查流水线步骤；job_id 上有唯一索引，一条任务最多属于一个步骤。 */
   public getPatternPipelineStepByJobId(jobId: string): PatternPipelineStepRecord | undefined {
@@ -1655,6 +1658,7 @@ function mapPatternPipeline(row: Row): PatternPipelineRecord {
     specId: String(row.spec_id),
     specVersion: String(row.spec_version),
     layout: row.layout as PodPrintLayout,
+    repeatLayout: row.repeat_layout as PodRepeatLayout,
     listingPlatform: row.listing_platform as ListingPlatform,
     listingProviderId: String(row.listing_provider_id),
     listingModelId: String(row.listing_model_id),

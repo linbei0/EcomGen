@@ -36,7 +36,7 @@ const PRESET_FRAGMENTS: Record<PatternVariantPreset, string> = {
   GRID: "Rearrange into a regular grid, motif centers aligned on a straight lattice with equal gutters.",
   BORDER: "Rearrange as a border frame of motifs around an open center field.",
   CENTER_MOTIF: "Rearrange into one large centered motif surrounded by generous even margins.",
-  HALF_DROP: "Rearrange into a half-drop repeat so every other column is offset by half a motif height.",
+  REARRANGE_HALF_DROP: "Rearrange into a half-drop repeat so every other column is offset by half a motif height.",
 };
 
 /**
@@ -53,7 +53,7 @@ export const PATTERN_VARIANT_PRESET_LABELS: Record<PatternVariantPreset, string>
   GRID: "规整网格",
   BORDER: "边框环绕",
   CENTER_MOTIF: "中央主体",
-  HALF_DROP: "半错位重复",
+  REARRANGE_HALF_DROP: "半错位重复",
 };
 
 /** 轴向的中文名，供 UI 分组展示。 */
@@ -68,7 +68,7 @@ export function presetBelongsToAxis(axis: PatternVariantAxis, preset: PatternVar
  * 衍生提示词版本：必须进入任务指纹（api 侧），理由同起稿——指纹含 axial/preset/extra 等输入，
  * 不含编译后的提示词，改模板不递增版本会让旧任务被复用成"新模板的产物"。
  */
-export const PATTERN_VARIANT_PROMPT_VERSION = "2026.10.1";
+export const PATTERN_VARIANT_PROMPT_VERSION = "2026.10.2";
 
 /**
  * 底版护栏：与轴向预设正交，按用户选定的底版模式取一条。三个模式互斥——挑了透明底就不能

@@ -3644,6 +3644,14 @@ components:
       enum:
         - CENTERED
         - TILE
+    PodRepeatLayout:
+      type: string
+      enum:
+        - STRAIGHT
+        - HALF_DROP
+        - ONE_THIRD_DROP
+        - HALF_BRICK
+        - MIRROR
     PodPrintSpec:
       type: object
       required:
@@ -3799,12 +3807,13 @@ components:
         name:
           type: string
         kind:
-          description: PRINT_FILE 为印刷图稿 PNG，MOCKUP 为品类示意图 PNG（高级插画风场景渲染，非实拍），MANIFEST 为溯源清单 JSON。
+          description: PRINT_FILE 为印刷图稿 PNG，MOCKUP 为品类示意图 PNG（高级插画风场景渲染，非实拍），MANIFEST 为溯源清单 JSON，SEAMLESS_TILE 为满印重复单元的透明底 PNG（源图原生分辨率，供第三方平台二次平铺）；仅满印版式产出。
           type: string
           enum:
             - PRINT_FILE
             - MOCKUP
             - MANIFEST
+            - SEAMLESS_TILE
         url:
           type: string
         hash:
@@ -4040,6 +4049,9 @@ components:
         layout:
           description: 版式；缺省 CENTERED。TILE 为满印平铺，未验缝的花型可能出现接缝。
           $ref: "#/components/schemas/PodPrintLayout"
+        repeatLayout:
+          description: 平铺排列（仅 layout=TILE 生效）；缺省直排。排列只改摆放几何不改像素：镜像构造性无缝，错位类的接缝风险与直排相同。
+          $ref: "#/components/schemas/PodRepeatLayout"
         idempotencyKey:
           minLength: 1
           type: string
@@ -4154,7 +4166,7 @@ components:
         - GRID
         - BORDER
         - CENTER_MOTIF
-        - HALF_DROP
+        - REARRANGE_HALF_DROP
     PatternBackgroundMode:
       type: string
       enum:
@@ -4169,6 +4181,7 @@ components:
         - specId
         - specVersion
         - layout
+        - repeatLayout
         - listingPlatform
         - listingProviderId
         - listingModelId
@@ -4192,6 +4205,9 @@ components:
           type: string
         layout:
           $ref: "#/components/schemas/PodPrintLayout"
+        repeatLayout:
+          description: 平铺排列（仅 layout=TILE 生效）；创建时缺省直排。裁决出口「换镜像出满印」会把它改写为 MIRROR。
+          $ref: "#/components/schemas/PodRepeatLayout"
         listingPlatform:
           $ref: "#/components/schemas/ListingPlatform"
         listingProviderId:
@@ -4294,6 +4310,7 @@ components:
       type: string
       enum:
         - USE_CENTERED
+        - USE_MIRROR
         - ALLOW_SEAM
     PatternPipelineAnswers:
       type: object
@@ -4310,6 +4327,9 @@ components:
         layout:
           description: 版式；缺省 CENTERED。
           $ref: "#/components/schemas/PodPrintLayout"
+        repeatLayout:
+          description: 平铺排列（仅 layout=TILE 生效）；缺省直排。携带本字段而版式非 TILE 时拒绝。
+          $ref: "#/components/schemas/PodRepeatLayout"
         listingPlatform:
           $ref: "#/components/schemas/ListingPlatform"
         listingProviderId:
@@ -4342,6 +4362,9 @@ components:
         layout:
           description: 版式；缺省 CENTERED。
           $ref: "#/components/schemas/PodPrintLayout"
+        repeatLayout:
+          description: 平铺排列（仅 layout=TILE 生效）；缺省直排。携带本字段而版式非 TILE 时拒绝。
+          $ref: "#/components/schemas/PodRepeatLayout"
         listingPlatform:
           $ref: "#/components/schemas/ListingPlatform"
         listingProviderId:

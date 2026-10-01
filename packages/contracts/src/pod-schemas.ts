@@ -3,6 +3,7 @@ import { stringEnumSchema } from "./enums.js";
 import { Job } from "./api-schemas.js";
 import { schemaRef } from "./ref.js";
 import { SEGMENTATION_PROTOCOLS } from "./segmentation.js";
+import { PodRepeatLayout } from "./pod-repeat.js";
 import {
   ETSY_TAGS_MAX, ETSY_TAG_MAX_LENGTH, ETSY_TITLE_MAX, AMAZON_TITLE_MAX, TIKTOK_TITLE_MAX, TIKTOK_TITLE_MIN,
   LISTING_PLATFORMS, MAX_LISTING_KEYWORDS_LENGTH, MAX_LISTING_SELLING_POINTS_LENGTH,
@@ -33,7 +34,7 @@ export const TILEABLE_STATUSES = ["NONE", "VERIFIED", "FAILED"] as const;
 export const TileableStatus = stringEnumSchema(TILEABLE_STATUSES, "#/components/schemas/TileableStatus");
 export type TileableStatus = Static<typeof TileableStatus>;
 
-/** CENTERED：contain-fit 进安全区居中；TILE：满印平铺（repeat 铺满整幅可印区，无安全边距）。 */
+/** CENTERED：contain-fit 进安全区居中；TILE：满印平铺（repeat 铺满整幅可印区，无安全边距）。满印的摆放几何由平铺排列（pod-repeat.ts 的 repeatLayout）描述，与版式正交。 */
 export const POD_PRINT_LAYOUTS = ["CENTERED", "TILE"] as const;
 export const PodPrintLayout = stringEnumSchema(POD_PRINT_LAYOUTS, "#/components/schemas/PodPrintLayout");
 export type PodPrintLayout = Static<typeof PodPrintLayout>;
@@ -84,7 +85,7 @@ export type UpdatePatternInput = Static<typeof UpdatePatternInput>;
 
 export const PrintPackFile = Type.Object({
   name: Type.String(),
-  kind: Type.Union([Type.Literal("PRINT_FILE"), Type.Literal("MOCKUP"), Type.Literal("MANIFEST")], { description: "PRINT_FILE 为印刷图稿 PNG，MOCKUP 为品类示意图 PNG（高级插画风场景渲染，非实拍），MANIFEST 为溯源清单 JSON。" }),
+  kind: Type.Union([Type.Literal("PRINT_FILE"), Type.Literal("MOCKUP"), Type.Literal("MANIFEST"), Type.Literal("SEAMLESS_TILE")], { description: "PRINT_FILE 为印刷图稿 PNG，MOCKUP 为品类示意图 PNG（高级插画风场景渲染，非实拍），MANIFEST 为溯源清单 JSON，SEAMLESS_TILE 为满印重复单元的透明底 PNG（源图原生分辨率，供第三方平台二次平铺）；仅满印版式产出。" }),
   url: Type.String(),
   hash: Type.String(),
 }, { $id: "#/components/schemas/PrintPackFile" });
@@ -150,6 +151,7 @@ export type PatternListingResult = Static<typeof PatternListingResult>;
 const PATTERN_PIPELINE_ANSWERS_PROPERTIES = {
   specId: Type.String({ minLength: 1, description: "pod-print-specs 目录中的规格 ID。" }),
   layout: Type.Optional(schemaRef(PodPrintLayout, { description: "版式；缺省 CENTERED。" })),
+  repeatLayout: Type.Optional(schemaRef(PodRepeatLayout, { description: "平铺排列（仅 layout=TILE 生效）；缺省直排。携带本字段而版式非 TILE 时拒绝。" })),
   listingPlatform: schemaRef(ListingPlatform),
   listingProviderId: Type.String({ format: "uuid", description: "文案用的推理 Provider（需支持视觉）。" }),
   listingModelId: Type.String({ minLength: 1 }),
@@ -213,6 +215,7 @@ export type CreatePatternForgeJobInput = Static<typeof CreatePatternForgeJobInpu
 export const CreatePrintPackJobInput = Type.Object({
   specId: Type.String({ minLength: 1, description: "pod-print-specs 目录中的规格 ID。" }),
   layout: Type.Optional(schemaRef(PodPrintLayout, { description: "版式；缺省 CENTERED。TILE 为满印平铺，未验缝的花型可能出现接缝。" })),
+  repeatLayout: Type.Optional(schemaRef(PodRepeatLayout, { description: "平铺排列（仅 layout=TILE 生效）；缺省直排。排列只改摆放几何不改像素：镜像构造性无缝，错位类的接缝风险与直排相同。" })),
   idempotencyKey: Type.Optional(Type.String({ minLength: 1 })),
 }, { $id: "#/components/schemas/CreatePrintPackJobInput" });
 export type CreatePrintPackJobInput = Static<typeof CreatePrintPackJobInput>;
@@ -240,7 +243,7 @@ export type PatternVariantAxis = Static<typeof PatternVariantAxis>;
  * 与"协议从模型声明派生、请求显式值只做校验"同一套路；提示词片段在 ecom-skill
  * 以 `Record<PatternVariantPreset, …>` 维护，缺项是编译期错误而不是运行期兜底。
  */
-export const PATTERN_VARIANT_PRESET_IDS = ["WATERCOLOR", "LINE_ART", "FLAT_VECTOR", "GOUACHE", "PAPER_CUT", "SCATTER", "GRID", "BORDER", "CENTER_MOTIF", "HALF_DROP"] as const;
+export const PATTERN_VARIANT_PRESET_IDS = ["WATERCOLOR", "LINE_ART", "FLAT_VECTOR", "GOUACHE", "PAPER_CUT", "SCATTER", "GRID", "BORDER", "CENTER_MOTIF", "REARRANGE_HALF_DROP"] as const;
 export const PatternVariantPreset = stringEnumSchema(PATTERN_VARIANT_PRESET_IDS, "#/components/schemas/PatternVariantPreset");
 export type PatternVariantPreset = Static<typeof PatternVariantPreset>;
 
@@ -252,7 +255,7 @@ export type PatternVariantPreset = Static<typeof PatternVariantPreset>;
  */
 export const PATTERN_VARIANT_PRESETS: Record<PatternVariantAxis, readonly PatternVariantPreset[]> = {
   STYLE: ["WATERCOLOR", "LINE_ART", "FLAT_VECTOR", "GOUACHE", "PAPER_CUT"],
-  COMPOSITION: ["SCATTER", "GRID", "BORDER", "CENTER_MOTIF", "HALF_DROP"],
+  COMPOSITION: ["SCATTER", "GRID", "BORDER", "CENTER_MOTIF", "REARRANGE_HALF_DROP"],
 };
 
 // 生成式衍生：源花型作为参考图走 images/edits，prompt 由 ecom-skill 的固化模板派生（不经 LLM 改写）。
@@ -318,8 +321,11 @@ export const PATTERN_PIPELINE_BLOCK_REASONS = ["SEAM_RISK"] as const;
 export const PatternPipelineBlockReason = stringEnumSchema(PATTERN_PIPELINE_BLOCK_REASONS, "#/components/schemas/PatternPipelineBlockReason");
 export type PatternPipelineBlockReason = Static<typeof PatternPipelineBlockReason>;
 
-/** AWAITING_INPUT 的两个出口：改用居中版式继续，或明知有接缝仍出满印。 */
-export const PATTERN_PIPELINE_RESOLUTIONS = ["USE_CENTERED", "ALLOW_SEAM"] as const;
+/**
+ * AWAITING_INPUT 的三个出口：改用居中版式继续；换镜像排列出满印（构造性无缝，无需验缝通过，
+ * 见 pod-repeat.ts 与 ADR-0001）；或明知有接缝仍按原排列出满印。
+ */
+export const PATTERN_PIPELINE_RESOLUTIONS = ["USE_CENTERED", "USE_MIRROR", "ALLOW_SEAM"] as const;
 export const PatternPipelineResolution = stringEnumSchema(PATTERN_PIPELINE_RESOLUTIONS, "#/components/schemas/PatternPipelineResolution");
 export type PatternPipelineResolution = Static<typeof PatternPipelineResolution>;
 
@@ -339,6 +345,7 @@ export const PatternPipeline = Type.Object({
   specId: Type.String(),
   specVersion: Type.String(),
   layout: schemaRef(PodPrintLayout),
+  repeatLayout: schemaRef(PodRepeatLayout, { description: "平铺排列（仅 layout=TILE 生效）；创建时缺省直排。裁决出口「换镜像出满印」会把它改写为 MIRROR。" }),
   listingPlatform: schemaRef(ListingPlatform),
   listingProviderId: Type.String({ format: "uuid" }),
   listingModelId: Type.String({ minLength: 1 }),
@@ -360,7 +367,7 @@ export const CreatePatternPipelineInput = Type.Object({
 }, { $id: "#/components/schemas/CreatePatternPipelineInput" });
 export type CreatePatternPipelineInput = Static<typeof CreatePatternPipelineInput>;
 
-/** 从 AWAITING_INPUT 继续；resolution 决定后续版式与是否接受接缝风险。 */
+/** 从 AWAITING_INPUT 继续；resolution 决定后续版式与排列（USE_MIRROR 改写 repeatLayout）及是否接受接缝风险。 */
 export const ContinuePatternPipelineInput = Type.Object({
   resolution: schemaRef(PatternPipelineResolution),
 }, { $id: "#/components/schemas/ContinuePatternPipelineInput" });

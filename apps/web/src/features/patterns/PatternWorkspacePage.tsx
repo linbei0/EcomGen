@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { App, Button, Image, Input, Popconfirm, Popover, Progress, Select, Skeleton, Slider } from "antd";
 import { ArrowLeft, ChevronRight, Download, Package, Pencil, Trash2 } from "lucide-react";
-import { TILEABILITY_ALGORITHM_VERSION, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESETS } from "@ecomgen/contracts";
+import { REPEAT_UNIT_PLACEMENTS, TILEABILITY_ALGORITHM_VERSION, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESETS } from "@ecomgen/contracts";
 import { PATTERN_VARIANT_AXIS_LABELS, PATTERN_VARIANT_PRESET_LABELS } from "@ecomgen/ecom-skill";
 
 import {
@@ -25,6 +25,7 @@ import {
   type PatternVariantPreset,
   type PodPrintLayout,
   type PodPrintSpec,
+  type PodRepeatLayout,
 } from "../../api/hooks/usePatterns";
 import { useJobStatus } from "../../api/hooks/useJobs";
 import { useProviders } from "../../api/hooks/useProviders";
@@ -36,7 +37,7 @@ import { jobErrorText } from "../../lib/jobError";
 import { modelOptions, parseModelKey } from "../../lib/modelOptions";
 import { panelBackdrop } from "./heroPatterns";
 import { PatternPipelineSection } from "./PatternPipelineSection";
-import { BackgroundModeSelect, CopyRow, ImageModelSelect, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, podSpecOptionLabel, SOURCE_LABELS, SectionHead, StatusPill, stageText, statusLabel, statusTone, tileableBadge } from "./shared";
+import { BackgroundModeSelect, CopyRow, ImageModelSelect, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, podSpecOptionLabel, RepeatLayoutChipRow, SOURCE_LABELS, SectionHead, StatusPill, stageText, statusLabel, statusTone, tileableBadge } from "./shared";
 import styles from "./PatternWorkspacePage.module.css";
 
 /** 衍生可选底版：源图在，所以"跟随源图"也在；顺序即默认优先顺序。 */
@@ -54,8 +55,11 @@ const VIEW_LABELS: Record<StageView, string> = { artwork: "原图", tile: "平�
 const TILE_LAYOUT_HINTS: Record<Pattern["tileable"], string> = {
   NONE: "平铺满印会把花型重复铺满可印区，但该花型还未验缝：四边能否对上未知，建议先切到「平铺」视图验缝。",
   VERIFIED: "平铺满印会把花型重复铺满可印区；该花型已验缝通过，四边衔接可用。",
-  FAILED: "该花型验缝未通过：满印会在成品上露出规则接缝。建议改用居中版式，或换一张边缘能对上的花型。",
+  FAILED: "该花型验缝未通过：满印会在成品上露出规则接缝。建议改用居中版式、换镜像排列，或换一张边缘能对上的花型。",
 };
+
+/** 镜像排列的代价提示：它是验缝失败花型的诚实出路（构造性无缝），但翻转对称是真实的视觉代价。 */
+const MIRROR_REPEAT_HINT = "镜像排列按构造无缝（无需验缝通过），但图案会上下左右翻转对称：含文字、人物侧脸或明显朝向的花型慎用。错位排列（半落/三落/错砖）的接缝风险与直排相同。";
 
 /**
  * 花型工作区：/patterns/:patternId 全屏详情视图，取代旧的 420px 详情抽屉。
@@ -305,7 +309,11 @@ function ArtworkStage({ pattern }: { pattern: Pattern }) {
 }
 
 /**
- * 平铺舞台：镜像满铺 + 平铺尺寸滑杆，观察四边拼接是否连贯。
+ * 平铺舞台：按平铺排列满铺预览 + 排列切换 + 平铺尺寸滑杆，观察拼接是否连贯。
+ *
+ * 预览用内联 SVG pattern 复刻成包时的单元几何（REPEAT_UNIT_PLACEMENTS 是与 worker 共用的
+ * 唯一真相源）：越界摆放位额外画 -1 单元偏移的副本，让裁掉的部分从对侧补回——这正是
+ * "单元无缝"的构造方式，预览与成包产物因此所见即所得。纯矢量无 canvas 库，切换零请求零费用。
  *
  * 验缝入口在这里而不是动作栏：判定只在"整块连续印花"的语境下才有意义，而这个舞台就是那个语境。
  * 判定是花型内容的确定性函数，所以当判定已按当前算法版本算出时不再提供按钮——重跑只会得到同一
@@ -316,10 +324,13 @@ function TileStage({ pattern }: { pattern: Pattern }) {
   const queryClient = useQueryClient();
   const createCheck = useCreatePatternTileCheckJob();
   const [tileSize, setTileSize] = useState(160);
+  const [repeatLayout, setRepeatLayout] = useState<PodRepeatLayout>("STRAIGHT");
   const [checkJobId, setCheckJobId] = useState<string | null>(null);
   const checkJob = useJobStatus(checkJobId ?? undefined);
   const badge = tileableBadge(pattern.tileable);
   const stale = pattern.tileable !== "NONE" && pattern.tileableCheckedWith !== TILEABILITY_ALGORITHM_VERSION;
+  // useId 带冒号不能直接进 url(#…) 片段引用，剥掉非安全字符；剩余部分仍保证唯一。
+  const fillId = `tile-pattern-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   // 验缝终态结算：失败如实报错撤卡；成功失效花型列表让徽标与分数刷新。
   useEffect(() => {
@@ -344,9 +355,48 @@ function TileStage({ pattern }: { pattern: Pattern }) {
     );
   }
   const running = createCheck.isPending || (checkJob.data ? checkJob.data.status === "QUEUED" || checkJob.data.status === "RUNNING" : false);
+  const unit = REPEAT_UNIT_PLACEMENTS[repeatLayout];
+  const unitWidth = tileSize * unit.columns;
+  const unitHeight = tileSize * unit.rows;
   return (
     <div className={styles.tileStageWrap}>
-      <div className={styles.tileStage} style={{ backgroundImage: `url("${pattern.imageUrl}")`, backgroundSize: `${tileSize}px auto` }} />
+      <div className={styles.tileStage}>
+        <svg className={styles.tileStageSvg} role="img" aria-label="平铺预览">
+          <defs>
+            <pattern id={fillId} patternUnits="userSpaceOnUse" width={unitWidth} height={unitHeight}>
+              {/*
+                每个摆放位画四份（本位与 -1 单元的横/竖/对角副本）：pattern 会裁掉出界内容，
+                偏移副本恰好把裁掉的部分从对侧补回，形成无缝环绕。
+              */}
+              {unit.placements.flatMap((placement, index) =>
+                [0, -1].flatMap((shiftX) =>
+                  [0, -1].map((shiftY) => {
+                    const x = placement.dx * tileSize + shiftX * unitWidth;
+                    const y = placement.dy * tileSize + shiftY * unitHeight;
+                    return (
+                      <image
+                        key={`${index}:${shiftX}:${shiftY}`}
+                        href={pattern.imageUrl}
+                        x={0}
+                        y={0}
+                        width={tileSize}
+                        height={tileSize}
+                        preserveAspectRatio="none"
+                        transform={`translate(${x + (placement.flipX ? tileSize : 0)} ${y + (placement.flipY ? tileSize : 0)}) scale(${placement.flipX ? -1 : 1} ${placement.flipY ? -1 : 1})`}
+                      />
+                    );
+                  }),
+                ),
+              )}
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill={`url(#${fillId})`} />
+        </svg>
+      </div>
+      <div className={styles.tileControls}>
+        <span className={styles.tileControlsLabel}>排列</span>
+        <RepeatLayoutChipRow value={repeatLayout} onChange={setRepeatLayout} variant="rail" ariaLabel="平铺排列" />
+      </div>
       <div className={styles.tileControls}>
         <span className={styles.tileControlsLabel}>平铺尺寸</span>
         <Slider
@@ -383,7 +433,7 @@ function TileStage({ pattern }: { pattern: Pattern }) {
         ) : null}
       </div>
       <p className={styles.wsHint}>
-        验缝只判定、不改动图稿：比对左右边缘列与上下边缘行的差异，据此给出「可平铺 / 接缝明显」。满印品类需要可平铺花型，单区域印花（如 T 恤前片）不需要。
+        排列只改摆放与翻转、不改图稿：错位类的接缝风险与直排相同，镜像按构造无缝。验缝只判定、不改动图稿：比对左右边缘列与上下边缘行的差异，据此给出「可平铺 / 接缝明显」。满印品类需要可平铺花型，单区域印花（如 T 恤前片）不需要。
       </p>
     </div>
   );
@@ -410,6 +460,7 @@ function PackStage({ pattern, specs }: { pattern: Pattern; specs: PodPrintSpec[]
   }
   const mockup = active?.files.find((file) => file.kind === "MOCKUP");
   const printFile = active?.files.find((file) => file.kind === "PRINT_FILE");
+  const seamlessTile = active?.files.find((file) => file.kind === "SEAMLESS_TILE");
   const manifest = active?.files.find((file) => file.kind === "MANIFEST");
   const label = active ? specLabel.get(active.specId) ?? active.specId : "";
   return (
@@ -437,6 +488,11 @@ function PackStage({ pattern, specs }: { pattern: Pattern; specs: PodPrintSpec[]
         {mockup ? (
           <Button size="small" icon={<Download size={12} strokeWidth={2} />} href={mockup.url} target="_blank">
             下载示意图
+          </Button>
+        ) : null}
+        {seamlessTile ? (
+          <Button size="small" icon={<Download size={12} strokeWidth={2} />} href={seamlessTile.url} target="_blank">
+            下载无缝单元
           </Button>
         ) : null}
         {manifest ? (
@@ -727,6 +783,7 @@ function PackSection({ pattern, specs, onQueued }: { pattern: Pattern; specs: Po
   const packsQuery = usePatternPrintPacks(pattern.id);
   const [specId, setSpecId] = useState<string | null>(null);
   const [layout, setLayout] = useState<PodPrintLayout>("CENTERED");
+  const [repeatLayout, setRepeatLayout] = useState<PodRepeatLayout>("STRAIGHT");
   const packs = packsQuery.data?.items ?? [];
   const packRunning = packs.some((pack) => pack.status === "QUEUED" || pack.status === "RUNNING");
   const packFailed = packs.some((pack) => pack.status === "FAILED");
@@ -745,7 +802,12 @@ function PackSection({ pattern, specs, onQueued }: { pattern: Pattern; specs: Po
       <SectionHead title="规格包" status={packStatus} />
       <p className={styles.wsHint}>300DPI 投产图稿，像素只来自你的花型。</p>
       <LayoutChipRow value={layout} onChange={setLayout} variant="rail" />
-      {layout === "TILE" ? <p className={styles.wsHint}>{TILE_LAYOUT_HINTS[pattern.tileable]}</p> : null}
+      {layout === "TILE" ? (
+        <>
+          <RepeatLayoutChipRow value={repeatLayout} onChange={setRepeatLayout} variant="rail" ariaLabel="平铺排列" />
+          <p className={styles.wsHint}>{repeatLayout === "MIRROR" ? MIRROR_REPEAT_HINT : TILE_LAYOUT_HINTS[pattern.tileable]}</p>
+        </>
+      ) : null}
       <div className={styles.formCol}>
         <Select
           size="small"
@@ -763,7 +825,7 @@ function PackSection({ pattern, specs, onQueued }: { pattern: Pattern; specs: Po
           onClick={() => {
             if (!specId) return;
             createPack.mutate(
-              { patternId: pattern.id, body: { specId, layout } },
+              { patternId: pattern.id, body: { specId, layout, ...(layout === "TILE" ? { repeatLayout } : {}) } },
               {
                 onSuccess: ({ reused }) => {
                   if (reused) message.info("相同规格与版式的规格包已存在，已为你复用");

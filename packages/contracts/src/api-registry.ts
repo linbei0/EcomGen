@@ -18,6 +18,7 @@ import {
   PatternPipeline, PatternPipelineList, PatternPipelineStep, PatternPipelineStepName, PatternPipelineStepStatus,
   PatternPipelineStatus, PatternPipelineBlockReason, PatternPipelineResolution, PatternPipelineAnswers, CreatePatternPipelineInput, ContinuePatternPipelineInput,
 } from "./pod-schemas.js";
+import { PodRepeatLayout } from "./pod-repeat.js";
 import { EventEnvelope, ModelCapabilities, ModelDefinition } from "./legacy-schemas.js";
 
 /** All schemas emitted into OpenAPI components.schemas. */
@@ -30,7 +31,7 @@ export const API_SCHEMA_REGISTRY = {
   ...api,
   ...requests,
   ModelSpec, ModelGender, ModelAge, ModelHeritage, ModelStature, ModelBuild, ModelPortrait, EcomModel, ModelList, ModelPortraitList, CreateModelInput, UpdateModelInput, CreateModelCastJobInput,
-  PatternSource, PodPrintCategory, PodPrintLayout, PodPrintSpec, PodPrintSpecList, Pattern, PatternList, UpdatePatternInput,
+  PatternSource, PodPrintCategory, PodPrintLayout, PodRepeatLayout, PodPrintSpec, PodPrintSpecList, Pattern, PatternList, UpdatePatternInput,
   PrintPackFile, PrintPackStatus, PrintPack, PrintPackList, CreatePrintPackJobResponse, ListingPlatform, ListingCopy, PatternListingResult,
   CreatePatternExtractJobInput, CreatePatternForgeJobInput, CreatePrintPackJobInput, CreatePatternListingJobInput,
   CreatePatternDeriveJobInput, TileableStatus, CreatePatternVariantJobInput, PatternVariantAxis, PatternVariantPreset, PatternBackgroundMode,

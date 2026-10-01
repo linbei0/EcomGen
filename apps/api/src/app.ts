@@ -126,8 +126,9 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   }): Promise<{ pipeline: PatternPipelineWithSteps; reused: boolean }> {
     const spec = validatePatternPipelineAnswers(repository, input.answers);
     const layout = input.answers.layout ?? "CENTERED";
+    const repeatLayout = layout === "TILE" ? input.answers.repeatLayout ?? "STRAIGHT" : "STRAIGHT";
     const idempotencyKey = input.idempotencyKey ?? null;
-    const fingerprint = requestFingerprint({ type: "PATTERN_PIPELINE", patternId: input.patternId, patternHash: input.patternHash, specId: spec.id, specVersion: POD_PRINT_SPEC_VERSION, layout, listingPlatform: input.answers.listingPlatform, listingProviderId: input.answers.listingProviderId, listingModelId: input.answers.listingModelId, sellingPoints: input.answers.sellingPoints ?? null, bannedWords: input.answers.bannedWords ?? null, idempotencyKey });
+    const fingerprint = requestFingerprint({ type: "PATTERN_PIPELINE", patternId: input.patternId, patternHash: input.patternHash, specId: spec.id, specVersion: POD_PRINT_SPEC_VERSION, layout, repeatLayout, listingPlatform: input.answers.listingPlatform, listingProviderId: input.answers.listingProviderId, listingModelId: input.answers.listingModelId, sellingPoints: input.answers.sellingPoints ?? null, bannedWords: input.answers.bannedWords ?? null, idempotencyKey });
     // 只复用进行中的同参数流水线：已完成的再点一次是"再出一套"的明确意图，复用会静默无事发生。
     const reusable = repository.findReusablePatternPipeline(fingerprint);
     if (reusable) return { pipeline: reusable, reused: true };
@@ -137,6 +138,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       specId: spec.id,
       specVersion: POD_PRINT_SPEC_VERSION,
       layout,
+      repeatLayout,
       listingPlatform: input.answers.listingPlatform,
       listingProviderId: input.answers.listingProviderId,
       listingModelId: input.answers.listingModelId,
@@ -526,7 +528,10 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (!spec) throw new ApiError(400, "VALIDATION_ERROR", `未知的印刷规格：${body.specId}`);
     const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
     const layout = body.layout ?? "CENTERED";
-    const fingerprint = requestFingerprint({ type: "PRINT_PACK", patternId: pattern.id, patternHash: pattern.fileHash, specId: spec.id, layout, specVersion: POD_PRINT_SPEC_VERSION, idempotencyKey });
+    const repeatLayout = body.repeatLayout ?? "STRAIGHT";
+    // 排列只在满印下有意义：显式带排列却选居中是矛盾答案，拒绝而不是静默忽略。
+    if (body.repeatLayout && layout !== "TILE") throw new ApiError(400, "VALIDATION_ERROR", "平铺排列仅在满印（TILE）版式下生效");
+    const fingerprint = requestFingerprint({ type: "PRINT_PACK", patternId: pattern.id, patternHash: pattern.fileHash, specId: spec.id, layout, repeatLayout, specVersion: POD_PRINT_SPEC_VERSION, idempotencyKey });
     const existing = repository.findJobByFingerprint(null, fingerprint);
     if (existing) {
       const pack = repository.getPrintPackByJobId(existing.id);
@@ -536,7 +541,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
       const reusable = existing.status === "QUEUED" || existing.status === "RUNNING" || (existing.status === "SUCCEEDED" && manifestScene === POD_MOCKUP_SCENE_VERSION);
       if (reusable) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, printPack: pack ? publicPrintPack(pack) : null });
     }
-    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PRINT_PACK", input: { patternId: pattern.id, specId: spec.id, specVersion: POD_PRINT_SPEC_VERSION, layout }, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } });
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PRINT_PACK", input: { patternId: pattern.id, specId: spec.id, specVersion: POD_PRINT_SPEC_VERSION, layout, repeatLayout }, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } });
     const printPack = repository.createPrintPack({ patternId: pattern.id, jobId: job.id, specId: spec.id, specVersion: POD_PRINT_SPEC_VERSION, status: "QUEUED" });
     await enqueueOrMarkFailed(job, "print_pack", { onFail: (failedJobId) => markDomainRecordFailed(repository, "PRINT_PACK", failedJobId) });
     return reply.code(202).send({ job, printPack: publicPrintPack(printPack) });
@@ -645,7 +650,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const pipeline = ensurePatternPipeline(repository, parameter(request, "pipelineId"));
     return publicPatternPipeline(pipeline);
   });
-  // AWAITING_INPUT 的裁决：改用居中版式继续，或明知有接缝仍出满印。两者都由用户明确选择。
+  // AWAITING_INPUT 的裁决：改用居中版式继续、换镜像排列出满印（构造性无缝），或明知有接缝仍出满印。均由用户明确选择。
   app.post("/api/v1/pattern-pipelines/:pipelineId/continue", async (request, reply) => {
     const pipeline = ensurePatternPipeline(repository, parameter(request, "pipelineId"));
     if (pipeline.status !== "AWAITING_INPUT" || pipeline.blockReason !== "SEAM_RISK") throw new ApiError(409, "CONFLICT", "该流水线当前不需要裁决");
@@ -654,8 +659,14 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const body = parseBody(ContinuePatternPipelineInput, request.body);
     const tileCheck = pipeline.steps.find((entry) => entry.step === "TILE_CHECK");
     if (!tileCheck) throw new ApiError(409, "CONFLICT", "该流水线没有验缝步骤，无法裁决");
-    // 先改版式再建任务：PRINT_PACK 任务从流水线读 layout，顺序反了就会按旧版式出图。
-    repository.updatePatternPipeline(pipeline.id, { layout: body.resolution === "USE_CENTERED" ? "CENTERED" : "TILE", status: "RUNNING", blockReason: null });
+    // 先改版式/排列再建任务：PRINT_PACK 任务从流水线读 layout 与 repeatLayout，顺序反了就会按旧答案出图。
+    repository.updatePatternPipeline(pipeline.id, {
+      layout: body.resolution === "USE_CENTERED" ? "CENTERED" : "TILE",
+      // USE_MIRROR 把排列改写为镜像（构造性无缝，闸门放行的依据）；其余出口保留用户创建时选的排列。
+      repeatLayout: body.resolution === "USE_MIRROR" ? "MIRROR" : pipeline.repeatLayout,
+      status: "RUNNING",
+      blockReason: null,
+    });
     const updated = repository.getPatternPipeline(pipeline.id) ?? pipeline;
     const next = nextPipelineStep(updated.steps, tileCheck);
     if (!next) throw new ApiError(409, "CONFLICT", "验缝之后没有可执行的步骤");
@@ -676,7 +687,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (step.step === "SOURCE") throw new ApiError(409, "CONFLICT", "图案获取步骤请从花型墙的来源入口重新发起");
     // AWAITING_INPUT 只由 /continue 放行：允许在这里"重跑"下一个待办步骤，等于给了一条绕过接缝裁决
     // 直接出满印的暗门，而用户以为自己只是在重跑。
-    if (pipeline.status === "AWAITING_INPUT") throw new ApiError(409, "CONFLICT", "流水线正等待你的裁决，请先选择「改为居中继续」或「仍出满印」");
+    if (pipeline.status === "AWAITING_INPUT") throw new ApiError(409, "CONFLICT", "流水线正等待你的裁决，请先选择「改为居中继续」「换镜像出满印」或「仍出满印」");
     resetPipelineStepsFrom(repository, pipeline.id, step.id);
     const updated = repository.getPatternPipeline(pipeline.id) ?? pipeline;
     const target = updated.steps.find((entry) => entry.id === step.id) ?? step;
@@ -1697,6 +1708,7 @@ function publicPatternPipeline(record: PatternPipelineWithSteps) {
     specId: record.specId,
     specVersion: record.specVersion,
     layout: record.layout,
+    repeatLayout: record.repeatLayout,
     listingPlatform: record.listingPlatform,
     listingProviderId: record.listingProviderId,
     listingModelId: record.listingModelId,
@@ -1742,6 +1754,9 @@ function resolvePatternSegmentationModel(repository: EcomRepository, providerId:
 function validatePatternPipelineAnswers(repository: EcomRepository, answers: PatternPipelineAnswers) {
   const spec = getPodPrintSpec(answers.specId);
   if (!spec) throw new ApiError(400, "VALIDATION_ERROR", `未知的印刷规格：${answers.specId}`);
+  if (answers.repeatLayout && (answers.layout ?? "CENTERED") !== "TILE") {
+    throw new ApiError(400, "VALIDATION_ERROR", "平铺排列仅在满印（TILE）版式下生效");
+  }
   verifyCopywritingModel(repository, answers.listingProviderId, answers.listingModelId);
   return spec;
 }

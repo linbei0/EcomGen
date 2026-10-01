@@ -9,11 +9,12 @@ import { forgeSuite, planImageEdit, planLayerElements, planStoryboard, reviseIma
 import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, SuiteCatalog, nextPipelineStep, openDatabase, resolveDataDir, settlePipelineStep, startPipelineStep, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
 import { compileUserTemplate, compileModelCastPrompt, compilePatternExtractPrompt, compilePatternForgePrompt, compilePatternVariantPrompt, defaultPatternName, defaultVariantName, presetBelongsToAxis, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
 import { normalizeSuiteDocument, type SuiteDocumentInput } from "@ecomgen/ecom-suite";
-import { getPodPrintSpec, POD_MOCKUP_SCENE_VERSION, POD_PRINT_SPEC_VERSION, MODEL_CAST_CANDIDATES_MAX, PATTERN_FORGE_CANDIDATES_MAX, MAX_CANDIDATES_PER_TYPE, TILEABILITY_ALGORITHM_VERSION, resolveImageSize, userAssetKindForRole, EDIT_OPERATION_CAPABILITIES, LISTING_PLATFORMS, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESET_IDS, POD_PRINT_CATEGORIES, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, validateEcomSuiteFile, type CompositePolicy, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type ListingPlatform, type ModelSpec, type PatternBackgroundMode, type PatternVariantAxis, type PatternVariantPreset, type PlanningMode, type PodPrintCategory, type PodPrintLayout } from "@ecomgen/contracts";
+import { getPodPrintSpec, POD_MOCKUP_SCENE_VERSION, POD_PRINT_SPEC_VERSION, MODEL_CAST_CANDIDATES_MAX, PATTERN_FORGE_CANDIDATES_MAX, MAX_CANDIDATES_PER_TYPE, TILEABILITY_ALGORITHM_VERSION, resolveImageSize, userAssetKindForRole, EDIT_OPERATION_CAPABILITIES, LISTING_PLATFORMS, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESET_IDS, POD_PRINT_CATEGORIES, POD_REPEAT_LAYOUTS, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, validateEcomSuiteFile, type CompositePolicy, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type ListingPlatform, type ModelSpec, type PatternBackgroundMode, type PatternVariantAxis, type PatternVariantPreset, type PlanningMode, type PodPrintCategory, type PodPrintLayout, type PodRepeatLayout } from "@ecomgen/contracts";
 import { createJobQueue, createRedisConnection, enqueue, queueKindForJobType, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, buildReasoningModel, createSegmentationProvider, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { createPsdLayerAccumulator, extractAlpha, invertMask, multiplyAlpha, unionOfMasks } from "./layer-composite.js";
-import { computePrintPackPlacement, computePrintPackTileLayout } from "./print-pack.js";
+import { computePrintPackPlacement, computePrintPackTileLayout, computeRepeatUnitGeometry } from "./print-pack.js";
+import { composeRepeatUnit } from "./repeat-unit.js";
 import { renderPrintMockup } from "./print-mockups.js";
 import { applyRecolor, type RecolorParams } from "./pattern-derive.js";
 import { hasTransparentPixels, resolvePatternBackground, verifyPatternBackground } from "./pattern-background.js";
@@ -118,7 +119,8 @@ process.once("SIGTERM", () => { void stop().then(() => process.exit(0)); });
  *    已经是 SUCCEEDED 的步骤直接返回，不重复入队下一步。
  *
  * 验缝未通过且版式为满印时**不静默继续**：把风险写进步骤 detail，流水线停在 AWAITING_INPUT
- * 等用户裁决（居中继续 / 仍出满印）。自动降级成居中会把满印需求偷偷改成单区域印花。
+ * 等用户裁决（居中继续 / 换镜像出满印 / 仍出满印）。自动降级成居中会把满印需求偷偷改成单区域印花。
+ * 唯一不拦的排列是镜像：重复单元接缝两侧像素恒等，构造性无缝对任意图片成立（ADR-0001）。
  */
 async function advancePatternPipeline(job: JobRecord): Promise<void> {
   const step = repository.getPatternPipelineStepByJobId(job.id);
@@ -139,9 +141,10 @@ async function advancePatternPipeline(job: JobRecord): Promise<void> {
     }
     if (step.step === "TILE_CHECK") {
       const pattern = patternId ? repository.getPattern(patternId) : undefined;
-      detail = { tileable: pattern?.tileable ?? null, tileableScore: pattern?.tileableScore ?? null };
-      if (pipeline.layout === "TILE" && pattern?.tileable !== "VERIFIED") {
-        repository.updatePatternPipelineStep(step.id, { status: "SUCCEEDED", detail: { ...detail, warning: "验缝未通过：满印会在成品上露出规则接缝" } });
+      detail = { tileable: pattern?.tileable ?? null, tileableScore: pattern?.tileableScore ?? null, repeatLayout: pipeline.repeatLayout };
+      // 镜像豁免闸门：排列的接缝是构造性无缝，验缝结论对它不适用；错位类排列与直排同险，照常拦。
+      if (pipeline.layout === "TILE" && pipeline.repeatLayout !== "MIRROR" && pattern?.tileable !== "VERIFIED") {
+        repository.updatePatternPipelineStep(step.id, { status: "SUCCEEDED", detail: { ...detail, warning: "验缝未通过：满印会在成品上露出规则接缝；可改用「镜像」排列继续（构造性无缝，图案会上下左右翻转对称）" } });
         repository.updatePatternPipeline(pipeline.id, { status: "AWAITING_INPUT", blockReason: "SEAM_RISK" });
         return;
       }
@@ -608,17 +611,23 @@ async function executePrintPack(job: JobRecord): Promise<void> {
     if (!meta.width || !meta.height) throw new Error("Pattern image dimensions are unavailable");
     // 版式快照在 job.input：CENTERED 居中进安全区；TILE 满印平铺（无安全边距）。
     const layout: PodPrintLayout = job.input.layout === "TILE" ? "TILE" : "CENTERED";
+    // 平铺排列快照：仅满印生效；输入没有该字段的旧任务按直排（与缺省语义一致）。
+    const repeatLayout: PodRepeatLayout = layout === "TILE" && typeof job.input.repeatLayout === "string" && (POD_REPEAT_LAYOUTS as readonly string[]).includes(job.input.repeatLayout)
+      ? job.input.repeatLayout as PodRepeatLayout
+      : "STRAIGHT";
     await updateJob(job, { progress: 30 });
     let composed: Buffer;
     let placement: ReturnType<typeof computePrintPackPlacement> | null = null;
     let tile: ReturnType<typeof computePrintPackTileLayout> | null = null;
     if (layout === "TILE") {
-      tile = computePrintPackTileLayout(spec.widthPx, spec.heightPx, meta.width, meta.height);
+      tile = computePrintPackTileLayout(spec.widthPx, spec.heightPx, meta.width, meta.height, repeatLayout);
       const tileImage = await sharp(source).ensureAlpha().resize(tile.tileWidth, tile.tileHeight, { fit: "fill", kernel: "lanczos3" }).png().toBuffer();
+      // 排列只在重复单元内部生效：先按单元几何拼出无缝单元（环绕补画），单元再像直排一样铺满画布。
+      const unitImage = await composeRepeatUnit({ data: tileImage, width: tile.tileWidth, height: tile.tileHeight }, tile);
       const composites: Array<{ input: Buffer; left: number; top: number }> = [];
       for (let row = 0; row < tile.rows; row += 1) {
         for (let column = 0; column < tile.columns; column += 1) {
-          composites.push({ input: tileImage, left: tile.left + column * tile.tileWidth, top: tile.top + row * tile.tileHeight });
+          composites.push({ input: unitImage, left: tile.left + column * tile.unitWidth, top: tile.top + row * tile.unitHeight });
         }
       }
       composed = await sharp({ create: { width: spec.widthPx, height: spec.heightPx, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
@@ -643,6 +652,16 @@ async function executePrintPack(job: JobRecord): Promise<void> {
     await updateJob(job, { progress: 70 });
     const storedPrint = await storage.putPrintPackArtifact(record.id, `${safeName(pattern.name)}_${spec.id}`, printFile);
     const storedMockup = await storage.putPrintPackArtifact(record.id, `${safeName(pattern.name)}_${spec.id}_mockup`, mockup);
+    // 无缝单元：满印版式的附加产物，源图原生分辨率合成（不放大插值），供 Printful 等第三方平台二次平铺。
+    // 直排的单元就是源图本身，直接复用存储缓冲，不再重编码；居中版式不是平铺，不产出。
+    let seamlessTile: Buffer | null = null;
+    let seamlessSize: { width: number; height: number } | null = null;
+    if (layout === "TILE") {
+      const seamlessGeometry = computeRepeatUnitGeometry(meta.width, meta.height, repeatLayout);
+      seamlessTile = repeatLayout === "STRAIGHT" ? source : await composeRepeatUnit({ data: source, width: meta.width, height: meta.height }, seamlessGeometry);
+      seamlessSize = { width: seamlessGeometry.unitWidth, height: seamlessGeometry.unitHeight };
+    }
+    const storedSeamless = seamlessTile ? await storage.putPrintPackArtifact(record.id, `${safeName(pattern.name)}_${spec.id}_seamless-tile`, seamlessTile) : null;
     const manifest = {
       kind: "ecomgen.print-pack" as const,
       manifestVersion: 1 as const,
@@ -651,11 +670,15 @@ async function executePrintPack(job: JobRecord): Promise<void> {
       pattern: { id: pattern.id, name: pattern.name, sourceType: pattern.sourceType, fileHash: pattern.fileHash, sourceAssetHash: pattern.sourceAssetHash, tileable: pattern.tileable, tileableScore: pattern.tileableScore, tileableAlgorithmVersion: pattern.tileableCheckedWith },
       spec: { id: spec.id, version: record.specVersion, category: spec.category, dpi: spec.dpi, widthPx: spec.widthPx, heightPx: spec.heightPx, safeMarginPct: spec.safeMarginPct },
       layout,
+      repeatLayout: layout === "TILE" ? repeatLayout : null,
+      // 镜像的单元接缝两侧像素恒等（构造性无缝）；其余排列的缝等于源图的缝，是否可见由验缝判定回答。
+      seam: layout === "TILE" ? (repeatLayout === "MIRROR" ? "by-construction" as const : "depends-on-source-tileability" as const) : null,
       // 场景渲染版本进 manifest：api 侧据此判定旧包示意图过期（重新成包可复得新渲染）。
       mockupScene: POD_MOCKUP_SCENE_VERSION,
       resample: "lanczos3" as const,
       placement,
       tile,
+      seamlessTile: seamlessSize,
       // AIGC 标识在此占位：XMP/C2PA 写入集中在导出层实现（见 model-library-roadmap 4.8），不在合成路径重复实现。
       aigcLabeling: { applied: false, note: "XMP labeling is applied at the export layer, not during pack composition." },
       createdAt: new Date().toISOString(),
@@ -665,6 +688,7 @@ async function executePrintPack(job: JobRecord): Promise<void> {
     const files = [
       { name: `${safeName(pattern.name)}_${spec.id}.png`, kind: "PRINT_FILE" as const, storagePath: storedPrint.path, hash: storedPrint.hash },
       { name: `${safeName(pattern.name)}_${spec.id}_mockup.png`, kind: "MOCKUP" as const, storagePath: storedMockup.path, hash: storedMockup.hash },
+      ...(storedSeamless ? [{ name: `${safeName(pattern.name)}_${spec.id}_seamless-tile.png`, kind: "SEAMLESS_TILE" as const, storagePath: storedSeamless.path, hash: storedSeamless.hash }] : []),
       { name: "manifest.json", kind: "MANIFEST" as const, storagePath: storedManifest.path, hash: storedManifest.hash },
     ];
     const updated = update({ status: "SUCCEEDED", files, manifest, error: null });

@@ -41,7 +41,7 @@ export function createPipelineStepJob(repository: EcomRepository, pipeline: Patt
     return { job, jobType: "PATTERN_TILE_CHECK" };
   }
   if (step.step === "PRINT_PACK") {
-    const job = repository.createJob({ ...base, type: "PRINT_PACK", input: { patternId, specId: pipeline.specId, specVersion: pipeline.specVersion, layout: pipeline.layout }, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } });
+    const job = repository.createJob({ ...base, type: "PRINT_PACK", input: { patternId, specId: pipeline.specId, specVersion: pipeline.specVersion, layout: pipeline.layout, repeatLayout: pipeline.repeatLayout }, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } });
     repository.createPrintPack({ patternId, jobId: job.id, specId: pipeline.specId, specVersion: pipeline.specVersion, status: "QUEUED" });
     repository.updatePatternPipelineStep(step.id, { jobId: job.id });
     return { job, jobType: "PRINT_PACK" };

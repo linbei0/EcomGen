@@ -704,6 +704,7 @@ function migrate(database: SqliteDatabase): void {
       spec_id TEXT NOT NULL,
       spec_version TEXT NOT NULL,
       layout TEXT NOT NULL,
+      repeat_layout TEXT NOT NULL,
       listing_platform TEXT NOT NULL,
       listing_provider_id TEXT NOT NULL,
       listing_model_id TEXT NOT NULL,

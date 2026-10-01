@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { computePrintPackPlacement, computePrintPackTileLayout } from "./print-pack.js";
+import { computePrintPackPlacement, computePrintPackTileLayout, computeRepeatUnitGeometry } from "./print-pack.js";
 import { computeMockupArtworkPlacement, MOCKUP_CANVAS, mockupGeometryFor, MUG_VISIBLE_WRAP_FRACTION } from "./print-mockups.js";
-import { getPodPrintSpec, POD_PRINT_CATEGORIES, POD_PRINT_SPECS } from "@ecomgen/contracts";
+import { getPodPrintSpec, POD_PRINT_CATEGORIES, POD_PRINT_SPECS, POD_REPEAT_LAYOUTS } from "@ecomgen/contracts";
 
 /**
  * 规格包排版数学是 PRINT_PACK 的领域不变量：像素只来自花型的确定性 contain-fit，
@@ -106,6 +106,91 @@ describe("computePrintPackTileLayout", () => {
   it("非法输入抛错而不是产出不可打印的结果", () => {
     expect(() => computePrintPackTileLayout(0, 100, 10, 10)).toThrow();
     expect(() => computePrintPackTileLayout(100, 100, 0, 10)).toThrow();
+  });
+
+  /**
+   * 平铺排列只改"重复单元"不改花型缩放：错位类与直排同尺寸同密度（ADR-0001）；
+   * 镜像强制单元 ≥2×2，缩放目标减半。单元覆盖与居中越界语义与直排共用同一套数学。
+   */
+  describe("平铺排列", () => {
+    const canvas = [3600, 4800] as const;
+    const source = [600, 600] as const;
+
+    it("直排与缺省行为逐字段一致：单元=花型本身", () => {
+      const byDefault = computePrintPackTileLayout(canvas[0], canvas[1], source[0], source[1]);
+      const explicit = computePrintPackTileLayout(canvas[0], canvas[1], source[0], source[1], "STRAIGHT");
+      expect(explicit).toEqual(byDefault);
+      expect(explicit.unitWidth).toBe(explicit.tileWidth);
+      expect(explicit.unitHeight).toBe(explicit.tileHeight);
+      expect(explicit.placements).toEqual([{ left: 0, top: 0, flipX: false, flipY: false }]);
+    });
+
+    it("半落单元 2×1，第二列下错半高；花型缩放与直排一致", () => {
+      const straight = computePrintPackTileLayout(canvas[0], canvas[1], source[0], source[1], "STRAIGHT");
+      const layout = computePrintPackTileLayout(canvas[0], canvas[1], source[0], source[1], "HALF_DROP");
+      expect(layout.tileWidth).toBe(straight.tileWidth);
+      expect(layout.tileHeight).toBe(straight.tileHeight);
+      expect(layout.unitWidth).toBe(layout.tileWidth * 2);
+      expect(layout.unitHeight).toBe(layout.tileHeight);
+      expect(layout.placements).toEqual([
+        { left: 0, top: 0, flipX: false, flipY: false },
+        { left: layout.tileWidth, top: Math.round(layout.tileHeight / 2), flipX: false, flipY: false },
+      ]);
+    });
+
+    it("三落单元 3×1，错位比例为 1/3、2/3 高", () => {
+      const layout = computePrintPackTileLayout(canvas[0], canvas[1], source[0], source[1], "ONE_THIRD_DROP");
+      expect(layout.unitWidth).toBe(layout.tileWidth * 3);
+      expect(layout.placements.map((placement) => placement.top)).toEqual([0, Math.round(layout.tileHeight / 3), Math.round((layout.tileHeight * 2) / 3)]);
+    });
+
+    it("错砖单元 1×2，第二行右错半宽", () => {
+      const layout = computePrintPackTileLayout(canvas[0], canvas[1], source[0], source[1], "HALF_BRICK");
+      expect(layout.unitWidth).toBe(layout.tileWidth);
+      expect(layout.unitHeight).toBe(layout.tileHeight * 2);
+      expect(layout.placements).toEqual([
+        { left: 0, top: 0, flipX: false, flipY: false },
+        { left: Math.round(layout.tileWidth / 2), top: layout.tileHeight, flipX: false, flipY: false },
+      ]);
+    });
+
+    it("镜像单元 2×2 四象限翻转，缩放减半保证单元在画布每轴至少重复 2 次", () => {
+      const straight = computePrintPackTileLayout(canvas[0], canvas[1], source[0], source[1], "STRAIGHT");
+      const layout = computePrintPackTileLayout(canvas[0], canvas[1], source[0], source[1], "MIRROR");
+      expect(layout.tileWidth).toBe(Math.round(straight.tileWidth / 2));
+      expect(layout.placements).toEqual([
+        { left: 0, top: 0, flipX: false, flipY: false },
+        { left: layout.tileWidth, top: 0, flipX: true, flipY: false },
+        { left: 0, top: layout.tileHeight, flipX: false, flipY: true },
+        { left: layout.tileWidth, top: layout.tileHeight, flipX: true, flipY: true },
+      ]);
+      expect(layout.columns).toBeGreaterThanOrEqual(2);
+      expect(layout.rows).toBeGreaterThanOrEqual(2);
+    });
+
+    it("全部排列的单元都覆盖整幅画布，摆放位不越出单元", () => {
+      for (const repeat of POD_REPEAT_LAYOUTS) {
+        const layout = computePrintPackTileLayout(canvas[0], canvas[1], source[0], source[1], repeat);
+        expect(layout.columns * layout.unitWidth + Math.abs(layout.left)).toBeGreaterThanOrEqual(canvas[0]);
+        expect(layout.rows * layout.unitHeight + Math.abs(layout.top)).toBeGreaterThanOrEqual(canvas[1]);
+        for (const placement of layout.placements) {
+          expect(placement.left).toBeGreaterThanOrEqual(0);
+          expect(placement.top).toBeGreaterThanOrEqual(0);
+          expect(placement.left).toBeLessThan(layout.unitWidth);
+          expect(placement.top).toBeLessThan(layout.unitHeight);
+        }
+      }
+    });
+
+    it("无缝单元几何按源图原生分辨率计算，不放大插值", () => {
+      const geometry = computeRepeatUnitGeometry(1254, 1254, "HALF_DROP");
+      expect(geometry.unitWidth).toBe(2508);
+      expect(geometry.unitHeight).toBe(1254);
+      const mirror = computeRepeatUnitGeometry(1254, 1254, "MIRROR");
+      expect(mirror.unitWidth).toBe(2508);
+      expect(mirror.unitHeight).toBe(2508);
+      expect(() => computeRepeatUnitGeometry(0, 10, "STRAIGHT")).toThrow();
+    });
   });
 });
 
