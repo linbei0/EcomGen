@@ -122,16 +122,3 @@ export function useDeleteModelPortrait() {
     },
   });
 }
-
-/** 选角任务状态轮询：QUEUED/RUNNING 时 1.5s 一拍，终态即停，由页面负责失效候选缓存。 */
-export function useModelCastJob(jobId: string | undefined) {
-  return useQuery({
-    queryKey: qk.job(jobId ?? ""),
-    enabled: Boolean(jobId),
-    queryFn: async () => unwrap(api.GET("/jobs/{jobId}", { params: { path: { jobId: jobId! } } })),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === "QUEUED" || status === "RUNNING" ? 1500 : false;
-    },
-  });
-}

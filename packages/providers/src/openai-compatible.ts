@@ -21,6 +21,13 @@ export interface ImageGenerationInput {
   images?: Array<{ data: Buffer; filename: string; mimeType: string }>;
   mask?: { data: Buffer; filename: string; mimeType: string };
   inputFidelity?: "low" | "high";
+  /**
+   * 透明底输出。只有确实支持该参数的模型才能收到它（判定见
+   * contracts 的 supportsTransparentBackground），且必须与 outputFormat 的 png/webp 同用——
+   * jpeg 装不下 alpha，Provider 会直接报错或悄悄给一张不带透明的图。
+   */
+  background?: "transparent" | "opaque" | "auto";
+  outputFormat?: "png" | "webp" | "jpeg";
   operation?: EditOperation;
   /** 调用方取消信号；中断会真正断开在途请求，避免取消后继续等待并按次计费。 */
   signal?: AbortSignal;
@@ -44,8 +51,16 @@ export interface ImageEditInput {
   sourceImage: ImageInput;
   referenceImages?: ImageInput[];
   mask?: ImageInput;
-  operation: EditOperation;
+  /**
+   * 编辑操作提示；一个都不传表示这次不是注册表里的编辑操作（例如花型工坊的整图改风格），
+   * 而不是"某个操作没写"。适配器只在提供时才把它作为表单字段发给上游：
+   * 拿一个语义不符的操作名去顶替会误导支持该字段的 Provider，不如如实空着。
+   */
+  operation?: EditOperation;
   inputFidelity?: "low" | "high";
+  /** 透明底输出；语义与 ImageGenerationInput.background 相同。 */
+  background?: "transparent" | "opaque" | "auto";
+  outputFormat?: "png" | "webp" | "jpeg";
   /** 调用方取消信号；中断会真正断开在途请求，避免取消后继续等待并按次计费。 */
   signal?: AbortSignal;
 }
@@ -129,6 +144,9 @@ export class OpenAiCompatibleImageProvider {
       size: input.size,
       quality: input.quality,
       response_format: "b64_json",
+      // 只在调用方明确要求时下发：默认请求保持原样，不带 background/output_format。
+      ...(input.background ? { background: input.background } : {}),
+      ...(input.outputFormat ? { output_format: input.outputFormat } : {}),
       n: 1
     }), input.signal);
     return this.readImageResponse(response, input.signal);
@@ -143,6 +161,8 @@ export class OpenAiCompatibleImageProvider {
       images: [input.sourceImage, ...(input.referenceImages ?? [])],
       mask: input.mask,
       inputFidelity: input.inputFidelity,
+      background: input.background,
+      outputFormat: input.outputFormat,
       operation: input.operation,
       idempotencyKey: input.idempotencyKey,
       signal: input.signal
@@ -167,6 +187,8 @@ export class OpenAiCompatibleImageProvider {
     if (input.size) form.set("size", input.size);
     if (input.quality) form.set("quality", input.quality);
     if (input.inputFidelity) form.set("input_fidelity", input.inputFidelity);
+    if (input.background) form.set("background", input.background);
+    if (input.outputFormat) form.set("output_format", input.outputFormat);
     for (const image of input.images ?? []) {
       form.append("image", new Blob([new Uint8Array(image.data)], { type: image.mimeType }), image.filename);
     }

@@ -81,6 +81,28 @@ describe("gitee AI SAM 3 segmentation", () => {
     expect(result.mask.data).toEqual(Buffer.from([255, 0, 255, 0]));
   });
 
+  it("treats mask.size as [width, height]: a non-square mask must not be folded", async () => {
+    // 2026-09-30 非正方形真实响应实测 size 是 [width, height]，不是 COCO 的 [height, width]；
+    // 按后者解释时非正方形蒙版被错列折叠成竖条纹碎片（正方形用例天然发现不了）。
+    // counts [0,2,1,2,1] 在 3×2 上应解出两行 [fg,bg,fg]/[fg,fg,bg]；
+    // 若按 [height,width] 解释会解出 2×3 布局 [fg,fg]/[fg,fg]/[bg,bg]，与断言不符。
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      segments: [{ confidence: 0.91, bbox: [1, 0.5, 2.5, 1.5], mask: { encoding: "rle", size: [3, 2], counts: rleCounts_([0, 2, 1, 2, 1], false) } }]
+    }), { status: 200 })));
+
+    const provider = new GiteeSam3SegmentationProvider({ baseUrl: "https://ai.gitee.com/v1", apiKey: "gitee-key" });
+    const result = await provider.segment({ imageUrl: "data:image/png;base64,CCCC", textPrompt: "printed graphic" });
+
+    expect(result.mask.width).toBe(3);
+    expect(result.mask.height).toBe(2);
+    expect(result.mask.data).toEqual(Buffer.from([255, 0, 255, 255, 255, 0]));
+    // bbox 是 [x1,y1,x2,y2] 像素坐标，各除以对应的宽/高
+    expect(result.bbox?.x).toBeCloseTo(1 / 3);
+    expect(result.bbox?.y).toBeCloseTo(0.25);
+    expect(result.bbox?.width).toBeCloseTo(0.5);
+    expect(result.bbox?.height).toBeCloseTo(0.5);
+  });
+
   it("falls back to plain pycocotools counts when not gzipped", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       segments: [{ mask: { encoding: "rle", size: [2, 2], counts: rleCounts_([0, 2, 0, 2], false) } }]

@@ -1430,6 +1430,477 @@ paths:
                 $ref: "#/components/schemas/EcomModel"
         "404":
           $ref: "#/components/responses/NotFound"
+  /patterns:
+    get:
+      operationId: listPatterns
+      responses:
+        "200":
+          description: Global pattern library; entries whose artwork is still being produced are hidden until the artifact lands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternList"
+    post:
+      operationId: noopPatternsPost
+      responses:
+        "405":
+          description: Method not allowed; patterns are created by extract/forge/upload jobs.
+  /patterns/{patternId}:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    get:
+      operationId: getPattern
+      responses:
+        "200":
+          description: Single pattern with source lineage metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pattern"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updatePattern
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePatternInput"
+      responses:
+        "200":
+          description: Renamed or re-tagged pattern.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pattern"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deletePattern
+      responses:
+        "204":
+          description: Pattern artwork files and record removed.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patterns/extract-jobs:
+    post:
+      operationId: createPatternExtractJob
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreatePatternExtractJobInput"
+      responses:
+        "202":
+          description: Extract job accepted (or an existing job reused for an identical request).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /patterns/forge-jobs:
+    post:
+      operationId: createPatternForgeJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternForgeJobInput"
+      responses:
+        "202":
+          description: Forge job accepted (or an existing job reused for an identical request).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /patterns/{patternId}/print-pack-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPrintPackJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePrintPackJobInput"
+      responses:
+        "200":
+          description: Existing identical print pack job reused.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePrintPackJobResponse"
+        "202":
+          description: Print pack job accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePrintPackJobResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/derive-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternDeriveJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternDeriveJobInput"
+      responses:
+        "200":
+          description: Existing identical derive job reused (its derived pattern still exists).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "202":
+          description: Derive job accepted; runs locally in the worker without provider cost.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/variant-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternVariantJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternVariantJobInput"
+      responses:
+        "200":
+          description: Existing identical variant job reused (its derived patterns still exist).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "202":
+          description: Variant job accepted; each candidate becomes a new pattern whose lineage points at the source.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /patterns/{patternId}/tile-check-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternTileCheckJob
+      responses:
+        "200":
+          description: Existing identical tileability check reused (same pattern artwork and algorithm version).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "202":
+          description: Tileability check accepted; runs locally in the worker at no provider cost and never modifies the artwork.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/print-packs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    get:
+      operationId: listPatternPrintPacks
+      responses:
+        "200":
+          description: Print packs generated for this pattern, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrintPackList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /print-packs/{printPackId}:
+    parameters:
+      - $ref: "#/components/parameters/PrintPackId"
+    get:
+      operationId: getPrintPack
+      responses:
+        "200":
+          description: Print pack with its current status and artifact files.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrintPack"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patterns/{patternId}/listing-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternListingJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternListingJobInput"
+      responses:
+        "202":
+          description: Listing copy job accepted (or an existing job reused for an identical request).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/listing-jobs/{jobId}/result:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+      - $ref: "#/components/parameters/JobId"
+    get:
+      operationId: getPatternListingResult
+      responses:
+        "200":
+          description: Validated listing copy for the requested pattern.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternListingResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/pipelines:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternPipeline
+      description: Starts the three-answer packaging pipeline (tile check → print pack → listing copy) for one pattern.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternPipelineInput"
+      responses:
+        "200":
+          description: An in-flight pipeline with identical answers was reused; finished pipelines are never reused because re-running is an explicit intent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "202":
+          description: Pipeline created and its first step enqueued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      operationId: listPatternPipelines
+      responses:
+        "200":
+          description: Packaging pipelines recorded for this pattern, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipelineList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /pattern-pipelines/{pipelineId}:
+    parameters:
+      - $ref: "#/components/parameters/PipelineId"
+    get:
+      operationId: getPatternPipeline
+      responses:
+        "200":
+          description: Pipeline receipt with per-step status, detail and error text.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /pattern-pipelines/{pipelineId}/continue:
+    parameters:
+      - $ref: "#/components/parameters/PipelineId"
+    post:
+      operationId: continuePatternPipeline
+      description: Resolves a pipeline parked at AWAITING_INPUT by either switching to the centered layout or accepting the seam risk on a full-bleed print.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContinuePatternPipelineInput"
+      responses:
+        "202":
+          description: Resolution accepted and the next step enqueued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /pattern-pipelines/{pipelineId}/steps/{step}/retry:
+    parameters:
+      - $ref: "#/components/parameters/PipelineId"
+      - $ref: "#/components/parameters/PipelineStep"
+    post:
+      operationId: retryPatternPipelineStep
+      description: Resets the requested step and every downstream step (their results were computed from the old input), then restarts it.
+      responses:
+        "202":
+          description: Step restarted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /pattern-pipelines/{pipelineId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/PipelineId"
+    post:
+      operationId: cancelPatternPipeline
+      description: Cancels the in-flight job first (that is where metered provider calls are actually interrupted) and then records the remaining steps and the pipeline as cancelled.
+      responses:
+        "200":
+          description: Pipeline receipt after cancellation; already terminal pipelines are returned unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /pod/print-specs:
+    get:
+      operationId: listPodPrintSpecs
+      responses:
+        "200":
+          description: Deterministic print-spec catalog; entries carry source notes and a catalog version that flows into every pack manifest.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PodPrintSpecList"
+  /files/patterns/{patternId}:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    get:
+      operationId: getPatternFile
+      responses:
+        "200":
+          description: Pattern artwork (transparent PNG).
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /files/print-packs/{printPackId}/files/{index}:
+    parameters:
+      - $ref: "#/components/parameters/PrintPackId"
+      - name: index
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 0
+    get:
+      operationId: getPrintPackFile
+      responses:
+        "200":
+          description: Print pack artifact by file index (print-ready PNG or manifest JSON).
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patterns/upload:
+    post:
+      operationId: uploadPattern
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 花型图稿（建议透明底 PNG）。
+                name:
+                  type: string
+                tags:
+                  type: string
+                  description: JSON 数组字符串形式的标签列表。
+                pipeline:
+                  type: string
+                  description: 可选的成包答案（PatternPipelineAnswers 的 JSON 字符串）；带上时上传完成后立即起跑成包流水线。
+      responses:
+        "201":
+          description: Pattern stored directly into the library (source UPLOADED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pattern"
+        "400":
+          $ref: "#/components/responses/ValidationError"
 components:
   parameters:
     ProviderId:
@@ -1509,6 +1980,33 @@ components:
       schema:
         type: string
         format: uuid
+    PatternId:
+      name: patternId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PrintPackId:
+      name: printPackId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PipelineId:
+      name: pipelineId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PipelineStep:
+      name: step
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PatternPipelineStepName"
     SuiteId:
       name: suiteId
       in: path
@@ -1620,6 +2118,8 @@ components:
         - GENERATED
         - LAYER
         - MODEL
+        - PATTERN
+        - PRINT_PACK
     ImageResolution:
       type: string
       enum:
@@ -1650,6 +2150,7 @@ components:
       enum:
         - PRODUCT_DESCRIPTION
         - PLANNING_INSTRUCTION
+        - LISTING
     JobType:
       type: string
       enum:
@@ -1663,6 +2164,12 @@ components:
         - LAYER_EXPORT
         - SUITE_FORGE
         - MODEL_CAST
+        - PATTERN_EXTRACT
+        - PATTERN_FORGE
+        - PATTERN_DERIVE
+        - PATTERN_VARIANT
+        - PATTERN_TILE_CHECK
+        - PRINT_PACK
     JobStatus:
       type: string
       enum:
@@ -2712,18 +3219,7 @@ components:
           format: uuid
           type: string
         type:
-          type: string
-          enum:
-            - PLAN
-            - COPYWRITE
-            - GENERATE
-            - EXPORT
-            - EDIT_PLAN
-            - EDIT_GENERATE
-            - LAYER_PLAN
-            - LAYER_EXPORT
-            - SUITE_FORGE
-            - MODEL_CAST
+          $ref: "#/components/schemas/JobType"
         status:
           type: string
           enum:
@@ -5178,3 +5674,749 @@ components:
           maximum: 4
           default: 1
           type: integer
+    PatternSource:
+      type: string
+      enum:
+        - EXTRACTED
+        - GENERATED
+        - UPLOADED
+        - DERIVED
+    PodPrintCategory:
+      type: string
+      enum:
+        - TSHIRT
+        - HOODIE
+        - MUG_11OZ
+        - POSTER
+        - TOTE_BAG
+        - PHONE_CASE
+    PodPrintLayout:
+      type: string
+      enum:
+        - CENTERED
+        - TILE
+    PodPrintSpec:
+      type: object
+      required:
+        - id
+        - category
+        - label
+        - widthPx
+        - heightPx
+        - dpi
+        - safeMarginPct
+        - notes
+      properties:
+        id:
+          minLength: 1
+          description: 稳定规格 ID（非 uuid），进入规格包 manifest；目录修订时保持不变。
+          type: string
+        category:
+          $ref: "#/components/schemas/PodPrintCategory"
+        label:
+          minLength: 1
+          description: 中文显示名。
+          type: string
+        widthPx:
+          minimum: 1
+          description: 可印画布宽（像素）= 英寸 × dpi。
+          type: integer
+        heightPx:
+          minimum: 1
+          description: 可印画布高（像素）= 英寸 × dpi。
+          type: integer
+        dpi:
+          minimum: 72
+          description: 目标打印精度；同时写入产物 PNG 的 DPI 元数据。
+          type: integer
+        safeMarginPct:
+          minimum: 0
+          maximum: 50
+          description: 安全边距占画布短边的百分比；花型 contain-fit 后再内缩。
+          type: integer
+        notes:
+          description: 来源与适用性说明；含「以工厂模板为准」提示。
+          type: string
+    PodPrintSpecList:
+      type: object
+      required:
+        - specVersion
+        - items
+      properties:
+        specVersion:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PodPrintSpec"
+    Pattern:
+      type: object
+      required:
+        - id
+        - name
+        - source
+        - tags
+        - tileable
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        name:
+          type: string
+        source:
+          $ref: "#/components/schemas/PatternSource"
+        tags:
+          maxItems: 8
+          type: array
+          items:
+            type: string
+        sourceJobId:
+          description: 来源任务 id；UPLOADED 为 null。前端用它把任务与其产物卡片关联（占位卡结算、复用定位）。
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        parentPatternId:
+          description: 衍生源花型 id；非 DERIVED 为 null。版本栈用它在前端从花型列表自行回溯血缘，不设专门端点。
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        tileable:
+          description: 可平铺判定；只对整块连续印花的品类（满印服饰/全环绕马克杯/满版手机壳/织物）有意义，单区域印花无需。由本地验缝写入，不改动像素。
+          $ref: "#/components/schemas/TileableStatus"
+        tileableScore:
+          description: 验缝归一化相似度 0..1；未校验为 null。供人工判断，不参与徽标以外的判定。
+          anyOf:
+            - type: number
+            - type: "null"
+        tileableCheckedWith:
+          description: 写入该判定时的验缝算法版本；与当前 TILEABILITY_ALGORITHM_VERSION 不一致表示判定已过期需重算。
+          anyOf:
+            - type: string
+            - type: "null"
+        imageUrl:
+          description: 花型原图（透明底 PNG）访问地址。
+          type: string
+        thumbUrl:
+          type: string
+        width:
+          anyOf:
+            - type: integer
+            - type: "null"
+        height:
+          anyOf:
+            - type: integer
+            - type: "null"
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    PatternList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pattern"
+    UpdatePatternInput:
+      type: object
+      properties:
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        tags:
+          maxItems: 8
+          type: array
+          items:
+            minLength: 1
+            maxLength: 24
+            type: string
+    PrintPackFile:
+      type: object
+      required:
+        - name
+        - kind
+        - url
+        - hash
+      properties:
+        name:
+          type: string
+        kind:
+          description: PRINT_FILE 为印刷图稿 PNG，MOCKUP 为品类示意图 PNG（高级插画风场景渲染，非实拍），MANIFEST 为溯源清单 JSON。
+          type: string
+          enum:
+            - PRINT_FILE
+            - MOCKUP
+            - MANIFEST
+        url:
+          type: string
+        hash:
+          type: string
+    PrintPackStatus:
+      type: string
+      enum:
+        - QUEUED
+        - RUNNING
+        - SUCCEEDED
+        - FAILED
+        - CANCELLED
+    PrintPack:
+      type: object
+      required:
+        - id
+        - jobId
+        - patternId
+        - specId
+        - specVersion
+        - status
+        - files
+        - error
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        jobId:
+          format: uuid
+          type: string
+        patternId:
+          format: uuid
+          type: string
+        specId:
+          type: string
+        specVersion:
+          type: string
+        status:
+          $ref: "#/components/schemas/PrintPackStatus"
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrintPackFile"
+        error:
+          anyOf:
+            - type: object
+              patternProperties:
+                ^(.*)$: {}
+            - type: "null"
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    PrintPackList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrintPack"
+    CreatePrintPackJobResponse:
+      type: object
+      required:
+        - job
+        - printPack
+      properties:
+        job:
+          $ref: "#/components/schemas/Job"
+        printPack:
+          anyOf:
+            - $ref: "#/components/schemas/PrintPack"
+            - type: "null"
+    ListingPlatform:
+      type: string
+      enum:
+        - ETSY
+        - AMAZON
+        - TIKTOK_SHOP
+    ListingCopy:
+      type: object
+      required:
+        - platform
+        - title
+        - tags
+        - description
+        - bullets
+      properties:
+        platform:
+          $ref: "#/components/schemas/ListingPlatform"
+        title:
+          description: 平台标题；长度受平台硬约束（Etsy≤140 / Amazon≤75 / TikTok 25–200）。
+          type: string
+        tags:
+          description: 平台标签；Etsy 最多 13 个每个 ≤20 字符，其余平台可为空数组。
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+        bullets:
+          description: 平台要点（Amazon 五点式）；不适用平台为空数组。
+          type: array
+          items:
+            type: string
+    PatternListingResult:
+      type: object
+      required:
+        - jobId
+        - patternId
+        - platform
+        - copy
+        - createdAt
+      properties:
+        jobId:
+          format: uuid
+          type: string
+        patternId:
+          format: uuid
+          type: string
+        platform:
+          $ref: "#/components/schemas/ListingPlatform"
+        copy:
+          $ref: "#/components/schemas/ListingCopy"
+        createdAt:
+          format: date-time
+          type: string
+    CreatePatternExtractJobInput:
+      type: object
+      required:
+        - providerId
+        - modelId
+        - file
+      properties:
+        providerId:
+          format: uuid
+          type: string
+        modelId:
+          minLength: 1
+          type: string
+        protocol:
+          description: 分割协议；与 Provider 声明矛盾时拒绝。
+          type: string
+          enum:
+            - fal
+            - grounded_sam
+            - gitee_sam3
+        file:
+          format: binary
+          description: 带图案的商品实拍图。
+          type: string
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        brief:
+          maxLength: 2000
+          description: 补充描述，例如「只留杯壁图案、去掉杯把和底座」，进入分割文本提示。
+          type: string
+        tags:
+          maxItems: 8
+          type: array
+          items:
+            minLength: 1
+            maxLength: 24
+            type: string
+        pipeline:
+          description: 可选：提取完成后接着跑成包流水线（图案来源即这次提取）。
+          $ref: "#/components/schemas/PatternPipelineAnswers"
+        idempotencyKey:
+          minLength: 1
+          type: string
+    CreatePatternForgeJobInput:
+      type: object
+      required:
+        - providerId
+        - imageModelId
+        - theme
+      properties:
+        providerId:
+          format: uuid
+          type: string
+        imageModelId:
+          minLength: 1
+          type: string
+        theme:
+          minLength: 1
+          maxLength: 2000
+          description: 图案主题描述，例如「水彩野花束、奶油色底」。
+          type: string
+        style:
+          maxLength: 60
+          description: 风格画种，例如 watercolor / line art / geometric。
+          type: string
+        category:
+          description: 目标承印品类；只影响构图建议，不改变出图像素。
+          $ref: "#/components/schemas/PodPrintCategory"
+        candidateCount:
+          minimum: 1
+          maximum: 4
+          default: 1
+          type: integer
+        background:
+          description: 底版；缺省 WHITE。TRANSPARENT 要求所选模型支持（见 supportsTransparentBackground），否则路由拒绝。
+          type: string
+          enum:
+            - WHITE
+            - TRANSPARENT
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        pipeline:
+          description: 可选：起稿完成后接着跑成包流水线；多候选时从第一张有产物的候选起链。
+          $ref: "#/components/schemas/PatternPipelineAnswers"
+        idempotencyKey:
+          minLength: 1
+          type: string
+    CreatePrintPackJobInput:
+      type: object
+      required:
+        - specId
+      properties:
+        specId:
+          minLength: 1
+          description: pod-print-specs 目录中的规格 ID。
+          type: string
+        layout:
+          description: 版式；缺省 CENTERED。TILE 为满印平铺，未验缝的花型可能出现接缝。
+          $ref: "#/components/schemas/PodPrintLayout"
+        idempotencyKey:
+          minLength: 1
+          type: string
+    CreatePatternListingJobInput:
+      type: object
+      required:
+        - providerId
+        - modelId
+        - platform
+      properties:
+        providerId:
+          format: uuid
+          type: string
+        modelId:
+          minLength: 1
+          type: string
+        platform:
+          $ref: "#/components/schemas/ListingPlatform"
+        sellingPoints:
+          maxLength: 2000
+          description: 卖点与受众补充描述。
+          type: string
+        mustIncludeWords:
+          maxLength: 500
+          type: string
+        bannedWords:
+          maxLength: 500
+          description: 禁用词；同时注入生成提示与结果校验。
+          type: string
+        idempotencyKey:
+          minLength: 1
+          type: string
+    CreatePatternDeriveJobInput:
+      type: object
+      properties:
+        hueShift:
+          minimum: -180
+          maximum: 180
+          description: 色相旋转角度。
+          type: integer
+        saturationPct:
+          minimum: 0
+          maximum: 300
+          description: 饱和度百分比（100 为不变）。
+          type: integer
+        brightnessPct:
+          minimum: 10
+          maximum: 300
+          description: 亮度百分比（100 为不变）。
+          type: integer
+        idempotencyKey:
+          minLength: 1
+          type: string
+    TileableStatus:
+      type: string
+      enum:
+        - NONE
+        - VERIFIED
+        - FAILED
+    CreatePatternVariantJobInput:
+      type: object
+      required:
+        - providerId
+        - imageModelId
+        - axis
+        - preset
+      properties:
+        providerId:
+          format: uuid
+          type: string
+        imageModelId:
+          minLength: 1
+          type: string
+        axis:
+          $ref: "#/components/schemas/PatternVariantAxis"
+        preset:
+          description: 轴向预设；必须属于 axis 对应的预设集合，否则路由拒绝。
+          $ref: "#/components/schemas/PatternVariantPreset"
+        extra:
+          maxLength: 60
+          description: 补充描述，附加在固化模板之后。
+          type: string
+        background:
+          description: 底版；缺省 SOURCE（跟随源图）。TRANSPARENT 要求所选模型支持，否则路由拒绝。
+          $ref: "#/components/schemas/PatternBackgroundMode"
+        candidateCount:
+          minimum: 1
+          maximum: 4
+          default: 1
+          type: integer
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        idempotencyKey:
+          minLength: 1
+          type: string
+    PatternVariantAxis:
+      type: string
+      enum:
+        - STYLE
+        - COMPOSITION
+    PatternVariantPreset:
+      type: string
+      enum:
+        - WATERCOLOR
+        - LINE_ART
+        - FLAT_VECTOR
+        - GOUACHE
+        - PAPER_CUT
+        - SCATTER
+        - GRID
+        - BORDER
+        - CENTER_MOTIF
+        - HALF_DROP
+    PatternBackgroundMode:
+      type: string
+      enum:
+        - SOURCE
+        - WHITE
+        - TRANSPARENT
+    PatternPipeline:
+      type: object
+      required:
+        - id
+        - patternId
+        - specId
+        - specVersion
+        - layout
+        - listingPlatform
+        - listingProviderId
+        - listingModelId
+        - status
+        - steps
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        patternId:
+          description: SOURCE 步骤完成后回填；从既有花型起链时创建即有值。
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        specId:
+          type: string
+        specVersion:
+          type: string
+        layout:
+          $ref: "#/components/schemas/PodPrintLayout"
+        listingPlatform:
+          $ref: "#/components/schemas/ListingPlatform"
+        listingProviderId:
+          format: uuid
+          type: string
+        listingModelId:
+          minLength: 1
+          type: string
+        status:
+          $ref: "#/components/schemas/PatternPipelineStatus"
+        blockReason:
+          description: AWAITING_INPUT 的原因，其它状态为 null。
+          anyOf:
+            - $ref: "#/components/schemas/PatternPipelineBlockReason"
+            - type: "null"
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatternPipelineStep"
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    PatternPipelineList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatternPipeline"
+    PatternPipelineStep:
+      type: object
+      required:
+        - step
+        - position
+        - status
+        - jobId
+        - detail
+        - error
+      properties:
+        step:
+          $ref: "#/components/schemas/PatternPipelineStepName"
+        position:
+          description: 执行顺序；推进按它取下一步，不靠枚举顺序。
+          type: integer
+        status:
+          $ref: "#/components/schemas/PatternPipelineStepStatus"
+        jobId:
+          description: 该步骤对应的任务；前端据此轮询进度与错误原文。
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        detail:
+          description: 步骤补充事实（验缝分数、接缝风险提示等），不参与状态机。
+          anyOf:
+            - type: object
+              patternProperties:
+                ^(.*)$: {}
+            - type: "null"
+        error:
+          anyOf:
+            - type: object
+              patternProperties:
+                ^(.*)$: {}
+            - type: "null"
+    PatternPipelineStepName:
+      type: string
+      enum:
+        - SOURCE
+        - TILE_CHECK
+        - PRINT_PACK
+        - LISTING
+    PatternPipelineStepStatus:
+      type: string
+      enum:
+        - PENDING
+        - QUEUED
+        - RUNNING
+        - SUCCEEDED
+        - FAILED
+        - CANCELLED
+    PatternPipelineStatus:
+      type: string
+      enum:
+        - QUEUED
+        - RUNNING
+        - SUCCEEDED
+        - FAILED
+        - AWAITING_INPUT
+        - CANCELLED
+    PatternPipelineBlockReason:
+      const: SEAM_RISK
+      type: string
+    PatternPipelineResolution:
+      type: string
+      enum:
+        - USE_CENTERED
+        - ALLOW_SEAM
+    PatternPipelineAnswers:
+      type: object
+      required:
+        - specId
+        - listingPlatform
+        - listingProviderId
+        - listingModelId
+      properties:
+        specId:
+          minLength: 1
+          description: pod-print-specs 目录中的规格 ID。
+          type: string
+        layout:
+          description: 版式；缺省 CENTERED。
+          $ref: "#/components/schemas/PodPrintLayout"
+        listingPlatform:
+          $ref: "#/components/schemas/ListingPlatform"
+        listingProviderId:
+          format: uuid
+          description: 文案用的推理 Provider（需支持视觉）。
+          type: string
+        listingModelId:
+          minLength: 1
+          type: string
+        sellingPoints:
+          maxLength: 2000
+          description: 卖点与受众补充描述。
+          type: string
+        bannedWords:
+          maxLength: 500
+          description: 禁用词；同时注入生成提示与结果校验。
+          type: string
+    CreatePatternPipelineInput:
+      type: object
+      required:
+        - specId
+        - listingPlatform
+        - listingProviderId
+        - listingModelId
+      properties:
+        specId:
+          minLength: 1
+          description: pod-print-specs 目录中的规格 ID。
+          type: string
+        layout:
+          description: 版式；缺省 CENTERED。
+          $ref: "#/components/schemas/PodPrintLayout"
+        listingPlatform:
+          $ref: "#/components/schemas/ListingPlatform"
+        listingProviderId:
+          format: uuid
+          description: 文案用的推理 Provider（需支持视觉）。
+          type: string
+        listingModelId:
+          minLength: 1
+          type: string
+        sellingPoints:
+          maxLength: 2000
+          description: 卖点与受众补充描述。
+          type: string
+        bannedWords:
+          maxLength: 500
+          description: 禁用词；同时注入生成提示与结果校验。
+          type: string
+        idempotencyKey:
+          minLength: 1
+          type: string
+    ContinuePatternPipelineInput:
+      type: object
+      required:
+        - resolution
+      properties:
+        resolution:
+          $ref: "#/components/schemas/PatternPipelineResolution"

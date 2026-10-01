@@ -1119,6 +1119,381 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/patterns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPatterns"];
+        put?: never;
+        post: operations["noopPatternsPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/{patternId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getPattern"];
+        put?: never;
+        post?: never;
+        delete: operations["deletePattern"];
+        options?: never;
+        head?: never;
+        patch: operations["updatePattern"];
+        trace?: never;
+    };
+    "/patterns/extract-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPatternExtractJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/forge-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPatternForgeJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/{patternId}/print-pack-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPrintPackJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/{patternId}/derive-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPatternDeriveJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/{patternId}/variant-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPatternVariantJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/{patternId}/tile-check-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPatternTileCheckJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/{patternId}/print-packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listPatternPrintPacks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/print-packs/{printPackId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printPackId: components["parameters"]["PrintPackId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getPrintPack"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/{patternId}/listing-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPatternListingJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/{patternId}/listing-jobs/{jobId}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getPatternListingResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/{patternId}/pipelines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listPatternPipelines"];
+        put?: never;
+        /** @description Starts the three-answer packaging pipeline (tile check → print pack → listing copy) for one pattern. */
+        post: operations["createPatternPipeline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-pipelines/{pipelineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pipelineId: components["parameters"]["PipelineId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getPatternPipeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-pipelines/{pipelineId}/continue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pipelineId: components["parameters"]["PipelineId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Resolves a pipeline parked at AWAITING_INPUT by either switching to the centered layout or accepting the seam risk on a full-bleed print. */
+        post: operations["continuePatternPipeline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-pipelines/{pipelineId}/steps/{step}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pipelineId: components["parameters"]["PipelineId"];
+                step: components["parameters"]["PipelineStep"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Resets the requested step and every downstream step (their results were computed from the old input), then restarts it. */
+        post: operations["retryPatternPipelineStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-pipelines/{pipelineId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pipelineId: components["parameters"]["PipelineId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Cancels the in-flight job first (that is where metered provider calls are actually interrupted) and then records the remaining steps and the pipeline as cancelled. */
+        post: operations["cancelPatternPipeline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pod/print-specs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPodPrintSpecs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/files/patterns/{patternId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getPatternFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/files/print-packs/{printPackId}/files/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printPackId: components["parameters"]["PrintPackId"];
+                index: number;
+            };
+            cookie?: never;
+        };
+        get: operations["getPrintPackFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/patterns/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["uploadPattern"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1138,7 +1513,7 @@ export interface components {
         /** @enum {string} */
         LibraryItemSource: "UPLOADED" | "GENERATED" | "MODEL";
         /** @enum {string} */
-        LibraryItemKind: "PRODUCT" | "REFERENCE" | "GENERATED" | "LAYER" | "MODEL";
+        LibraryItemKind: "PRODUCT" | "REFERENCE" | "GENERATED" | "LAYER" | "MODEL" | "PATTERN" | "PRINT_PACK";
         /** @enum {string} */
         ImageResolution: "1K" | "2K" | "4K";
         /** @enum {string} */
@@ -1146,9 +1521,9 @@ export interface components {
         /** @enum {string} */
         PlanningMode: "AI" | "MANUAL";
         /** @enum {string} */
-        CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION";
+        CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION" | "LISTING";
         /** @enum {string} */
-        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE" | "MODEL_CAST";
+        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE" | "MODEL_CAST" | "PATTERN_EXTRACT" | "PATTERN_FORGE" | "PATTERN_DERIVE" | "PATTERN_VARIANT" | "PATTERN_TILE_CHECK" | "PRINT_PACK";
         /** @enum {string} */
         JobStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
         /** @enum {string} */
@@ -1537,8 +1912,7 @@ export interface components {
         Job: {
             /** Format: uuid */
             id: string;
-            /** @enum {string} */
-            type: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE" | "MODEL_CAST";
+            type: components["schemas"]["JobType"];
             /** @enum {string} */
             status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
             progress: number;
@@ -2382,6 +2756,309 @@ export interface components {
             /** @default 1 */
             candidateCount: number;
         };
+        /** @enum {string} */
+        PatternSource: "EXTRACTED" | "GENERATED" | "UPLOADED" | "DERIVED";
+        /** @enum {string} */
+        PodPrintCategory: "TSHIRT" | "HOODIE" | "MUG_11OZ" | "POSTER" | "TOTE_BAG" | "PHONE_CASE";
+        /** @enum {string} */
+        PodPrintLayout: "CENTERED" | "TILE";
+        PodPrintSpec: {
+            /** @description 稳定规格 ID（非 uuid），进入规格包 manifest；目录修订时保持不变。 */
+            id: string;
+            category: components["schemas"]["PodPrintCategory"];
+            /** @description 中文显示名。 */
+            label: string;
+            /** @description 可印画布宽（像素）= 英寸 × dpi。 */
+            widthPx: number;
+            /** @description 可印画布高（像素）= 英寸 × dpi。 */
+            heightPx: number;
+            /** @description 目标打印精度；同时写入产物 PNG 的 DPI 元数据。 */
+            dpi: number;
+            /** @description 安全边距占画布短边的百分比；花型 contain-fit 后再内缩。 */
+            safeMarginPct: number;
+            /** @description 来源与适用性说明；含「以工厂模板为准」提示。 */
+            notes: string;
+        };
+        PodPrintSpecList: {
+            specVersion: string;
+            items: components["schemas"]["PodPrintSpec"][];
+        };
+        Pattern: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            source: components["schemas"]["PatternSource"];
+            tags: string[];
+            /** @description 来源任务 id；UPLOADED 为 null。前端用它把任务与其产物卡片关联（占位卡结算、复用定位）。 */
+            sourceJobId?: string | null;
+            /** @description 衍生源花型 id；非 DERIVED 为 null。版本栈用它在前端从花型列表自行回溯血缘，不设专门端点。 */
+            parentPatternId?: string | null;
+            /** @description 可平铺判定；只对整块连续印花的品类（满印服饰/全环绕马克杯/满版手机壳/织物）有意义，单区域印花无需。由本地验缝写入，不改动像素。 */
+            tileable: components["schemas"]["TileableStatus"];
+            /** @description 验缝归一化相似度 0..1；未校验为 null。供人工判断，不参与徽标以外的判定。 */
+            tileableScore?: number | null;
+            /** @description 写入该判定时的验缝算法版本；与当前 TILEABILITY_ALGORITHM_VERSION 不一致表示判定已过期需重算。 */
+            tileableCheckedWith?: string | null;
+            /** @description 花型原图（透明底 PNG）访问地址。 */
+            imageUrl?: string;
+            thumbUrl?: string;
+            width?: number | null;
+            height?: number | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PatternList: {
+            items: components["schemas"]["Pattern"][];
+        };
+        UpdatePatternInput: {
+            name?: string;
+            tags?: string[];
+        };
+        PrintPackFile: {
+            name: string;
+            /**
+             * @description PRINT_FILE 为印刷图稿 PNG，MOCKUP 为品类示意图 PNG（高级插画风场景渲染，非实拍），MANIFEST 为溯源清单 JSON。
+             * @enum {string}
+             */
+            kind: "PRINT_FILE" | "MOCKUP" | "MANIFEST";
+            url: string;
+            hash: string;
+        };
+        /** @enum {string} */
+        PrintPackStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+        PrintPack: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            jobId: string;
+            /** Format: uuid */
+            patternId: string;
+            specId: string;
+            specVersion: string;
+            status: components["schemas"]["PrintPackStatus"];
+            files: components["schemas"]["PrintPackFile"][];
+            error: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PrintPackList: {
+            items: components["schemas"]["PrintPack"][];
+        };
+        CreatePrintPackJobResponse: {
+            job: components["schemas"]["Job"];
+            printPack: components["schemas"]["PrintPack"] | null;
+        };
+        /** @enum {string} */
+        ListingPlatform: "ETSY" | "AMAZON" | "TIKTOK_SHOP";
+        ListingCopy: {
+            platform: components["schemas"]["ListingPlatform"];
+            /** @description 平台标题；长度受平台硬约束（Etsy≤140 / Amazon≤75 / TikTok 25–200）。 */
+            title: string;
+            /** @description 平台标签；Etsy 最多 13 个每个 ≤20 字符，其余平台可为空数组。 */
+            tags: string[];
+            description: string;
+            /** @description 平台要点（Amazon 五点式）；不适用平台为空数组。 */
+            bullets: string[];
+        };
+        PatternListingResult: {
+            /** Format: uuid */
+            jobId: string;
+            /** Format: uuid */
+            patternId: string;
+            platform: components["schemas"]["ListingPlatform"];
+            copy: components["schemas"]["ListingCopy"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreatePatternExtractJobInput: {
+            /** Format: uuid */
+            providerId: string;
+            modelId: string;
+            /**
+             * @description 分割协议；与 Provider 声明矛盾时拒绝。
+             * @enum {string}
+             */
+            protocol?: "fal" | "grounded_sam" | "gitee_sam3";
+            /**
+             * Format: binary
+             * @description 带图案的商品实拍图。
+             */
+            file: string;
+            name?: string;
+            /** @description 补充描述，例如「只留杯壁图案、去掉杯把和底座」，进入分割文本提示。 */
+            brief?: string;
+            tags?: string[];
+            /** @description 可选：提取完成后接着跑成包流水线（图案来源即这次提取）。 */
+            pipeline?: components["schemas"]["PatternPipelineAnswers"];
+            idempotencyKey?: string;
+        };
+        CreatePatternForgeJobInput: {
+            /** Format: uuid */
+            providerId: string;
+            imageModelId: string;
+            /** @description 图案主题描述，例如「水彩野花束、奶油色底」。 */
+            theme: string;
+            /** @description 风格画种，例如 watercolor / line art / geometric。 */
+            style?: string;
+            /** @description 目标承印品类；只影响构图建议，不改变出图像素。 */
+            category?: components["schemas"]["PodPrintCategory"];
+            /** @default 1 */
+            candidateCount: number;
+            /**
+             * @description 底版；缺省 WHITE。TRANSPARENT 要求所选模型支持（见 supportsTransparentBackground），否则路由拒绝。
+             * @enum {string}
+             */
+            background?: "WHITE" | "TRANSPARENT";
+            name?: string;
+            /** @description 可选：起稿完成后接着跑成包流水线；多候选时从第一张有产物的候选起链。 */
+            pipeline?: components["schemas"]["PatternPipelineAnswers"];
+            idempotencyKey?: string;
+        };
+        CreatePrintPackJobInput: {
+            /** @description pod-print-specs 目录中的规格 ID。 */
+            specId: string;
+            /** @description 版式；缺省 CENTERED。TILE 为满印平铺，未验缝的花型可能出现接缝。 */
+            layout?: components["schemas"]["PodPrintLayout"];
+            idempotencyKey?: string;
+        };
+        CreatePatternListingJobInput: {
+            /** Format: uuid */
+            providerId: string;
+            modelId: string;
+            platform: components["schemas"]["ListingPlatform"];
+            /** @description 卖点与受众补充描述。 */
+            sellingPoints?: string;
+            mustIncludeWords?: string;
+            /** @description 禁用词；同时注入生成提示与结果校验。 */
+            bannedWords?: string;
+            idempotencyKey?: string;
+        };
+        CreatePatternDeriveJobInput: {
+            /** @description 色相旋转角度。 */
+            hueShift?: number;
+            /** @description 饱和度百分比（100 为不变）。 */
+            saturationPct?: number;
+            /** @description 亮度百分比（100 为不变）。 */
+            brightnessPct?: number;
+            idempotencyKey?: string;
+        };
+        /** @enum {string} */
+        TileableStatus: "NONE" | "VERIFIED" | "FAILED";
+        CreatePatternVariantJobInput: {
+            /** Format: uuid */
+            providerId: string;
+            imageModelId: string;
+            axis: components["schemas"]["PatternVariantAxis"];
+            /** @description 轴向预设；必须属于 axis 对应的预设集合，否则路由拒绝。 */
+            preset: components["schemas"]["PatternVariantPreset"];
+            /** @description 补充描述，附加在固化模板之后。 */
+            extra?: string;
+            /** @description 底版；缺省 SOURCE（跟随源图）。TRANSPARENT 要求所选模型支持，否则路由拒绝。 */
+            background?: components["schemas"]["PatternBackgroundMode"];
+            /** @default 1 */
+            candidateCount: number;
+            name?: string;
+            idempotencyKey?: string;
+        };
+        /** @enum {string} */
+        PatternVariantAxis: "STYLE" | "COMPOSITION";
+        /** @enum {string} */
+        PatternVariantPreset: "WATERCOLOR" | "LINE_ART" | "FLAT_VECTOR" | "GOUACHE" | "PAPER_CUT" | "SCATTER" | "GRID" | "BORDER" | "CENTER_MOTIF" | "HALF_DROP";
+        /** @enum {string} */
+        PatternBackgroundMode: "SOURCE" | "WHITE" | "TRANSPARENT";
+        PatternPipeline: {
+            /** Format: uuid */
+            id: string;
+            /** @description SOURCE 步骤完成后回填；从既有花型起链时创建即有值。 */
+            patternId: string | null;
+            specId: string;
+            specVersion: string;
+            layout: components["schemas"]["PodPrintLayout"];
+            listingPlatform: components["schemas"]["ListingPlatform"];
+            /** Format: uuid */
+            listingProviderId: string;
+            listingModelId: string;
+            status: components["schemas"]["PatternPipelineStatus"];
+            /** @description AWAITING_INPUT 的原因，其它状态为 null。 */
+            blockReason?: components["schemas"]["PatternPipelineBlockReason"] | null;
+            steps: components["schemas"]["PatternPipelineStep"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PatternPipelineList: {
+            items: components["schemas"]["PatternPipeline"][];
+        };
+        PatternPipelineStep: {
+            step: components["schemas"]["PatternPipelineStepName"];
+            /** @description 执行顺序；推进按它取下一步，不靠枚举顺序。 */
+            position: number;
+            status: components["schemas"]["PatternPipelineStepStatus"];
+            /** @description 该步骤对应的任务；前端据此轮询进度与错误原文。 */
+            jobId: string | null;
+            /** @description 步骤补充事实（验缝分数、接缝风险提示等），不参与状态机。 */
+            detail: {
+                [key: string]: unknown;
+            } | null;
+            error: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** @enum {string} */
+        PatternPipelineStepName: "SOURCE" | "TILE_CHECK" | "PRINT_PACK" | "LISTING";
+        /** @enum {string} */
+        PatternPipelineStepStatus: "PENDING" | "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+        /** @enum {string} */
+        PatternPipelineStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "AWAITING_INPUT" | "CANCELLED";
+        /** @constant */
+        PatternPipelineBlockReason: "SEAM_RISK";
+        /** @enum {string} */
+        PatternPipelineResolution: "USE_CENTERED" | "ALLOW_SEAM";
+        PatternPipelineAnswers: {
+            /** @description pod-print-specs 目录中的规格 ID。 */
+            specId: string;
+            /** @description 版式；缺省 CENTERED。 */
+            layout?: components["schemas"]["PodPrintLayout"];
+            listingPlatform: components["schemas"]["ListingPlatform"];
+            /**
+             * Format: uuid
+             * @description 文案用的推理 Provider（需支持视觉）。
+             */
+            listingProviderId: string;
+            listingModelId: string;
+            /** @description 卖点与受众补充描述。 */
+            sellingPoints?: string;
+            /** @description 禁用词；同时注入生成提示与结果校验。 */
+            bannedWords?: string;
+        };
+        CreatePatternPipelineInput: {
+            /** @description pod-print-specs 目录中的规格 ID。 */
+            specId: string;
+            /** @description 版式；缺省 CENTERED。 */
+            layout?: components["schemas"]["PodPrintLayout"];
+            listingPlatform: components["schemas"]["ListingPlatform"];
+            /**
+             * Format: uuid
+             * @description 文案用的推理 Provider（需支持视觉）。
+             */
+            listingProviderId: string;
+            listingModelId: string;
+            /** @description 卖点与受众补充描述。 */
+            sellingPoints?: string;
+            /** @description 禁用词；同时注入生成提示与结果校验。 */
+            bannedWords?: string;
+            idempotencyKey?: string;
+        };
+        ContinuePatternPipelineInput: {
+            resolution: components["schemas"]["PatternPipelineResolution"];
+        };
     };
     responses: {
         /** @description Request does not match the schema. */
@@ -2442,6 +3119,10 @@ export interface components {
         UserTemplateId: string;
         ModelId: string;
         ModelPortraitId: string;
+        PatternId: string;
+        PrintPackId: string;
+        PipelineId: string;
+        PipelineStep: components["schemas"]["PatternPipelineStepName"];
         SuiteId: string;
         Cursor: string;
     };
@@ -4525,6 +5206,680 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    listPatterns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Global pattern library; entries whose artwork is still being produced are hidden until the artifact lands. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternList"];
+                };
+            };
+        };
+    };
+    noopPatternsPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Method not allowed; patterns are created by extract/forge/upload jobs. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getPattern: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Single pattern with source lineage metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pattern"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deletePattern: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pattern artwork files and record removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updatePattern: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePatternInput"];
+            };
+        };
+        responses: {
+            /** @description Renamed or re-tagged pattern. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pattern"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createPatternExtractJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["CreatePatternExtractJobInput"];
+            };
+        };
+        responses: {
+            /** @description Extract job accepted (or an existing job reused for an identical request). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    createPatternForgeJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePatternForgeJobInput"];
+            };
+        };
+        responses: {
+            /** @description Forge job accepted (or an existing job reused for an identical request). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    createPrintPackJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePrintPackJobInput"];
+            };
+        };
+        responses: {
+            /** @description Existing identical print pack job reused. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatePrintPackJobResponse"];
+                };
+            };
+            /** @description Print pack job accepted. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatePrintPackJobResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    createPatternDeriveJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePatternDeriveJobInput"];
+            };
+        };
+        responses: {
+            /** @description Existing identical derive job reused (its derived pattern still exists). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Derive job accepted; runs locally in the worker without provider cost. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    createPatternVariantJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePatternVariantJobInput"];
+            };
+        };
+        responses: {
+            /** @description Existing identical variant job reused (its derived patterns still exist). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Variant job accepted; each candidate becomes a new pattern whose lineage points at the source. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    createPatternTileCheckJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Existing identical tileability check reused (same pattern artwork and algorithm version). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Tileability check accepted; runs locally in the worker at no provider cost and never modifies the artwork. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listPatternPrintPacks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print packs generated for this pattern, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintPackList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPrintPack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printPackId: components["parameters"]["PrintPackId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print pack with its current status and artifact files. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintPack"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createPatternListingJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePatternListingJobInput"];
+            };
+        };
+        responses: {
+            /** @description Listing copy job accepted (or an existing job reused for an identical request). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getPatternListingResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Validated listing copy for the requested pattern. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternListingResult"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listPatternPipelines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Packaging pipelines recorded for this pattern, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternPipelineList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createPatternPipeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePatternPipelineInput"];
+            };
+        };
+        responses: {
+            /** @description An in-flight pipeline with identical answers was reused; finished pipelines are never reused because re-running is an explicit intent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternPipeline"];
+                };
+            };
+            /** @description Pipeline created and its first step enqueued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternPipeline"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getPatternPipeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pipelineId: components["parameters"]["PipelineId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pipeline receipt with per-step status, detail and error text. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternPipeline"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    continuePatternPipeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pipelineId: components["parameters"]["PipelineId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContinuePatternPipelineInput"];
+            };
+        };
+        responses: {
+            /** @description Resolution accepted and the next step enqueued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternPipeline"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    retryPatternPipelineStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pipelineId: components["parameters"]["PipelineId"];
+                step: components["parameters"]["PipelineStep"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Step restarted. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternPipeline"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    cancelPatternPipeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pipelineId: components["parameters"]["PipelineId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pipeline receipt after cancellation; already terminal pipelines are returned unchanged. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternPipeline"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listPodPrintSpecs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deterministic print-spec catalog; entries carry source notes and a catalog version that flows into every pack manifest. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PodPrintSpecList"];
+                };
+            };
+        };
+    };
+    getPatternFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patternId: components["parameters"]["PatternId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pattern artwork (transparent PNG). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPrintPackFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printPackId: components["parameters"]["PrintPackId"];
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print pack artifact by file index (print-ready PNG or manifest JSON). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "application/json": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    uploadPattern: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description 花型图稿（建议透明底 PNG）。
+                     */
+                    file?: string;
+                    name?: string;
+                    /** @description JSON 数组字符串形式的标签列表。 */
+                    tags?: string;
+                    /** @description 可选的成包答案（PatternPipelineAnswers 的 JSON 字符串）；带上时上传完成后立即起跑成包流水线。 */
+                    pipeline?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Pattern stored directly into the library (source UPLOADED). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pattern"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
         };
     };
 }

@@ -16,6 +16,8 @@ export const LIBRARY_KIND_OPTIONS: Array<{ label: string; value: LibraryKindFilt
   { label: "生成", value: "GENERATED" },
   { label: "分层", value: "LAYER" },
   { label: "模特", value: "MODEL" },
+  { label: "花型", value: "PATTERN" },
+  { label: "规格包", value: "PRINT_PACK" },
 ];
 
 /** 资产库视图行：服务端已提供完整的可访问 url 与缩略图 url，前端不再二次拼装。 */
@@ -104,7 +106,7 @@ export function adaptLibraryItem(raw: unknown): LibraryItem | null {
   const createdAt = asString(record.createdAt);
   if (!id || !url || !thumbnailUrl || !createdAt) return null;
   if (source !== "UPLOADED" && source !== "GENERATED" && source !== "MODEL") return null;
-  if (kind !== "PRODUCT" && kind !== "REFERENCE" && kind !== "GENERATED" && kind !== "LAYER" && kind !== "MODEL") return null;
+  if (kind !== "PRODUCT" && kind !== "REFERENCE" && kind !== "GENERATED" && kind !== "LAYER" && kind !== "MODEL" && kind !== "PATTERN" && kind !== "PRINT_PACK") return null;
   return {
     id,
     source,

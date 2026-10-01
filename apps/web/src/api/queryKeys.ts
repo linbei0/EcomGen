@@ -22,6 +22,13 @@ export const qk = {
   /** 全局模特库：列表与单模特详情、候选列表按模特隔离。 */
   models: ["models"] as const,
   modelPortraits: (id: string) => ["models", id, "portraits"] as const,
+  /** 全局花型库：列表、规格目录与按花型隔离的规格包/文案结果。 */
+  patterns: ["patterns"] as const,
+  podPrintSpecs: ["pod", "print-specs"] as const,
+  printPacks: (patternId: string) => ["patterns", patternId, "print-packs"] as const,
+  patternListingJob: (patternId: string, jobId: string) => ["patterns", patternId, "listing-jobs", jobId] as const,
+  /** 成包流水线：列表按花型隔离；重跑/裁决/取消后失效这一条列表键即完成刷新。 */
+  patternPipelines: (patternId: string) => ["patterns", patternId, "pipelines"] as const,
   projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,
   project: (id: string) => ["projects", id] as const,
   /** 资产库分页查询：类型/关键词/来源项目/素材用途全部进 key，筛选变化即从首个游标重新查询。 */

@@ -11,7 +11,7 @@ export class LocalAssetStore {
   }
 
   public async initialize(): Promise<void> {
-    await Promise.all(["assets", "outputs", "exports", "edits", "layers", "thumbs", "tmp", "suite-forge"].map((part) => mkdir(join(this.root, part), { recursive: true })));
+    await Promise.all(["assets", "outputs", "exports", "edits", "layers", "thumbs", "tmp", "suite-forge", "patterns", "print-packs"].map((part) => mkdir(join(this.root, part), { recursive: true })));
   }
 
   public async putAsset(projectId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
@@ -85,6 +85,27 @@ export class LocalAssetStore {
     return { path: relativePath, hash };
   }
 
+  /** 花型产物：提取结果、起稿候选或上传的花型文件；按 pattern 聚合，随花型删除级联清理。 */
+  public async putPatternArtifact(patternId: string, name: string, content: Buffer, extension = ".png"): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const relativePath = join("patterns", patternId, `${name}-${hash.slice(0, 12)}${this.safeExtension(extension)}`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
+  /** 提取/起稿的源图留痕：同 job 的源图与产物共居 patterns/<patternId>/，保证来源可追溯。 */
+  public async putPatternSource(patternId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
+    return this.putPatternArtifact(patternId, "source", content, this.safeExtension(originalName) || ".png");
+  }
+
+  /** 规格包产物（印刷图稿 PNG 与 manifest/ZIP）；按 printPack 聚合，随规格包删除级联清理。 */
+  public async putPrintPackArtifact(printPackId: string, name: string, content: Buffer, extension = ".png"): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const relativePath = join("print-packs", printPackId, `${name}-${hash.slice(0, 12)}${this.safeExtension(extension)}`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
   /** 缩略图按内容 hash 寻址：同一张图跨项目共享一份，删除项目不影响派生缓存。 */
   public thumbnailPath(hash: string): string {
     return join("thumbs", `${hash}.webp`);
@@ -141,6 +162,18 @@ export class LocalAssetStore {
   public async deleteModel(modelId: string): Promise<void> {
     this.assertSingleSegment(modelId, "Model id");
     await this.deleteNamespaceChild("models", modelId);
+  }
+
+  /** 永久删除花型的全部本地文件：源图留痕与花型产物（patterns/<patternId>/ 整目录）。 */
+  public async deletePattern(patternId: string): Promise<void> {
+    this.assertSingleSegment(patternId, "Pattern id");
+    await this.deleteNamespaceChild("patterns", patternId);
+  }
+
+  /** 永久删除规格包的全部本地文件（print-packs/<printPackId>/ 整目录）。 */
+  public async deletePrintPack(printPackId: string): Promise<void> {
+    this.assertSingleSegment(printPackId, "Print pack id");
+    await this.deleteNamespaceChild("print-packs", printPackId);
   }
 
   /** id 来自 URL 参数并直接参与拼路径，是路径穿越的高危入口：强制单段目录名，杜绝 `../` 等形态进入递归删除。 */

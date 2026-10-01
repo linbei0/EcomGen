@@ -30,7 +30,6 @@ import {
   useDeleteModel,
   useDeleteModelPortrait,
   useDeleteReferenceFace,
-  useModelCastJob,
   useModelPortraits,
   useModels,
   useSelectModelPortrait,
@@ -38,20 +37,17 @@ import {
   type EcomModel,
   type ModelPortrait,
 } from "../../api/hooks/useModels";
+import { useJobStatus } from "../../api/hooks/useJobs";
 import { qk } from "../../api/queryKeys";
 import { useProviders } from "../../api/hooks/useProviders";
 import { AppTopbar } from "../../components/AppTopbar";
 import { errorText } from "../../lib/errorText";
+import { jobErrorText } from "../../lib/jobError";
 import { formatShortDate } from "../../lib/format";
 import { MODEL_IDENTITY_FILTERS, matchesModelIdentity, type ModelIdentityFilters, type ModelIdentityKey } from "../../lib/modelIdentityFilters";
 import { modelOptions } from "../../lib/modelOptions";
 import { ModelDesigner } from "./ModelDesigner";
 import styles from "./ModelsPage.module.css";
-
-function jobMessage(job: { error?: unknown } | undefined): string | null {
-  const error = job?.error as { message?: unknown } | null | undefined;
-  return typeof error?.message === "string" && error.message ? error.message : null;
-}
 
 /** 模特定妆照是人像摄影，只保留竖构图与方形画幅；横版（3:2/4:3/16:9/21:9）没有业务意义。 */
 const MODEL_ASPECT_RATIOS: ReadonlyArray<string> = ["AUTO", "2:3", "3:4", "4:5", "9:16", "1:1"];
@@ -124,7 +120,7 @@ export function ModelsPage() {
   const activeDimensions = Object.keys(identityFilters).length;
   const portraitsQuery = useModelPortraits(selected?.id);
   const portraits = useMemo(() => portraitsQuery.data?.items ?? [], [portraitsQuery.data]);
-  const castJob = useModelCastJob(castJobId ?? undefined);
+  const castJob = useJobStatus(castJobId ?? undefined);
 
   const setIdentityFilter = (key: ModelIdentityKey, value: string | null) => {
     setIdentityFilters((current) => {
@@ -162,7 +158,7 @@ export function ModelsPage() {
     }
     void queryClient.invalidateQueries({ queryKey: qk.models });
     if (status === "SUCCEEDED") message.success("定妆照已生成");
-    else message.error(`定妆照生成失败：${jobMessage(castJob.data) ?? "请检查生图模型配置"}`);
+    else message.error(`定妆照生成失败：${jobErrorText(castJob.data) ?? "请检查生图模型配置"}`);
     // selected 只用来定位失效范围，其引用变化不应重触发本 effect。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [castJobId, castJob.data, message, queryClient]);

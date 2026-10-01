@@ -67,6 +67,23 @@ export const COPYWRITING_INSTRUCTION_SCHEMA: StructuredOutputSchema = {
   },
 };
 
+/** 花型 Listing 文案的产出契约；字段与 contracts 的 ListingCopy 对齐，平台字数硬校验在 validateListingCopy。 */
+export const LISTING_COPY_SCHEMA: StructuredOutputSchema = {
+  name: "ecomgen_listing_copy",
+  schema: {
+    type: "object",
+    ...noAdditionalProperties,
+    properties: {
+      platform: { type: "string", enum: ["ETSY", "AMAZON", "TIKTOK_SHOP"] },
+      title: { type: "string" },
+      tags: { type: "array", items: { type: "string" } },
+      description: { type: "string" },
+      bullets: { type: "array", items: { type: "string" } },
+    },
+    required: ["platform", "title", "tags", "description", "bullets"],
+  },
+};
+
 export const EDIT_PLAN_OUTPUT_SCHEMA: StructuredOutputSchema = {
   name: "ecomgen_edit_plan",
   schema: {

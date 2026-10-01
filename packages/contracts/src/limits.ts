@@ -40,3 +40,49 @@ export const MODEL_AURA_MAX = 3;
 
 /** 单次选角生成的候选张数上限，与项目生成批次语义一致。 */
 export const MODEL_CAST_CANDIDATES_MAX = 4;
+
+// ---- 花型工坊（POD）----
+
+/** 花型名称长度上限。 */
+export const MAX_PATTERN_NAME_LENGTH = 60;
+
+/** 花型标签数量与单条长度上限；标签进入资产库筛选与 listing 生成上下文。 */
+export const PATTERN_TAGS_MAX = 8;
+export const MAX_PATTERN_TAG_LENGTH = 24;
+
+/** 提取补充描述 / 起稿主题描述长度上限；进入分割提示或起稿 prompt 编译。 */
+export const MAX_PATTERN_BRIEF_LENGTH = 2000;
+
+/** 单次 AI 起稿的候选张数上限，与选角、生成批次语义一致。 */
+export const PATTERN_FORGE_CANDIDATES_MAX = 4;
+
+/** 起稿可选风格画种数量上限；风格词表在 pod-schemas 维护，这里只约束引用长度。 */
+export const MAX_PATTERN_STYLE_LENGTH = 60;
+
+/**
+ * 单次生成式衍生（画风 / 构图）的候选张数上限。
+ * 与起稿分开命名：两者是付费生图，但成本口径不同——衍生会带上源花型作为参考图。
+ */
+export const PATTERN_VARIANT_CANDIDATES_MAX = 4;
+
+// ---- Listing 文案平台硬约束（首版跨境三平台）----
+// 数值来自平台官方规范（见 docs/reference/pod-domain-research.md 第 3 节），
+// 生成与校验共用同一份数值，改平台规则时只动这里。
+
+export const LISTING_PLATFORMS = ["ETSY", "AMAZON", "TIKTOK_SHOP"] as const;
+
+/** Etsy：标题 ≤140 字符，13 个 tags 每个 ≤20 字符。 */
+export const ETSY_TITLE_MAX = 140;
+export const ETSY_TAGS_MAX = 13;
+export const ETSY_TAG_MAX_LENGTH = 20;
+
+/** Amazon Merch：标题上限 75 字符（平台正收紧至该值）。 */
+export const AMAZON_TITLE_MAX = 75;
+
+/** TikTok Shop：标题 25–200 字符。 */
+export const TIKTOK_TITLE_MIN = 25;
+export const TIKTOK_TITLE_MAX = 200;
+
+/** Listing 卖点补充、必含词与禁用词输入的长度上限。 */
+export const MAX_LISTING_SELLING_POINTS_LENGTH = 2000;
+export const MAX_LISTING_KEYWORDS_LENGTH = 500;

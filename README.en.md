@@ -29,6 +29,9 @@ EcomGen is a local-first AI e-commerce image suite workbench for individual sell
 - **Editing workbench**: output-branch editing with masked inpaint, product replacement, scene adjust, outpaint, references, and versioned edit sessions.
 - **AI layering & multi-format export**: automatically recognize elements and export per-layer PNG, ZIP, and PSD files with visibility toggling, ordering, and history.
 - **Global asset library**: browse uploads, generated outputs, and layer files across all projects, and reuse any of them in another project.
+- **Model library**: create model identities (gender, age, heritage, stature, build) and cast them into consistent multi-pose portraits and scene shots.
+- **Pattern Studio**: extract a pattern from a product photo, forge one from a prompt, or upload your own POD pattern asset; supports deterministic recoloring, style/composition variants, **local tiling verification** (a pixel-comparison verdict of tileable / visible seam that never modifies the artwork), 300DPI print packs with mockups per print spec, and vision-based cross-border listing copy.
+- **Packaging pipeline**: answer three questions (print spec, layout, target platform) and the chain from tiling check to print pack to listing copy runs on its own, leaving a per-step receipt that can be re-run individually; a full-bleed print with a failed tiling check stops for a user decision instead of silently downgrading.
 - **Review & export**: manually review results, then package everything into a ZIP with a `manifest.json`.
 
 ## Workflow
@@ -53,6 +56,9 @@ The API validates, persists, and enqueues; Pi Agent understands business rules a
 | `/`              | Project gallery | Create, archive, restore, and delete projects; open Suite Forge, asset library, settings |
 | `/projects/:id`  | Project workbench | Setup → Storyboard → Results: assets, planning, generation, editing, layering, export |
 | `/library`       | Global asset library | Manage assets, outputs, and layer files across all projects                        |
+| `/models`        | Model library  | Create and manage model identities; cast them into consistent portraits and scenes    |
+| `/patterns`      | Pattern Studio | POD pattern assets: extract, forge, upload, derive, verify tiling, print packs, listing copy |
+| `/patterns/:patternId` | Pattern workspace | Preview artwork/tiling/print pack, run the three-answer packaging pipeline, review lineage |
 | `/suite-forge`   | Suite Forge    | Upload a viral suite and reverse-engineer it into a reusable suite template           |
 
 ## Tech stack

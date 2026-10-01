@@ -1,0 +1,634 @@
+/* 花型工坊页面。约束：不做左侧功能树——三个入花动作一行排开，主体是花型墙网格，
+   操作集中在右侧抽屉；区域用竖线与间距层级区分，风格与模特库同族。
+   深色层级纪律：面板一律 var(--bg-1)、浮出层 var(--bg-2)，强调色只出现在
+   选中态、主按钮、进行中徽标三处。 */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-0);
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 筛选栏：搜索 + 来源 chips + 标签多选 + 批量开关，只在墙上有内容时出现。 */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterSearch {
+  width: 210px;
+}
+
+.chipRow {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 3px 10px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.chip:hover {
+  border-color: var(--line-2);
+  color: var(--text-1);
+}
+
+.chipActive {
+  border-color: var(--accent-line);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+/* 批量模式的卡片勾选态与角标。 */
+.cardBatchChecked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+
+.batchCheck {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #141414;
+}
+
+/* 批量操作条：底部居中浮出，层级高于内容低于遮罩。 */
+.batchBar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--bg-2);
+  box-shadow: var(--shadow-pop);
+}
+
+.batchCount {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 500;
+  padding: 0 4px;
+}
+
+.batchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-1);
+  font-size: 12px;
+}
+
+.batchRowName {
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 进行中指示：轻量 chip，替代整行横幅——占位卡本身已经在墙内承担进度反馈。 */
+.runningChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: var(--accent-subtle);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.runningDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: runningPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes runningPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  grid-auto-rows: min-content;
+  gap: 14px;
+  align-content: start;
+  padding-bottom: 24px;
+}
+
+.card {
+  border: 1px solid var(--line-1);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg-1);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.card:hover {
+  border-color: var(--line-2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pop);
+}
+
+.card:focus-visible {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+
+.thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  background:
+    linear-gradient(45deg, var(--line-1) 25%, transparent 25%, transparent 75%, var(--line-1) 75%),
+    linear-gradient(45deg, var(--line-1) 25%, transparent 25%, transparent 75%, var(--line-1) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* 平铺预览：叠加在棋盘格上的一层 repeat 背景，透明像素透出棋盘格。 */
+.tileBg {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+  background-size: 33.3% auto;
+  background-position: center;
+}
+
+/* 生成占位卡：与花型卡同构的骨架，底纹 + 流光 + 真实任务进度。 */
+.placeholderThumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  background-repeat: repeat;
+  background-size: 42px auto;
+  background-position: center;
+  background-color: var(--bg-1);
+}
+
+.thumbShimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(237, 236, 230, 0.06) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: thumbShimmer 1.8s linear infinite;
+}
+
+@keyframes thumbShimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -80% 0; }
+}
+
+.placeholderBody {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.placeholderStage {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* 卡片底部快捷操作条：悬停或聚焦时显形（与资产库的 hover 显形按钮同族）。 */
+.cardActions {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 18px 8px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.62));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.card:hover .cardActions,
+.card:focus-within .cardActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cardActionBtn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.cardActionBtn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.cardActionBtnActive {
+  color: var(--accent);
+}
+
+.badges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  gap: 4px;
+}
+
+.badge {
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg-0) 72%, transparent);
+  backdrop-filter: blur(4px);
+  color: var(--text-2);
+}
+
+/* 可平铺判定徽标：本地验缝写出的结论，是事实而不是装饰，因此只在有判定时渲染。 */
+.badgeOk {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 24%, transparent);
+}
+
+.badgeWarn {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 24%, transparent);
+}
+
+/* 卡片上的删除入口：悬停或键盘聚焦时显现。抽屉里的删除藏在二次点击之后，
+   卡片墙角图标是删除功能的第一发现路径。 */
+.cardDelete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg-0) 72%, transparent);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+
+.card:hover .cardDelete,
+.cardDelete:focus-visible {
+  opacity: 1;
+}
+
+.cardDelete:hover {
+  background: var(--danger);
+}
+
+.cardBody {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardTags {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 空状态：Hero Patterns 地形底纹的品牌时刻，主 CTA 直接给出两条入花路径。 */
+.empty {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line-1);
+  border-radius: 14px;
+  padding: 64px 32px;
+  text-align: center;
+  background-color: var(--bg-1);
+  background-repeat: repeat;
+  background-size: 220px auto;
+  background-position: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.emptyGlyph {
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.emptyDesc {
+  margin: 0;
+  max-width: 430px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+.emptyActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.emptyHint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* 加载与错误态：与空态同占一整行。 */
+.skeletonGrid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 14px;
+}
+
+.state {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line-1);
+  border-radius: 14px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-2);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+/* 整页拖拽遮罩：drop 事件由页面容器承接，这里只是视觉层。 */
+.dropOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg-0) 68%, transparent);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.dropFrame {
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  padding: 40px 64px;
+  background: var(--accent-subtle);
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--accent);
+}
+
+/* ---- 批量对话框与复制行（详情视图已迁往 PatternWorkspacePage） ---- */
+
+.formHint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* 「接着成包」折叠区：默认收起，勾选后才展开答案字段，常规"先拿花型"的路径不受影响。 */
+.pipelineToggle {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-2);
+}
+
+.pipelineToggle .formRow {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+.copyRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.copyLabel {
+  flex: 0 0 52px;
+  color: var(--text-3);
+  padding-top: 2px;
+}
+
+.copyValue {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-1);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* 状态徽标：rail 内所有"跑到哪一步"的展示共用一套。五态只表状态，不参与强调——唯一强调色留给主按钮。 */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 8px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.statusNeutral {
+  border-color: var(--line-1);
+  background: var(--bg-2);
+  color: var(--text-3);
+}
+
+.statusBusy {
+  border-color: var(--accent-line);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.statusOk {
+  border-color: color-mix(in srgb, var(--success) 42%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+}
+
+.statusFailed {
+  border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+/* 停等不是故障：用告警色而不是错误色，与 AWAITING_INPUT 的语义对齐。 */
+.statusBlocked {
+  border-color: color-mix(in srgb, var(--warning) 42%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+}
+
+/* 节标题行 = 标题 + 状态徽标 + 下方细线；吸顶变体给 rail 主路径节，滚动收据时标题留在栏顶。 */
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.sectionHeadSticky {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: var(--bg-1);
+}
+
+.sectionHeadTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .cardActions,
+  .cardDelete,
+  .cardActionBtn {
+    transition: none;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+
+  .thumbShimmer {
+    animation: none;
+  }
+
+  .runningDot {
+    animation: none;
+  }
+}

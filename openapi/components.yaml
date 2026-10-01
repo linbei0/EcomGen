@@ -77,6 +77,33 @@ components:
       schema:
         type: string
         format: uuid
+    PatternId:
+      name: patternId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PrintPackId:
+      name: printPackId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PipelineId:
+      name: pipelineId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PipelineStep:
+      name: step
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PatternPipelineStepName"
     SuiteId:
       name: suiteId
       in: path

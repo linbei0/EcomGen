@@ -27,6 +27,8 @@ type LibraryDateRange = Parameters<NonNullable<React.ComponentProps<typeof Range
 function badgeLabel(source: string, kind: string): string {
   if (kind === "LAYER") return "分层";
   if (kind === "MODEL") return "模特";
+  if (kind === "PATTERN") return "花型";
+  if (kind === "PRINT_PACK") return "规格包";
   if (source === "GENERATED") return "生成";
   return kind === "PRODUCT" ? "商品" : "参考";
 }
@@ -174,6 +176,12 @@ export function LibraryPage() {
     for (const itemId of selected) {
       const item = byId.get(itemId);
       if (!item) continue;
+      // 花型与规格包是全局领域资产，不是项目素材；加入项目只对项目域四类成立。
+      if (item.kind === "PATTERN" || item.kind === "PRINT_PACK") {
+        failed += 1;
+        if (!firstError) firstError = "花型与规格包不归属项目，无法加入项目素材";
+        continue;
+      }
       try {
         await copy.mutateAsync({
           projectId: targetProjectId,
@@ -223,7 +231,7 @@ export function LibraryPage() {
                 ? "正在读取素材…"
                 : filterActive
                   ? `筛选后 ${total} 张`
-                  : `共 ${total} 张 · 覆盖上传素材、生成结果与模特定妆照`}
+                  : `共 ${total} 张 · 覆盖上传素材、生成结果、模特与花型产物`}
             </p>
           </div>
           <Button

@@ -14,8 +14,8 @@ import type { FalSegmentationResult } from "./fal.js";
  *   再按官方 JS 样例（rleDecode）的变长编码解码——与 pycocotools C 仅符号位不同（0x10 vs 0x40，
  *   2026-09 用真实响应实测校准：0x10 时游程总和恰好等于 mask 面积且解出 bbox 与服务端一致）；
  *   展开顺序是列主序（Fortran），需转置为行主序灰度图。
- * - mask.size 遵循 COCO 惯例 [height, width]；bbox 是原图像素坐标 [x1, y1, x2, y2]，
- *   归一化时假设 mask.size 与原图一致（文档示例一致；如真实响应不符需在此换算）。
+ * - mask.size 是 [width, height]（与 COCO 的 [height, width] 相反，2026-09-30 非正方形真实响应实测）；
+ *   bbox 是原图像素坐标 [x1, y1, x2, y2]，按 size 两维归一化。
  * - 分割按次计费：只提交一次，网络失败/超时如实上报，不自动重发；探测绝不执行模型。
  */
 export const GITEE_SAM3_SEGMENTATION_PATH = "images/segmentation";
@@ -73,7 +73,11 @@ export class GiteeSam3SegmentationProvider {
     if (!segment?.mask) throw new ProviderError("gitee sam3 response does not contain a segment mask", 502);
     const size = segment.mask.size;
     if (!isSizePair(size) || typeof segment.mask.counts !== "string") throw new ProviderError("gitee sam3 mask is missing size or counts", 502);
-    const [maskHeight, maskWidth] = size;
+    // size 是 [width, height]，不是 COCO 的 [height, width]：2026-09-30 用真实非正方形响应实测
+    // （size [1440,1920] 对应 1440×1920 原图，游程列主序步长为 size[1]=1920，且首个前景列
+    // 686248/1920≈357 与 bbox x1≈354.6 吻合）；按 [height,width] 解释时非正方形蒙版会被
+    // 错列折叠成竖条纹碎片，正方形则恰好不受影响——曾因此产出整幅碎裂的花型且任务照常 SUCCEEDED。
+    const [maskWidth, maskHeight] = size;
     const gray = unpackRleMask(decodeRleCounts(segment.mask.counts), maskWidth, maskHeight);
     return {
       mask: { data: gray, mimeType: "raw/gray8", width: maskWidth, height: maskHeight },

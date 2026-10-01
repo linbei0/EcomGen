@@ -7,12 +7,15 @@ import sharp from "sharp";
 
 // App 级端点测试的边界在 Redis/BullMQ：状态真相是 SQLite 与 REST 响应，
 // 入队只需要确认发生且方向正确，不应要求本地真实 Redis。
-vi.mock("@ecomgen/jobs", async () => {
+vi.mock("@ecomgen/jobs", async (importOriginal) => {
+  // queueKindForJobType 等纯映射用真实现（mock 缺导出会让所有入队路由 500），只有连接与队列是替身。
+  const actual = await importOriginal<typeof import("@ecomgen/jobs")>();
   const connection = { duplicate: () => connection, quit: async () => { } };
   return {
+    ...actual,
     QUEUE_NAME: "ecomgen-test",
     createRedisConnection: () => connection,
-    createJobQueue: () => ({ close: async () => { } }),
+    createJobQueue: () => ({ close: async () => { }, getJob: async () => undefined }),
     enqueue: vi.fn(async () => { }),
     RedisProjectEventBus: class {
       public async publish(projectId: string, type: string, data: unknown) {
@@ -28,7 +31,7 @@ vi.mock("@ecomgen/jobs", async () => {
 
 import type { FastifyInstance } from "fastify";
 import { EcomRepository, LocalAssetStore, openDatabase } from "@ecomgen/core";
-import { MODEL_SPEC_DEFAULTS } from "@ecomgen/contracts";
+import { MODEL_SPEC_DEFAULTS, POD_MOCKUP_SCENE_VERSION, TILEABILITY_ALGORITHM_VERSION } from "@ecomgen/contracts";
 import { buildApi, resolveCorsOrigins } from "./app.js";
 import { enqueue } from "@ecomgen/jobs";
 
@@ -36,6 +39,22 @@ let dataDir = "";
 let database: ReturnType<typeof openDatabase>;
 let repository: EcomRepository;
 let app: FastifyInstance;
+
+/** 直接落一条花型供路由用；storagePath 传 null 模拟提取/起稿在途（尚无图稿）。三个花型 describe 共用。 */
+function seedPattern(name: string, storagePath: string | null = "patterns/seed.png") {
+  return repository.createPattern({
+    name,
+    sourceType: "UPLOADED",
+    sourceJobId: null,
+    sourceAssetHash: null,
+    parentPatternId: null,
+    storagePath,
+    fileHash: storagePath ? `hash-${name}` : null,
+    width: storagePath ? 800 : null,
+    height: storagePath ? 800 : null,
+    tags: [],
+  });
+}
 
 beforeEach(async () => {
   dataDir = mkdtempSync(join(tmpdir(), "ecomgen-api-test-"));
@@ -984,5 +1003,349 @@ describe("POST /api/v1/projects/:projectId/storyboard/confirm 版本校验", () 
     const current = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/storyboard/confirm`, payload: { version } });
     expect(current.statusCode).toBe(200);
     expect(repository.getStoryboard(project.id)).toMatchObject({ status: "CONFIRMED", version });
+  });
+});
+
+describe("POST /api/v1/patterns/:patternId/print-pack-jobs 场景版本复用", () => {
+  it("SUCCEEDED 包场景版本落后时同指纹新建；当前场景版本的包照常 200 复用", async () => {
+    const pattern = seedPattern("stale-scene");
+    const first = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/print-pack-jobs`, payload: { specId: "mug-11oz-wrap" } });
+    expect(first.statusCode).toBe(202);
+    const firstJobId = first.json<{ job: { id: string } }>().job.id;
+
+    // 模拟旧场景渲染的已完成包：任务终态 SUCCEEDED，manifest.mockupScene 落后于当前版本
+    repository.updateJob(firstJobId, { status: "SUCCEEDED", progress: 100 });
+    const stalePack = repository.getPrintPackByJobId(firstJobId);
+    expect(stalePack).toBeDefined();
+    repository.updatePrintPack(stalePack!.id, { status: "SUCCEEDED", manifest: { mockupScene: "2000.01" } });
+
+    const second = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/print-pack-jobs`, payload: { specId: "mug-11oz-wrap" } });
+    expect(second.statusCode).toBe(202);
+    expect(second.json<{ job: { id: string } }>().job.id).not.toBe(firstJobId);
+
+    // 新建包渲染完成后（manifest 带当前场景版本），同指纹请求回到 200 复用
+    const newJobId = second.json<{ job: { id: string } }>().job.id;
+    repository.updateJob(newJobId, { status: "SUCCEEDED", progress: 100 });
+    repository.updatePrintPack(repository.getPrintPackByJobId(newJobId)!.id, { status: "SUCCEEDED", manifest: { mockupScene: POD_MOCKUP_SCENE_VERSION } });
+    const reuse = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/print-pack-jobs`, payload: { specId: "mug-11oz-wrap" } });
+    expect(reuse.statusCode).toBe(200);
+    expect(reuse.json<{ job: { id: string } }>().job.id).toBe(newJobId);
+  });
+
+  it("FAILED 任务不放行复用，同指纹重提走新建", async () => {
+    const pattern = seedPattern("failed-pack");
+    const first = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/print-pack-jobs`, payload: { specId: "poster-18x24" } });
+    const jobId = first.json<{ job: { id: string } }>().job.id;
+    repository.updateJob(jobId, { status: "FAILED", progress: 100, error: { message: "boom" } });
+
+    const second = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/print-pack-jobs`, payload: { specId: "poster-18x24" } });
+    expect(second.statusCode).toBe(202);
+    expect(second.json<{ job: { id: string } }>().job.id).not.toBe(jobId);
+  });
+});
+
+describe("POST /api/v1/patterns/:patternId/tile-check-jobs 验缝", () => {
+  it("无图稿的花型拒绝验缝，不产生任务", async () => {
+    const pattern = seedPattern("no-artwork", null);
+    const response = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/tile-check-jobs` });
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ error: { code: string } }>().error.code).toBe("CONFLICT");
+
+    const unknown = await app.inject({ method: "POST", url: `/api/v1/patterns/${randomUUID()}/tile-check-jobs` });
+    expect(unknown.statusCode).toBe(404);
+  });
+
+  it("同花型同算法版本复用任务，判定随花型下发且新花型默认 NONE", async () => {
+    const pattern = seedPattern("tile-check", "patterns/tile.png");
+    // 新入库花型不带上任何"已验过"的假定
+    expect(pattern).toMatchObject({ tileable: "NONE", tileableScore: null, tileableCheckedWith: null });
+
+    const first = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/tile-check-jobs` });
+    expect(first.statusCode).toBe(202);
+    expect(first.json<{ type: string }>().type).toBe("PATTERN_TILE_CHECK");
+    const jobId = first.json<{ id: string }>().id;
+
+    // 在途重复提交复用同一任务，不重复入队
+    const second = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/tile-check-jobs` });
+    expect(second.statusCode).toBe(202);
+    expect(second.json<{ id: string }>().id).toBe(jobId);
+
+    // 判定回写后：任务终态复用返回 200，判定与算法版本随花型列表下发
+    repository.setPatternTileable(pattern.id, { status: "FAILED", score: 0.2, algorithmVersion: TILEABILITY_ALGORITHM_VERSION });
+    repository.updateJob(jobId, { status: "SUCCEEDED", progress: 100 });
+    const third = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/tile-check-jobs` });
+    expect(third.statusCode).toBe(200);
+    expect(third.json<{ id: string }>().id).toBe(jobId);
+
+    const listed = await app.inject({ method: "GET", url: "/api/v1/patterns" });
+    const item = listed.json<{ items: Array<{ id: string }> }>().items.find((entry) => entry.id === pattern.id);
+    expect(item).toMatchObject({ tileable: "FAILED", tileableScore: 0.2, tileableCheckedWith: TILEABILITY_ALGORITHM_VERSION });
+  });
+});
+
+describe("成包流水线（三问一跑）", () => {
+  function pipelineAnswers() {
+    const provider = saveProvider();
+    return { listingProviderId: provider.id, listingModelId: "reasoner" };
+  }
+
+  it("建链按「验缝 → 规格包 → 文案」创建并起跑第一步；进行中的同参数流水线复用，终态后不再复用", async () => {
+    const pattern = seedPattern("pipe-create");
+    const answers = pipelineAnswers();
+
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "CENTERED", listingPlatform: "ETSY", ...answers },
+    });
+    expect(created.statusCode).toBe(202);
+    const pipeline = created.json<{ id: string; status: string; steps: Array<{ id: string; step: string; status: string; jobId: string | null }> }>();
+    // 从既有花型建链时第一问（图案从哪来）已被入口回答，步骤表里没有 SOURCE
+    expect(pipeline.steps.map((entry) => entry.step)).toEqual(["TILE_CHECK", "PRINT_PACK", "LISTING"]);
+    expect(pipeline.steps.map((entry) => entry.status)).toEqual(["QUEUED", "PENDING", "PENDING"]);
+    expect(pipeline.status).toBe("RUNNING");
+
+    const tileStep = pipeline.steps[0]!;
+    expect(tileStep.jobId).toBeTruthy();
+    expect(repository.getJob(tileStep.jobId!)).toMatchObject({ type: "PATTERN_TILE_CHECK", projectId: null });
+    // 规格包与文案的任务此刻不该存在：它们由 worker 在一步成功后推进创建
+    expect(repository.getPrintPackByJobId(pipeline.steps[1]!.jobId ?? "")).toBeUndefined();
+
+    const reusable = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "CENTERED", listingPlatform: "ETSY", ...answers },
+    });
+    expect(reusable.statusCode).toBe(200);
+    expect(reusable.json<{ id: string }>().id).toBe(pipeline.id);
+
+    // 用户重跑是有意义的意图：已完成的流水线不再被静默复用
+    repository.updatePatternPipeline(pipeline.id, { status: "SUCCEEDED" });
+    const rerun = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "CENTERED", listingPlatform: "ETSY", ...answers },
+    });
+    expect(rerun.statusCode).toBe(202);
+    expect(rerun.json<{ id: string }>().id).not.toBe(pipeline.id);
+  });
+
+  it("无图稿花型、未知规格、非视觉文案模型都被挡在建链之前", async () => {
+    const provider = saveProvider();
+    const blank = seedPattern("pipe-blank", null);
+    const specAnswers = { listingProviderId: provider.id, listingModelId: "reasoner" };
+
+    const noArtwork = await app.inject({ method: "POST", url: `/api/v1/patterns/${blank.id}/pipelines`, payload: { specId: "tshirt-front-12x16", listingPlatform: "ETSY", ...specAnswers } });
+    expect(noArtwork.statusCode).toBe(409);
+
+    const pattern = seedPattern("pipe-guards");
+    const badSpec = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/pipelines`, payload: { specId: "not-a-spec", listingPlatform: "ETSY", ...specAnswers } });
+    expect(badSpec.statusCode).toBe(400);
+
+    // 文案步骤要读花型图，纯生图模型（supportsVision=false）不能接文案
+    const blind = await app.inject({ method: "POST", url: `/api/v1/patterns/${pattern.id}/pipelines`, payload: { specId: "tshirt-front-12x16", listingPlatform: "ETSY", listingProviderId: provider.id, listingModelId: "image" } });
+    expect(blind.statusCode).toBe(422);
+    expect(blind.json<{ error: { code: string } }>().error.code).toBe("CAPABILITY_UNSUPPORTED");
+  });
+
+  it("满印验缝未通过时停在 AWAITING_INPUT，两个出口都明确可选", async () => {
+    const pattern = seedPattern("pipe-seam");
+    const answers = pipelineAnswers();
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "TILE", listingPlatform: "ETSY", ...answers },
+    });
+    const pipeline = created.json<{ id: string; steps: Array<{ id: string; step: string }> }>();
+
+    // 模拟 worker 判定：验缝未通过，流水线停在 AWAITING_INPUT，规格包不被起跑
+    const tileStep = repository.getPatternPipeline(pipeline.id)!.steps.find((entry) => entry.step === "TILE_CHECK")!;
+    repository.updatePatternPipelineStep(tileStep.id, { status: "SUCCEEDED", detail: { tileable: "FAILED", warning: "验缝未通过" } });
+    repository.updatePatternPipeline(pipeline.id, { status: "AWAITING_INPUT", blockReason: "SEAM_RISK" });
+
+    const receipt = await app.inject({ method: "GET", url: `/api/v1/pattern-pipelines/${pipeline.id}` });
+    expect(receipt.statusCode).toBe(200);
+    expect(receipt.json<{ status: string; blockReason: string }>()).toMatchObject({ status: "AWAITING_INPUT", blockReason: "SEAM_RISK" });
+
+    // 裁决点只认 /continue：单步重跑不能成为绕过接缝风险直接出满印的暗门
+    const bypass = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/steps/PRINT_PACK/retry` });
+    expect(bypass.statusCode).toBe(409);
+    expect(bypass.json<{ error: { message: string } }>().error.message).toContain("裁决");
+    expect(repository.getPatternPipeline(pipeline.id)!.steps.find((entry) => entry.step === "PRINT_PACK")).toMatchObject({ status: "PENDING", jobId: null });
+
+    // 出口一：改为居中继续。版式必须在建任务之前落库，否则规格包会按旧的满印版式出图
+    const centered = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/continue`, payload: { resolution: "USE_CENTERED" } });
+    expect(centered.statusCode).toBe(202);
+    expect(centered.json<{ status: string; layout: string }>()).toMatchObject({ status: "RUNNING", layout: "CENTERED" });
+    const packStep = repository.getPatternPipeline(pipeline.id)!.steps.find((entry) => entry.step === "PRINT_PACK")!;
+    expect(packStep).toMatchObject({ status: "QUEUED" });
+    expect(repository.getJob(packStep.jobId!)?.input).toMatchObject({ layout: "CENTERED" });
+
+    // 裁决只在 AWAITING_INPUT 时有意义，重复裁决要挡住
+    const again = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/continue`, payload: { resolution: "ALLOW_SEAM" } });
+    expect(again.statusCode).toBe(409);
+  });
+
+  it("仍出满印出口保留 TILE 版式；单步重跑重置下游并拒绝在途步骤与 SOURCE 步骤", async () => {
+    const pattern = seedPattern("pipe-retry");
+    const answers = pipelineAnswers();
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "TILE", listingPlatform: "ETSY", ...answers },
+    });
+    const pipeline = created.json<{ id: string; steps: Array<{ id: string; step: string; status: string }> }>();
+    const tileStep = repository.getPatternPipeline(pipeline.id)!.steps.find((entry) => entry.step === "TILE_CHECK")!;
+    repository.updatePatternPipelineStep(tileStep.id, { status: "SUCCEEDED" });
+    repository.updatePatternPipeline(pipeline.id, { status: "AWAITING_INPUT", blockReason: "SEAM_RISK" });
+
+    const allowSeam = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/continue`, payload: { resolution: "ALLOW_SEAM" } });
+    expect(allowSeam.statusCode).toBe(202);
+    expect(allowSeam.json<{ layout: string }>().layout).toBe("TILE");
+
+    const packStep = repository.getPatternPipeline(pipeline.id)!.steps.find((entry) => entry.step === "PRINT_PACK")!;
+    // 在途步骤不能重跑：会与正在执行的 worker 争抢同一份领域记录
+    const inFlight = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/steps/PRINT_PACK/retry` });
+    expect(inFlight.statusCode).toBe(409);
+
+    // 重跑验缝：该步与其下游一起回到 PENDING，再按 position 重新起跑验缝本身
+    const retried = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/steps/TILE_CHECK/retry` });
+    expect(retried.statusCode).toBe(202);
+    const steps = repository.getPatternPipeline(pipeline.id)!.steps;
+    expect(steps.find((entry) => entry.step === "TILE_CHECK")).toMatchObject({ status: "QUEUED" });
+    expect(steps.find((entry) => entry.step === "PRINT_PACK")).toMatchObject({ status: "PENDING", jobId: null });
+    expect(steps.find((entry) => entry.step === "LISTING")).toMatchObject({ status: "PENDING" });
+
+    const unknownStep = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/steps/NOPE/retry` });
+    expect(unknownStep.statusCode).toBe(400);
+  });
+
+  it("取消流水线先终止在途任务，再把余下步骤与流水线一起置为取消", async () => {
+    const pattern = seedPattern("pipe-cancel");
+    const answers = pipelineAnswers();
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/v1/patterns/${pattern.id}/pipelines`,
+      payload: { specId: "tshirt-front-12x16", layout: "CENTERED", listingPlatform: "ETSY", ...answers },
+    });
+    const pipeline = created.json<{ id: string; steps: Array<{ id: string; jobId: string | null }> }>();
+    const tileJobId = pipeline.steps[0]!.jobId!;
+
+    const cancelled = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/cancel` });
+    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.json<{ status: string }>().status).toBe("CANCELLED");
+    expect(repository.getJob(tileJobId)?.cancelRequested).toBe(true);
+    const steps = repository.getPatternPipeline(pipeline.id)!.steps;
+    expect(steps.map((entry) => entry.status)).toEqual(["CANCELLED", "CANCELLED", "CANCELLED"]);
+
+    // 终态流水线再取消是幂等的，不报错也不产生新状态
+    const idempotent = await app.inject({ method: "POST", url: `/api/v1/pattern-pipelines/${pipeline.id}/cancel` });
+    expect(idempotent.statusCode).toBe(200);
+    expect(idempotent.json<{ status: string }>().status).toBe("CANCELLED");
+  });
+});
+
+/** 极简 multipart 编码器：现有用例都绕开多段表单，而两个源入口的流水线答案只能走 multipart。 */
+function multipartBody(boundary: string, file: { field: string; filename: string; mimeType: string; content: Buffer }, fields: Record<string, string>): Buffer {
+  const parts: Buffer[] = [];
+  for (const [name, value] of Object.entries(fields)) {
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`));
+  }
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${file.field}"; filename="${file.filename}"\r\nContent-Type: ${file.mimeType}\r\n\r\n`));
+  parts.push(file.content);
+  parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+  return Buffer.concat(parts);
+}
+
+describe("源入口接「接着成包」", () => {
+  async function pngBuffer(): Promise<Buffer> {
+    return sharp({ create: { width: 12, height: 12, channels: 4, background: { r: 20, g: 40, b: 60, alpha: 1 } } }).png().toBuffer();
+  }
+
+  function segmentationProvider() {
+    return saveProvider([
+      ...DEFAULT_MODELS,
+      { id: "sam", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null, segmentationProtocol: "gitee_sam3" },
+    ]);
+  }
+
+  it("提取带上成包答案：同一次请求建源任务 + 指向它的 SOURCE 步骤，且不在 API 侧起跑后续步骤", async () => {
+    const provider = segmentationProvider();
+    const boundary = "----ecomgen-test-boundary";
+    const answers = { specId: "tshirt-front-12x16", layout: "CENTERED", listingPlatform: "ETSY", listingProviderId: provider.id, listingModelId: "reasoner" };
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/patterns/extract-jobs",
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, { field: "file", filename: "source.png", mimeType: "image/png", content: await pngBuffer() }, {
+        providerId: provider.id,
+        modelId: "sam",
+        pipeline: JSON.stringify(answers),
+      }),
+    });
+    expect(response.statusCode).toBe(202);
+    const jobId = response.json<{ id: string }>().id;
+
+    const created = repository.listPatternsByJobId(jobId);
+    expect(created).toHaveLength(1);
+    const pipelines = repository.listPatternPipelines(created[0]!.id);
+    expect(pipelines).toHaveLength(1);
+    const pipeline = pipelines[0]!;
+    // 步骤表里有 SOURCE（这次的图案来源就是这次提取），并已绑上来源任务
+    expect(pipeline.steps.map((entry) => entry.step)).toEqual(["SOURCE", "TILE_CHECK", "PRINT_PACK", "LISTING"]);
+    expect(pipeline.steps[0]).toMatchObject({ status: "QUEUED", jobId });
+    expect(pipeline).toMatchObject({ status: "RUNNING", patternId: created[0]!.id, specId: "tshirt-front-12x16" });
+    // 后续步骤必须等 SOURCE 产出：API 不越权先建任务
+    expect(pipeline.steps.slice(1).every((entry) => entry.status === "PENDING" && entry.jobId === null)).toBe(true);
+  });
+
+  it("上传带上成包答案：图案已在库里，直接按既有花型起跑验缝", async () => {
+    const provider = segmentationProvider();
+    const boundary = "----ecomgen-test-boundary";
+    const answers = { specId: "mug-11oz-wrap", listingPlatform: "AMAZON", listingProviderId: provider.id, listingModelId: "reasoner" };
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/patterns/upload",
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, { field: "file", filename: "tile.png", mimeType: "image/png", content: await pngBuffer() }, { pipeline: JSON.stringify(answers) }),
+    });
+    expect(response.statusCode).toBe(201);
+    const patternId = response.json<{ id: string }>().id;
+
+    const pipelines = repository.listPatternPipelines(patternId);
+    expect(pipelines).toHaveLength(1);
+    const pipeline = pipelines[0]!;
+    // 上传没有来源任务可等，所以没有 SOURCE 步骤，第一步已起跑
+    expect(pipeline.steps.map((entry) => entry.step)).toEqual(["TILE_CHECK", "PRINT_PACK", "LISTING"]);
+    expect(pipeline.steps[0]).toMatchObject({ status: "QUEUED" });
+    expect(repository.getJob(pipeline.steps[0]!.jobId!)).toMatchObject({ type: "PATTERN_TILE_CHECK" });
+    // 未显式给版式时落到缺省居中
+    expect(pipeline).toMatchObject({ status: "RUNNING", layout: "CENTERED" });
+  });
+
+  it("成包答案本身出错时整条请求被拒，不留半个花型", async () => {
+    const provider = segmentationProvider();
+    const boundary = "----ecomgen-test-boundary";
+    const files = { field: "file", filename: "tile.png", mimeType: "image/png", content: await pngBuffer() };
+
+    // 未知规格：答案在入队前就被校验，花型不该入库
+    const badSpec = await app.inject({
+      method: "POST",
+      url: "/api/v1/patterns/upload",
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, files, { pipeline: JSON.stringify({ specId: "not-a-spec", listingPlatform: "ETSY", listingProviderId: provider.id, listingModelId: "reasoner" }) }),
+    });
+    expect(badSpec.statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", url: "/api/v1/patterns" })).json<{ items: unknown[] }>().items).toHaveLength(0);
+
+    // 不是合法 JSON：与"没填"给不同口径的报错
+    const notJson = await app.inject({
+      method: "POST",
+      url: "/api/v1/patterns/upload",
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, files, { pipeline: "{oops" }),
+    });
+    expect(notJson.statusCode).toBe(400);
+    expect(notJson.json<{ error: { message: string } }>().error.message).toContain("JSON");
   });
 });

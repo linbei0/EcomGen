@@ -36,6 +36,23 @@ export function useJob(projectId: string, jobId: string | undefined) {
   return query;
 }
 
+/**
+ * 全局任务（不绑定项目，如模特选角、花型提取）的状态轮询：QUEUED/RUNNING 时 1.5s 一拍，终态即停。
+ * 返回原始契约 Job 而非适配层视图，供无项目上下文的页面直接读取 status/progress/error；
+ * 项目域轮询用 useJob（带 PLAN 成功后的分镜联动）。
+ */
+export function useJobStatus(jobId: string | undefined) {
+  return useQuery({
+    queryKey: qk.job(jobId ?? ""),
+    enabled: Boolean(jobId),
+    queryFn: async () => unwrap(api.GET("/jobs/{jobId}", { params: { path: { jobId: jobId! } } })),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "QUEUED" || status === "RUNNING" ? 1500 : false;
+    },
+  });
+}
+
 export function useCancelJob(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({

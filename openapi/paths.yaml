@@ -1421,3 +1421,474 @@ paths:
                 $ref: "#/components/schemas/EcomModel"
         "404":
           $ref: "#/components/responses/NotFound"
+  /patterns:
+    get:
+      operationId: listPatterns
+      responses:
+        "200":
+          description: Global pattern library; entries whose artwork is still being produced are hidden until the artifact lands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternList"
+    post:
+      operationId: noopPatternsPost
+      responses:
+        "405":
+          description: Method not allowed; patterns are created by extract/forge/upload jobs.
+  /patterns/{patternId}:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    get:
+      operationId: getPattern
+      responses:
+        "200":
+          description: Single pattern with source lineage metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pattern"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updatePattern
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePatternInput"
+      responses:
+        "200":
+          description: Renamed or re-tagged pattern.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pattern"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deletePattern
+      responses:
+        "204":
+          description: Pattern artwork files and record removed.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patterns/extract-jobs:
+    post:
+      operationId: createPatternExtractJob
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreatePatternExtractJobInput"
+      responses:
+        "202":
+          description: Extract job accepted (or an existing job reused for an identical request).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /patterns/forge-jobs:
+    post:
+      operationId: createPatternForgeJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternForgeJobInput"
+      responses:
+        "202":
+          description: Forge job accepted (or an existing job reused for an identical request).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /patterns/{patternId}/print-pack-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPrintPackJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePrintPackJobInput"
+      responses:
+        "200":
+          description: Existing identical print pack job reused.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePrintPackJobResponse"
+        "202":
+          description: Print pack job accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePrintPackJobResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/derive-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternDeriveJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternDeriveJobInput"
+      responses:
+        "200":
+          description: Existing identical derive job reused (its derived pattern still exists).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "202":
+          description: Derive job accepted; runs locally in the worker without provider cost.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/variant-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternVariantJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternVariantJobInput"
+      responses:
+        "200":
+          description: Existing identical variant job reused (its derived patterns still exist).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "202":
+          description: Variant job accepted; each candidate becomes a new pattern whose lineage points at the source.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /patterns/{patternId}/tile-check-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternTileCheckJob
+      responses:
+        "200":
+          description: Existing identical tileability check reused (same pattern artwork and algorithm version).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "202":
+          description: Tileability check accepted; runs locally in the worker at no provider cost and never modifies the artwork.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/print-packs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    get:
+      operationId: listPatternPrintPacks
+      responses:
+        "200":
+          description: Print packs generated for this pattern, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrintPackList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /print-packs/{printPackId}:
+    parameters:
+      - $ref: "#/components/parameters/PrintPackId"
+    get:
+      operationId: getPrintPack
+      responses:
+        "200":
+          description: Print pack with its current status and artifact files.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrintPack"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patterns/{patternId}/listing-jobs:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternListingJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternListingJobInput"
+      responses:
+        "202":
+          description: Listing copy job accepted (or an existing job reused for an identical request).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/listing-jobs/{jobId}/result:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+      - $ref: "#/components/parameters/JobId"
+    get:
+      operationId: getPatternListingResult
+      responses:
+        "200":
+          description: Validated listing copy for the requested pattern.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternListingResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /patterns/{patternId}/pipelines:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    post:
+      operationId: createPatternPipeline
+      description: Starts the three-answer packaging pipeline (tile check → print pack → listing copy) for one pattern.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternPipelineInput"
+      responses:
+        "200":
+          description: An in-flight pipeline with identical answers was reused; finished pipelines are never reused because re-running is an explicit intent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "202":
+          description: Pipeline created and its first step enqueued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      operationId: listPatternPipelines
+      responses:
+        "200":
+          description: Packaging pipelines recorded for this pattern, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipelineList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /pattern-pipelines/{pipelineId}:
+    parameters:
+      - $ref: "#/components/parameters/PipelineId"
+    get:
+      operationId: getPatternPipeline
+      responses:
+        "200":
+          description: Pipeline receipt with per-step status, detail and error text.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /pattern-pipelines/{pipelineId}/continue:
+    parameters:
+      - $ref: "#/components/parameters/PipelineId"
+    post:
+      operationId: continuePatternPipeline
+      description: Resolves a pipeline parked at AWAITING_INPUT by either switching to the centered layout or accepting the seam risk on a full-bleed print.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContinuePatternPipelineInput"
+      responses:
+        "202":
+          description: Resolution accepted and the next step enqueued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /pattern-pipelines/{pipelineId}/steps/{step}/retry:
+    parameters:
+      - $ref: "#/components/parameters/PipelineId"
+      - $ref: "#/components/parameters/PipelineStep"
+    post:
+      operationId: retryPatternPipelineStep
+      description: Resets the requested step and every downstream step (their results were computed from the old input), then restarts it.
+      responses:
+        "202":
+          description: Step restarted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /pattern-pipelines/{pipelineId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/PipelineId"
+    post:
+      operationId: cancelPatternPipeline
+      description: Cancels the in-flight job first (that is where metered provider calls are actually interrupted) and then records the remaining steps and the pipeline as cancelled.
+      responses:
+        "200":
+          description: Pipeline receipt after cancellation; already terminal pipelines are returned unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternPipeline"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /pod/print-specs:
+    get:
+      operationId: listPodPrintSpecs
+      responses:
+        "200":
+          description: Deterministic print-spec catalog; entries carry source notes and a catalog version that flows into every pack manifest.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PodPrintSpecList"
+  /files/patterns/{patternId}:
+    parameters:
+      - $ref: "#/components/parameters/PatternId"
+    get:
+      operationId: getPatternFile
+      responses:
+        "200":
+          description: Pattern artwork (transparent PNG).
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /files/print-packs/{printPackId}/files/{index}:
+    parameters:
+      - $ref: "#/components/parameters/PrintPackId"
+      - name: index
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 0
+    get:
+      operationId: getPrintPackFile
+      responses:
+        "200":
+          description: Print pack artifact by file index (print-ready PNG or manifest JSON).
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patterns/upload:
+    post:
+      operationId: uploadPattern
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 花型图稿（建议透明底 PNG）。
+                name:
+                  type: string
+                tags:
+                  type: string
+                  description: JSON 数组字符串形式的标签列表。
+                pipeline:
+                  type: string
+                  description: 可选的成包答案（PatternPipelineAnswers 的 JSON 字符串）；带上时上传完成后立即起跑成包流水线。
+      responses:
+        "201":
+          description: Pattern stored directly into the library (source UPLOADED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pattern"
+        "400":
+          $ref: "#/components/responses/ValidationError"

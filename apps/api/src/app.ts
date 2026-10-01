@@ -5,12 +5,12 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { fastifySSE } from "@fastify/sse";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, requestFingerprint, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type JobRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ModelPortraitRecord, type ModelRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type SuiteListQuery, type UserTemplateRecord, SUITE_PAGE_SIZE_DEFAULT, SUITE_PAGE_SIZE_MAX } from "@ecomgen/core";
-import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, findModelSpecConflicts, getTemplate, isUserTemplateId, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
+import { EcomRepository, LocalAssetStore, SecretBox, SuiteCatalog, settlePipelineStep, nextPipelineStep, openDatabase, pipelineStepPlan, requestFingerprint, resetPipelineStepsFrom, startPipelineStep, type AssetRecord, type EditReferenceAssetRecord, type EditSessionRecord, type JobRecord, type LayerExportRecord, type LayerPlanRecord, type LibraryItemRecord, type ModelPortraitRecord, type ModelRecord, type PatternPipelineWithSteps, type PatternRecord, type PrintPackRecord, type ProjectRecord, type ProviderRecord, type SearchSourceRecord, type SuiteForgeResultRecord, type SuiteListQuery, type UserTemplateRecord, SUITE_PAGE_SIZE_DEFAULT, SUITE_PAGE_SIZE_MAX } from "@ecomgen/core";
+import { compileUserTemplate, ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, PATTERN_FORGE_PROMPT_VERSION, PATTERN_VARIANT_PROMPT_VERSION, defaultPatternName, findModelSpecConflicts, getTemplate, isUserTemplateId, presetBelongsToAxis, resolveTemplatesWithUser } from "@ecomgen/ecom-skill";
 import { SUITE_TAXONOMY, type SuiteDocumentInput, type SuiteOrigin } from "@ecomgen/ecom-suite";
-import { createJobQueue, createRedisConnection, enqueue, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
-import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, ModelSpec, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreateModelCastJobInput, CreateModelInput, CreatePlanningJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, ConfirmStoryboardInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateModelInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, ASSET_ROLES, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, MODEL_AGES, MODEL_BUILDS, MODEL_GENDERS, MODEL_HERITAGES, MODEL_STATURES, PLATFORM_TARGETS, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, roleForUserAssetKind, validateEcomSuiteFile } from "@ecomgen/contracts";
+import { createJobQueue, createRedisConnection, enqueue, queueKindForJobType, RedisProjectEventBus, type EcomJobKind } from "@ecomgen/jobs";
+import type { AssetRole, CopywritingTarget, ImageAspectRatio, ImageResolution, JobType, LibraryItemKind, PatternBackgroundMode, PlanningMode, PlatformTarget, ReasoningProtocolProfile, SearchSourceKind, ModelSpec, SegmentationProtocol, StoryboardMode, TargetMarket, UserAssetKind, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
+import { CopyLibraryAssetToProjectInput, CreateCopywritingJobInput, CreateExportJobRequest, CreateGenerationJobInput, CreateLayerExportInput, CreateLayerPlanInput, CreateModelCastJobInput, CreateModelInput, CreatePatternDeriveJobInput, CreatePatternExtractJobInput, CreatePatternForgeJobInput, CreatePatternListingJobInput, CreatePatternPipelineInput, ContinuePatternPipelineInput, PatternPipelineAnswers, CreatePatternVariantJobInput, CreatePlanningJobInput, CreatePrintPackJobInput, CreateProviderInput, CreateSearchSourceInput, CreateProjectInput, CreateUserTemplateInput, ConfirmStoryboardInput, EcomSuiteFile, EditGenerationConfigInput, SelectEditSessionOutputInput, TestProviderInput, UpdateEditSessionMemoryInput, UpdateModelInput, UpdatePatternInput, UpdateProjectInput, UpdateProviderInput, UpdateSearchSourceInput, UpdateStoryboardItemInput, UpdateUserTemplateInput, ASSET_ROLES, DEFAULT_CANDIDATES_PER_TYPE, DEFAULT_IMAGE_ASPECT_RATIO, DEFAULT_IMAGE_RESOLUTION, DEFAULT_TARGET_IMAGE_COUNT, IMAGE_ASPECT_RATIOS, IMAGE_RESOLUTIONS, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_PATTERN_BRIEF_LENGTH, MAX_PATTERN_NAME_LENGTH, MAX_PATTERN_TAG_LENGTH, MAX_PRODUCT_IMAGE_ASSETS, MAX_REFERENCE_IMAGE_ASSETS, MAX_REQUESTED_SUITE_SHOTS, MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MAX_TARGET_IMAGE_COUNT, MAX_UPLOAD_FILE_BYTES, MIN_SUITE_FORGE_SHOTS, MIN_TARGET_IMAGE_COUNT, MODEL_AGES, MODEL_BUILDS, MODEL_GENDERS, MODEL_HERITAGES, MODEL_STATURES, PLATFORM_TARGETS, LISTING_PLATFORMS, PATTERN_PIPELINE_STEPS, PATTERN_TAGS_MAX, POD_MOCKUP_SCENE_VERSION, POD_PRINT_SPECS, POD_PRINT_SPEC_VERSION, SEGMENTATION_PROTOCOL_CAPABILITIES, SEGMENTATION_PROTOCOLS, TILEABILITY_ALGORITHM_VERSION, getPodPrintSpec, roleForUserAssetKind, supportsTransparentBackground, validateEcomSuiteFile } from "@ecomgen/contracts";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, createSegmentationProvider, probeReasoning, type PromptSegmentationProtocol } from "@ecomgen/providers";
 
 import { ApiError } from "./errors.js";
@@ -88,6 +88,73 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
         throw new ApiError(503, "QUEUE_UNAVAILABLE", message);
       }
     }
+  }
+  /**
+   * 请求取消一个任务：已失败任务直接落 CANCELLED（没有可中断的队列工作，但需要关闭失败提示并留审计记录）；
+   * 仍在队列中等待的移出队列；已在执行的只置取消标记，由 Worker 断开在途请求。
+   * 抽成函数是因为流水线取消也要走同一条路径——两处各写一份必然会丢其中一种情况。
+   */
+  async function requestJobCancellation(id: string): Promise<JobRecord> {
+    const current = repository.getJob(id);
+    if (!current) missing("job", id);
+    if (current.status === "FAILED") return repository.updateJob(id, { status: "CANCELLED", cancelRequested: true }) ?? current;
+    const queued = await queue.getJob(id);
+    const state = queued ? await queued.getState() : "unknown";
+    if (queued && ["waiting", "delayed", "prioritized"].includes(state)) {
+      await queued.remove();
+      return repository.updateJob(id, { status: "CANCELLED", cancelRequested: true }) ?? current;
+    }
+    return repository.updateJob(id, { cancelRequested: true }) ?? current;
+  }
+  /**
+   * 建链（三问一跑）：校验两个答案 → 建流水线 → 起跑第一步。
+   *
+   * 从既有花型起链（POST /patterns/:patternId/pipelines）与"源入口顺带成包"共用本函数：
+   * 两处对同一份答案必须给出同一套校验、默认值、指纹与步骤表，分开写必然漂移。
+   *
+   * 两种起跑方式刻意不同：
+   * - 从既有花型：立刻建第一个步骤的任务并入队（图案已经在库里）。
+   * - 从源入口：SOURCE 步骤绑定来源任务、只置队列中，**不入队**——图案要等来源任务产出了才有，
+   *   由 Worker 在来源任务成功后推进（见 worker 的 advancePatternPipeline）。
+   */
+  async function startPatternPipeline(input: {
+    patternId: string | null;
+    patternHash: string | null;
+    answers: PatternPipelineAnswers;
+    sourceJobId?: string;
+    idempotencyKey?: string | null;
+  }): Promise<{ pipeline: PatternPipelineWithSteps; reused: boolean }> {
+    const spec = validatePatternPipelineAnswers(repository, input.answers);
+    const layout = input.answers.layout ?? "CENTERED";
+    const idempotencyKey = input.idempotencyKey ?? null;
+    const fingerprint = requestFingerprint({ type: "PATTERN_PIPELINE", patternId: input.patternId, patternHash: input.patternHash, specId: spec.id, specVersion: POD_PRINT_SPEC_VERSION, layout, listingPlatform: input.answers.listingPlatform, listingProviderId: input.answers.listingProviderId, listingModelId: input.answers.listingModelId, sellingPoints: input.answers.sellingPoints ?? null, bannedWords: input.answers.bannedWords ?? null, idempotencyKey });
+    // 只复用进行中的同参数流水线：已完成的再点一次是"再出一套"的明确意图，复用会静默无事发生。
+    const reusable = repository.findReusablePatternPipeline(fingerprint);
+    if (reusable) return { pipeline: reusable, reused: true };
+    const fromSource = Boolean(input.sourceJobId);
+    const pipeline = repository.createPatternPipeline({
+      patternId: input.patternId,
+      specId: spec.id,
+      specVersion: POD_PRINT_SPEC_VERSION,
+      layout,
+      listingPlatform: input.answers.listingPlatform,
+      listingProviderId: input.answers.listingProviderId,
+      listingModelId: input.answers.listingModelId,
+      listingHints: { sellingPoints: input.answers.sellingPoints ?? null, bannedWords: input.answers.bannedWords ?? null },
+      requestFingerprint: fingerprint,
+      steps: pipelineStepPlan(fromSource),
+    });
+    const first = pipeline.steps[0];
+    if (!first) throw new ApiError(500, "INTERNAL_ERROR", "流水线没有可执行的步骤");
+    if (input.sourceJobId) {
+      repository.updatePatternPipelineStep(first.id, { status: "QUEUED", jobId: input.sourceJobId });
+      const running = repository.updatePatternPipeline(pipeline.id, { status: "RUNNING" }) ?? pipeline;
+      return { pipeline: running, reused: false };
+    }
+    if (!input.patternId) throw new ApiError(500, "INTERNAL_ERROR", "流水线缺少花型，无法起跑");
+    const started = startPipelineStep(repository, pipeline, first, input.patternId);
+    await enqueueOrMarkFailed(started.job, queueKindForJobType(started.jobType), { onFail: (jobId) => settlePipelineStep(repository, jobId, "FAILED", { code: "QUEUE_UNAVAILABLE", message: "任务已创建但队列暂不可用" }) });
+    return { pipeline: repository.getPatternPipeline(pipeline.id) ?? pipeline, reused: false };
   }
   app.setErrorHandler((error, request, reply) => {
     const known = error instanceof ApiError;
@@ -307,7 +374,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     return reply.code(204).send();
   });
   // 选角生成：付费生图任务，不绑定项目。指纹含 spec、notes、参考脸 hash 与生成参数，
-  // 同 spec 重复提交复用既有 QUEUED/RUNNING/SUCCEEDED 任务。
+  // 同 spec 重复提交复用既有 QUEUED/RUNNING/SUCCEEDED 任务；定妆照被删光后同指纹重提必须新建。
   app.post("/api/v1/models/:modelId/cast-jobs", async (request, reply) => {
     const model = ensureModel(repository, parameter(request, "modelId"));
     const body = parseBody(CreateModelCastJobInput, request.body);
@@ -316,7 +383,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const idempotencyKey = (request.headers["idempotency-key"] as string | undefined) ?? null;
     const fingerprint = requestFingerprint({ type: "MODEL_CAST", modelId: model.id, spec: model.spec, notes: model.notes, referenceFaceHash: model.referenceFaceHash, providerId: body.providerId, imageModelId: body.imageModelId, aspectRatio: body.aspectRatio, candidateCount, idempotencyKey });
     const existing = repository.findJobByFingerprint(null, fingerprint);
-    if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    if (existing && reusableFingerprintedJob(existing, repository.listModelPortraitsByJobId(existing.id).length > 0)) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
     const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "MODEL_CAST", input: { modelId: model.id, aspectRatio: body.aspectRatio, candidateCount, spec: model.spec, notes: model.notes, referenceFacePath: model.referenceFacePath }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueueOrMarkFailed(job, "model_cast");
     return reply.code(202).send(job);
@@ -350,6 +417,298 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     const portrait = repository.getModelPortrait(parameter(request, "portraitId"));
     if (!portrait) missing("model portrait", parameter(request, "portraitId"));
     return sendStored(request, reply, storage, portrait, "model portrait", parameter(request, "portraitId"));
+  });
+
+  // ---- 花型工坊：全局花型库 + 提取/起稿/规格包/Listing 文案任务。任务不绑定项目，前端依赖任务轮询。 ----
+  app.get("/api/v1/patterns", async () => {
+    // 无产物的行（提取排队中或失败）对库不可见：主图路径落盘前它没有可展示的内容。
+    const items = repository.listPatterns().filter((record) => record.storagePath).map(publicPattern);
+    return { items, nextCursor: null };
+  });
+  app.get("/api/v1/patterns/:patternId", async (request) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    return publicPattern(pattern);
+  });
+  app.delete("/api/v1/patterns/:patternId", async (request, reply) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    // 先清文件再删行：行删了就找不到存储路径；文件清理失败时保留记录可重试（与模特删除同理）。
+    await storage.deletePattern(pattern.id);
+    repository.deletePattern(pattern.id);
+    return reply.code(204).send();
+  });
+  app.patch("/api/v1/patterns/:patternId", async (request) => {
+    const current = ensurePattern(repository, parameter(request, "patternId"));
+    const body = parseBody(UpdatePatternInput, request.body);
+    const patch: { name?: string; tags?: string[] } = {};
+    if (body.name !== undefined) patch.name = readText(body.name, "name");
+    if (body.tags !== undefined) patch.tags = body.tags.map((tag) => readText(tag, "tag"));
+    const record = repository.updatePattern(current.id, patch) ?? current;
+    return publicPattern(record);
+  });
+  // 提取：源图以 multipart 上传并作为来源血缘留痕；分割 Provider 由页面自选（全局页没有项目配置可继承）。
+  app.post("/api/v1/patterns/extract-jobs", async (request, reply) => {
+    const { upload, fields } = await readSingleImageMultipart(request, "source image");
+    const providerId = readText(fields.providerId, "providerId");
+    const modelId = readText(fields.modelId, "modelId");
+    const { protocol } = resolvePatternSegmentationModel(repository, providerId, modelId, readOptionalText(fields.protocol));
+    const brief = optionalBoundedText(readOptionalText(fields.brief), MAX_PATTERN_BRIEF_LENGTH, "brief");
+    const name = optionalBoundedText(readOptionalText(fields.name), MAX_PATTERN_NAME_LENGTH, "name");
+    const tags = parsePatternTags(readOptionalText(fields.tags));
+    const idempotencyKey = readOptionalText(fields.idempotencyKey) ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
+    // 成包答案先校验：请求要失败就该在落源图、建任务之前失败，不留半个花型。
+    const answers = readPatternPipelineAnswers(fields.pipeline);
+    if (answers) validatePatternPipelineAnswers(repository, answers);
+    const sourceHash = contentHash(upload.buffer);
+    const fingerprint = requestFingerprint({ type: "PATTERN_EXTRACT", providerId, modelId, protocol, sourceHash, brief: brief ?? null, name: name ?? null, tags, idempotencyKey });
+    const existing = repository.findJobByFingerprint(null, fingerprint);
+    // 在途照常复用；SUCCEEDED 花型被删后按同指纹重提必须新建，否则只会复用一个不再产出花型的旧任务。
+    if (existing && reusableFingerprintedJob(existing, repository.hasPatternArtifactsByJobId(existing.id))) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    const jobId = randomUUID();
+    const patternId = randomUUID();
+    // 源图先落 patterns/<id>/ 作为血缘留痕：提取成功后与花型同目录，删除花型时一并清理。
+    const storedSource = await storage.putPatternSource(patternId, upload.filename, upload.buffer);
+    const job = repository.createJob({ id: jobId, projectId: null, storyboardItemId: null, type: "PATTERN_EXTRACT", input: { patternId, sourcePath: storedSource.path, sourceHash: storedSource.hash, name: name ?? null, brief: brief ?? null, tags, segmentationProviderId: providerId, segmentationModelId: modelId, segmentationProtocol: protocol }, requestFingerprint: fingerprint, providerId, modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    repository.createPattern({ id: patternId, name: name ?? defaultPatternName(brief ?? upload.filename.replace(/\.[^.]+$/, "")), sourceType: "EXTRACTED", sourceJobId: jobId, sourceAssetHash: storedSource.hash, parentPatternId: null, storagePath: null, fileHash: null, width: null, height: null, tags });
+    // 流水线必须在入队之前建好并绑上 SOURCE 步骤：Worker 可能在本请求返回前就完成提取，
+    // 那时若还没有步骤行，推进就找不到落点，整条链永远不会启动。
+    if (answers) {
+      await startPatternPipeline({ patternId, patternHash: null, answers, sourceJobId: jobId, idempotencyKey });
+    }
+    // 入队失败不回滚花型行：无产物的行对库不可见，任务重试会复用同一行（含已留痕的源图）。
+    await enqueueOrMarkFailed(job, "pattern_extract", { onFail: (failedJobId) => settlePipelineStep(repository, failedJobId, "FAILED", { code: "QUEUE_UNAVAILABLE", message: "任务已创建但队列暂不可用" }) });
+    return reply.code(202).send(job);
+  });
+  // 上传花型文件：跳过提取，直接以本地文件入库（来源 UPLOADED），供规格包与文案复用。
+  app.post("/api/v1/patterns/upload", async (request, reply) => {
+    const { upload, fields } = await readSingleImageMultipart(request, "pattern image");
+    const name = optionalBoundedText(readOptionalText(fields.name), MAX_PATTERN_NAME_LENGTH, "name");
+    const tags = parsePatternTags(readOptionalText(fields.tags));
+    // 同上：答案不合法时整个请求失败，不留孤儿花型。
+    const answers = readPatternPipelineAnswers(fields.pipeline);
+    if (answers) validatePatternPipelineAnswers(repository, answers);
+    const patternId = randomUUID();
+    // 统一归一化为 PNG 再入库：客户端声明的 mimetype 不可信，而下游有一整串"花型即 PNG"的假设
+    // （存储扩展名、衍生时发往 images/edits 的 mimeType、文件接口回传的 Content-Type），
+    // JPEG/WebP 直接入库会让它们全部失真；顺手把解码失败挡在入库之前。
+    const patternPng = await sharp(upload.buffer).png().toBuffer();
+    const stored = await storage.putPatternArtifact(patternId, "pattern", patternPng);
+    const dimensions = await imageDimensions(patternPng);
+    const record = repository.createPattern({ id: patternId, name: name ?? defaultPatternName(upload.filename.replace(/\.[^.]+$/, "")), sourceType: "UPLOADED", sourceJobId: null, sourceAssetHash: stored.hash, parentPatternId: null, storagePath: stored.path, fileHash: stored.hash, width: dimensions.width, height: dimensions.height, tags });
+    // 上传没有来源任务可等，图案此刻就在库里，所以直接按"从既有花型起链"的方式起跑。
+    if (answers) await startPatternPipeline({ patternId: record.id, patternHash: record.fileHash, answers });
+    return reply.code(201).send(publicPattern(record));
+  });
+  // AI 起稿：主题/风格是入队快照，prompt 由 ecom-skill 的编译函数确定性派生；每张候选独立成花型。
+  app.post("/api/v1/patterns/forge-jobs", async (request, reply) => {
+    const body = parseBody(CreatePatternForgeJobInput, request.body);
+    verifyModel(repository, body.providerId, body.imageModelId, "image");
+    const background = body.background ?? "WHITE";
+    assertTransparentBackgroundAvailable(repository, body.providerId, body.imageModelId, background);
+    const candidateCount = body.candidateCount ?? 1;
+    const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
+    // background 进指纹：它改的是编译后的提示词，不进指纹就会让"同主题不同底版"的两个请求互相复用。
+    const fingerprint = requestFingerprint({ type: "PATTERN_FORGE", providerId: body.providerId, imageModelId: body.imageModelId, theme: body.theme, style: body.style ?? null, category: body.category ?? null, background, candidateCount, name: body.name ?? null, promptVersion: PATTERN_FORGE_PROMPT_VERSION, idempotencyKey });
+    const existing = repository.findJobByFingerprint(null, fingerprint);
+    // 在途照常复用（起稿的花型随候选完成才落库，不能要求在途已有产物）；产物被删光后同指纹重提必须新建。
+    if (existing && reusableFingerprintedJob(existing, repository.hasPatternArtifactsByJobId(existing.id))) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PATTERN_FORGE", input: { theme: body.theme, style: body.style ?? null, category: body.category ?? null, background, candidateCount, name: body.name ?? null }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    // 与提取同理：流水线先建好再入队，Worker 才找得到 SOURCE 步骤；多候选时由第一张有产物的候选起链。
+    if (body.pipeline) await startPatternPipeline({ patternId: null, patternHash: null, answers: body.pipeline, sourceJobId: job.id, idempotencyKey });
+    await enqueueOrMarkFailed(job, "pattern_forge", { onFail: (failedJobId) => settlePipelineStep(repository, failedJobId, "FAILED", { code: "QUEUE_UNAVAILABLE", message: "任务已创建但队列暂不可用" }) });
+    return reply.code(202).send(job);
+  });
+  // 规格包：花型 × 规格条目的确定性合成，双记录模式（createJob → createPrintPack → onFail 标记失败）。
+  app.post("/api/v1/patterns/:patternId/print-pack-jobs", async (request, reply) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    if (!pattern.storagePath) throw new ApiError(409, "CONFLICT", "该花型还没有可用的图稿产物，无法生成规格包");
+    const body = parseBody(CreatePrintPackJobInput, request.body);
+    const spec = getPodPrintSpec(body.specId);
+    if (!spec) throw new ApiError(400, "VALIDATION_ERROR", `未知的印刷规格：${body.specId}`);
+    const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
+    const layout = body.layout ?? "CENTERED";
+    const fingerprint = requestFingerprint({ type: "PRINT_PACK", patternId: pattern.id, patternHash: pattern.fileHash, specId: spec.id, layout, specVersion: POD_PRINT_SPEC_VERSION, idempotencyKey });
+    const existing = repository.findJobByFingerprint(null, fingerprint);
+    if (existing) {
+      const pack = repository.getPrintPackByJobId(existing.id);
+      // 在途任务照常复用；SUCCEEDED 包的场景渲染版本落后（manifest.mockupScene 非当前）时不再复用，
+      // 同指纹新建任务重渲示意图（findJobByFingerprint 取最新一条，旧包保留在历史列表）；FAILED 放行走新建。
+      const manifestScene = pack?.manifest && typeof pack.manifest.mockupScene === "string" ? pack.manifest.mockupScene : null;
+      const reusable = existing.status === "QUEUED" || existing.status === "RUNNING" || (existing.status === "SUCCEEDED" && manifestScene === POD_MOCKUP_SCENE_VERSION);
+      if (reusable) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, printPack: pack ? publicPrintPack(pack) : null });
+    }
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PRINT_PACK", input: { patternId: pattern.id, specId: spec.id, specVersion: POD_PRINT_SPEC_VERSION, layout }, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } });
+    const printPack = repository.createPrintPack({ patternId: pattern.id, jobId: job.id, specId: spec.id, specVersion: POD_PRINT_SPEC_VERSION, status: "QUEUED" });
+    await enqueueOrMarkFailed(job, "print_pack", { onFail: (failedJobId) => markDomainRecordFailed(repository, "PRINT_PACK", failedJobId) });
+    return reply.code(202).send({ job, printPack: publicPrintPack(printPack) });
+  });
+  // 花型衍生：确定性本地改色运算（HSL 调制），产出一 new 花型；同参数复用既有任务。
+  app.post("/api/v1/patterns/:patternId/derive-jobs", async (request, reply) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    if (!pattern.storagePath) throw new ApiError(409, "CONFLICT", "该花型还没有可用的图稿产物，无法衍生");
+    const body = parseBody(CreatePatternDeriveJobInput, request.body);
+    if (body.hueShift === undefined && body.saturationPct === undefined && body.brightnessPct === undefined) {
+      throw new ApiError(400, "VALIDATION_ERROR", "改色至少需要提供色相、饱和度或亮度之一");
+    }
+    const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
+    const fingerprint = requestFingerprint({ type: "PATTERN_DERIVE", patternId: pattern.id, patternHash: pattern.fileHash, hueShift: body.hueShift ?? null, saturationPct: body.saturationPct ?? null, brightnessPct: body.brightnessPct ?? null, idempotencyKey });
+    const existing = repository.findJobByFingerprint(null, fingerprint);
+    // 与提取/起稿同规：在途照常复用；衍生产物被删后同指纹重提必须新建，不再复用孤儿任务。
+    if (existing && reusableFingerprintedJob(existing, repository.hasPatternArtifactsByJobId(existing.id))) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PATTERN_DERIVE", input: { patternId: pattern.id, hueShift: body.hueShift ?? null, saturationPct: body.saturationPct ?? null, brightnessPct: body.brightnessPct ?? null }, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } });
+    await enqueueOrMarkFailed(job, "pattern_derive");
+    return reply.code(202).send(job);
+  });
+  // 生成式衍生（画风 / 构图）：源花型作参考图走 images/edits，每张候选产出独立新花型（血缘指向源）。
+  // 与起稿同规：Provider/模型入队快照 + 指纹复用；付费生图，失败不自动重跑。
+  app.post("/api/v1/patterns/:patternId/variant-jobs", async (request, reply) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    if (!pattern.storagePath) throw new ApiError(409, "CONFLICT", "该花型还没有可用的图稿产物，无法衍生");
+    const body = parseBody(CreatePatternVariantJobInput, request.body);
+    verifyModel(repository, body.providerId, body.imageModelId, "image");
+    // 契约把 preset 限死为枚举，轴向归属在编译层单点判定，避免两处各写一份预设清单。
+    if (!presetBelongsToAxis(body.axis, body.preset)) throw new ApiError(400, "VALIDATION_ERROR", `预设 ${body.preset} 不属于轴向 ${body.axis}`);
+    const background = body.background ?? "SOURCE";
+    assertTransparentBackgroundAvailable(repository, body.providerId, body.imageModelId, background);
+    const candidateCount = body.candidateCount ?? 1;
+    const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
+    const fingerprint = requestFingerprint({ type: "PATTERN_VARIANT", patternId: pattern.id, patternHash: pattern.fileHash, axis: body.axis, preset: body.preset, extra: body.extra ?? null, background, providerId: body.providerId, imageModelId: body.imageModelId, candidateCount, name: body.name ?? null, promptVersion: PATTERN_VARIANT_PROMPT_VERSION, idempotencyKey });
+    const existing = repository.findJobByFingerprint(null, fingerprint);
+    // 候选随完成才落库，在途照常复用；产物被删光后同指纹重提必须新建，不再复用孤儿任务。
+    if (existing && reusableFingerprintedJob(existing, repository.hasPatternArtifactsByJobId(existing.id))) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PATTERN_VARIANT", input: { patternId: pattern.id, axis: body.axis, preset: body.preset, extra: body.extra ?? null, background, candidateCount, name: body.name ?? null }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    await enqueueOrMarkFailed(job, "pattern_variant");
+    return reply.code(202).send(job);
+  });
+  // 验缝：本地确定性环绕位移判定，零费用、不改动花型像素；这条路径是 tileable* 的唯一写入方。
+  app.post("/api/v1/patterns/:patternId/tile-check-jobs", async (request, reply) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    if (!pattern.storagePath) throw new ApiError(409, "CONFLICT", "该花型还没有可用的图稿产物，无法验缝");
+    const idempotencyKey = (request.headers["idempotency-key"] as string | undefined) ?? null;
+    // 算法版本进指纹：阈值或度量口径升级后，同花型重提自然新建任务，而不是复用一个按旧算法判定的旧任务。
+    const fingerprint = requestFingerprint({ type: "PATTERN_TILE_CHECK", patternId: pattern.id, patternHash: pattern.fileHash, algorithmVersion: TILEABILITY_ALGORITHM_VERSION, idempotencyKey });
+    const existing = repository.findJobByFingerprint(null, fingerprint);
+    if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PATTERN_TILE_CHECK", input: { patternId: pattern.id }, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } });
+    await enqueueOrMarkFailed(job, "pattern_tile_check");
+    return reply.code(202).send(job);
+  });
+  app.get("/api/v1/patterns/:patternId/print-packs", async (request) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    return { items: repository.listPrintPacks(pattern.id).map(publicPrintPack) };
+  });
+  app.get("/api/v1/print-packs/:printPackId", async (request) => {
+    const pack = repository.getPrintPack(parameter(request, "printPackId"));
+    if (!pack) missing("print pack", parameter(request, "printPackId"));
+    return publicPrintPack(pack);
+  });
+  // Listing 文案：COPYWRITE 的全局扩展，看图写跨境标题/tags/描述；结果存 pattern_listing_results。
+  app.post("/api/v1/patterns/:patternId/listing-jobs", async (request, reply) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    if (!pattern.storagePath) throw new ApiError(409, "CONFLICT", "该花型还没有可用的图稿产物，无法生成 Listing 文案");
+    const body = parseBody(CreatePatternListingJobInput, request.body);
+    verifyCopywritingModel(repository, body.providerId, body.modelId);
+    const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
+    const fingerprint = requestFingerprint({ type: "COPYWRITE", target: "LISTING", patternId: pattern.id, patternHash: pattern.fileHash, platform: body.platform, sellingPoints: body.sellingPoints ?? null, mustIncludeWords: body.mustIncludeWords ?? null, bannedWords: body.bannedWords ?? null, providerId: body.providerId, modelId: body.modelId, idempotencyKey });
+    const existing = repository.findJobByFingerprint(null, fingerprint);
+    if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "COPYWRITE", input: { target: "LISTING", patternId: pattern.id, platform: body.platform, sellingPoints: body.sellingPoints ?? null, mustIncludeWords: body.mustIncludeWords ?? null, bannedWords: body.bannedWords ?? null }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    await enqueueOrMarkFailed(job, "copywrite");
+    return reply.code(202).send(job);
+  });
+  app.get("/api/v1/patterns/:patternId/listing-jobs/:jobId/result", async (request) => {
+    const patternId = parameter(request, "patternId");
+    const record = repository.getPatternListingResult(parameter(request, "jobId"));
+    if (!record || record.patternId !== patternId) missing("listing result", parameter(request, "jobId"));
+    return record;
+  });
+  app.get("/api/v1/pod/print-specs", async () => ({ specVersion: POD_PRINT_SPEC_VERSION, items: POD_PRINT_SPECS }));
+
+  // ---- 成包流水线（三问一跑）：花型 × 规格 × 平台一次串起「验缝 → 规格包 → 文案」。 ----
+  // 编排不是用户要学的东西：步骤顺序内建，用户只回答问题；每一步仍可单独重跑（见 steps/:step/retry）。
+  app.post("/api/v1/patterns/:patternId/pipelines", async (request, reply) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    if (!pattern.storagePath) throw new ApiError(409, "CONFLICT", "该花型还没有可用的图稿产物，无法成包");
+    const body = parseBody(CreatePatternPipelineInput, request.body);
+    const { pipeline, reused } = await startPatternPipeline({
+      patternId: pattern.id,
+      patternHash: pattern.fileHash,
+      answers: body,
+      idempotencyKey: body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null,
+    });
+    return reply.code(reused ? 200 : 202).send(publicPatternPipeline(pipeline));
+  });
+  app.get("/api/v1/patterns/:patternId/pipelines", async (request) => {
+    const pattern = ensurePattern(repository, parameter(request, "patternId"));
+    return { items: repository.listPatternPipelines(pattern.id).map(publicPatternPipeline) };
+  });
+  app.get("/api/v1/pattern-pipelines/:pipelineId", async (request) => {
+    const pipeline = ensurePatternPipeline(repository, parameter(request, "pipelineId"));
+    return publicPatternPipeline(pipeline);
+  });
+  // AWAITING_INPUT 的裁决：改用居中版式继续，或明知有接缝仍出满印。两者都由用户明确选择。
+  app.post("/api/v1/pattern-pipelines/:pipelineId/continue", async (request, reply) => {
+    const pipeline = ensurePatternPipeline(repository, parameter(request, "pipelineId"));
+    if (pipeline.status !== "AWAITING_INPUT" || pipeline.blockReason !== "SEAM_RISK") throw new ApiError(409, "CONFLICT", "该流水线当前不需要裁决");
+    const patternId = pipeline.patternId;
+    if (!patternId) throw new ApiError(409, "CONFLICT", "该流水线还没有花型，无法继续");
+    const body = parseBody(ContinuePatternPipelineInput, request.body);
+    const tileCheck = pipeline.steps.find((entry) => entry.step === "TILE_CHECK");
+    if (!tileCheck) throw new ApiError(409, "CONFLICT", "该流水线没有验缝步骤，无法裁决");
+    // 先改版式再建任务：PRINT_PACK 任务从流水线读 layout，顺序反了就会按旧版式出图。
+    repository.updatePatternPipeline(pipeline.id, { layout: body.resolution === "USE_CENTERED" ? "CENTERED" : "TILE", status: "RUNNING", blockReason: null });
+    const updated = repository.getPatternPipeline(pipeline.id) ?? pipeline;
+    const next = nextPipelineStep(updated.steps, tileCheck);
+    if (!next) throw new ApiError(409, "CONFLICT", "验缝之后没有可执行的步骤");
+    const started = startPipelineStep(repository, updated, next, patternId);
+    await enqueueOrMarkFailed(started.job, queueKindForJobType(started.jobType), { onFail: (jobId) => settlePipelineStep(repository, jobId, "FAILED", { code: "QUEUE_UNAVAILABLE", message: "任务已创建但队列暂不可用" }) });
+    return reply.code(202).send(publicPatternPipeline(repository.getPatternPipeline(pipeline.id) ?? pipeline));
+  });
+  // 单步重跑：重置该步及其下游（下游结果基于旧输入，必须一并重算），再重新起跑该步。
+  app.post("/api/v1/pattern-pipelines/:pipelineId/steps/:step/retry", async (request, reply) => {
+    const pipeline = ensurePatternPipeline(repository, parameter(request, "pipelineId"));
+    const patternId = pipeline.patternId;
+    if (!patternId) throw new ApiError(409, "CONFLICT", "该流水线还没有花型，无法重跑");
+    const stepName = enumValue(parameter(request, "step"), [...PATTERN_PIPELINE_STEPS], "step");
+    const step = pipeline.steps.find((entry) => entry.step === stepName);
+    if (!step) throw new ApiError(404, "NOT_FOUND", `该流水线没有步骤：${stepName}`);
+    // 在途步骤不能重跑：会与正在执行的 Worker 争抢同一份领域记录，并叠加付费调用。
+    if (step.status === "QUEUED" || step.status === "RUNNING") throw new ApiError(409, "CONFLICT", "该步骤正在运行，请先取消再重跑");
+    if (step.step === "SOURCE") throw new ApiError(409, "CONFLICT", "图案获取步骤请从花型墙的来源入口重新发起");
+    // AWAITING_INPUT 只由 /continue 放行：允许在这里"重跑"下一个待办步骤，等于给了一条绕过接缝裁决
+    // 直接出满印的暗门，而用户以为自己只是在重跑。
+    if (pipeline.status === "AWAITING_INPUT") throw new ApiError(409, "CONFLICT", "流水线正等待你的裁决，请先选择「改为居中继续」或「仍出满印」");
+    resetPipelineStepsFrom(repository, pipeline.id, step.id);
+    const updated = repository.getPatternPipeline(pipeline.id) ?? pipeline;
+    const target = updated.steps.find((entry) => entry.id === step.id) ?? step;
+    const started = startPipelineStep(repository, updated, target, patternId);
+    await enqueueOrMarkFailed(started.job, queueKindForJobType(started.jobType), { onFail: (jobId) => settlePipelineStep(repository, jobId, "FAILED", { code: "QUEUE_UNAVAILABLE", message: "任务已创建但队列暂不可用" }) });
+    return reply.code(202).send(publicPatternPipeline(repository.getPatternPipeline(pipeline.id) ?? pipeline));
+  });
+  app.post("/api/v1/pattern-pipelines/:pipelineId/cancel", async (request) => {
+    const pipeline = ensurePatternPipeline(repository, parameter(request, "pipelineId"));
+    if (pipeline.status === "SUCCEEDED" || pipeline.status === "CANCELLED") return publicPatternPipeline(pipeline);
+    // 先取消在途任务（真正的计费请求在这里被断开），再落流水线状态；顺序反了会出现"已取消但请求仍在途"。
+    const active = [...pipeline.steps].reverse().find((entry) => entry.jobId);
+    if (active?.jobId) await requestJobCancellation(active.jobId);
+    for (const step of pipeline.steps) {
+      if (step.status === "PENDING" || step.status === "QUEUED" || step.status === "RUNNING") repository.updatePatternPipelineStep(step.id, { status: "CANCELLED" });
+    }
+    repository.updatePatternPipeline(pipeline.id, { status: "CANCELLED", blockReason: null });
+    return publicPatternPipeline(repository.getPatternPipeline(pipeline.id) ?? pipeline);
+  });
+
+  app.get("/api/v1/files/patterns/:patternId", async (request, reply) => {
+    const pattern = repository.getPattern(parameter(request, "patternId"));
+    if (!pattern) missing("pattern", parameter(request, "patternId"));
+    return sendStored(request, reply, storage, { storagePath: pattern.storagePath, hash: pattern.fileHash ?? undefined, mimeType: "image/png" }, "pattern", parameter(request, "patternId"));
+  });
+  app.get("/api/v1/files/print-packs/:printPackId/files/:index", async (request, reply) => {
+    const pack = repository.getPrintPack(parameter(request, "printPackId"));
+    if (!pack) missing("print pack", parameter(request, "printPackId"));
+    const index = Number(parameter(request, "index"));
+    const file = Number.isInteger(index) && index >= 0 ? pack.files?.[index] : undefined;
+    if (!file) missing("print pack file", `${parameter(request, "printPackId")}/${index}`);
+    return sendStored(request, reply, storage, { storagePath: file.storagePath, hash: file.hash }, "print pack file", file.name);
   });
 
   app.get("/api/v1/providers", async () => ({ items: repository.listProviders().map(publicProvider), nextCursor: null }));
@@ -520,7 +879,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   // 资产库：assets/outputs/model_portraits/layer_exports 的全局只读视图，不复制文件、不落库；缩略图按内容 hash 共享。
   app.get("/api/v1/library-assets", async (request) => {
     const query = (request.query ?? {}) as Record<string, unknown>;
-    const kind = typeof query.kind === "string" && query.kind ? enumValue<LibraryItemKind>(query.kind, ["PRODUCT", "REFERENCE", "GENERATED", "LAYER", "MODEL"], "kind") : null;
+    const kind = typeof query.kind === "string" && query.kind ? enumValue<LibraryItemKind>(query.kind, ["PRODUCT", "REFERENCE", "GENERATED", "LAYER", "MODEL", "PATTERN", "PRINT_PACK"], "kind") : null;
     const q = typeof query.q === "string" && query.q.trim() ? query.q.trim() : null;
     // 项目 ID 与路径参数同口径只接受 UUID：非法值返回 400，不静默当作没传。
     const projectId = typeof query.projectId === "string" && query.projectId.trim() ? query.projectId.trim() : null;
@@ -891,20 +1250,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (!result) missing("copywriting result", jobId);
     return result;
   });
-  app.post("/api/v1/jobs/:jobId/cancel", async (request) => {
-    const id = parameter(request, "jobId");
-    const current = repository.getJob(id);
-    if (!current) missing("job", id);
-    // 已失败任务没有可中断的队列工作，将其标记为已取消以关闭失败提示，同时保留审计记录。
-    if (current.status === "FAILED") return repository.updateJob(id, { status: "CANCELLED", cancelRequested: true });
-    const queued = await queue.getJob(id);
-    const state = queued ? await queued.getState() : "unknown";
-    if (queued && ["waiting", "delayed", "prioritized"].includes(state)) {
-      await queued.remove();
-      return repository.updateJob(id, { status: "CANCELLED", cancelRequested: true });
-    }
-    return repository.updateJob(id, { cancelRequested: true });
-  });
+  app.post("/api/v1/jobs/:jobId/cancel", async (request) => requestJobCancellation(parameter(request, "jobId")));
   app.post("/api/v1/jobs/:jobId/retry", async (request, reply) => {
     const id = parameter(request, "jobId"); const job = repository.getJob(id); if (!job) missing("job", id);
     // 只有失败任务可重试：重试 QUEUED/RUNNING 会叠加 Provider 调用产生重复计费，
@@ -928,9 +1274,17 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
         createLayerRecord = (retryJobId) => { repository.createLayerExport({ projectId: output.projectId, outputId: output.id, jobId: retryJobId, planId, status: "QUEUED", includeBackground, psdStoragePath: null, layerFiles: null, error: null }); };
       }
     }
+    // 规格包重试同理：记录按新 jobId 重建，否则 Worker 找不到对应记录会立即失败。
+    if (job.type === "PRINT_PACK") {
+      const patternId = typeof job.input.patternId === "string" ? job.input.patternId : "";
+      const specId = typeof job.input.specId === "string" ? job.input.specId : "";
+      const specVersion = typeof job.input.specVersion === "string" ? job.input.specVersion : "";
+      if (!patternId || !specId || !specVersion) throw new ApiError(409, "CONFLICT", "无法重试：规格包任务缺少快照");
+      createLayerRecord = (retryJobId) => { repository.createPrintPack({ patternId, jobId: retryJobId, specId, specVersion, status: "QUEUED" }); };
+    }
     // 重试即替代原任务：先终结原失败任务再入队新任务，前端结果区不再残留旧卡片；retryable 在此关闭使并发双击得到 409。
     repository.updateJob(id, { status: "CANCELLED", cancelRequested: true, retryable: false });
-    const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); createLayerRecord?.(retry.id); await enqueueOrMarkFailed(retry, queueKindForJobType(retry.type), { onFail: (jobId) => markLayerRecordFailed(repository, retry.type, jobId) }); return reply.code(202).send(retry);
+    const retry = repository.createJob({ id: randomUUID(), projectId: job.projectId, storyboardItemId: job.storyboardItemId, type: job.type, input, providerId: job.providerId, modelId: job.modelId, estimatedCost: job.estimatedCost }); createLayerRecord?.(retry.id); await enqueueOrMarkFailed(retry, queueKindForJobType(retry.type), { onFail: (jobId) => markDomainRecordFailed(repository, retry.type, jobId) }); return reply.code(202).send(retry);
   });
   app.get("/api/v1/projects/:projectId/outputs", async (request) => repository.listOutputs(parameter(request, "projectId")));
   app.post("/api/v1/projects/:projectId/export-jobs", async (request, reply) => { const projectId = parameter(request, "projectId"); ensureProject(repository, projectId); const body = parseBody(CreateExportJobRequest, request.body ?? {}); const input = { outputIds: body.outputIds, filenamePrefix: body.filenamePrefix }; const fingerprint = requestFingerprint({ type: "EXPORT", projectId, input, idempotencyKey: request.headers["idempotency-key"] ?? null }); const existing = repository.findJobByFingerprint(projectId, fingerprint); if (existing) { const exportRecord = repository.getExportByJobId(existing.id); return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send({ job: existing, export: exportRecord ?? null }); } const job = repository.createJob({ id: randomUUID(), projectId, storyboardItemId: null, type: "EXPORT", input, requestFingerprint: fingerprint, estimatedCost: { status: "UNKNOWN", unit: "local-storage" } }); const exportRecord = repository.createExport({ projectId, jobId: job.id, status: "QUEUED", storagePath: null }); await enqueueOrMarkFailed(job, "export", { onFail: (failedJobId) => { const pendingExport = repository.getExportByJobId(failedJobId); if (pendingExport) repository.updateExport(pendingExport.id, { status: "FAILED" }); } }); return reply.code(202).send({ job, export: exportRecord }); });
@@ -974,7 +1328,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (duplicate) { const duplicatePlan = repository.getLayerPlanByJobId(duplicate.id); if (duplicatePlan) return reply.code(duplicate.status === "SUCCEEDED" ? 200 : 202).send(publicLayerPlan(duplicatePlan)); }
     const job = repository.createJob({ id: randomUUID(), projectId: output.projectId, storyboardItemId: null, type: "LAYER_PLAN", input, requestFingerprint: fingerprint, providerId: project.reasoningProviderId, modelId: project.reasoningModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     const plan = repository.createLayerPlan({ projectId: output.projectId, outputId: output.id, jobId: job.id, outputHash: output.hash, status: "QUEUED", elements: [], error: null });
-    await enqueueOrMarkFailed(job, "layer_plan", { onFail: (failedJobId) => markLayerRecordFailed(repository, "LAYER_PLAN", failedJobId) });
+    await enqueueOrMarkFailed(job, "layer_plan", { onFail: (failedJobId) => markDomainRecordFailed(repository, "LAYER_PLAN", failedJobId) });
     return reply.code(202).send(publicLayerPlan(plan));
   });
   app.get("/api/v1/outputs/:outputId/layer-exports", async (request) => {
@@ -1024,7 +1378,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
     if (duplicate) { const duplicateExport = repository.getLayerExportByJobId(duplicate.id); if (duplicateExport) return reply.code(duplicate.status === "SUCCEEDED" ? 200 : 202).send({ job: duplicate, layerExport: publicLayerExport(duplicateExport) }); }
     const job = repository.createJob({ id: randomUUID(), projectId: output.projectId, storyboardItemId: null, type: "LAYER_EXPORT", input, requestFingerprint: fingerprint, providerId: project.segmentationModel.providerId, modelId: project.segmentationModel.modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     const layerExport = repository.createLayerExport({ projectId: output.projectId, outputId: output.id, jobId: job.id, planId, status: "QUEUED", includeBackground, psdStoragePath: null, layerFiles: null, error: null });
-    await enqueueOrMarkFailed(job, "layer_export", { onFail: (failedJobId) => markLayerRecordFailed(repository, "LAYER_EXPORT", failedJobId) });
+    await enqueueOrMarkFailed(job, "layer_export", { onFail: (failedJobId) => markDomainRecordFailed(repository, "LAYER_EXPORT", failedJobId) });
     return reply.code(202).send({ job, layerExport: publicLayerExport(layerExport) });
   });
   app.get("/api/v1/files/layer-exports/:layerExportId", async (request, reply) => {
@@ -1258,20 +1612,8 @@ function editGenerationConfigFor(repository: EcomRepository, project: ProjectRec
   verifyModel(repository, imageProviderId, imageModelId, "image");
   return { reasoningProviderId, reasoningModelId, imageProviderId, imageModelId, imageResolution: config.imageResolution === undefined ? project.imageResolution : config.imageResolution, candidateCount: config.candidateCount === undefined ? clampCandidates(project.candidatesPerType) : config.candidateCount };
 }
-function queueKindForJobType(type: JobType): EcomJobKind {
-  if (type === "PLAN") return "plan";
-  if (type === "COPYWRITE") return "copywrite";
-  if (type === "GENERATE") return "generate";
-  if (type === "EDIT_PLAN") return "edit_plan";
-  if (type === "EDIT_GENERATE") return "edit_generate";
-  if (type === "LAYER_PLAN") return "layer_plan";
-  if (type === "LAYER_EXPORT") return "layer_export";
-  if (type === "SUITE_FORGE") return "suite_forge";
-  if (type === "MODEL_CAST") return "model_cast";
-  return "export";
-}
-/** 入队失败时同步把任务的分层伴随记录推进到终态，避免前端看到永远 QUEUED 的记录。 */
-function markLayerRecordFailed(repository: EcomRepository, type: JobType, jobId: string): void {
+/** 入队失败时同步把任务的领域伴随记录推进到终态，避免前端看到永远 QUEUED 的记录。 */
+function markDomainRecordFailed(repository: EcomRepository, type: JobType, jobId: string): void {
   const error = { code: "QUEUE_UNAVAILABLE", message: "任务已创建但队列暂不可用，请稍后重试" };
   if (type === "LAYER_PLAN") {
     const plan = repository.getLayerPlanByJobId(jobId);
@@ -1280,6 +1622,10 @@ function markLayerRecordFailed(repository: EcomRepository, type: JobType, jobId:
   if (type === "LAYER_EXPORT") {
     const layerExport = repository.getLayerExportByJobId(jobId);
     if (layerExport) repository.updateLayerExport(layerExport.id, { status: "FAILED", error });
+  }
+  if (type === "PRINT_PACK") {
+    const pack = repository.getPrintPackByJobId(jobId);
+    if (pack) repository.updatePrintPack(pack.id, { status: "FAILED", error });
   }
 }
 // ProviderId/modelId 为 null 表示项目尚未选择模型（Provider 被删除后置空），在入口拦截而不是打出一个注定失败的任务
@@ -1297,10 +1643,156 @@ function readSegmentationModel(repository: EcomRepository, value: unknown): { pr
   if (requested && requested !== model.segmentationProtocol) throw new ApiError(400, "VALIDATION_ERROR", `segmentationModel.protocol must match the model's declared protocol (${model.segmentationProtocol})`);
   return { providerId: ref.providerId, modelId: ref.modelId, protocol: model.segmentationProtocol };
 }
+/**
+ * 透明底是参数级能力，不是提示词风格：模型给不了就在入队前拒绝，而不是让用户为一次注定画成棋盘格的调用付费。
+ * 只有显式选 TRANSPARENT 才校验——SOURCE 的语义是"跟随源图"，源图是否透明由 worker 解码判定，
+ * 那时源图案已经在库里，报错信息也能说清是"源的透明底保不住"。
+ */
+function assertTransparentBackgroundAvailable(repository: EcomRepository, providerId: string, modelId: string, mode: PatternBackgroundMode | undefined): void {
+  if (mode !== "TRANSPARENT") return;
+  const declared = repository.getProvider(providerId)?.models.find((candidate) => candidate.id === modelId);
+  if (declared && supportsTransparentBackground(declared.id)) return;
+  throw new ApiError(422, "CAPABILITY_UNSUPPORTED", `模型 ${modelId} 不支持透明底，请改用 gpt-image-1 / 1.5 / 2 系列，或把底版改成白底`);
+}
 function ensureProject(repository: EcomRepository, id: string): void { if (!repository.getProject(id)) missing("project", id); }
 function missing(resource: string, id: string): never { throw new ApiError(404, "NOT_FOUND", `${resource} not found: ${id}`); }
 
 function ensureModel(repository: EcomRepository, id: string): ModelRecord { const model = repository.getModel(id); if (!model) missing("model", id); return model; }
+function ensurePattern(repository: EcomRepository, id: string): PatternRecord { const pattern = repository.getPattern(id); if (!pattern) missing("pattern", id); return pattern; }
+function ensurePatternPipeline(repository: EcomRepository, id: string): PatternPipelineWithSteps { const pipeline = repository.getPatternPipeline(id); if (!pipeline) missing("pattern pipeline", id); return pipeline; }
+
+/**
+ * 指纹复用的前提是产物仍在：在途任务照常复用——forge/cast 的产物随候选完成才逐张落库，
+ * 在途阶段以"产物存在"为复用条件会让重复提交重复计费；SUCCEEDED 任务的产物被删除后
+ * 指纹成为孤儿，复用它只会返回一个不再产出任何东西的旧任务（花型墙/定妆照区永远空着），
+ * 必须放行走新建流程。同一指纹新建任务安全：findJobByFingerprint 取最新一条且无唯一约束。
+ */
+function reusableFingerprintedJob(existing: JobRecord, hasProducts: boolean): boolean {
+  return existing.status !== "SUCCEEDED" || hasProducts;
+}
+function publicPattern(record: PatternRecord) {
+  return {
+    id: record.id,
+    name: record.name,
+    source: record.sourceType,
+    tags: record.tags,
+    sourceJobId: record.sourceJobId,
+    parentPatternId: record.parentPatternId,
+    tileable: record.tileable,
+    tileableScore: record.tileableScore,
+    tileableCheckedWith: record.tileableCheckedWith,
+    ...(record.storagePath ? { imageUrl: `/api/v1/files/patterns/${record.id}` } : {}),
+    ...(record.fileHash ? { thumbUrl: `/api/v1/files/thumbnails/${record.fileHash}` } : {}),
+    width: record.width,
+    height: record.height,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
+/** 流水线序列化：步骤按 position 顺序下发，前端直接照它渲染时间线收据（不重新排序）。 */
+function publicPatternPipeline(record: PatternPipelineWithSteps) {
+  return {
+    id: record.id,
+    patternId: record.patternId,
+    specId: record.specId,
+    specVersion: record.specVersion,
+    layout: record.layout,
+    listingPlatform: record.listingPlatform,
+    listingProviderId: record.listingProviderId,
+    listingModelId: record.listingModelId,
+    status: record.status,
+    blockReason: record.blockReason,
+    steps: record.steps.map((step) => ({ step: step.step, position: step.position, status: step.status, jobId: step.jobId, detail: step.detail, error: step.error })),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
+function publicPrintPack(record: PrintPackRecord) {
+  return {
+    id: record.id,
+    jobId: record.jobId,
+    patternId: record.patternId,
+    specId: record.specId,
+    specVersion: record.specVersion,
+    status: record.status,
+    files: (record.files ?? []).map((file, index) => ({ name: file.name, kind: file.kind, hash: file.hash, url: `/api/v1/files/print-packs/${record.id}/files/${index}` })),
+    error: record.error,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
+/** 花型提取的分割模型解析：与项目分层同语义——协议从模型声明派生，请求显式协议仅做一致性校验。 */
+function resolvePatternSegmentationModel(repository: EcomRepository, providerId: string, modelId: string, requestedProtocol: string | null | undefined): { provider: ProviderRecord; model: { id: string }; protocol: SegmentationProtocol } {
+  const provider = repository.getProvider(providerId);
+  if (!provider) missing("provider", providerId);
+  const model = provider.models.find((candidate) => candidate.id === modelId);
+  if (!model) throw new ApiError(400, "VALIDATION_ERROR", "segmentation model is not declared by the selected provider");
+  if (!model.segmentationProtocol) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected segmentation model has no segmentation API configured");
+  const requested = requestedProtocol ? enumValue(requestedProtocol, [...SEGMENTATION_PROTOCOLS], "protocol") : undefined;
+  if (requested && requested !== model.segmentationProtocol) throw new ApiError(400, "VALIDATION_ERROR", `protocol must match the model's declared protocol (${model.segmentationProtocol})`);
+  if (model.segmentationProtocol === "seedream_layerize") throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "花型提取不支持 Seedream 图层拆分协议，请选择 SAM 类分割模型");
+  return { provider, model, protocol: model.segmentationProtocol };
+}
+/**
+ * 成包答案的校验：规格必须存在，文案模型必须是支持视觉的推理模型（文案步骤要读花型图）。
+ *
+ * 与建链分开是因为源入口要在**写任何文件或行之前**先失败：一个 400 请求不该留下半个花型。
+ * 返回解析出的规格，供调用方避免二次查表。
+ */
+function validatePatternPipelineAnswers(repository: EcomRepository, answers: PatternPipelineAnswers) {
+  const spec = getPodPrintSpec(answers.specId);
+  if (!spec) throw new ApiError(400, "VALIDATION_ERROR", `未知的印刷规格：${answers.specId}`);
+  verifyCopywritingModel(repository, answers.listingProviderId, answers.listingModelId);
+  return spec;
+}
+/** multipart 的 tags 字段是 JSON 数组字符串；逐项校验后截断到容量上限。 */
+/**
+ * 源入口（提取 / 上传）共用的 multipart 收集：一个 image/* 文件 + 一组文本字段。
+ * 收集规则只写这一份——两个路由各抄一遍的话，将来加同一条字段约束必然漏一处。
+ * fileLabel 同时拼进三条错误信息与缺省文件名（如 "source image" / "pattern image"）。
+ */
+async function readSingleImageMultipart(request: FastifyRequest, fileLabel: string): Promise<{ upload: { filename: string; buffer: Buffer }; fields: Record<string, string> }> {
+  let upload: { filename: string; buffer: Buffer } | null = null;
+  const fields: Record<string, string> = {};
+  for await (const part of request.parts()) {
+    if (part.type === "file") {
+      if (!part.mimetype.startsWith("image/")) throw new ApiError(400, "VALIDATION_ERROR", "Only image files are supported");
+      if (upload) throw new ApiError(400, "VALIDATION_ERROR", `A single ${fileLabel} is required`);
+      upload = { filename: part.filename || fileLabel, buffer: await part.toBuffer() };
+      continue;
+    }
+    fields[part.fieldname] = typeof part.value === "string" ? part.value : String(part.value ?? "");
+  }
+  if (!upload) throw new ApiError(400, "VALIDATION_ERROR", `A ${fileLabel} is required`);
+  return { upload, fields };
+}
+
+/** multipart 字段不走 TypeBox，长度上限必须在这里对齐契约（同 suite-forge 的 boundedText 约定）。 */
+function optionalBoundedText(value: string | undefined, maxLength: number, field: string): string | undefined {
+  if (value && value.length > maxLength) throw new ApiError(400, "VALIDATION_ERROR", `${field} must be at most ${maxLength} characters`);
+  return value;
+}
+
+function parsePatternTags(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { throw new ApiError(400, "VALIDATION_ERROR", "tags must be a JSON array of strings"); }
+  if (!Array.isArray(parsed) || parsed.some((tag) => typeof tag !== "string")) throw new ApiError(400, "VALIDATION_ERROR", "tags must be a JSON array of strings");
+  const tags = parsed.map((tag) => (tag as string).trim()).filter(Boolean).slice(0, PATTERN_TAGS_MAX);
+  if (tags.some((tag) => tag.length > MAX_PATTERN_TAG_LENGTH)) throw new ApiError(400, "VALIDATION_ERROR", `tag exceeds ${MAX_PATTERN_TAG_LENGTH} characters`);
+  return tags;
+}
+/**
+ * multipart 里的成包答案：多段表单只能传字符串，所以这一项是 JSON 文本。
+ * 解析失败与字段缺失必须给不同口径的错误——把"没填"和"填错了"混成同一句，用户改不动。
+ */
+function readPatternPipelineAnswers(raw: string | null | undefined): PatternPipelineAnswers | undefined {
+  const text = readOptionalText(raw);
+  if (!text) return undefined;
+  let parsed: unknown;
+  try { parsed = JSON.parse(text); } catch { throw new ApiError(400, "VALIDATION_ERROR", "pipeline 必须是 JSON 对象"); }
+  return parseBody(PatternPipelineAnswers, parsed);
+}
 function publicModelPortrait(portrait: ModelPortraitRecord) {
   return {
     id: portrait.id,
@@ -1415,14 +1907,18 @@ async function sendStored(request: FastifyRequest, reply: FastifyReply, storage:
 function mimeForPath(path: string): string { if (path.endsWith(".png")) return "image/png"; if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg"; if (path.endsWith(".webp")) return "image/webp"; if (path.endsWith(".zip")) return "application/zip"; if (path.endsWith(".psd")) return "image/vnd.adobe.photoshop"; return "application/octet-stream"; }
 function publicLibraryAsset(item: LibraryItemRecord): Record<string, unknown> {
   const idBody = item.id.slice(item.id.indexOf(":") + 1);
-  // 分层条目 ID 为 layer:<layerExportId>:<index>，下载走分层文件端点。
+  // 分层条目 ID 为 layer:<layerExportId>:<index>，下载走分层文件端点；规格包同理按文件下标寻址。
   const url = item.id.startsWith("layer:")
     ? `/api/v1/files/layer-exports/${idBody.slice(0, idBody.lastIndexOf(":"))}/layers/${idBody.slice(idBody.lastIndexOf(":") + 1)}`
     : item.id.startsWith("model:")
       ? `/api/v1/files/model-portraits/${idBody}`
-      : item.source === "UPLOADED"
-        ? `/api/v1/files/assets/${idBody}`
-        : `/api/v1/files/outputs/${idBody}`;
+      : item.id.startsWith("pattern:")
+        ? `/api/v1/files/patterns/${idBody}`
+        : item.id.startsWith("pack:")
+          ? `/api/v1/files/print-packs/${idBody.slice(0, idBody.lastIndexOf(":"))}/files/${idBody.slice(idBody.lastIndexOf(":") + 1)}`
+          : item.source === "UPLOADED"
+            ? `/api/v1/files/assets/${idBody}`
+            : `/api/v1/files/outputs/${idBody}`;
   return {
     id: item.id,
     source: item.source,

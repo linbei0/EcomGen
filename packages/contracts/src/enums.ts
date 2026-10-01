@@ -26,15 +26,16 @@ export const USER_ASSET_KIND_REFERENCE = "REFERENCE" as const;
 export const UserAssetKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE" }, { $id: "#/components/schemas/UserAssetKind" });
 /** 资产库条目的物理来源：项目上传、生成结果或模特定妆照。 */
 export const LibraryItemSource = Type.Enum({ UPLOADED: "UPLOADED", GENERATED: "GENERATED", MODEL: "MODEL" }, { $id: "#/components/schemas/LibraryItemSource" });
-/** 资产库筛选类别：上传素材按用途分为商品/参考，生成结果、分层切图与模特定妆照各列一类。 */
-export const LibraryItemKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE", GENERATED: "GENERATED", LAYER: "LAYER", MODEL: "MODEL" }, { $id: "#/components/schemas/LibraryItemKind" });
+/** 资产库筛选类别：上传素材按用途分为商品/参考，生成结果、分层切图、花型与规格包各列一类。 */
+export const LibraryItemKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE", GENERATED: "GENERATED", LAYER: "LAYER", MODEL: "MODEL", PATTERN: "PATTERN", PRINT_PACK: "PRINT_PACK" }, { $id: "#/components/schemas/LibraryItemKind" });
 export const ImageResolution = Type.Enum({ K1: "1K", K2: "2K", K4: "4K" }, { $id: "#/components/schemas/ImageResolution" });
 export const ImageAspectRatio = Type.Enum({ AUTO: "AUTO", SQUARE: "1:1", PORTRAIT_2_3: "2:3", LANDSCAPE_3_2: "3:2", PORTRAIT: "3:4", LANDSCAPE: "4:3", PORTRAIT_4_5: "4:5", LANDSCAPE_5_4: "5:4", PORTRAIT_9_16: "9:16", WIDE: "16:9", ULTRA_WIDE: "21:9" }, { $id: "#/components/schemas/ImageAspectRatio" });
 export const PlanningMode = Type.Enum({ AI: "AI", MANUAL: "MANUAL" }, { $id: "#/components/schemas/PlanningMode" });
 /** 套图来源：随仓库内置或由用户导入/目录投放。 */
 export const EcomSuiteOrigin = Type.Enum({ BUILTIN: "builtin", USER: "user" }, { $id: "#/components/schemas/EcomSuiteOrigin" });
-export const CopywritingTarget = Type.Enum({ PRODUCT_DESCRIPTION: "PRODUCT_DESCRIPTION", PLANNING_INSTRUCTION: "PLANNING_INSTRUCTION" }, { $id: "#/components/schemas/CopywritingTarget" });
-export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERATE: "GENERATE", EXPORT: "EXPORT", EDIT_PLAN: "EDIT_PLAN", EDIT_GENERATE: "EDIT_GENERATE", LAYER_PLAN: "LAYER_PLAN", LAYER_EXPORT: "LAYER_EXPORT", SUITE_FORGE: "SUITE_FORGE", MODEL_CAST: "MODEL_CAST" }, { $id: "#/components/schemas/JobType" });
+/** LISTING：面向跨境电商平台的 listing 文案包（标题/tags/描述/要点），由花型工坊发起，不绑定项目。 */
+export const CopywritingTarget = Type.Enum({ PRODUCT_DESCRIPTION: "PRODUCT_DESCRIPTION", PLANNING_INSTRUCTION: "PLANNING_INSTRUCTION", LISTING: "LISTING" }, { $id: "#/components/schemas/CopywritingTarget" });
+export const JobType = Type.Enum({ PLAN: "PLAN", COPYWRITE: "COPYWRITE", GENERATE: "GENERATE", EXPORT: "EXPORT", EDIT_PLAN: "EDIT_PLAN", EDIT_GENERATE: "EDIT_GENERATE", LAYER_PLAN: "LAYER_PLAN", LAYER_EXPORT: "LAYER_EXPORT", SUITE_FORGE: "SUITE_FORGE", MODEL_CAST: "MODEL_CAST", PATTERN_EXTRACT: "PATTERN_EXTRACT", PATTERN_FORGE: "PATTERN_FORGE", PATTERN_DERIVE: "PATTERN_DERIVE", PATTERN_VARIANT: "PATTERN_VARIANT", PATTERN_TILE_CHECK: "PATTERN_TILE_CHECK", PRINT_PACK: "PRINT_PACK" }, { $id: "#/components/schemas/JobType" });
 export const JobStatus = Type.Enum({ QUEUED: "QUEUED", RUNNING: "RUNNING", SUCCEEDED: "SUCCEEDED", FAILED: "FAILED", CANCELLED: "CANCELLED" }, { $id: "#/components/schemas/JobStatus" });
 export const ReasoningProtocolProfile = Type.Enum({ OPENAI: "openai", DASHSCOPE_QWEN: "dashscope_qwen", OPENAI_RESPONSES: "openai_responses" }, { $id: "#/components/schemas/ReasoningProtocolProfile" });
 export const SearchSourceKind = Type.Enum({ BRAVE: "brave", TAVILY: "tavily", SEARXNG: "searxng" }, { $id: "#/components/schemas/SearchSourceKind" });

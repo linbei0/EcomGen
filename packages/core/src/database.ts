@@ -567,6 +567,23 @@ function migrate(database: SqliteDatabase): void {
     database.exec("ALTER TABLE outputs ADD COLUMN generation_batch_id TEXT");
     database.exec("UPDATE outputs SET generation_batch_id=job_id WHERE edit_session_id IS NULL AND generation_batch_id IS NULL");
   }
+  // 验缝判定（本地确定性接缝比较，常量见 contracts/pod-tileability.ts）：判定的唯一写入方是
+  // PATTERN_TILE_CHECK 任务。这段守卫必须放在 CREATE TABLE patterns 之前，所以要先判定表是否存在
+  // ——columnNames 对不存在的表返回空集，只有 size > 0 才说明是历史库、才需要补列；
+  // 新库由下面的建表语句直接带上这三列。
+  const patternColumns = columnNames(database, "patterns");
+  if (patternColumns.size > 0) {
+    if (!patternColumns.has("tileable_status")) {
+      database.exec("ALTER TABLE patterns ADD COLUMN tileable_status TEXT NOT NULL DEFAULT 'NONE'");
+    }
+    if (!patternColumns.has("tileable_score")) {
+      database.exec("ALTER TABLE patterns ADD COLUMN tileable_score REAL");
+    }
+    // 写入该判定时的算法版本：与当前版本不一致即判定过期，需要重算（花型像素不可变，判定只在算法变更时失效）。
+    if (!patternColumns.has("tileable_checked_with")) {
+      database.exec("ALTER TABLE patterns ADD COLUMN tileable_checked_with TEXT");
+    }
+  }
   database.exec(`
     CREATE TABLE IF NOT EXISTS edit_reference_assets (
       id TEXT PRIMARY KEY,
@@ -625,6 +642,97 @@ function migrate(database: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_layer_plans_output ON layer_plans(output_id, created_at DESC);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_layer_exports_job ON layer_exports(job_id);
     CREATE INDEX IF NOT EXISTS idx_layer_exports_output ON layer_exports(output_id, created_at DESC);
+  `);
+  // 花型工坊：patterns 是全局实体（无项目外键，同 models）；print_packs 是「一任务一记录」的领域记录（同 layer_exports）。
+  // Listing 文案结果独立成表而不是复用 copywriting_results：后者 project_id NOT NULL 且外键到 projects，
+  // 而 Listing 由花型发起、归属花型域，硬塞进项目域需要把列约束改可空（SQLite 只能重建表）。
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS patterns (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      source_job_id TEXT,
+      source_asset_hash TEXT,
+      parent_pattern_id TEXT,
+      storage_path TEXT,
+      file_hash TEXT,
+      width INTEGER,
+      height INTEGER,
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      tileable_status TEXT NOT NULL DEFAULT 'NONE',
+      tileable_score REAL,
+      tileable_checked_with TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (parent_pattern_id) REFERENCES patterns(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_patterns_created ON patterns(created_at DESC);
+    -- source_job_id：每个花型任务的指纹复用判定与断点续跑都按它查；file_hash：资产库缩略图按 hash 找回花型。
+    CREATE INDEX IF NOT EXISTS idx_patterns_source_job ON patterns(source_job_id);
+    CREATE INDEX IF NOT EXISTS idx_patterns_file_hash ON patterns(file_hash);
+    CREATE TABLE IF NOT EXISTS print_packs (
+      id TEXT PRIMARY KEY,
+      pattern_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      spec_id TEXT NOT NULL,
+      spec_version TEXT NOT NULL,
+      status TEXT NOT NULL,
+      files_json TEXT,
+      manifest_json TEXT,
+      error_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (pattern_id) REFERENCES patterns(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_print_packs_job ON print_packs(job_id);
+    CREATE INDEX IF NOT EXISTS idx_print_packs_pattern ON print_packs(pattern_id, created_at DESC);
+    CREATE TABLE IF NOT EXISTS pattern_listing_results (
+      job_id TEXT PRIMARY KEY,
+      pattern_id TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      content_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+      FOREIGN KEY (pattern_id) REFERENCES patterns(id) ON DELETE CASCADE
+    );
+    -- 成包流水线：一条流水线是「图案 × 品类规格 × 平台」的一次串联执行，步骤各自对应一个任务行。
+    -- pattern_id 可空：从花型墙的来源动作（提取/起稿/上传）起链时，花型要等 SOURCE 步骤完成才存在；
+    -- 因此外键用 SET NULL 而不是 CASCADE——删花型不该连流水线历史一起抹掉（用户仍要看到它产过什么）。
+    CREATE TABLE IF NOT EXISTS pattern_pipelines (
+      id TEXT PRIMARY KEY,
+      pattern_id TEXT,
+      spec_id TEXT NOT NULL,
+      spec_version TEXT NOT NULL,
+      layout TEXT NOT NULL,
+      listing_platform TEXT NOT NULL,
+      listing_provider_id TEXT NOT NULL,
+      listing_model_id TEXT NOT NULL,
+      listing_hints_json TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL,
+      block_reason TEXT,
+      request_fingerprint TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (pattern_id) REFERENCES patterns(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_pattern_pipelines_pattern ON pattern_pipelines(pattern_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_pattern_pipelines_fingerprint ON pattern_pipelines(request_fingerprint);
+    -- 步骤表：position 决定推进顺序，不依赖枚举顺序；job_id 是唯一反查键（worker 靠它从完成的任务找回流水线）。
+    CREATE TABLE IF NOT EXISTS pattern_pipeline_steps (
+      id TEXT PRIMARY KEY,
+      pipeline_id TEXT NOT NULL,
+      step TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      job_id TEXT,
+      detail_json TEXT,
+      error_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (pipeline_id) REFERENCES pattern_pipelines(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_pattern_pipeline_steps_job ON pattern_pipeline_steps(job_id) WHERE job_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_pattern_pipeline_steps_pipeline ON pattern_pipeline_steps(pipeline_id, position);
   `);
   // 资产库视图：生成结果此前未记录尺寸，旧行保持 NULL，由前端按占位比例兜底。
   if (!columnNames(database, "outputs").has("width")) {

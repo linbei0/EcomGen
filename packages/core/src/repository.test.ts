@@ -866,3 +866,147 @@ describe("LayerPlan / LayerExport 持久化", () => {
     database.close();
   });
 });
+
+describe("花型库 / 规格包持久化", () => {
+  it("花型 CRUD：(sourceJobId, fileHash) 幂等、产物回填后进资产库、删除级联清理规格包", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+
+    // 无产物的花型行对资产库不可见：提取/起稿任务运行期间不产生半成品条目
+    const created = repository.createPattern({ name: "水彩野花", sourceType: "EXTRACTED", sourceJobId: "extract-job-1", sourceAssetHash: "src-hash", parentPatternId: null, storagePath: null, fileHash: null, width: null, height: null, tags: ["野花"] });
+    expect(repository.listLibraryItems({ kind: "PATTERN" }).items).toHaveLength(0);
+
+    // 产物回填后进入资产库（花型工坊来源不归属项目）
+    repository.setPatternArtifact(created.id, { storagePath: "patterns/a/pattern.png", fileHash: "artifact-hash", width: 1024, height: 768 });
+    const library = repository.listLibraryItems({ kind: "PATTERN" }).items;
+    expect(library.map((entry) => entry.id)).toEqual([`pattern:${created.id}`]);
+    expect(library[0]).toMatchObject({ hash: "artifact-hash", source: "GENERATED", projectName: "花型工坊" });
+
+    // 同 (sourceJobId, fileHash) 幂等：Worker 重试复用同一行，不产生重复花型
+    const duplicated = repository.createPattern({ name: "重复行", sourceType: "EXTRACTED", sourceJobId: "extract-job-1", sourceAssetHash: "src-hash", parentPatternId: null, storagePath: "other.png", fileHash: "artifact-hash", width: 1, height: 1, tags: [] });
+    expect(duplicated.id).toBe(created.id);
+    expect(repository.listPatterns()).toHaveLength(1);
+
+    expect(repository.updatePattern(created.id, { name: "改名", tags: ["a", "b"] })).toMatchObject({ name: "改名", tags: ["a", "b"] });
+    expect(repository.updatePattern("missing-pattern", { name: "x" })).toBeUndefined();
+
+    // 规格包：一任务一记录（job_id 反查），文件清单成功后写入；只有 PRINT_FILE 进资产库
+    const pack = repository.createPrintPack({ patternId: created.id, jobId: "pack-job-1", specId: "tshirt-front-12x16", specVersion: "2026.09" });
+    expect(repository.getPrintPackByJobId("pack-job-1")?.id).toBe(pack.id);
+    repository.updatePrintPack(pack.id, {
+      status: "SUCCEEDED",
+      files: [
+        { name: "tshirt-front-12x16.png", kind: "PRINT_FILE", storagePath: "print-packs/x/print.png", hash: "pack-hash" },
+        { name: "manifest.json", kind: "MANIFEST", storagePath: "print-packs/x/manifest.json", hash: "manifest-hash" },
+      ],
+      manifest: { patternHash: "artifact-hash" },
+    });
+    expect(repository.listLibraryItems({ kind: "PRINT_PACK" }).items.map((entry) => entry.id)).toEqual([`pack:${pack.id}:0`]);
+    expect(repository.resolveLibrarySource(`pack:${pack.id}:0`)).toMatchObject({ storagePath: "print-packs/x/print.png", hash: "pack-hash", mimeType: "image/png" });
+    // manifest 是溯源清单而非可预览图
+    expect(repository.resolveLibrarySource(`pack:${pack.id}:1`)).toBeUndefined();
+
+    expect(repository.resolveLibrarySource(`pattern:${created.id}`)).toMatchObject({ storagePath: "patterns/a/pattern.png", hash: "artifact-hash" });
+    expect(repository.findLibrarySourcePath("pack-hash")).toBe("print-packs/x/print.png");
+
+    // 删除花型级联清理规格包，两段库条目同时消失
+    expect(repository.deletePattern(created.id)).toBe(true);
+    expect(repository.getPrintPack(pack.id)).toBeUndefined();
+    expect(repository.getPattern(created.id)).toBeUndefined();
+    expect(repository.listLibraryItems({ kind: "PATTERN" }).items).toHaveLength(0);
+    expect(repository.listLibraryItems({ kind: "PRINT_PACK" }).items).toHaveLength(0);
+    database.close();
+  });
+
+  it("验缝判定独立于图稿内容：新花型从 NONE 起步，重算覆盖判定并记录算法版本", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const pattern = repository.createPattern({ name: "满印花型", sourceType: "GENERATED", sourceJobId: "forge-1", sourceAssetHash: null, parentPatternId: null, storagePath: "patterns/t/pattern.png", fileHash: "tile-hash", width: 600, height: 600, tags: [] });
+
+    // 可平铺是"已验证的事实"，不能在入库时就假定成立
+    expect(pattern).toMatchObject({ tileable: "NONE", tileableScore: null, tileableCheckedWith: null });
+
+    expect(repository.setPatternTileable(pattern.id, { status: "VERIFIED", score: 0.98, algorithmVersion: "2026.09.1" }))
+      .toMatchObject({ tileable: "VERIFIED", tileableScore: 0.98, tileableCheckedWith: "2026.09.1" });
+    expect(repository.getPattern(pattern.id)).toMatchObject({ tileable: "VERIFIED", tileableScore: 0.98 });
+
+    // 算法版本升级后重算：判定被覆盖，且旧版本号不再残留
+    expect(repository.setPatternTileable(pattern.id, { status: "FAILED", score: 0.31, algorithmVersion: "2027.01" }))
+      .toMatchObject({ tileable: "FAILED", tileableScore: 0.31, tileableCheckedWith: "2027.01" });
+    expect(repository.setPatternTileable("missing-pattern", { status: "VERIFIED", score: 1, algorithmVersion: "2027.01" })).toBeUndefined();
+    database.close();
+  });
+
+  it("Listing 文案结果按 jobId 存储且同 job 覆盖，独立于项目域 copywriting_results", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const pattern = repository.createPattern({ name: "上传花型", sourceType: "UPLOADED", sourceJobId: null, sourceAssetHash: null, parentPatternId: null, storagePath: "patterns/b/pattern.png", fileHash: "upload-hash", width: 100, height: 100, tags: [] });
+    // job_id 外键到 jobs：Listing 是 COPYWRITE 的全局扩展，结果随任务生命周期级联清理
+    const job = repository.createJob({ id: "listing-job-1", projectId: null, storyboardItemId: null, type: "COPYWRITE", status: "QUEUED", input: {} });
+
+    repository.savePatternListingResult({ jobId: job.id, patternId: pattern.id, platform: "ETSY", copy: { platform: "ETSY", title: "Cozy Cat Tee", tags: ["cat"], description: "d", bullets: [] } });
+    expect(repository.getPatternListingResult(job.id)).toMatchObject({ patternId: pattern.id, platform: "ETSY", copy: { title: "Cozy Cat Tee" } });
+
+    // 同一任务的重复保存覆盖旧结果（重试成功后以最后一次校验通过的文案为准）
+    repository.savePatternListingResult({ jobId: job.id, patternId: pattern.id, platform: "AMAZON", copy: { platform: "AMAZON", title: "Cat Tee", tags: [], description: "d2", bullets: ["b"] } });
+    expect(repository.getPatternListingResult(job.id)?.platform).toBe("AMAZON");
+    expect(repository.getPatternListingResult("missing-job")).toBeUndefined();
+    database.close();
+  });
+
+  it("恢复中断任务时把 RUNNING 规格包同步回 QUEUED，前端不会停在假运行态", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const pattern = repository.createPattern({ name: "马克杯花型", sourceType: "GENERATED", sourceJobId: "forge-job-1", sourceAssetHash: null, parentPatternId: null, storagePath: "patterns/c/pattern.png", fileHash: "forge-hash", width: 100, height: 100, tags: [] });
+    const job = repository.createJob({ id: "recover-pack-job", projectId: null, storyboardItemId: null, type: "PRINT_PACK", status: "QUEUED", input: {} });
+    const pack = repository.createPrintPack({ patternId: pattern.id, jobId: job.id, specId: "mug-11oz-wrap", specVersion: "2026.09", status: "RUNNING" });
+    database.prepare("UPDATE print_packs SET error_json=? WHERE id=?").run(JSON.stringify({ message: "stale" }), pack.id);
+    database.prepare("UPDATE jobs SET status='RUNNING' WHERE id=?").run(job.id);
+
+    expect(repository.recoverInterruptedJobs().map((entry) => entry.id)).toEqual([job.id]);
+    expect(repository.getPrintPack(pack.id)).toMatchObject({ status: "QUEUED", error: null });
+    database.close();
+  });
+
+  it("成包流水线按指纹只复用进行中的记录，终态后新建；删花型保留流水线历史但断开引用", () => {
+    const database = openDatabase(":memory:");
+    const repository = new EcomRepository(database);
+    const pattern = repository.createPattern({ name: "流水线花型", sourceType: "GENERATED", sourceJobId: "forge-1", sourceAssetHash: null, parentPatternId: null, storagePath: "patterns/p/pattern.png", fileHash: "pipe-hash", width: 600, height: 600, tags: [] });
+    const pipeline = repository.createPatternPipeline({
+      patternId: pattern.id,
+      specId: "tshirt-front-12x16",
+      specVersion: "2026.09",
+      layout: "TILE",
+      listingPlatform: "ETSY",
+      listingProviderId: "provider-1",
+      listingModelId: "vision-1",
+      listingHints: { sellingPoints: "棉感", bannedWords: null },
+      requestFingerprint: "pipe-fingerprint",
+      steps: [
+        { step: "TILE_CHECK", position: 0 },
+        { step: "PRINT_PACK", position: 1 },
+        { step: "LISTING", position: 2 },
+      ],
+    });
+    expect(pipeline).toMatchObject({ status: "QUEUED", blockReason: null, patternId: pattern.id, layout: "TILE" });
+    expect(pipeline.steps.map((entry) => entry.step)).toEqual(["TILE_CHECK", "PRINT_PACK", "LISTING"]);
+    expect(pipeline.steps.every((entry) => entry.status === "PENDING" && entry.jobId === null)).toBe(true);
+
+    // 进行中的同参数流水线可复用；一旦终态就不再复用，用户再点一次是明确的"再出一套"。
+    expect(repository.findReusablePatternPipeline("pipe-fingerprint")?.id).toBe(pipeline.id);
+    repository.updatePatternPipeline(pipeline.id, { status: "SUCCEEDED" });
+    expect(repository.findReusablePatternPipeline("pipe-fingerprint")).toBeUndefined();
+
+    const tileStep = pipeline.steps[0]!;
+    repository.updatePatternPipelineStep(tileStep.id, { status: "SUCCEEDED", jobId: "tile-job-1", detail: { tileable: "FAILED", tileableScore: 0.2 } });
+    expect(repository.getPatternPipelineStepByJobId("tile-job-1")).toMatchObject({ id: tileStep.id, status: "SUCCEEDED", detail: { tileable: "FAILED" } });
+    expect(repository.getPatternPipeline(pipeline.id)?.steps[0]).toMatchObject({ detail: { tileable: "FAILED" } });
+
+    // 删花型：ON DELETE SET NULL 保留流水线审计历史（任务与判定结果仍可追溯），只断开引用。
+    expect(repository.deletePattern(pattern.id)).toBe(true);
+    const orphan = repository.getPatternPipeline(pipeline.id);
+    expect(orphan).toMatchObject({ patternId: null });
+    expect(orphan?.steps).toHaveLength(3);
+    database.close();
+  });
+});

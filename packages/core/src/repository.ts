@@ -8,15 +8,24 @@ import type {
   JobType,
   LibraryItemKind,
   LibraryItemSource,
+  ListingCopy,
+  ListingPlatform,
   ModelDefinition,
   ModelSpec,
+  PatternSource,
+  PatternPipelineBlockReason,
+  PatternPipelineStatus,
+  PatternPipelineStepName,
+  PatternPipelineStepStatus,
   PlatformTarget,
+  PodPrintLayout,
   ReasoningProtocolProfile,
   SearchSourceKind,
   SegmentationModelRef,
   StoryboardMode,
   StoryboardShotRole,
-  TargetMarket
+  TargetMarket,
+  TileableStatus,
 } from "@ecomgen/contracts";
 import type { CompositePolicy, EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
 import type { SuiteDocumentInput } from "@ecomgen/ecom-suite";
@@ -110,6 +119,101 @@ export interface ModelPortraitRecord {
   aspectRatio: ImageAspectRatio;
   selected: boolean;
   createdAt: string;
+}
+
+/** 全局花型库条目；来源血缘（提取源图 hash / 起稿任务 / 父花型）是自检与追溯的留痕基础。 */
+export interface PatternRecord {
+  id: string;
+  name: string;
+  sourceType: PatternSource;
+  sourceJobId: string | null;
+  sourceAssetHash: string | null;
+  parentPatternId: string | null;
+  storagePath: string | null;
+  fileHash: string | null;
+  width: number | null;
+  height: number | null;
+  tags: string[];
+  /** 可平铺判定；只有 PATTERN_TILE_CHECK 任务会改写它，花型图内容本身不被验缝修改。 */
+  tileable: TileableStatus;
+  /** 验缝归一化相似度 0..1；未校验为 null。 */
+  tileableScore: number | null;
+  /** 写入该判定时的算法版本；与当前版本不一致表示判定过期。 */
+  tileableCheckedWith: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 规格包产物文件；PRINT_FILE 为可投产 PNG，MOCKUP 为品类示意图，MANIFEST 为溯源清单。 */
+export interface PrintPackFileRecord {
+  name: string;
+  kind: "PRINT_FILE" | "MOCKUP" | "MANIFEST";
+  storagePath: string;
+  hash: string;
+}
+
+/** 规格包领域记录；一任务一记录（job_id 唯一），文件清单与 manifest 在成功后写入。 */
+export interface PrintPackRecord {
+  id: string;
+  patternId: string;
+  jobId: string;
+  specId: string;
+  specVersion: string;
+  status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+  files: PrintPackFileRecord[] | null;
+  manifest: Record<string, unknown> | null;
+  error: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 花型 Listing 文案结果；独立于 copywriting_results（后者归属项目域且 project_id 非空）。 */
+export interface PatternListingResultRecord {
+  jobId: string;
+  patternId: string;
+  platform: ListingPlatform;
+  copy: ListingCopy;
+  createdAt: string;
+}
+
+/** 成包流水线：一次「图案 × 品类规格 × 平台」的串联执行；步骤各自对应一个任务行。 */
+export interface PatternPipelineRecord {
+  id: string;
+  /** SOURCE 步骤完成后回填；从既有花型起链时创建即有值。 */
+  patternId: string | null;
+  specId: string;
+  specVersion: string;
+  layout: PodPrintLayout;
+  listingPlatform: ListingPlatform;
+  listingProviderId: string;
+  listingModelId: string;
+  listingHints: { sellingPoints: string | null; bannedWords: string | null };
+  status: PatternPipelineStatus;
+  /** AWAITING_INPUT 的原因，其它状态为 null。 */
+  blockReason: PatternPipelineBlockReason | null;
+  requestFingerprint: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 流水线步骤；position 决定推进顺序，job_id 是 worker 从完成任务反查流水线的唯一键。 */
+export interface PatternPipelineStepRecord {
+  id: string;
+  pipelineId: string;
+  step: PatternPipelineStepName;
+  position: number;
+  status: PatternPipelineStepStatus;
+  jobId: string | null;
+  /** 步骤补充事实（验缝分数、接缝风险提示等），不参与状态机。 */
+  detail: Record<string, unknown> | null;
+  error: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 流水线及其步骤（API 序列化用；步骤按 position 升序）。 */
+export interface PatternPipelineWithSteps extends PatternPipelineRecord {
+  steps: PatternPipelineStepRecord[];
 }
 
 export interface ProjectRecord {
@@ -683,6 +787,174 @@ export class EcomRepository {
   public listAllModelPortraits(): ModelPortraitRecord[] {
     return (this.db.prepare("SELECT * FROM model_portraits ORDER BY created_at DESC, id DESC").all() as Row[]).map(mapModelPortrait);
   }
+  /** 指纹复用判定用：某次选角任务当前还挂着的候选定妆照。 */
+  public listModelPortraitsByJobId(jobId: string): ModelPortraitRecord[] {
+    return (this.db.prepare("SELECT * FROM model_portraits WHERE job_id=? ORDER BY created_at DESC, id DESC").all(jobId) as Row[]).map(mapModelPortrait);
+  }
+
+  // ---- 全局花型库 ----
+
+  public listPatterns(): PatternRecord[] { return (this.db.prepare("SELECT * FROM patterns ORDER BY created_at DESC, id DESC").all() as Row[]).map(mapPattern); }
+  /** 指纹复用判定用：某次提取/起稿任务当前还挂着的花型（用户删除后为空）。 */
+  public listPatternsByJobId(jobId: string): PatternRecord[] {
+    return (this.db.prepare("SELECT * FROM patterns WHERE source_job_id=? ORDER BY created_at DESC, id DESC").all(jobId) as Row[]).map(mapPattern);
+  }
+  /** 同一判定但只需布尔答案（API 的指纹复用）时用这条：EXISTS 一行即返回，不把候选行整表 map 出来。 */
+  public hasPatternArtifactsByJobId(jobId: string): boolean {
+    const row = this.db.prepare("SELECT 1 FROM patterns WHERE source_job_id=? AND storage_path IS NOT NULL AND file_hash IS NOT NULL LIMIT 1").get(jobId);
+    return row !== undefined;
+  }
+  public getPattern(id: string): PatternRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM patterns WHERE id=?").get(id);
+    return row ? mapPattern(row as Row) : undefined;
+  }
+  /** Worker 落一条花型；同 (sourceJobId, fileHash) 幂等返回既有行，重试不产生重复花型。 */
+  public createPattern(input: Omit<PatternRecord, "id" | "createdAt" | "updatedAt" | "tileable" | "tileableScore" | "tileableCheckedWith"> & Partial<Pick<PatternRecord, "id" | "tileable" | "tileableScore" | "tileableCheckedWith">>): PatternRecord {
+    const existing = input.sourceJobId && input.fileHash
+      ? this.db.prepare("SELECT * FROM patterns WHERE source_job_id=? AND file_hash=? LIMIT 1").get(input.sourceJobId, input.fileHash) as Row | undefined
+      : undefined;
+    if (existing) return mapPattern(existing);
+    // 新花型一律从 NONE 起步：可平铺是"已验过"的事实，不能在入库时就假定成立。
+    const record: PatternRecord = { tileable: "NONE", tileableScore: null, tileableCheckedWith: null, ...input, id: input.id ?? randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO patterns (id,name,source_type,source_job_id,source_asset_hash,parent_pattern_id,storage_path,file_hash,width,height,tags_json,tileable_status,tileable_score,tileable_checked_with,created_at,updated_at)
+      VALUES (@id,@name,@sourceType,@sourceJobId,@sourceAssetHash,@parentPatternId,@storagePath,@fileHash,@width,@height,@tags,@tileable,@tileableScore,@tileableCheckedWith,@createdAt,@updatedAt)`)
+      .run({ ...record, tags: json(record.tags) });
+    return record;
+  }
+  public updatePattern(id: string, patch: Partial<Pick<PatternRecord, "name" | "tags">>): PatternRecord | undefined {
+    const current = this.getPattern(id);
+    if (!current) return undefined;
+    const record: PatternRecord = { ...current, ...patch, updatedAt: now() };
+    this.db.prepare("UPDATE patterns SET name=@name,tags_json=@tags,updated_at=@updatedAt WHERE id=@id")
+      .run({ id: record.id, name: record.name, tags: json(record.tags), updatedAt: record.updatedAt });
+    return record;
+  }
+  public deletePattern(id: string): boolean {
+    return this.db.prepare("DELETE FROM patterns WHERE id=?").run(id).changes > 0;
+  }
+
+  /** Worker 回填花型产物：文件落盘后一次性写入主图路径、hash 与尺寸；此前该行在资产库不可见。 */
+  public setPatternArtifact(id: string, artifact: { storagePath: string; fileHash: string; width: number | null; height: number | null }): PatternRecord | undefined {
+    const current = this.getPattern(id);
+    if (!current) return undefined;
+    const record: PatternRecord = { ...current, ...artifact, updatedAt: now() };
+    this.db.prepare("UPDATE patterns SET storage_path=@storagePath,file_hash=@fileHash,width=@width,height=@height,updated_at=@updatedAt WHERE id=@id")
+      .run({ id: record.id, storagePath: record.storagePath, fileHash: record.fileHash, width: record.width, height: record.height, updatedAt: record.updatedAt });
+    return record;
+  }
+
+  /**
+   * Worker 回写验缝判定；这是 tileable* 三列的唯一写入方。花型图内容不可变，所以判定只在
+   * 验缝算法版本变更时才需要重算，写入时一并记录算法版本以便识别过期判定。
+   */
+  public setPatternTileable(id: string, verdict: { status: TileableStatus; score: number | null; algorithmVersion: string }): PatternRecord | undefined {
+    const current = this.getPattern(id);
+    if (!current) return undefined;
+    const updatedAt = now();
+    this.db.prepare("UPDATE patterns SET tileable_status=@status,tileable_score=@score,tileable_checked_with=@algorithmVersion,updated_at=@updatedAt WHERE id=@id")
+      .run({ id, status: verdict.status, score: verdict.score, algorithmVersion: verdict.algorithmVersion, updatedAt });
+    return { ...current, tileable: verdict.status, tileableScore: verdict.score, tileableCheckedWith: verdict.algorithmVersion, updatedAt };
+  }
+
+  public createPrintPack(input: Omit<PrintPackRecord, "id" | "createdAt" | "updatedAt" | "status" | "files" | "manifest" | "error"> & Partial<Pick<PrintPackRecord, "status">>): PrintPackRecord {
+    const record: PrintPackRecord = { ...input, status: input.status ?? "QUEUED", files: null, manifest: null, error: null, id: randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO print_packs (id,pattern_id,job_id,spec_id,spec_version,status,files_json,manifest_json,error_json,created_at,updated_at)
+      VALUES (@id,@patternId,@jobId,@specId,@specVersion,@status,@files,@manifest,@error,@createdAt,@updatedAt)`)
+      .run({ ...record, files: record.files ? json(record.files) : null, manifest: record.manifest ? json(record.manifest) : null, error: record.error ? json(record.error) : null });
+    return record;
+  }
+  public getPrintPack(id: string): PrintPackRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM print_packs WHERE id=?").get(id);
+    return row ? mapPrintPack(row as Row) : undefined;
+  }
+  public getPrintPackByJobId(jobId: string): PrintPackRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM print_packs WHERE job_id=?").get(jobId);
+    return row ? mapPrintPack(row as Row) : undefined;
+  }
+  public listPrintPacks(patternId: string): PrintPackRecord[] {
+    return (this.db.prepare("SELECT * FROM print_packs WHERE pattern_id=? ORDER BY created_at DESC, id DESC").all(patternId) as Row[]).map(mapPrintPack);
+  }
+  public updatePrintPack(id: string, patch: Partial<Pick<PrintPackRecord, "status" | "files" | "manifest" | "error">>): PrintPackRecord | undefined {
+    const current = this.getPrintPack(id);
+    if (!current) return undefined;
+    const record: PrintPackRecord = { ...current, ...patch, updatedAt: now() };
+    this.db.prepare("UPDATE print_packs SET status=@status,files_json=@files,manifest_json=@manifest,error_json=@error,updated_at=@updatedAt WHERE id=@id")
+      .run({ id: record.id, status: record.status, files: record.files ? json(record.files) : null, manifest: record.manifest ? json(record.manifest) : null, error: record.error ? json(record.error) : null, updatedAt: record.updatedAt });
+    return record;
+  }
+  public deletePrintPack(id: string): boolean {
+    return this.db.prepare("DELETE FROM print_packs WHERE id=?").run(id).changes > 0;
+  }
+
+  public savePatternListingResult(input: Omit<PatternListingResultRecord, "createdAt">): PatternListingResultRecord {
+    const record: PatternListingResultRecord = { ...input, createdAt: now() };
+    this.db.prepare("INSERT OR REPLACE INTO pattern_listing_results (job_id,pattern_id,platform,content_json,created_at) VALUES (@jobId,@patternId,@platform,@copy,@createdAt)")
+      .run({ ...record, copy: json(record.copy) });
+    return record;
+  }
+  public getPatternListingResult(jobId: string): PatternListingResultRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM pattern_listing_results WHERE job_id=?").get(jobId);
+    return row ? mapPatternListingResult(row as Row) : undefined;
+  }
+
+  /**
+   * 建一条流水线及其全部步骤（同一事务，避免出现没有步骤的流水线）。
+   * 步骤由调用方给出（见 pattern-pipeline.ts 的 pipelineStepPlan）：从来源动作起链时含 SOURCE，
+   * 从既有花型起链时跳过它。首步若要立刻开跑，由调用方在建好后调 createPipelineStepJob 并入队。
+   */
+  public createPatternPipeline(input: Omit<PatternPipelineRecord, "id" | "createdAt" | "updatedAt" | "status" | "blockReason"> & { steps: Array<Pick<PatternPipelineStepRecord, "step" | "position">> }): PatternPipelineWithSteps {
+    const record: PatternPipelineRecord = { ...input, status: "QUEUED", blockReason: null, id: randomUUID(), createdAt: now(), updatedAt: now() };
+    const steps: PatternPipelineStepRecord[] = input.steps.map((step) => ({ ...step, id: randomUUID(), pipelineId: record.id, status: "PENDING", jobId: null, detail: null, error: null, createdAt: record.createdAt, updatedAt: record.updatedAt }));
+    const insertPipeline = this.db.prepare(`INSERT INTO pattern_pipelines (id,pattern_id,spec_id,spec_version,layout,listing_platform,listing_provider_id,listing_model_id,listing_hints_json,status,block_reason,request_fingerprint,created_at,updated_at)
+      VALUES (@id,@patternId,@specId,@specVersion,@layout,@listingPlatform,@listingProviderId,@listingModelId,@listingHints,@status,@blockReason,@requestFingerprint,@createdAt,@updatedAt)`);
+    const insertStep = this.db.prepare(`INSERT INTO pattern_pipeline_steps (id,pipeline_id,step,position,status,job_id,detail_json,error_json,created_at,updated_at)
+      VALUES (@id,@pipelineId,@step,@position,@status,@jobId,@detail,@error,@createdAt,@updatedAt)`);
+    const write = this.db.transaction(() => {
+      insertPipeline.run({ ...record, listingHints: json(record.listingHints) });
+      for (const step of steps) insertStep.run({ ...step, detail: null, error: null });
+    });
+    write();
+    return { ...record, steps };
+  }
+  public listPatternPipelines(patternId: string): PatternPipelineWithSteps[] {
+    const rows = this.db.prepare("SELECT * FROM pattern_pipelines WHERE pattern_id=? ORDER BY created_at DESC, id DESC").all(patternId) as Row[];
+    return rows.map((row) => this.withSteps(mapPatternPipeline(row)));
+  }
+  public getPatternPipeline(id: string): PatternPipelineWithSteps | undefined {
+    const row = this.db.prepare("SELECT * FROM pattern_pipelines WHERE id=?").get(id);
+    return row ? this.withSteps(mapPatternPipeline(row as Row)) : undefined;
+  }
+  /** 进行中的同参数流水线复用依据；已完成的不复用（用户重跑是有意义的意图，不该被静默吞掉）。 */
+  public findReusablePatternPipeline(fingerprint: string): PatternPipelineWithSteps | undefined {
+    const row = this.db.prepare("SELECT * FROM pattern_pipelines WHERE request_fingerprint=? AND status IN ('QUEUED','RUNNING','AWAITING_INPUT') ORDER BY created_at DESC, id DESC LIMIT 1").get(fingerprint);
+    return row ? this.withSteps(mapPatternPipeline(row as Row)) : undefined;
+  }
+  public updatePatternPipeline(id: string, patch: Partial<Pick<PatternPipelineRecord, "status" | "blockReason" | "patternId" | "layout">>): PatternPipelineWithSteps | undefined {
+    const current = this.getPatternPipeline(id);
+    if (!current) return undefined;
+    const record = { ...current, ...patch, updatedAt: now() };
+    this.db.prepare("UPDATE pattern_pipelines SET pattern_id=@patternId,layout=@layout,status=@status,block_reason=@blockReason,updated_at=@updatedAt WHERE id=@id")
+      .run({ id, patternId: record.patternId, layout: record.layout, status: record.status, blockReason: record.blockReason, updatedAt: record.updatedAt });
+    return { ...current, patternId: record.patternId, layout: record.layout, status: record.status, blockReason: record.blockReason, updatedAt: record.updatedAt };
+  }
+  /** worker 从完成的任务反查流水线步骤；job_id 上有唯一索引，一条任务最多属于一个步骤。 */
+  public getPatternPipelineStepByJobId(jobId: string): PatternPipelineStepRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM pattern_pipeline_steps WHERE job_id=?").get(jobId);
+    return row ? mapPatternPipelineStep(row as Row) : undefined;
+  }
+  public updatePatternPipelineStep(id: string, patch: Partial<Pick<PatternPipelineStepRecord, "status" | "jobId" | "detail" | "error">>): PatternPipelineStepRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM pattern_pipeline_steps WHERE id=?").get(id);
+    if (!row) return undefined;
+    const record: PatternPipelineStepRecord = { ...mapPatternPipelineStep(row as Row), ...patch, updatedAt: now() };
+    this.db.prepare("UPDATE pattern_pipeline_steps SET status=@status,job_id=@jobId,detail_json=@detail,error_json=@error,updated_at=@updatedAt WHERE id=@id")
+      .run({ id, status: record.status, jobId: record.jobId, detail: record.detail ? json(record.detail) : null, error: record.error ? json(record.error) : null, updatedAt: record.updatedAt });
+    return record;
+  }
+
+  private withSteps(pipeline: PatternPipelineRecord): PatternPipelineWithSteps {
+    const rows = this.db.prepare("SELECT * FROM pattern_pipeline_steps WHERE pipeline_id=? ORDER BY position ASC, id ASC").all(pipeline.id) as Row[];
+    return { ...pipeline, steps: rows.map(mapPatternPipelineStep) };
+  }
 
   public listProjects(archived = false): ProjectRecord[] {
     const order = archived ? "archived_at DESC, updated_at DESC" : "updated_at DESC";
@@ -802,6 +1074,27 @@ export class EcomRepository {
         AND json_extract(je.value, '$.hash') IS NOT NULL
         AND json_extract(je.value, '$.storagePath') IS NOT NULL
         AND (json_extract(je.value, '$.kind') IS NULL OR json_extract(je.value, '$.kind') <> 'composite')
+      UNION ALL
+      SELECT 'pattern:' || pt.id,
+             CASE WHEN pt.source_type = 'UPLOADED' THEN 'UPLOADED' ELSE 'GENERATED' END, 'PATTERN',
+             '', '花型工坊', pt.name,
+             'image/png', pt.storage_path, pt.file_hash, pt.width, pt.height, NULL, pt.created_at,
+             NULL
+      FROM patterns pt
+      WHERE pt.storage_path IS NOT NULL AND pt.file_hash IS NOT NULL
+      UNION ALL
+      SELECT 'pack:' || pk.id || ':' || je.key, 'GENERATED', 'PRINT_PACK',
+             '', '花型工坊', pt2.name || ' · ' || pk.spec_id,
+             'image/png', json_extract(je.value, '$.storagePath'), json_extract(je.value, '$.hash'),
+             NULL, NULL, NULL, pk.created_at,
+             NULL
+      FROM print_packs pk
+      JOIN patterns pt2 ON pt2.id = pk.pattern_id
+      CROSS JOIN json_each(pk.files_json) je
+      WHERE pk.status = 'SUCCEEDED' AND pk.files_json IS NOT NULL
+        AND json_extract(je.value, '$.kind') = 'PRINT_FILE'
+        AND json_extract(je.value, '$.hash') IS NOT NULL
+        AND json_extract(je.value, '$.storagePath') IS NOT NULL
     `;
 
     const sourceFilters: string[] = [];
@@ -887,7 +1180,13 @@ export class EcomRepository {
     if (layer?.storage_path) return String(layer.storage_path);
     // 模特定妆照同样进资产库：漏掉这一步，MODEL 条目的缩略图在惰性生成时会 404。
     const portrait = this.db.prepare("SELECT storage_path FROM model_portraits WHERE hash=? LIMIT 1").get(hash) as Row | undefined;
-    return portrait?.storage_path ? String(portrait.storage_path) : undefined;
+    if (portrait?.storage_path) return String(portrait.storage_path);
+    const pattern = this.db.prepare("SELECT storage_path FROM patterns WHERE file_hash=? LIMIT 1").get(hash) as Row | undefined;
+    if (pattern?.storage_path) return String(pattern.storage_path);
+    const packFile = this.db.prepare(
+      "SELECT json_extract(je.value, '$.storagePath') AS storage_path FROM print_packs pk, json_each(pk.files_json) je WHERE json_extract(je.value, '$.hash')=? LIMIT 1",
+    ).get(hash) as Row | undefined;
+    return packFile?.storage_path ? String(packFile.storage_path) : undefined;
   }
 
   /** 解析合成库 ID 指向的真实文件；返回 undefined 表示条目已不存在。 */
@@ -912,6 +1211,20 @@ export class EcomRepository {
       const index = Number(id.slice(lastSeparator + 1));
       const file = Number.isInteger(index) && index >= 0 ? this.getLayerExport(exportId)?.layerFiles?.[index] : undefined;
       if (!file || file.kind === "composite") return undefined;
+      return { source: "GENERATED", storagePath: file.storagePath, hash: file.hash, mimeType: "image/png", originalName: file.name, role: null };
+    }
+    if (prefix === "pattern") {
+      const pattern = this.getPattern(id);
+      if (!pattern?.storagePath || !pattern.fileHash) return undefined;
+      return { source: pattern.sourceType === "UPLOADED" ? "UPLOADED" : "GENERATED", storagePath: pattern.storagePath, hash: pattern.fileHash, mimeType: "image/png", originalName: pattern.name, role: null };
+    }
+    if (prefix === "pack") {
+      // 规格包 ID 形如 pack:<printPackId>:<index>，最后一段是文件数组下标；manifest 文件不作为可预览图。
+      const lastSeparator = id.lastIndexOf(":");
+      const packId = lastSeparator < 0 ? id : id.slice(0, lastSeparator);
+      const index = Number(id.slice(lastSeparator + 1));
+      const file = Number.isInteger(index) && index >= 0 ? this.getPrintPack(packId)?.files?.[index] : undefined;
+      if (!file || file.kind !== "PRINT_FILE") return undefined;
       return { source: "GENERATED", storagePath: file.storagePath, hash: file.hash, mimeType: "image/png", originalName: file.name, role: null };
     }
     if (prefix === "model") {
@@ -1026,6 +1339,8 @@ export class EcomRepository {
       for (const row of recovered) {
         this.db.prepare("UPDATE layer_plans SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
         this.db.prepare("UPDATE layer_exports SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
+        // 规格包是纯本地合成，重启后随 Job 重新排队即可；pattern_extract/forge 无预建领域记录。
+        this.db.prepare("UPDATE print_packs SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
       }
       for (const row of unverifiable) {
         this.db.prepare("UPDATE layer_plans SET status='FAILED',error_json=?,updated_at=? WHERE job_id=?").run(unknownMessage, updatedAt, row.id);
@@ -1329,6 +1644,42 @@ function mapStoryboardItem(row: Row): StoryboardItemRecord {
 }
 function mapJob(row: Row): JobRecord { return { id: String(row.id), projectId: row.project_id == null ? null : String(row.project_id), storyboardItemId: row.storyboard_item_id ? String(row.storyboard_item_id) : null, type: row.type as JobType, status: row.status as JobStatus, progress: Number(row.progress), retryable: Boolean(row.retryable), input: parse(row.input_json), requestFingerprint: row.request_fingerprint ? String(row.request_fingerprint) : null, providerId: row.provider_id ? String(row.provider_id) : null, modelId: row.model_id ? String(row.model_id) : null, estimatedCost: row.estimated_cost_json ? parse(row.estimated_cost_json) : null, actualCost: row.actual_cost_json ? parse(row.actual_cost_json) : null, cancelRequested: Boolean(row.cancel_requested), providerTaskId: row.provider_task_id ? String(row.provider_task_id) : null, error: row.error_json ? parse(row.error_json) : null, progressDetail: row.progress_detail_json ? parse(row.progress_detail_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapCopywritingResult(row: Row): CopywritingResultRecord { return { jobId: String(row.job_id), projectId: String(row.project_id), target: row.target as CopywritingTarget, content: String(row.content), createdAt: String(row.created_at) }; }
+function mapPattern(row: Row): PatternRecord { return { id: String(row.id), name: String(row.name), sourceType: row.source_type as PatternSource, sourceJobId: row.source_job_id == null ? null : String(row.source_job_id), sourceAssetHash: row.source_asset_hash == null ? null : String(row.source_asset_hash), parentPatternId: row.parent_pattern_id == null ? null : String(row.parent_pattern_id), storagePath: row.storage_path == null ? null : String(row.storage_path), fileHash: row.file_hash == null ? null : String(row.file_hash), width: row.width == null ? null : Number(row.width), height: row.height == null ? null : Number(row.height), tags: parse(row.tags_json ?? "[]"), tileable: (row.tileable_status ?? "NONE") as TileableStatus, tileableScore: row.tileable_score == null ? null : Number(row.tileable_score), tileableCheckedWith: row.tileable_checked_with == null ? null : String(row.tileable_checked_with), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapPrintPack(row: Row): PrintPackRecord { return { id: String(row.id), patternId: String(row.pattern_id), jobId: String(row.job_id), specId: String(row.spec_id), specVersion: String(row.spec_version), status: row.status as PrintPackRecord["status"], files: row.files_json ? parse(row.files_json) : null, manifest: row.manifest_json ? parse(row.manifest_json) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapPatternListingResult(row: Row): PatternListingResultRecord { return { jobId: String(row.job_id), patternId: String(row.pattern_id), platform: String(row.platform) as ListingPlatform, copy: parse(row.content_json) as ListingCopy, createdAt: String(row.created_at) }; }
+function mapPatternPipeline(row: Row): PatternPipelineRecord {
+  const hints = row.listing_hints_json ? parse(row.listing_hints_json) as { sellingPoints?: string | null; bannedWords?: string | null } : {};
+  return {
+    id: String(row.id),
+    patternId: row.pattern_id == null ? null : String(row.pattern_id),
+    specId: String(row.spec_id),
+    specVersion: String(row.spec_version),
+    layout: row.layout as PodPrintLayout,
+    listingPlatform: row.listing_platform as ListingPlatform,
+    listingProviderId: String(row.listing_provider_id),
+    listingModelId: String(row.listing_model_id),
+    listingHints: { sellingPoints: hints.sellingPoints ?? null, bannedWords: hints.bannedWords ?? null },
+    status: row.status as PatternPipelineStatus,
+    blockReason: row.block_reason == null ? null : String(row.block_reason) as PatternPipelineBlockReason,
+    requestFingerprint: row.request_fingerprint == null ? null : String(row.request_fingerprint),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+function mapPatternPipelineStep(row: Row): PatternPipelineStepRecord {
+  return {
+    id: String(row.id),
+    pipelineId: String(row.pipeline_id),
+    step: String(row.step) as PatternPipelineStepName,
+    position: Number(row.position),
+    status: String(row.status) as PatternPipelineStepStatus,
+    jobId: row.job_id == null ? null : String(row.job_id),
+    detail: row.detail_json ? parse(row.detail_json) : null,
+    error: row.error_json ? parse(row.error_json) : null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
 function mapWebResearchAudit(row: Row): WebResearchAuditRecord { return { jobId: String(row.job_id), availability: row.availability as WebResearchAvailability, invocationCount: Number(row.invocation_count), successfulAttemptCount: Number(row.successful_attempt_count), failedAttemptCount: Number(row.failed_attempt_count), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapWebResearchAttempt(row: Row): WebResearchAttemptRecord { return { id: String(row.id), jobId: String(row.job_id), query: String(row.query), sourceId: String(row.source_id), sourceName: String(row.source_name), sourceKind: String(row.source_kind), status: row.status as WebResearchAttemptStatus, resultCount: Number(row.result_count), errorMessage: row.error_message ? String(row.error_message) : null, createdAt: String(row.created_at) }; }
 function mapOutput(row: Row): OutputRecord {

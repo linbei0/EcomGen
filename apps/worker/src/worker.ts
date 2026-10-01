@@ -5,14 +5,19 @@ import { Worker } from "bullmq";
 import archiver from "archiver";
 import sharp from "sharp";
 import { writePsdBuffer } from "ag-psd";
-import { forgeSuite, planImageEdit, planLayerElements, planStoryboard, reviseImagePrompt, writeCopywriting, type SuiteForgeHints } from "@ecomgen/agent";
-import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, SuiteCatalog, openDatabase, resolveDataDir, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
-import { compileUserTemplate, compileModelCastPrompt, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
+import { forgeSuite, planImageEdit, planLayerElements, planStoryboard, reviseImagePrompt, writeCopywriting, writeListingCopy, type SuiteForgeHints } from "@ecomgen/agent";
+import { EcomRepository, EXTERNAL_REQUEST_STARTED, LocalAssetStore, SecretBox, SuiteCatalog, nextPipelineStep, openDatabase, resolveDataDir, settlePipelineStep, startPipelineStep, type AssetRecord, type EditTurnRecord, type JobRecord, type LayerExportLayerFileRecord, type LayerExportRecord, type LayerPlanRecord, type ProjectRecord } from "@ecomgen/core";
+import { compileUserTemplate, compileModelCastPrompt, compilePatternExtractPrompt, compilePatternForgePrompt, compilePatternVariantPrompt, defaultPatternName, defaultVariantName, presetBelongsToAxis, getTemplate, type EcomTemplate } from "@ecomgen/ecom-skill";
 import { normalizeSuiteDocument, type SuiteDocumentInput } from "@ecomgen/ecom-suite";
-import { resolveImageSize, userAssetKindForRole, EDIT_OPERATION_CAPABILITIES, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, validateEcomSuiteFile, type CompositePolicy, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type ModelSpec, type PlanningMode } from "@ecomgen/contracts";
-import { createJobQueue, createRedisConnection, enqueue, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
+import { getPodPrintSpec, POD_MOCKUP_SCENE_VERSION, POD_PRINT_SPEC_VERSION, MODEL_CAST_CANDIDATES_MAX, PATTERN_FORGE_CANDIDATES_MAX, MAX_CANDIDATES_PER_TYPE, TILEABILITY_ALGORITHM_VERSION, resolveImageSize, userAssetKindForRole, EDIT_OPERATION_CAPABILITIES, LISTING_PLATFORMS, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESET_IDS, POD_PRINT_CATEGORIES, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, validateEcomSuiteFile, type CompositePolicy, type CopywritingTarget, type EditExecutionMode, type EditOperation, type ImageAspectRatio, type ImageResolution, type JobType, type ListingPlatform, type ModelSpec, type PatternBackgroundMode, type PatternVariantAxis, type PatternVariantPreset, type PlanningMode, type PodPrintCategory, type PodPrintLayout } from "@ecomgen/contracts";
+import { createJobQueue, createRedisConnection, enqueue, queueKindForJobType, type EcomJobKind, type EcomJobPayload, QUEUE_NAME, RedisProjectEventBus } from "@ecomgen/jobs";
 import { GeminiImageProvider, OpenAiCompatibleImageProvider, ProviderError, SeedreamLayerizeProvider, buildReasoningModel, createSegmentationProvider, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { createPsdLayerAccumulator, extractAlpha, invertMask, multiplyAlpha, unionOfMasks } from "./layer-composite.js";
+import { computePrintPackPlacement, computePrintPackTileLayout } from "./print-pack.js";
+import { renderPrintMockup } from "./print-mockups.js";
+import { applyRecolor, type RecolorParams } from "./pattern-derive.js";
+import { hasTransparentPixels, resolvePatternBackground, verifyPatternBackground } from "./pattern-background.js";
+import { verifyTileable } from "./tile-verify.js";
 import { assertPixelProtectedInputs, assignImageHandles, imageHandle, selectGenerationAssets, selectVisionAssets, visionAttachmentMetadata, withGenerationAssetRoles } from "./visual-assets.js";
 import { VisionDerivativeCache } from "./vision-cache.js";
 
@@ -58,10 +63,24 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
     else if (queueJob.data.kind === "layer_export") await executeLayerExport(job, cancellation.signal);
     else if (queueJob.data.kind === "suite_forge") await executeSuiteForge(job);
     else if (queueJob.data.kind === "model_cast") await executeModelCast(job, cancellation.signal);
+    else if (queueJob.data.kind === "pattern_extract") await executePatternExtract(job, cancellation.signal);
+    else if (queueJob.data.kind === "pattern_forge") await executePatternForge(job, cancellation.signal);
+    else if (queueJob.data.kind === "pattern_derive") await executePatternDerive(job);
+    else if (queueJob.data.kind === "pattern_variant") await executePatternVariant(job, cancellation.signal);
+    else if (queueJob.data.kind === "pattern_tile_check") await executePatternTileCheck(job);
+    else if (queueJob.data.kind === "print_pack") await executePrintPack(job);
     else await executeExport(job);
     // 终态与清空外部请求标记在同一条 UPDATE 内原子完成：标记一旦设置就只在终态消失，
     // 避免终态写入前进程崩溃时恢复层误判任务仍在付费请求窗口内。
-    const current = repository.getJob(job.id); if (current?.cancelRequested || current?.status === "CANCELLED") { await updateJob(job, { status: "CANCELLED", progress: current.progress, providerTaskId: null }); } else await updateJob(job, { status: "SUCCEEDED", progress: 100, providerTaskId: null });
+    const current = repository.getJob(job.id);
+    if (current?.cancelRequested || current?.status === "CANCELLED") {
+      await updateJob(job, { status: "CANCELLED", progress: current.progress, providerTaskId: null });
+      settlePipelineStep(repository, job.id, "CANCELLED", null);
+    } else {
+      await updateJob(job, { status: "SUCCEEDED", progress: 100, providerTaskId: null });
+      // 推进必须发生在任务终态写入之后：即使推进失败，任务本身已成为"已成功"的真相，不能被改判。
+      await advancePatternPipeline(job);
+    }
   } catch (error) {
     if (error instanceof JobCancelled) { await updateJob(job, { status: "CANCELLED", cancelRequested: true, providerTaskId: null }); return; }
     const message = error instanceof Error ? error.message : String(error);
@@ -73,6 +92,7 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
       }
     }
     await updateJob(job, { status: "FAILED", progress: 100, error: { message, providerStatus: error instanceof ProviderError ? error.status : undefined } });
+    settlePipelineStep(repository, job.id, "FAILED", { message });
     throw error;
   } finally {
     cancellation.dispose();
@@ -87,6 +107,61 @@ console.log("ecomgen worker ready");
 async function stop(): Promise<void> { clearInterval(referenceCleanupTimer); await worker.close(); await executionQueue.close(); await executionRedis.quit(); await events.close(); await redis.quit(); }
 process.once("SIGINT", () => { void stop().then(() => process.exit(0)); });
 process.once("SIGTERM", () => { void stop().then(() => process.exit(0)); });
+
+/**
+ * 流水线推进：某个步骤的任务成功后，把步骤置成功并按需起跑下一步。
+ *
+ * 两条不变量：
+ * 1) 本函数**绝不抛错**。它跑在任务成功后，抛错只会让调用方把一个已成功的任务改判为失败；
+ *    推进本身的问题（找不到花型、入队失败）改写流水线与步骤，用户在工作区能看到原因。
+ * 2) 幂等。进程崩溃后 recoverInterruptedJobs 会重新执行同一任务，于是本函数会被再次调用——
+ *    已经是 SUCCEEDED 的步骤直接返回，不重复入队下一步。
+ *
+ * 验缝未通过且版式为满印时**不静默继续**：把风险写进步骤 detail，流水线停在 AWAITING_INPUT
+ * 等用户裁决（居中继续 / 仍出满印）。自动降级成居中会把满印需求偷偷改成单区域印花。
+ */
+async function advancePatternPipeline(job: JobRecord): Promise<void> {
+  const step = repository.getPatternPipelineStepByJobId(job.id);
+  if (!step) return;
+  const pipeline = repository.getPatternPipeline(step.pipelineId);
+  if (!pipeline) return;
+  if (step.status === "SUCCEEDED") return;
+  try {
+    let patternId = pipeline.patternId;
+    let detail: Record<string, unknown> | null = null;
+    if (step.step === "SOURCE") {
+      // 契约承诺"多候选时从第一张有产物的候选起链"：listPatternsByJobId 按创建时间倒序，
+      // 所以取过滤后的最后一个（最早）而不是第一个（最新）。
+      const produced = repository.listPatternsByJobId(job.id).filter((entry) => entry.storagePath).pop();
+      if (!produced) throw new Error("图案获取步骤已完成，但没有任何花型产物，无法继续成包");
+      patternId = produced.id;
+      repository.updatePatternPipeline(pipeline.id, { patternId });
+    }
+    if (step.step === "TILE_CHECK") {
+      const pattern = patternId ? repository.getPattern(patternId) : undefined;
+      detail = { tileable: pattern?.tileable ?? null, tileableScore: pattern?.tileableScore ?? null };
+      if (pipeline.layout === "TILE" && pattern?.tileable !== "VERIFIED") {
+        repository.updatePatternPipelineStep(step.id, { status: "SUCCEEDED", detail: { ...detail, warning: "验缝未通过：满印会在成品上露出规则接缝" } });
+        repository.updatePatternPipeline(pipeline.id, { status: "AWAITING_INPUT", blockReason: "SEAM_RISK" });
+        return;
+      }
+    }
+    repository.updatePatternPipelineStep(step.id, { status: "SUCCEEDED", detail });
+    if (!patternId) throw new Error("流水线没有花型，无法继续下一步");
+    const next = nextPipelineStep(pipeline.steps, step);
+    if (!next) {
+      repository.updatePatternPipeline(pipeline.id, { status: "SUCCEEDED", blockReason: null });
+      return;
+    }
+    const started = startPipelineStep(repository, pipeline, next, patternId);
+    await enqueue(executionQueue, { jobId: started.job.id, kind: queueKindForJobType(started.jobType) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    repository.updatePatternPipelineStep(step.id, { status: "FAILED", error: { message } });
+    repository.updatePatternPipeline(pipeline.id, { status: "FAILED", blockReason: null });
+    console.error(`Pattern pipeline ${pipeline.id} could not advance after job ${job.id}: ${message}`);
+  }
+}
 
 async function executePlan(job: JobRecord): Promise<void> {
   throwIfCancelled(job);
@@ -242,11 +317,9 @@ async function executeModelCast(job: JobRecord, signal: AbortSignal): Promise<vo
   if (!input.spec || typeof input.spec !== "object") throw new Error(`Job ${job.id} has no model spec snapshot`);
   const spec = input.spec as ModelSpec;
   const notes = typeof input.notes === "string" ? input.notes : "";
-  const candidateCount = typeof input.candidateCount === "number" ? Math.min(4, Math.max(1, Math.round(input.candidateCount))) : 1;
+  const candidateCount = typeof input.candidateCount === "number" ? Math.min(MODEL_CAST_CANDIDATES_MAX, Math.max(1, Math.round(input.candidateCount))) : 1;
   const aspectRatio = (typeof input.aspectRatio === "string" ? input.aspectRatio : "AUTO") as ImageAspectRatio;
-  const provider = providerFor(job.providerId);
-  const model = provider.models.find((candidate) => candidate.id === job.modelId);
-  if (!model || (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini")) throw new Error("Selected image model has no executable image API");
+  const { provider, model } = imageModelForJob(job);
   const generator = imageGeneratorFor(provider, model);
   const size = resolveImageSize("1K", aspectRatio, "1024x1536");
   // 参考脸也取快照：任务指纹按入队时的参考脸 hash 计算，读实时库值会让实发 prompt 与指纹脱钩
@@ -274,7 +347,370 @@ async function executeModelCast(job: JobRecord, signal: AbortSignal): Promise<vo
   await updateJob(job, { providerTaskId: null });
 }
 
+async function executePatternExtract(job: JobRecord, signal: AbortSignal): Promise<void> {
+  throwIfCancelled(job);
+  // 分割快照与源图路径都在入队时写入 input；执行只认快照，排队后改配置不影响本次执行。
+  const input = job.input as { patternId?: unknown; sourcePath?: unknown; brief?: unknown; segmentationProviderId?: unknown; segmentationModelId?: unknown; segmentationProtocol?: unknown };
+  const pattern = repository.getPattern(typeof input.patternId === "string" ? input.patternId : "");
+  if (!pattern) throw new Error(`Pattern record missing for extract job ${job.id}`);
+  const sourcePath = typeof input.sourcePath === "string" ? input.sourcePath : "";
+  if (!sourcePath) throw new Error("Pattern extract job has no source image snapshot");
+  if (!isSegmentationProtocol(input.segmentationProtocol)) throw new Error("Pattern extract job is missing its segmentation snapshot");
+  const protocol = input.segmentationProtocol;
+  // seedream_layerize 是多元素图层拆分，与单主体提取语义不符：快照若带该协议直接显式失败。
+  if (protocol === "seedream_layerize") throw new Error("Pattern extraction does not support the seedream_layerize protocol");
+  const segmentationProviderId = typeof input.segmentationProviderId === "string" ? input.segmentationProviderId : "";
+  const segmentationModelId = typeof input.segmentationModelId === "string" ? input.segmentationModelId : "";
+  if (!segmentationProviderId || !segmentationModelId) throw new Error("Pattern extract job is missing its segmentation snapshot");
+  const provider = providerFor(segmentationProviderId);
+  const source = await storage.read(sourcePath);
+  const meta = await sharp(source).metadata();
+  if (!meta.width || !meta.height) throw new Error("Source image dimensions are unavailable");
+  await updateJob(job, { progress: 15 });
+  // fal 接受公网 URL 或 data URI；本地上传图没有公网地址，直接内联。
+  const imageUrl = `data:${mimeForStoragePath(sourcePath)};base64,${source.toString("base64")}`;
+  const segmenter = createSegmentationProvider(protocol, { baseUrl: provider.baseUrl, apiKey: secrets.decrypt(provider.encryptedApiKey) });
+  const modelPath = protocol === "fal" && segmentationModelId.includes("/") ? segmentationModelId : undefined;
+  await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED });
+  const result = await segmenter.segment({ imageUrl, textPrompt: compilePatternExtractPrompt(typeof input.brief === "string" ? input.brief : undefined), box: undefined, modelPath, signal });
+  throwIfCancelled(job);
+  const mask = await normalizeMask(result.mask, meta.width, meta.height);
+  if (!maskHasForeground(mask)) throw new Error("未在商品图中分割出印花图案，请补充更具体的描述或更换图片后重试");
+  // mask 只是选区：像素一律取自原图（PIXEL_PROTECTED 纪律），随后裁掉全透明边缘得到可入库花型。
+  const originalRgba = await decodeRgba(source, meta.width, meta.height);
+  const cutoutPng = await pngFromRgba(multiplyAlpha(originalRgba, mask), meta.width, meta.height);
+  const trimmed = await sharp(cutoutPng).trim().png().toBuffer();
+  const stored = await storage.putPatternArtifact(pattern.id, "pattern", trimmed);
+  const { width, height } = await outputDerivatives(storage, stored.hash, trimmed);
+  const updated = repository.setPatternArtifact(pattern.id, { storagePath: stored.path, fileHash: stored.hash, width, height });
+  if (!updated) throw new Error(`Pattern record disappeared for extract job ${job.id}`);
+  await updateJob(job, { progress: 95 });
+}
+
+/**
+ * AI 起稿：确定性编译 prompt 后按候选幂等生成，每张候选直接成为独立花型。
+ * 与选角同构：入队快照 + generationKey 断点续跑，不自动重跑已计费请求。
+ *
+ * 候选行在产物落盘后才创建（同 executeModelCast），因此"行存在 ⇒ 图稿存在"是一条真不变量：
+ * 先建行会让失败候选留下 storagePath=null 的幽灵行，而断点计数若把它算作已完成，重试就会静默
+ * 跳过该候选——少出一张且没有任何地方说明为什么少。代价是极端情况下（落盘后、建行前进程退出）
+ * 会留下 patterns/<uuid>/ 下的孤儿文件：不可见且不阻塞任何流程，比幽灵行安全。
+ */
+/** 生成式候选的血缘：起稿无源（GENERATED），衍生指向源花型（DERIVED）。 */
+interface PatternCandidateLineage {
+  sourceType: "GENERATED" | "DERIVED";
+  sourceAssetHash: string | null;
+  parentPatternId: string | null;
+  tags: string[];
+}
+
+/**
+ * 生成式候选的落盘尾段（起稿 / 衍生共用）：目录名先于数据库行确定，产物落盘后才建行，
+ * 保证"行存在 ⇒ 图稿存在"。两条链路的差异只在血缘字段与"编译 prompt + 选 generate/editImage"，
+ * 这段尾段逐行同构——收成一份，不变量只在一处注释。
+ */
+async function storePatternCandidate(job: JobRecord, image: Buffer, naming: { baseName: string; index: number; total: number }, lineage: PatternCandidateLineage): Promise<void> {
+  const patternId = randomUUID();
+  const stored = await storage.putPatternArtifact(patternId, "pattern", image);
+  const { width, height } = await outputDerivatives(storage, stored.hash, image);
+  repository.createPattern({
+    id: patternId,
+    name: naming.total > 1 ? `${naming.baseName} #${naming.index}` : naming.baseName,
+    sourceType: lineage.sourceType,
+    sourceJobId: job.id,
+    sourceAssetHash: lineage.sourceAssetHash,
+    parentPatternId: lineage.parentPatternId,
+    storagePath: stored.path,
+    fileHash: stored.hash,
+    width,
+    height,
+    tags: lineage.tags,
+  });
+}
+
+/** 断点续跑的完成计数：只有已落产物的候选才算完成；旧数据残留的无产物行必须被重算而不是被跳过。 */
+function completedPatternCandidates(job: JobRecord): number {
+  return repository.listPatternsByJobId(job.id).filter((entry) => entry.storagePath && entry.fileHash).length;
+}
+
+/** 任务快照 → 可执行生图模型：三个生成式执行器共用同一份 API 白名单与错误口径。 */
+function imageModelForJob(job: JobRecord) {
+  const provider = providerFor(job.providerId);
+  const model = provider.models.find((candidate) => candidate.id === job.modelId);
+  if (!model || (model.imageApiKind !== "openai_images" && model.imageApiKind !== "gemini")) throw new Error("Selected image model has no executable image API");
+  return { provider, model };
+}
+
+async function executePatternForge(job: JobRecord, signal: AbortSignal): Promise<void> {
+  throwIfCancelled(job);
+  const input = job.input as { theme?: unknown; style?: unknown; category?: unknown; background?: unknown; candidateCount?: unknown; name?: unknown };
+  const theme = typeof input.theme === "string" ? input.theme.trim() : "";
+  if (!theme) throw new Error("Pattern forge job has no theme snapshot");
+  const category = typeof input.category === "string" && (POD_PRINT_CATEGORIES as readonly string[]).includes(input.category) ? (input.category as PodPrintCategory) : undefined;
+  // 上限与 API 的 schema 同源（limits.ts）：常量调大后两端必须一起放行，worker 静默截半就是少出图且无解释。
+  const candidateCount = typeof input.candidateCount === "number" ? Math.min(PATTERN_FORGE_CANDIDATES_MAX, Math.max(1, Math.round(input.candidateCount))) : 1;
+  const baseName = typeof input.name === "string" && input.name.trim() ? input.name.trim() : defaultPatternName(theme);
+  const { provider, model } = imageModelForJob(job);
+  const generator = imageGeneratorFor(provider, model);
+  // 起稿没有源图，底版只有白底/透明底两种；能力判定与拒绝都在 resolvePatternBackground 里，
+  // 发生在第一次付费调用之前——用户不该为一次注定被拒的请求付费。
+  const background: Exclude<PatternBackgroundMode, "SOURCE"> = input.background === "TRANSPARENT" ? "TRANSPARENT" : "WHITE";
+  const backgroundPlan = resolvePatternBackground({ mode: background, model });
+  const prompt = compilePatternForgePrompt({ theme, style: typeof input.style === "string" && input.style.trim() ? input.style.trim() : undefined, category, background });
+  const size = resolveImageSize("1K", "1:1", "1024x1024");
+  const completed = completedPatternCandidates(job);
+  for (let candidateIndex = completed + 1; candidateIndex <= candidateCount; candidateIndex += 1) {
+    throwIfCancelled(job);
+    await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED, progress: 20 + Math.round(((candidateIndex - 1) / candidateCount) * 60) });
+    const idempotencyKey = generationKeyFor(job.id, candidateIndex);
+    const result = await generator.generate(model.imageApiKind === "gemini"
+      ? { model: model.id, prompt, imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: "1K" as ImageResolution, idempotencyKey, signal }
+      : { model: model.id, prompt, size, quality: "high", ...(backgroundPlan.transparent ?? {}), idempotencyKey, signal });
+    throwIfCancelled(job);
+    await storePatternCandidate(job, result.image, { baseName, index: candidateIndex, total: candidateCount }, { sourceType: "GENERATED", sourceAssetHash: null, parentPatternId: null, tags: [] });
+    // 产物先入库再裁决：钱已经花出去了，图就留着；但"要了透明却拿到不透明"必须当场说清楚，
+    // 否则一张白底（更糟：模型画出来的棋盘格底纹）会静默流进成包流程，印在成品上才发现。
+    await verifyPatternBackground(backgroundPlan, result.image, "起稿");
+    await updateJob(job, { progress: 20 + Math.round((candidateIndex / candidateCount) * 60), providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED });
+  }
+  await updateJob(job, { providerTaskId: null });
+}
+
+/**
+ * 花型衍生：确定性本地改色（HSL 调制），产出一 new 花型（sourceType DERIVED、
+ * parentPatternId 指向源），源花型永不被改写。
+ * BullMQ 自动重试会产生同 jobId 的第二次执行：先查本任务已落的花型行，避免重试产出重复卡。
+ */
+async function executePatternDerive(job: JobRecord): Promise<void> {
+  throwIfCancelled(job);
+  const input = job.input as { patternId?: unknown; hueShift?: unknown; saturationPct?: unknown; brightnessPct?: unknown };
+  const source = repository.getPattern(typeof input.patternId === "string" ? input.patternId : "");
+  if (!source?.storagePath || !source.fileHash) throw new Error("Derive source pattern artwork is missing");
+  const boundedNumber = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
+  const hueShift = boundedNumber(input.hueShift) ?? 0;
+  const recolorParams: RecolorParams = { hueShift, saturationPct: boundedNumber(input.saturationPct), brightnessPct: boundedNumber(input.brightnessPct) };
+  const sourcePng = await storage.read(source.storagePath);
+  await updateJob(job, { progress: 20 });
+  const image = await applyRecolor(sourcePng, recolorParams);
+  await updateJob(job, { progress: 70 });
+  const derived = repository.listPatternsByJobId(job.id).find((entry) => entry.sourceType === "DERIVED")
+    ?? repository.createPattern({
+      name: `${source.name} · 改色 ${hueShift >= 0 ? "+" : ""}${hueShift}`,
+      sourceType: "DERIVED",
+      sourceJobId: job.id,
+      sourceAssetHash: source.fileHash,
+      parentPatternId: source.id,
+      storagePath: null,
+      fileHash: null,
+      width: null,
+      height: null,
+      tags: source.tags,
+    });
+  const stored = await storage.putPatternArtifact(derived.id, "pattern", image);
+  const { width, height } = await outputDerivatives(storage, stored.hash, image);
+  repository.setPatternArtifact(derived.id, { storagePath: stored.path, fileHash: stored.hash, width, height });
+  await updateJob(job, { progress: 95 });
+}
+
+/**
+ * 生成式衍生（画风 / 构图）：源花型作为参考图走 images/edits，Prompt 由 ecom-skill 的固化模板派生。
+ * 每张候选各自成为独立花型（sourceType DERIVED、parentPatternId 指向源），源花型永不被改写。
+ *
+ * 与起稿同构：入队快照 + generationKey 断点续跑 + 产物落盘后才建行；付费生图不自动重跑。
+ * 定位是快速铺款筛选：API 无法锁 seed/风格向量，所以不承诺候选之间的一致性。
+ */
+async function executePatternVariant(job: JobRecord, signal: AbortSignal): Promise<void> {
+  throwIfCancelled(job);
+  const input = job.input as { patternId?: unknown; axis?: unknown; preset?: unknown; extra?: unknown; background?: unknown; candidateCount?: unknown; name?: unknown };
+  const source = repository.getPattern(typeof input.patternId === "string" ? input.patternId : "");
+  if (!source?.storagePath || !source.fileHash) throw new Error("Variant source pattern artwork is missing");
+  const axis: PatternVariantAxis | null = input.axis === "STYLE" || input.axis === "COMPOSITION" ? input.axis : null;
+  const preset = typeof input.preset === "string" && (PATTERN_VARIANT_PRESET_IDS as readonly string[]).includes(input.preset) ? (input.preset as PatternVariantPreset) : null;
+  if (!axis || !preset) throw new Error("Pattern variant job has no axis/preset snapshot");
+  if (!presetBelongsToAxis(axis, preset)) throw new Error(`Pattern variant preset does not belong to axis: ${axis}/${preset}`);
+  const candidateCount = typeof input.candidateCount === "number" ? Math.min(PATTERN_VARIANT_CANDIDATES_MAX, Math.max(1, Math.round(input.candidateCount))) : 1;
+  const baseName = typeof input.name === "string" && input.name.trim() ? input.name.trim() : defaultVariantName(source.name, axis, preset);
+  const { provider, model } = imageModelForJob(job);
+  const generator = imageGeneratorFor(provider, model);
+  const sourceImage = await storage.read(source.storagePath);
+  // 源图本身是不是透明底要解码判定，不能按用户声明；`SOURCE` 模式据此决定"要不要发透明参数"：
+  // 源不透明时模型倾向照源铺底，要透明多半白要一次；源透明却重新铺白底，则等于把一张能直印的
+  // 花型降级成需要再抠一次的白底图。判定必须发生在编译提示词之前——护栏要按它选。
+  const sourceTransparent = await hasTransparentPixels(sourceImage);
+  const background: PatternBackgroundMode = input.background === "WHITE" || input.background === "TRANSPARENT" || input.background === "SOURCE" ? input.background : "SOURCE";
+  const backgroundPlan = resolvePatternBackground({ mode: background, model, sourceTransparent });
+  const prompt = compilePatternVariantPrompt({
+    axis,
+    preset,
+    extra: typeof input.extra === "string" && input.extra.trim() ? input.extra.trim() : undefined,
+    background,
+  });
+  const completed = completedPatternCandidates(job);
+  for (let candidateIndex = completed + 1; candidateIndex <= candidateCount; candidateIndex += 1) {
+    throwIfCancelled(job);
+    await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED, progress: 20 + Math.round(((candidateIndex - 1) / candidateCount) * 60) });
+    const result = await generator.editImage({
+      model: model.id,
+      prompt,
+      sourceImage: { data: sourceImage, filename: "pattern.png", mimeType: "image/png" },
+      ...(model.imageApiKind === "gemini" ? { imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: "1K" as ImageResolution } : {}),
+      ...(highInputFidelityForOpenAiImageModel(model.id) ? { inputFidelity: "high" as const } : {}),
+      ...(backgroundPlan.transparent ?? {}),
+      idempotencyKey: generationKeyFor(job.id, candidateIndex),
+      signal,
+    });
+    throwIfCancelled(job);
+    await storePatternCandidate(job, result.image, { baseName, index: candidateIndex, total: candidateCount }, { sourceType: "DERIVED", sourceAssetHash: source.fileHash, parentPatternId: source.id, tags: source.tags });
+    // 与起稿同一条纪律：产物留下，但源是透明底而结果不是，必须当场说清楚（透明底的丢失不可见，
+    // 但成包时会把白底或棋盘格底纹一起印上去）。
+    await verifyPatternBackground(backgroundPlan, result.image, "衍生");
+    await updateJob(job, { progress: 20 + Math.round((candidateIndex / candidateCount) * 60), providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED });
+  }
+  await updateJob(job, { providerTaskId: null });
+}
+
+/**
+ * 验缝：本地确定性判定，只写判定、不改动花型像素。
+ * 花型图内容不可变，所以同一算法对同一花型的结果恒定——唯一需要重跑的情形是验缝算法版本升级
+ * （判定里记录的算法版本与当前不一致时，重跑会把同一花型重新判定一次）。
+ */
+async function executePatternTileCheck(job: JobRecord): Promise<void> {
+  throwIfCancelled(job);
+  const patternId = typeof job.input.patternId === "string" ? job.input.patternId : "";
+  const pattern = repository.getPattern(patternId);
+  if (!pattern?.storagePath) throw new Error("Pattern artwork is missing for this tileability check");
+  const source = await storage.read(pattern.storagePath);
+  await updateJob(job, { progress: 40 });
+  const verdict = await verifyTileable(source);
+  const updated = repository.setPatternTileable(pattern.id, { status: verdict.status, score: verdict.score, algorithmVersion: TILEABILITY_ALGORITHM_VERSION });
+  if (!updated) throw new Error(`Pattern record disappeared for tile check job ${job.id}`);
+  await updateJob(job, { progress: 95 });
+}
+
+/**
+ * 规格包：纯本地确定性合成，无外部计费请求。
+ * 像素一律来自用户花型（重采样 + 居中排版），不交给生成模型——PIXEL_PROTECTED 纪律在 POD 域的延伸。
+ */
+async function executePrintPack(job: JobRecord): Promise<void> {
+  throwIfCancelled(job);
+  const record = repository.getPrintPackByJobId(job.id);
+  if (!record) throw new Error(`Print pack record missing for job ${job.id}`);
+  const update = (patch: Parameters<EcomRepository["updatePrintPack"]>[1]) => repository.updatePrintPack(record.id, patch);
+  try {
+    update({ status: "RUNNING", error: null });
+    const pattern = repository.getPattern(record.patternId);
+    if (!pattern?.storagePath || !pattern.fileHash) throw new Error("Pattern artwork is missing for this print pack");
+    const spec = getPodPrintSpec(record.specId);
+    if (!spec) throw new Error(`Print spec is unknown: ${record.specId}`);
+    if (POD_PRINT_SPEC_VERSION !== record.specVersion) throw new Error(`Print spec ${spec.id} has been revised (catalog ${POD_PRINT_SPEC_VERSION} != pack ${record.specVersion}); regenerate the pack`);
+    const source = await storage.read(pattern.storagePath);
+    const meta = await sharp(source).metadata();
+    if (!meta.width || !meta.height) throw new Error("Pattern image dimensions are unavailable");
+    // 版式快照在 job.input：CENTERED 居中进安全区；TILE 满印平铺（无安全边距）。
+    const layout: PodPrintLayout = job.input.layout === "TILE" ? "TILE" : "CENTERED";
+    await updateJob(job, { progress: 30 });
+    let composed: Buffer;
+    let placement: ReturnType<typeof computePrintPackPlacement> | null = null;
+    let tile: ReturnType<typeof computePrintPackTileLayout> | null = null;
+    if (layout === "TILE") {
+      tile = computePrintPackTileLayout(spec.widthPx, spec.heightPx, meta.width, meta.height);
+      const tileImage = await sharp(source).ensureAlpha().resize(tile.tileWidth, tile.tileHeight, { fit: "fill", kernel: "lanczos3" }).png().toBuffer();
+      const composites: Array<{ input: Buffer; left: number; top: number }> = [];
+      for (let row = 0; row < tile.rows; row += 1) {
+        for (let column = 0; column < tile.columns; column += 1) {
+          composites.push({ input: tileImage, left: tile.left + column * tile.tileWidth, top: tile.top + row * tile.tileHeight });
+        }
+      }
+      composed = await sharp({ create: { width: spec.widthPx, height: spec.heightPx, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+        .composite(composites)
+        .withMetadata({ density: spec.dpi })
+        .png()
+        .toBuffer();
+    } else {
+      placement = computePrintPackPlacement(spec.widthPx, spec.heightPx, spec.safeMarginPct, meta.width, meta.height);
+      const resized = await sharp(source).ensureAlpha().resize(placement.width, placement.height, { fit: "fill", kernel: "lanczos3" }).png().toBuffer();
+      composed = await sharp({ create: { width: spec.widthPx, height: spec.heightPx, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+        .composite([{ input: resized, left: placement.left, top: placement.top }])
+        .withMetadata({ density: spec.dpi })
+        .png()
+        .toBuffer();
+    }
+    // DPI 只是元数据，真正的印刷精度由像素尺寸决定；density 已在合成管线里写入，
+    // 让平台与工厂工具读到 300——不要把整幅 5400×7200 的 PNG 再解码重编码一次。
+    const printFile = composed;
+    // 品类示意图：扁平版型贴花型（非实拍），买手视角直观看到图案落位。
+    const mockup = await renderPrintMockup(spec.category, printFile);
+    await updateJob(job, { progress: 70 });
+    const storedPrint = await storage.putPrintPackArtifact(record.id, `${safeName(pattern.name)}_${spec.id}`, printFile);
+    const storedMockup = await storage.putPrintPackArtifact(record.id, `${safeName(pattern.name)}_${spec.id}_mockup`, mockup);
+    const manifest = {
+      kind: "ecomgen.print-pack" as const,
+      manifestVersion: 1 as const,
+      printPackId: record.id,
+      jobId: job.id,
+      pattern: { id: pattern.id, name: pattern.name, sourceType: pattern.sourceType, fileHash: pattern.fileHash, sourceAssetHash: pattern.sourceAssetHash, tileable: pattern.tileable, tileableScore: pattern.tileableScore, tileableAlgorithmVersion: pattern.tileableCheckedWith },
+      spec: { id: spec.id, version: record.specVersion, category: spec.category, dpi: spec.dpi, widthPx: spec.widthPx, heightPx: spec.heightPx, safeMarginPct: spec.safeMarginPct },
+      layout,
+      // 场景渲染版本进 manifest：api 侧据此判定旧包示意图过期（重新成包可复得新渲染）。
+      mockupScene: POD_MOCKUP_SCENE_VERSION,
+      resample: "lanczos3" as const,
+      placement,
+      tile,
+      // AIGC 标识在此占位：XMP/C2PA 写入集中在导出层实现（见 model-library-roadmap 4.8），不在合成路径重复实现。
+      aigcLabeling: { applied: false, note: "XMP labeling is applied at the export layer, not during pack composition." },
+      createdAt: new Date().toISOString(),
+    };
+    const manifestContent = Buffer.from(JSON.stringify(manifest, null, 2), "utf8");
+    const storedManifest = await storage.putPrintPackArtifact(record.id, "manifest", manifestContent, ".json");
+    const files = [
+      { name: `${safeName(pattern.name)}_${spec.id}.png`, kind: "PRINT_FILE" as const, storagePath: storedPrint.path, hash: storedPrint.hash },
+      { name: `${safeName(pattern.name)}_${spec.id}_mockup.png`, kind: "MOCKUP" as const, storagePath: storedMockup.path, hash: storedMockup.hash },
+      { name: "manifest.json", kind: "MANIFEST" as const, storagePath: storedManifest.path, hash: storedManifest.hash },
+    ];
+    const updated = update({ status: "SUCCEEDED", files, manifest, error: null });
+    if (!updated) throw new Error(`Print pack record disappeared for job ${job.id}`);
+    await updateJob(job, { progress: 95 });
+  } catch (error) {
+    if (error instanceof JobCancelled) update({ status: "CANCELLED", error: null });
+    else update({ status: "FAILED", error: { message: error instanceof Error ? error.message : String(error) } });
+    throw error;
+  }
+}
+
+/** 花型 Listing 文案：看图写跨境标题/tags/描述；结果存 pattern_listing_results，不进项目域。 */
+async function executePatternListing(job: JobRecord): Promise<void> {
+  throwIfCancelled(job);
+  const input = job.input as { patternId?: unknown; platform?: unknown; sellingPoints?: unknown; mustIncludeWords?: unknown; bannedWords?: unknown };
+  const pattern = repository.getPattern(typeof input.patternId === "string" ? input.patternId : "");
+  if (!pattern?.storagePath) throw new Error("Pattern artwork is missing for this listing job");
+  const platform = typeof input.platform === "string" && (LISTING_PLATFORMS as readonly string[]).includes(input.platform) ? (input.platform as ListingPlatform) : null;
+  if (!platform) throw new Error("Listing job has an invalid platform");
+  const provider = providerFor(job.providerId);
+  const model = provider.models.find((candidate) => candidate.id === job.modelId);
+  if (!model) throw new Error("Configured reasoning model no longer exists in its provider");
+  if (!model.supportsVision) throw new Error("Selected reasoning model must support Vision for listing copy");
+  await updateJob(job, { progress: 25 });
+  const original = await storage.read(pattern.storagePath);
+  const attachment = await cachedCompressForVision(original, pattern.fileHash ?? undefined);
+  const result = await writeListingCopy({
+    model: buildReasoningModel({ providerId: provider.id, modelId: model.id, baseUrl: provider.baseUrl, protocol: provider.reasoningProtocol, supportsVision: model.supportsVision, supportsThinking: model.supportsThinking, supportsStructuredOutput: model.supportsStructuredOutput }),
+    apiKey: secrets.decrypt(provider.encryptedApiKey),
+    platform,
+    patternName: pattern.name,
+    category: null,
+    sellingPoints: typeof input.sellingPoints === "string" && input.sellingPoints.trim() ? input.sellingPoints.trim() : null,
+    mustIncludeWords: typeof input.mustIncludeWords === "string" && input.mustIncludeWords.trim() ? input.mustIncludeWords.trim() : null,
+    bannedWords: typeof input.bannedWords === "string" && input.bannedWords.trim() ? input.bannedWords.trim() : null,
+    patternImages: [{ type: "image", mimeType: attachment.mimeType, data: attachment.data.toString("base64") }],
+  });
+  throwIfCancelled(job);
+  repository.savePatternListingResult({ jobId: job.id, patternId: pattern.id, platform, copy: result });
+  await updateJob(job, { progress: 90 });
+}
+
 async function executeCopywriting(job: JobRecord): Promise<void> {
+  // LISTING 由花型工坊发起、不绑定项目：走独立的看图写文案分支，复用 COPYWRITE 的队列与推理链路。
+  if (job.input.target === "LISTING") return executePatternListing(job);
   throwIfCancelled(job);
   const project = projectFor(job);
   const provider = providerFor(project.reasoningProviderId);
@@ -811,13 +1247,13 @@ function editGenerationConfigFor(project: ProjectRecord, turn: EditTurnRecord): 
   if (!project.reasoningProviderId || !project.reasoningModelId || !project.imageProviderId || !project.imageModelId) {
     throw new Error("该项目尚未选择推理与图片模型（Provider 可能已被删除），请在项目设置中重新选择");
   }
-  const defaults = { reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId, imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, imageResolution: project.imageResolution, candidateCount: Math.min(4, Math.max(1, Math.round(project.candidatesPerType))) };
+  const defaults = { reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId, imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, imageResolution: project.imageResolution, candidateCount: Math.min(MAX_CANDIDATES_PER_TYPE, Math.max(1, Math.round(project.candidatesPerType))) };
   const raw = (turn.annotations as Record<string, unknown>).generationConfig;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
   const config = raw as Record<string, unknown>;
   const readId = (key: keyof Pick<EditGenerationConfig, "reasoningProviderId" | "reasoningModelId" | "imageProviderId" | "imageModelId">) => typeof config[key] === "string" && config[key] ? config[key] as string : defaults[key];
   const resolution = config.imageResolution === "1K" || config.imageResolution === "2K" || config.imageResolution === "4K" ? config.imageResolution : defaults.imageResolution;
-  const candidateCount = typeof config.candidateCount === "number" && Number.isFinite(config.candidateCount) ? Math.min(4, Math.max(1, Math.round(config.candidateCount))) : defaults.candidateCount;
+  const candidateCount = typeof config.candidateCount === "number" && Number.isFinite(config.candidateCount) ? Math.min(MAX_CANDIDATES_PER_TYPE, Math.max(1, Math.round(config.candidateCount))) : defaults.candidateCount;
   return { reasoningProviderId: readId("reasoningProviderId"), reasoningModelId: readId("reasoningModelId"), imageProviderId: readId("imageProviderId"), imageModelId: readId("imageModelId"), imageResolution: resolution, candidateCount };
 }
 function effectiveEditMemory(session: { memorySummary: { summary?: string; constraints?: string[]; scopes?: Record<string, { summary?: string; constraints?: string[] }> } }, outputId: string): { summary?: string; constraints?: string[] } {
@@ -907,17 +1343,6 @@ function createShotProgressPublisher(job: JobRecord, hints: SuiteForgeHints): { 
     }
   };
 }
-function queueKindForJobType(type: JobType): EcomJobKind {
-  if (type === "PLAN") return "plan";
-  if (type === "COPYWRITE") return "copywrite";
-  if (type === "GENERATE") return "generate";
-  if (type === "EDIT_PLAN") return "edit_plan";
-  if (type === "EDIT_GENERATE") return "edit_generate";
-  if (type === "LAYER_PLAN") return "layer_plan";
-  if (type === "LAYER_EXPORT") return "layer_export";
-  if (type === "SUITE_FORGE") return "suite_forge";
-  return "export";
-}
 function editTurnFor(job: JobRecord): EditTurnRecord { const turnId = typeof job.input.editTurnId === "string" ? job.input.editTurnId : ""; const turn = repository.getEditTurn(turnId); if (!turn || turn.projectId !== job.projectId) throw new Error("Edit turn is missing or belongs to another project"); return turn; }
 function layerPlanFor(job: JobRecord): LayerPlanRecord { const plan = repository.getLayerPlanByJobId(job.id); if (!plan || plan.projectId !== job.projectId) throw new Error("Layer plan is missing or belongs to another project"); return plan; }
 function layerExportFor(job: JobRecord): LayerExportRecord { const record = repository.getLayerExportByJobId(job.id); if (!record || record.projectId !== job.projectId) throw new Error("Layer export is missing or belongs to another project"); return record; }
@@ -951,6 +1376,7 @@ async function normalizeMask(mask: { data: Buffer; mimeType: string; width: numb
   return image.greyscale().removeAlpha().resize(width, height, { fit: "fill" }).raw().toBuffer();
 }
 function maskHasForeground(mask: Buffer): boolean { return mask.some((value) => value > 8); }
+
 // joinChannel 对 Buffer 输入在部分平台触发 libpng 读错误；直接改写 raw RGBA 的 alpha 字节更稳。
 async function decodeRgba(image: Buffer, width: number, height: number): Promise<Buffer> {
   return sharp(image).ensureAlpha().resize(width, height, { fit: "fill" }).raw().toBuffer();

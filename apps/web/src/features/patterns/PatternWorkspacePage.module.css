@@ -1,0 +1,662 @@
+/*
+ * 花型工作区布局：顶部条 + 主区（预览舞台 70% / 生命周期动作栏 340px）+ 版本栈。
+ * token 语义与 PatternsPage.module.css 一致：面板 var(--bg-1)、舞台内衬 var(--bg-0)，
+ * 强调色只出现在选中态/主按钮/进行中徽标三处。
+ */
+
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+  overflow: hidden;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 24px 20px;
+}
+
+.wsHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.backLink:hover {
+  color: var(--text-1);
+  border-color: var(--line-2);
+}
+
+.headerDivider {
+  width: 1px;
+  height: 18px;
+  background: var(--line-2);
+  flex-shrink: 0;
+}
+
+.wsTitle {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.wsMeta {
+  color: var(--text-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 标签属于花型的身份元数据，跟着标题走；原来占着 rail 的一整节，实际只显示"无标签"四个字。 */
+.wsTags {
+  min-width: 0;
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wsActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.metaEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 280px;
+}
+
+/* 主区：舞台吃掉全部剩余宽度，动作栏固定 340px 常驻右侧。 */
+.wsMain {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 14px;
+}
+
+.stage {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-l);
+  overflow: hidden;
+}
+
+.stageTabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-1);
+  flex-shrink: 0;
+}
+
+.stageTab {
+  padding: 4px 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.stageTab:hover {
+  color: var(--text-1);
+}
+
+.stageTabActive {
+  background: var(--accent-subtle);
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+/*
+ * 图稿要装进舞台，尺寸链必须从 .stageCanvas 的确定高度一路用 flex 传下去：百分比 max-height 在
+ * 包含块高度取决于内容（不确定）时按 none 计算，而 antd Image 的包裹 div 是 display:inline-block、
+ * 高度由内容决定，约束挂在它上面会被静默丢弃，图片按原始像素绘制后再由 .stageCanvas 的
+ * overflow:hidden 裁掉下缘。这里改成绝对定位：图稿尺寸只由自身固有比例与 max-* 决定，与包裹层的
+ * 高度不再耦合；棋盘格环挂在 .stageImg 自己的 border 上，环与图稿同属一个盒子，不会在限高后脱节。
+ *
+ * 包裹层刻意用父级作用域选中而不是 Image 的 rootClassName：antd 会把 rootClassName 一并透传给
+ * 预览浮层的根节点（@rc-component/image 的 Preview 拿它当根 className），而那个根节点是
+ * position:fixed;inset:0 的全屏浮层，在这里挂 position 会把整个预览拖出视口——症状是点开后
+ * 没有遮罩也没有大图，只剩底部一条操作栏。预览浮层挂在 body 下，不可能匹配 .stageChecker 的后代。
+ */
+.stageCanvas {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  overflow: hidden;
+  background: var(--bg-0);
+}
+
+.stageChecker {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.stageChecker :global(.ant-image) {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.stageImg {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: block;
+  /* antd 对 .ant-image-img 写死了 width:100%（height 由宽度按原始宽高比反推），
+     要让图稿同时受舞台宽高约束就必须盖掉它；antd 样式是运行时注入的，靠级联顺序压不住。 */
+  width: auto !important;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border: 14px solid transparent;
+  border-radius: var(--radius-m);
+  background-image:
+    linear-gradient(45deg, var(--line-1) 25%, transparent 25%, transparent 75%, var(--line-1) 75%),
+    linear-gradient(45deg, var(--line-1) 25%, transparent 25%, transparent 75%, var(--line-1) 75%);
+  background-size: 22px 22px;
+  background-position: 0 0, 11px 11px;
+}
+
+.stageMask {
+  font-size: 13px;
+}
+
+.tileStageWrap {
+  align-self: stretch;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: -20px;
+}
+
+.tileStage {
+  flex: 1;
+  min-height: 0;
+  background-repeat: repeat;
+  background-position: center;
+}
+
+.tileControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line-1);
+  background: var(--bg-1);
+  flex-shrink: 0;
+}
+
+.tileControlsLabel {
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.packStage {
+  align-self: stretch;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.packChips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.packRunningChip {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.packArtwork {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.packArtwork img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-pop);
+}
+
+.packDownloads {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.stageEmpty {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-m);
+  color: var(--text-2);
+  font-size: 14px;
+  text-align: center;
+}
+
+.stageEmpty p {
+  margin: 0;
+}
+
+.stageEmptyHint {
+  color: var(--text-3);
+  font-size: 12px;
+  max-width: 320px;
+  line-height: 1.7;
+}
+
+/*
+ * 动作栏：主路径（成包流水线，唯一 primary 在这里）在上，单步动作收进可折叠的「分步操作」组。
+ * overflow-x 必须显式关掉：只声明 overflow-y 时 x 轴按规范会计算成 auto，
+ * 而栏内存在无空格的长 token（产物文件名），一旦某个子项撑宽，整栏就会横向滚动，
+ * 结果是每行文字左边被裁掉几个字——比纵向滚动难发现得多。
+ */
+.rail {
+  width: 340px;
+  flex-shrink: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-l);
+}
+
+.wsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px 16px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.wsSection:last-child {
+  border-bottom: none;
+}
+
+/* 分步操作组：默认收起是有意的——一键成包已覆盖同样的三步，摊开会把"该点哪个"变成用户的问题。 */
+.railGroup {
+  border-bottom: 1px solid var(--line-2);
+}
+
+.railGroup:last-child {
+  border-bottom: none;
+}
+
+.railGroupToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.railGroupToggle:hover {
+  color: var(--accent);
+}
+
+.railGroupChevron {
+  flex-shrink: 0;
+  color: var(--text-3);
+  transition: transform 0.15s;
+}
+
+.railGroupToggleOpen .railGroupChevron {
+  transform: rotate(90deg);
+}
+
+.railGroupSummary {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* 节内子块标题：衍生节用两条小标题分开"零费用"与"会产生费用"两条路径。 */
+.wsSubTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.wsHint {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* 子块标题行：标题与成本口径同排。费用信息从段落里提出来当徽标，扫视时不必逐行读。 */
+.wsSubHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.formCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.formRow {
+  display: flex;
+  gap: 8px;
+}
+
+.wsChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wsChip {
+  padding: 3px 12px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.wsChip:hover {
+  color: var(--text-1);
+  border-color: var(--line-2);
+}
+
+.wsChipActive {
+  background: var(--accent-subtle);
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.sliderBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sliderLabel {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.deriveProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.copyBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 流水线收据：步骤卡按执行顺序纵向排列，当前步用左侧强调条标出。 */
+.pipelineBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pipelineHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pipelineCancel {
+  margin-left: auto;
+  padding: 0 4px;
+}
+
+.pipelineStep {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-1);
+  border-left: 2px solid var(--line-2);
+  border-radius: var(--radius-s);
+  background: var(--bg-2);
+}
+
+/* 当前步用左强调条 + 背景染色标出，不用阴影光晕：光晕在非交互卡片上读起来像焦点态。 */
+.pipelineStepCurrent {
+  border-color: var(--accent-line);
+  border-left-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.pipelineStepHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pipelineStepName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.pipelineStepBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pipelineArtifacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 产物文件名是不可断行的长 token：允许按钮被压到栏宽以内，文本靠 .artifactName 截断。 */
+.pipelineArtifacts :global(.ant-btn-link) {
+  max-width: 100%;
+  height: 22px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.artifactName {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipelineExits {
+  display: flex;
+  gap: 6px;
+}
+
+/* 错误与警告两套色：失败是终态（红），接缝风险是待裁决的提示（黄），不能混成一种说法。 */
+.pipelineError {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.pipelineWarning {
+  margin: 0;
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+/* 版本栈：祖先 → 当前 → 子衍生的横向缩略图链。 */
+.lineageStrip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-l);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.lineageLabel {
+  color: var(--text-3);
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.lineageNode {
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-s);
+  background: var(--bg-2);
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.lineageNode:hover {
+  border-color: var(--text-3);
+}
+
+.lineageNode img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lineageNodeEmpty {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lineageNodeCurrent {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.state {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  color: var(--text-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backLink,
+  .stageTab,
+  .wsChip,
+  .railGroupToggle,
+  .railGroupChevron,
+  .lineageNode {
+    transition: none;
+  }
+}

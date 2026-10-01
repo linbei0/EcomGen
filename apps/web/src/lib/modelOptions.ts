@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_LAYER_EXPORT_ELEMENTS, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, type SegmentationProtocol } from "@ecomgen/contracts";
+import { DEFAULT_MAX_LAYER_EXPORT_ELEMENTS, SEGMENTATION_PROTOCOL_CAPABILITIES, isSegmentationProtocol, supportsTransparentBackground, type SegmentationProtocol } from "@ecomgen/contracts";
 
 /** 模型选择下拉的最小结构；ProviderConfig（schema.d.ts）与其结构兼容。 */
 export interface ModelOptionSource {
@@ -11,6 +11,8 @@ export interface ModelOption {
   value: string;
   label: string;
   vision: boolean;
+  /** 该模型能否给出真透明底；底版选择据此禁用"透明底"并说明原因。 */
+  transparentBackground: boolean;
 }
 
 export interface ModelPair {
@@ -20,15 +22,22 @@ export interface ModelPair {
   imageModelId: string;
 }
 
-/** value 约定 `${providerId}::${modelId}`；推理排除生图与分割模型，生图要求 imageApiKind。 */
+/**
+ * value 约定 `${providerId}::${modelId}`；推理排除生图与分割模型，生图要求 imageApiKind。
+ *
+ * 支持透明底的生图模型在标签里标出来：起稿/衍生会按这个能力要透明底，花型能不能直接印在
+ * 承印物上取决于它，用户在选模型时就该看到差别，而不是事后从产物上猜。
+ * 判定与 worker 同源（contracts 的 supportsTransparentBackground），不在这里另写一份正则。
+ */
 export function modelOptions(providers: ModelOptionSource[], kind: "reasoning" | "image"): ModelOption[] {
   return providers.flatMap((provider) =>
     provider.models
       .filter((model) => (kind === "image" ? Boolean(model.imageApiKind) : !model.imageApiKind && !model.segmentationProtocol))
       .map((model) => ({
         value: `${provider.id}::${model.id}`,
-        label: `${provider.name} / ${model.id}`,
+        label: `${provider.name} / ${model.id}${kind === "image" && supportsTransparentBackground(model.id) ? "（透明底）" : ""}`,
         vision: model.supportsVision,
+        transparentBackground: kind === "image" && supportsTransparentBackground(model.id),
       })),
   );
 }
@@ -70,13 +79,24 @@ export function layerElementLimit(options: SegmentationModelOption[], key: strin
   return protocol ? SEGMENTATION_PROTOCOL_CAPABILITIES[protocol].maxElements : DEFAULT_MAX_LAYER_EXPORT_ELEMENTS;
 }
 
+/** 解析 `${providerId}::${modelId}` 约定值；缺段时返回空串，由调用方按无效值处理。 */
+export function parseModelKey(key: string): { providerId: string; modelId: string } {
+  const [providerId, modelId] = key.split("::");
+  return { providerId: providerId ?? "", modelId: modelId ?? "" };
+}
+
 /** 首页一键创建取第一对可用模型；凑不齐一对时返回 null，由调用方引导去设置。 */
 export function pickDefaultModels(providers: ModelOptionSource[]): ModelPair | null {
-  const reasoning = modelOptions(providers, "reasoning")[0];
-  const image = modelOptions(providers, "image")[0];
-  if (!reasoning || !image) return null;
-  const [reasoningProviderId, reasoningModelId] = reasoning.value.split("::");
-  const [imageProviderId, imageModelId] = image.value.split("::");
-  if (!reasoningProviderId || !reasoningModelId || !imageProviderId || !imageModelId) return null;
-  return { reasoningProviderId, reasoningModelId, imageProviderId, imageModelId };
+  const reasoningOption = modelOptions(providers, "reasoning")[0];
+  const imageOption = modelOptions(providers, "image")[0];
+  if (!reasoningOption || !imageOption) return null;
+  const reasoning = parseModelKey(reasoningOption.value);
+  const image = parseModelKey(imageOption.value);
+  if (!reasoning.providerId || !reasoning.modelId || !image.providerId || !image.modelId) return null;
+  return {
+    reasoningProviderId: reasoning.providerId,
+    reasoningModelId: reasoning.modelId,
+    imageProviderId: image.providerId,
+    imageModelId: image.modelId,
+  };
 }

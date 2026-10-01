@@ -17,6 +17,7 @@
     "ag-psd": "^31.0.2",
     "antd": "^6.6.0",
     "fflate": "^0.8.3",
+    "hero-patterns": "^2.1.0",
     "lucide-react": "^1.31.0",
     "motion": "^13.1.0",
     "openapi-fetch": "~0.17.0",

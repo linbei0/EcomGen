@@ -19,6 +19,12 @@ const SuiteForgePage = lazy(() =>
 const ModelsPage = lazy(() =>
   import("../features/models/ModelsPage").then((module) => ({ default: module.ModelsPage })),
 );
+const PatternsPage = lazy(() =>
+  import("../features/patterns/PatternsPage").then((module) => ({ default: module.PatternsPage })),
+);
+const PatternWorkspacePage = lazy(() =>
+  import("../features/patterns/PatternWorkspacePage").then((module) => ({ default: module.PatternWorkspacePage })),
+);
 
 function RouteFallback() {
   return (
@@ -66,6 +72,23 @@ export const router = createBrowserRouter([
     element: (
       <Suspense fallback={<RouteFallback />}>
         <ModelsPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/patterns",
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <PatternsPage />
+      </Suspense>
+    ),
+  },
+  {
+    // 花型工作区：全屏详情视图（舞台预览 + 生命周期动作栏 + 版本栈），取代旧的详情抽屉。
+    path: "/patterns/:patternId",
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <PatternWorkspacePage />
       </Suspense>
     ),
   },

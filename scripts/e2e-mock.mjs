@@ -51,7 +51,7 @@ const forgeSuite = () => ({
   })),
   provenance: { sourceKind: "viral-reference-set", sourceImageCount: 2, detached: true, notes: "e2e-mock" }
 });
-const observed = { planningPrompt: "", copywritingPrompt: "", imagePrompt: "", layerPlanPrompt: "", suiteForgePrompt: "", samRequests: [], groundedRequests: [], layerizeRequests: [], giteeRequests: [] };
+const observed = { planningPrompt: "", copywritingPrompt: "", listingPrompt: "", imagePrompt: "", layerPlanPrompt: "", suiteForgePrompt: "", samRequests: [], groundedRequests: [], layerizeRequests: [], giteeRequests: [] };
 // 取消场景：带 marker 的生图请求永不响应，用来验证取消是否真正断开在途 HTTP 而不是等超时。
 const hangingImagePromptMarker = "e2e-hang-forever";
 const cancellation = { hangingRequests: 0, abortedBeforeResponse: 0 };
@@ -84,6 +84,17 @@ try {
         response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
         response.write(`data: ${JSON.stringify({ id: "mock-copywriting", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(copy) }, finish_reason: null }] })}\n\n`);
         response.write(`data: ${JSON.stringify({ id: "mock-copywriting", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+        response.write("data: [DONE]\n\n");
+        response.end();
+        return;
+      }
+      // 花型 Listing 文案：系统提示以专属 marker 识别，返回满足 Etsy 硬约束的 JSON（标题 ≤140、13×20 tags）
+      if (requestText.includes("cross-border print-on-demand listing copywriter")) {
+        observed.listingPrompt = requestText;
+        const listing = { platform: "ETSY", title: "Watercolor Wildflower Bouquet T Shirt Design", tags: Array.from({ length: 13 }, (_, index) => `tag${index}`), description: "A watercolor wildflower bouquet artwork for everyday wear and gifts.", bullets: [] };
+        response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        response.write(`data: ${JSON.stringify({ id: "mock-listing", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: JSON.stringify(listing) }, finish_reason: null }] })}\n\n`);
+        response.write(`data: ${JSON.stringify({ id: "mock-listing", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
         response.write("data: [DONE]\n\n");
         response.end();
         return;
@@ -585,6 +596,173 @@ try {
   assert.equal(selectedCastModel.portraitCount, 1);
   const modelsAfterCast = await requestJson(`${base}/models`, "GET");
   assert.equal(modelsAfterCast.items.find((item) => item.id === ecomModel.id)?.selectedPortrait.id, castPortraits.items[0].id);
+  // 花型工坊链路：商品图提取（SAM 单主体抠图）→ 规格包（确定性排版）→ Listing 文案（看图写跨境文案）
+  const printSpecs = await requestJson(`${base}/pod/print-specs`, "GET");
+  assert.equal(printSpecs.specVersion, "2026.09");
+  assert.equal(printSpecs.items.length, 6);
+  const extractForm = new FormData();
+  extractForm.append("providerId", provider.id);
+  extractForm.append("modelId", "sam-3");
+  extractForm.append("name", "水彩野花");
+  extractForm.append("brief", "只留杯壁图案");
+  extractForm.append("file", new Blob([patternSourcePng()], { type: "image/png" }), "cup.png");
+  const extractResponse = await fetch(`${base}/patterns/extract-jobs`, { method: "POST", body: extractForm });
+  const extractText = await extractResponse.text();
+  assert.equal(extractResponse.status, 202, extractText);
+  const extractJob = JSON.parse(extractText);
+  assert.equal(extractJob.type, "PATTERN_EXTRACT");
+  assert.equal(extractJob.projectId, null);
+  const extractDone = await waitJob(base, extractJob.id);
+  assert.equal(extractDone.status, "SUCCEEDED");
+  // 提取复用分割 Provider 三元组（显式快照，不继承项目配置）；请求到达 fal 端点并携带内联源图
+  assert.match(JSON.stringify(observed.samRequests.at(-1)), /"image_url":"data:image\/png;base64,/);
+  // 同源图同参数命中请求指纹：200 复用既有任务，不重复计费
+  const duplicateExtract = await fetch(`${base}/patterns/extract-jobs`, { method: "POST", body: extractForm });
+  assert.equal(duplicateExtract.status, 200);
+  assert.equal((await duplicateExtract.json()).id, extractJob.id);
+  const patterns = await requestJson(`${base}/patterns`, "GET");
+  assert.equal(patterns.items.length, 1);
+  const pattern = patterns.items[0];
+  assert.equal(pattern.source, "EXTRACTED");
+  assert.equal(pattern.name, "水彩野花");
+  assert.equal((await fetch(new URL(pattern.imageUrl, base))).status, 200);
+  assert.equal((await fetch(new URL(pattern.thumbUrl, base))).status, 200);
+  // 花型进资产库：PATTERN 条目按 pattern: 前缀寻址
+  const patternLibrary = await requestJson(`${base}/library-assets?kind=PATTERN`, "GET");
+  assert.equal(patternLibrary.items.length, 1);
+  assert.equal(patternLibrary.items[0].id, `pattern:${pattern.id}`);
+  // 规格包：一任务一记录，PRINT_FILE + manifest 双产物，只有 PRINT_FILE 进资产库
+  const packResponse = await requestJson(`${base}/patterns/${pattern.id}/print-pack-jobs`, "POST", { specId: "mug-11oz-wrap" });
+  assert.equal(packResponse.job.type, "PRINT_PACK");
+  assert.equal(packResponse.printPack.status, "QUEUED");
+  const packJob = await waitJob(base, packResponse.job.id);
+  assert.equal(packJob.status, "SUCCEEDED");
+  const packs = await requestJson(`${base}/patterns/${pattern.id}/print-packs`, "GET");
+  assert.equal(packs.items[0].status, "SUCCEEDED");
+  // 居中版式：PRINT_FILE + MOCKUP（品类示意图）+ MANIFEST 三件产物
+  assert.deepEqual(packs.items[0].files.map((file) => file.kind), ["PRINT_FILE", "MOCKUP", "MANIFEST"]);
+  const packPng = await fetch(new URL(packs.items[0].files[0].url, base));
+  assert.equal(packPng.status, 200);
+  assert.equal(Buffer.from(await packPng.arrayBuffer()).subarray(1, 4).toString("binary"), "PNG");
+  const packMockup = await fetch(new URL(packs.items[0].files[1].url, base));
+  assert.equal(packMockup.status, 200);
+  assert.equal(Buffer.from(await packMockup.arrayBuffer()).subarray(1, 4).toString("binary"), "PNG");
+  const packManifest = await fetch(new URL(packs.items[0].files[2].url, base));
+  assert.match(await packManifest.text(), /"kind":\s*"ecomgen\.print-pack"/);
+  const packLibrary = await requestJson(`${base}/library-assets?kind=PRINT_PACK`, "GET");
+  assert.equal(packLibrary.items.length, 1);
+  assert.equal((await fetch(new URL(packLibrary.items[0].url, base))).status, 200);
+  // 已成功的同规格请求复用（200），不重复合成
+  const reusedPack = await fetch(`${base}/patterns/${pattern.id}/print-pack-jobs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ specId: "mug-11oz-wrap" }) });
+  assert.equal(reusedPack.status, 200);
+  assert.equal((await reusedPack.json()).job.id, packResponse.job.id);
+  // Listing 文案：看图写 Etsy 文案，平台硬约束在 Prompt 与结果校验两侧生效
+  const listingBody = { providerId: provider.id, modelId: "mock-reasoner", platform: "ETSY", sellingPoints: "gift for plant lovers", bannedWords: "disney" };
+  const listingJob = await requestJson(`${base}/patterns/${pattern.id}/listing-jobs`, "POST", listingBody);
+  assert.equal(listingJob.type, "COPYWRITE");
+  const listingDone = await waitJob(base, listingJob.id);
+  assert.equal(listingDone.status, "SUCCEEDED");
+  assert.match(observed.listingPrompt, /Etsy rules/);
+  assert.match(observed.listingPrompt, /disney/); // 禁用词随 payload 注入生成提示，由结果校验保证不出现
+  const listingResult = await requestJson(`${base}/patterns/${pattern.id}/listing-jobs/${listingJob.id}/result`, "GET");
+  assert.equal(listingResult.platform, "ETSY");
+  assert.ok(listingResult.copy.title.length <= 140, "Etsy title must satisfy the 140-char cap");
+  assert.equal(listingResult.copy.tags.length, 13);
+  assert.doesNotMatch(listingResult.copy.title, /disney/i);
+  const reusedListing = await fetch(`${base}/patterns/${pattern.id}/listing-jobs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(listingBody) });
+  assert.equal(reusedListing.status, 200);
+  assert.equal((await reusedListing.json()).id, listingJob.id);
+  // AI 起稿：主题一句话直达生图，每张候选各自成为独立花型
+  const forgePatternJob = await requestJson(`${base}/patterns/forge-jobs`, "POST", { providerId: provider.id, imageModelId: "mock-image", theme: "水彩野花束，奶油色底，留白呼吸感", candidateCount: 1 });
+  assert.equal(forgePatternJob.type, "PATTERN_FORGE");
+  const forgePatternDone = await waitJob(base, forgePatternJob.id);
+  assert.equal(forgePatternDone.status, "SUCCEEDED");
+  const patternsAfterForge = await requestJson(`${base}/patterns`, "GET");
+  assert.equal(patternsAfterForge.items.length, 2);
+  assert.equal(patternsAfterForge.items.find((item) => item.id !== pattern.id)?.source, "GENERATED");
+  // 上传花型文件：跳过提取直接入库（来源 UPLOADED）
+  const uploadForm = new FormData();
+  uploadForm.append("name", "上传的几何花型");
+  uploadForm.append("tags", JSON.stringify(["几何"]));
+  uploadForm.append("file", new Blob([Buffer.from(onePixelReferencePng, "base64")], { type: "image/png" }), "geo.png");
+  const uploadResponse = await fetch(`${base}/patterns/upload`, { method: "POST", body: uploadForm });
+  const uploadText = await uploadResponse.text();
+  assert.equal(uploadResponse.status, 201, uploadText);
+  const uploadedPattern = JSON.parse(uploadText);
+  assert.equal(uploadedPattern.source, "UPLOADED");
+  assert.equal((await requestJson(`${base}/patterns`, "GET")).items.length, 3);
+  // 花型衍生：改色为确定性本地运算，产出新花型（source DERIVED、血缘指向源）
+  const recolorJob = await requestJson(`${base}/patterns/${pattern.id}/derive-jobs`, "POST", { hueShift: 40, saturationPct: 120 });
+  assert.equal(recolorJob.type, "PATTERN_DERIVE");
+  const recolorDone = await waitJob(base, recolorJob.id);
+  assert.equal(recolorDone.status, "SUCCEEDED");
+  const recolorPattern = (await requestJson(`${base}/patterns`, "GET")).items.find((item) => item.sourceJobId === recolorJob.id);
+  assert.ok(recolorPattern, "recolor derive must produce a visible pattern");
+  assert.equal(recolorPattern.source, "DERIVED");
+  assert.equal(recolorPattern.parentPatternId, pattern.id);
+  // 同参数复用（200），不重复产出花型
+  const reusedRecolor = await fetch(`${base}/patterns/${pattern.id}/derive-jobs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hueShift: 40, saturationPct: 120 }) });
+  assert.equal(reusedRecolor.status, 200);
+  assert.equal((await reusedRecolor.json()).id, recolorJob.id);
+  // 平铺满印版式：对改色产物成 TILE 包，产物仍为 PRINT_FILE + MOCKUP + MANIFEST 三件
+  const tilePack = await requestJson(`${base}/patterns/${recolorPattern.id}/print-pack-jobs`, "POST", { specId: "tshirt-front-12x16", layout: "TILE" });
+  const tilePackJob = await waitJob(base, tilePack.job.id);
+  assert.equal(tilePackJob.status, "SUCCEEDED");
+  const tilePacks = await requestJson(`${base}/patterns/${recolorPattern.id}/print-packs`, "GET");
+  assert.deepEqual(tilePacks.items[0].files.map((file) => file.kind), ["PRINT_FILE", "MOCKUP", "MANIFEST"]);
+  assert.equal((await fetch(new URL(tilePacks.items[0].files[0].url, base))).status, 200);
+  assert.equal((await fetch(new URL(tilePacks.items[0].files[1].url, base))).status, 200);
+  // 成包流水线（满印链跑完）：三问只答一次，worker 按 position 把「验缝 → 规格包 → 文案」推到底。
+  // 均匀底花型的验缝判定是确定性的 VERIFIED，所以这条链不该在任何一步停下。
+  const pipelineForm = new FormData();
+  pipelineForm.append("name", "流水线满印底纹");
+  pipelineForm.append("pipeline", JSON.stringify({ specId: "tshirt-front-12x16", layout: "TILE", listingPlatform: "ETSY", listingProviderId: provider.id, listingModelId: "mock-reasoner" }));
+  pipelineForm.append("file", new Blob([uniformPatternPng(64)], { type: "image/png" }), "uniform.png");
+  const pipelineUpload = await fetch(`${base}/patterns/upload`, { method: "POST", body: pipelineForm });
+  const pipelineUploadText = await pipelineUpload.text();
+  assert.equal(pipelineUpload.status, 201, pipelineUploadText);
+  const pipelinePattern = JSON.parse(pipelineUploadText);
+  // 上传没有来源任务可等：步骤表里没有 SOURCE，直接起跑验缝
+  const startedPipelines = await requestJson(`${base}/patterns/${pipelinePattern.id}/pipelines`, "GET");
+  assert.equal(startedPipelines.items.length, 1);
+  const startedPipeline = startedPipelines.items[0];
+  assert.deepEqual(startedPipeline.steps.map((step) => step.step), ["TILE_CHECK", "PRINT_PACK", "LISTING"]);
+  const sealedPipeline = await waitPipeline(base, startedPipeline.id);
+  assert.equal(sealedPipeline.status, "SUCCEEDED");
+  assert.deepEqual(sealedPipeline.steps.map((step) => step.status), ["SUCCEEDED", "SUCCEEDED", "SUCCEEDED"]);
+  // 验缝判定回写花型：这一步的产物就是属性本身
+  const sealedPattern = (await requestJson(`${base}/patterns`, "GET")).items.find((item) => item.id === pipelinePattern.id);
+  assert.equal(sealedPattern.tileable, "VERIFIED");
+  // 规格包与文案两步的产物都能按步骤 jobId 取回（收据不是空壳）
+  const pipelinePacks = await requestJson(`${base}/patterns/${pipelinePattern.id}/print-packs`, "GET");
+  assert.equal(pipelinePacks.items.length, 1);
+  assert.deepEqual(pipelinePacks.items[0].files.map((file) => file.kind), ["PRINT_FILE", "MOCKUP", "MANIFEST"]);
+  const listingStep = sealedPipeline.steps.find((step) => step.step === "LISTING");
+  const pipelineListing = await requestJson(`${base}/patterns/${pipelinePattern.id}/listing-jobs/${listingStep.jobId}/result`, "GET");
+  assert.equal(pipelineListing.platform, "ETSY");
+  assert.ok(pipelineListing.copy.tags.length > 0);
+
+  // 成包流水线（接缝裁决）：1×1 花型的验缝必然 FAILED，满印链必须停在 AWAITING_INPUT 等裁决，
+  // 既不静默降级成居中，也不越权先把规格包跑出来。
+  const seamPipeline = await requestJson(`${base}/patterns/${uploadedPattern.id}/pipelines`, "POST", { specId: "tshirt-front-12x16", layout: "TILE", listingPlatform: "ETSY", listingProviderId: provider.id, listingModelId: "mock-reasoner" });
+  assert.equal(seamPipeline.status, "RUNNING");
+  const waiting = await waitPipeline(base, seamPipeline.id, "AWAITING_INPUT");
+  assert.equal(waiting.blockReason, "SEAM_RISK");
+  const waitingTileStep = waiting.steps.find((step) => step.step === "TILE_CHECK");
+  assert.equal(waitingTileStep.status, "SUCCEEDED");
+  assert.match(String(waitingTileStep.detail.warning), /接缝/);
+  const waitingPackStep = waiting.steps.find((step) => step.step === "PRINT_PACK");
+  assert.equal(waitingPackStep.status, "PENDING");
+  assert.equal(waitingPackStep.jobId, null);
+  // 裁决一：改用居中继续 → 版式落库后规格包按新版式出图，链跑完
+  const resolved = await requestJson(`${base}/pattern-pipelines/${seamPipeline.id}/continue`, "POST", { resolution: "USE_CENTERED" });
+  assert.equal(resolved.layout, "CENTERED");
+  assert.equal(resolved.status, "RUNNING");
+  const resolvedDone = await waitPipeline(base, seamPipeline.id);
+  assert.equal(resolvedDone.status, "SUCCEEDED");
+  const resolvedPackStep = resolvedDone.steps.find((step) => step.step === "PRINT_PACK");
+  const resolvedPackJob = await requestJson(`${base}/jobs/${resolvedPackStep.jobId}`, "GET");
+  assert.equal(resolvedPackJob.input.layout, "CENTERED");
   // 取消传播：上游永不返回时，取消必须真正断开在途请求，而不是等超时后再丢弃已计费的结果。
   // 已生成的分镜被服务端冻结 Prompt，因此这里用一个独立项目构造该请求，顺带不干扰主链路的产物计数。
   const cancelProject = await requestJson(`${base}/projects`, "POST", {
@@ -623,7 +801,7 @@ try {
   // 取消不是瞬时错误：重发一次就是再付一次费，因此上游只允许收到一次请求。
   assert.equal(cancellation.hangingRequests, 1);
   assert.equal((await requestJson(`${base}/projects/${cancelProject.id}/outputs`, "GET")).length, 0);
-  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge -> model cast & select -> cancel aborts in-flight generation");
+  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge -> model cast & select -> pattern extract/forge/upload/derive & print pack (centered + tile + mockup) & listing & packaging pipeline (full chain + seam-risk stop & resolution) -> cancel aborts in-flight generation");
 } finally {
   await Promise.all(children.map(stop));
   if (mock) await new Promise((resolveClose) => mock.close(resolveClose));
@@ -635,6 +813,26 @@ function pngChunk(type, data) { const length = Buffer.alloc(4); length.writeUInt
 function solidPng(red, green, blue) {
   const header = Buffer.alloc(13); header.writeUInt32BE(1, 0); header.writeUInt32BE(1, 4); header[8] = 8; header[9] = 6;
   const raw = Buffer.from([0, red, green, blue, 255]);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), pngChunk("IHDR", header), pngChunk("IDAT", deflateSync(raw)), pngChunk("IEND", Buffer.alloc(0))]);
+}
+// 提取链路的源图：3×3 双色图（sharp trim 的下限就是 3×3），边框与中心异色保证抠像裁边后仍有产物
+// 均匀底 PNG：验缝对它是确定性的 VERIFIED（四周无差、内部也无差），用来走通"满印链一路跑完"
+function uniformPatternPng(size) {
+  const pixel = Buffer.from([120, 140, 90, 255]);
+  const row = Buffer.concat([Buffer.from([0]), ...Array.from({ length: size }, () => pixel)]);
+  const raw = Buffer.concat(Array.from({ length: size }, () => row));
+  const header = Buffer.alloc(13); header.writeUInt32BE(size, 0); header.writeUInt32BE(size, 4); header[8] = 8; header[9] = 6;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), pngChunk("IHDR", header), pngChunk("IDAT", deflateSync(raw)), pngChunk("IEND", Buffer.alloc(0))]);
+}
+function patternSourcePng() {
+  const ring = [26, 58, 46, 255];
+  const center = [204, 102, 61, 255];
+  const header = Buffer.alloc(13); header.writeUInt32BE(3, 0); header.writeUInt32BE(3, 4); header[8] = 8; header[9] = 6;
+  const raw = Buffer.from([
+    0, ...ring, ...ring, ...ring,
+    0, ...ring, ...center, ...ring,
+    0, ...ring, ...ring, ...ring,
+  ]);
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), pngChunk("IHDR", header), pngChunk("IDAT", deflateSync(raw)), pngChunk("IEND", Buffer.alloc(0))]);
 }
 function stop(child) { if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(); return new Promise((resolveStop) => { child.once("exit", resolveStop); child.kill(); }); }
@@ -662,5 +860,7 @@ async function freePort() { const server = createServer(); const port = await li
 async function requestJson(url, method, body) { const response = await fetch(url, { method, headers: body === undefined ? undefined : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); const text = await response.text(); assert.ok(response.ok, `${method} ${url} failed (${response.status}): ${text}`); return text ? JSON.parse(text) : undefined; }
 async function waitFor(predicate, timeoutMs = 15_000, label = "condition") { const end = Date.now() + timeoutMs; let lastError; while (Date.now() < end) { try { if (await predicate()) return; } catch (error) { lastError = error; } await delay(100); } throw lastError ?? new Error(`Timed out waiting for ${label}`); }
 async function waitJob(base, id) { let final; await waitFor(async () => { final = await requestJson(`${base}/jobs/${id}`, "GET"); return ["SUCCEEDED", "FAILED", "CANCELLED"].includes(final.status); }); return final; }
+// 流水线终态：AWAITING_INPUT 不是终态（等用户裁决），默认等"跑完或失败"；需要停在裁决点就显式传目标状态
+async function waitPipeline(base, id, stopAt) { let current; await waitFor(async () => { current = await requestJson(`${base}/pattern-pipelines/${id}`, "GET"); if (stopAt) return current.status === stopAt; return ["SUCCEEDED", "FAILED", "CANCELLED"].includes(current.status); }, 20_000, `pattern pipeline ${id}`); return current; }
 async function waitForJob(base, projectId, type) { let found; await waitFor(async () => { const detail = await requestJson(`${base}/projects/${projectId}`, "GET"); found = detail.jobs.find((job) => job.type === type); return Boolean(found && ["SUCCEEDED", "FAILED", "CANCELLED"].includes(found.status)); }); return found; }
 function delay(ms) { return new Promise((resolveDelay) => setTimeout(resolveDelay, ms)); }

@@ -78,6 +78,37 @@ describe("OpenAI-compatible image editing", () => {
     expect((request?.body as FormData).get("mask")).toBeNull();
   });
 
+  it("透明底要求同时下发 background 与 output_format，未要求时不带这两个字段", async () => {
+    const requests: RequestInit[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: URL, init?: RequestInit) => {
+      requests.push(init!);
+      return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("generated").toString("base64") }] }), { status: 200 });
+    }));
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+
+    // JSON 生成路径
+    await provider.generate({ model: "gpt-image-1.5", prompt: "pattern", background: "transparent", outputFormat: "png" });
+    expect(JSON.parse(requests[0]!.body as string)).toMatchObject({ background: "transparent", output_format: "png" });
+    // 多部分编辑路径：编辑后仍要保住源花型的 alpha
+    await provider.editImage({
+      model: "gpt-image-1.5",
+      prompt: "variant",
+      operation: "NATURAL_FUSION",
+      sourceImage: { data: Buffer.from("source"), filename: "pattern.png", mimeType: "image/png" },
+      background: "transparent",
+      outputFormat: "png"
+    });
+    const editBody = requests[1]!.body as FormData;
+    expect(editBody.get("background")).toBe("transparent");
+    expect(editBody.get("output_format")).toBe("png");
+
+    // 默认请求保持原样：第三方兼容端点不认这两个参数，多发可能让整次调用失败。
+    await provider.generate({ model: "image-model", prompt: "cup" });
+    const defaultBody = JSON.parse(requests[2]!.body as string) as Record<string, unknown>;
+    expect(defaultBody).not.toHaveProperty("background");
+    expect(defaultBody).not.toHaveProperty("output_format");
+  });
+
   it("derives edit capabilities from the selected image API adapter", () => {
     const imageModel = { supportsVision: true, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: "openai_images" as const };
     const textModel = { ...imageModel, imageApiKind: null };

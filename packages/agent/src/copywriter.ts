@@ -1,8 +1,8 @@
 import type { ImageContent } from "@earendil-works/pi-ai";
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { CopywritingTarget, PlatformTarget, TargetMarket } from "@ecomgen/contracts";
 import { createAgent, type ReasoningModel } from "./runtime.js";
 import { parseJsonResponse } from "./json-response.js";
+import { latestAssistantText, requiredText } from "./model-reply.js";
 import { COPYWRITING_DESCRIPTION_SCHEMA, COPYWRITING_INSTRUCTION_SCHEMA } from "./structured-output.js";
 
 export interface CopywritingInput {
@@ -66,7 +66,7 @@ export async function writeCopywriting(input: CopywritingInput): Promise<Copywri
   if (agent.state.errorMessage) throw new Error(`Copywriting model request failed: ${agent.state.errorMessage}`);
   let result: CopywritingResult;
   try {
-    result = validateCopywriting(input.target, parseJsonResponse(latestAssistantText(agent.state.messages)));
+    result = validateCopywriting(input.target, parseJsonResponse(latestAssistantText(agent.state.messages, "Copywriting")));
   } catch (error) {
     // LLM 对字符数软约束不可靠，超限是可恢复偏差：在同一会话里追加一次有界压缩
     // 重试并留出安全余量；仍超限则按失败处理，不静默截断文案。
@@ -77,19 +77,11 @@ export async function writeCopywriting(input: CopywritingInput): Promise<Copywri
       `Your previous result is too long. Rewrite it with the same JSON schema and the same facts, shortening every field so the final formatted content stays within ${limit} characters. Return only the JSON.`,
     );
     if (agent.state.errorMessage) throw new Error(`Copywriting model request failed: ${agent.state.errorMessage}`);
-    result = validateCopywriting(input.target, parseJsonResponse(latestAssistantText(agent.state.messages)));
+    result = validateCopywriting(input.target, parseJsonResponse(latestAssistantText(agent.state.messages, "Copywriting")));
   }
   return result;
 }
 
-function latestAssistantText(messages: readonly AgentMessage[]): string {
-  const response = [...messages].reverse().find((message) => message.role === "assistant");
-  const text = response
-    ? response.content.filter((part) => part.type === "text").map((part) => ("text" in part ? part.text : "")).join("\n")
-    : "";
-  if (!text) throw new Error("Copywriting model returned no text");
-  return text;
-}
 
 // 产品描述的 Prompt 目标是 400 字符（产品期望的简洁度），但 LLM 对字符计数不可靠，
 // 硬护栏放宽到 600 作为容差带：轻微超限直接放行，只有严重超限才触发压缩重试。
@@ -99,27 +91,23 @@ export function validateCopywriting(target: CopywritingTarget, value: unknown): 
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Copywriting model returned an invalid result");
   const record = value as Record<string, unknown>;
   if (target === "PRODUCT_DESCRIPTION") {
-    const productName = requiredText(record.productName, "productName");
+    const productName = requiredText(record.productName, "productName", "Copywriting");
     const sellingPoints = Array.isArray(record.coreSellingPoints)
-      ? record.coreSellingPoints.map((item) => requiredText(item, "coreSellingPoints"))
+      ? record.coreSellingPoints.map((item) => requiredText(item, "coreSellingPoints", "Copywriting"))
       : [];
     if (sellingPoints.length === 0) throw new Error("Copywriting model returned no core selling points");
     const content = [
       `产品名称：${productName}`,
       "核心卖点：",
       ...sellingPoints.map((item) => `- ${item}`),
-      `适用人群：${requiredText(record.suitableAudience, "suitableAudience")}`,
-      `期望场景：${requiredText(record.expectedScenarios, "expectedScenarios")}`,
+      `适用人群：${requiredText(record.suitableAudience, "suitableAudience", "Copywriting")}`,
+      `期望场景：${requiredText(record.expectedScenarios, "expectedScenarios", "Copywriting")}`,
     ].join("\n");
     return { target, content: checkedLength(content, PRODUCT_DESCRIPTION_LIMIT) };
   }
-  return { target, content: checkedLength(requiredText(record.content, "content"), 4000) };
+  return { target, content: checkedLength(requiredText(record.content, "content", "Copywriting"), 4000) };
 }
 
-function requiredText(value: unknown, field: string): string {
-  if (typeof value !== "string" || !value.trim()) throw new Error(`Copywriting model returned an invalid ${field}`);
-  return value.trim();
-}
 
 function checkedLength(value: string, maxLength: number): string {
   if (value.length > maxLength) throw new Error(`Copywriting model returned content longer than ${maxLength} characters`);

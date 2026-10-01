@@ -1,0 +1,24 @@
+/**
+ * 可平铺（无缝 / 四方连续）本地判定常量。
+ *
+ * 闭源生图 API 不暴露平铺控制，Prompt 里写 seamless 不构成保证（域调研见
+ * docs/reference/pod-domain-research.md 5.3），所以「可平铺」只能由本地确定性校验给出：
+ * 按半幅环绕位移比对中缝——等价于比对原始左右边缘列、上下边缘行的逐像素均差——归一化到 0..1，
+ * 低于阈值判 FAILED。判定只读像素、不改动任何像素，因此零费用且同输入恒同输出。
+ *
+ * 算法版本随花型记录下发（tileableCheckedWith）：阈值或度量口径修订时递增，使旧判定可被识别为
+ * 过期并重算。花型像素不可变，所以同一算法对同一花型的判定恒定——重新校验的唯一理由是算法变了。
+ *
+ * 该文件是纯数据常量，不进 API_SCHEMA_REGISTRY。
+ */
+
+/**
+ * 验缝阈值：可平铺分数 ≥ 该值判 VERIFIED，否则 FAILED。
+ *
+ * 分数的定义见 apps/worker/src/tile-verify.ts：环绕处的色差允许比该轴图内最大相邻色差高出
+ * (1 - 阈值) × 255 ≈ 26（约 10% 色阶）以内。两个轴取较差者，所以一个轴接不上就会失败。
+ */
+export const TILEABILITY_VERIFIED_MIN = 0.9;
+
+/** 验缝算法版本；度量口径或阈值修订时递增。 */
+export const TILEABILITY_ALGORITHM_VERSION = "2026.09.1";
