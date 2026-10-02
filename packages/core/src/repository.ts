@@ -1,1718 +1,280 @@
-import { randomUUID } from "node:crypto";
-import type {
-  AssetRole,
-  CopywritingTarget,
-  ImageAspectRatio,
-  ImageResolution,
-  JobStatus,
-  JobType,
-  LibraryItemKind,
-  LibraryItemSource,
-  ListingCopy,
-  ListingPlatform,
-  ModelDefinition,
-  ModelSpec,
-  PatternSource,
-  PatternPipelineBlockReason,
-  PatternPipelineStatus,
-  PatternPipelineStepName,
-  PatternPipelineStepStatus,
-  PlatformTarget,
-  PodPrintLayout,
-  PodRepeatLayout,
-  ReasoningProtocolProfile,
-  SearchSourceKind,
-  SegmentationModelRef,
-  StoryboardMode,
-  StoryboardShotRole,
-  TargetMarket,
-  TileableStatus,
-} from "@ecomgen/contracts";
-import type { CompositePolicy, EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus, ReferencePurpose, ReferenceSelection } from "@ecomgen/contracts";
-import type { SuiteDocumentInput } from "@ecomgen/ecom-suite";
 import type { SqliteDatabase } from "./database.js";
-import { normalize } from "./fingerprint.js";
+import { AssetRepository, type AssetRecord } from "./repositories/assetRepository.js";
+import {
+  EditSessionRepository,
+  type EditReferenceAssetRecord,
+  type EditSessionRecord,
+  type EditTurnRecord,
+} from "./repositories/editSessionRepository.js";
+import {
+  ExportRepository,
+  type ExportRecord,
+  type LayerExportRecord,
+  type LayerPlanRecord,
+} from "./repositories/exportRepository.js";
+import {
+  JobRepository,
+  type CopywritingResultRecord,
+  type JobRecord,
+  type WebResearchAuditRecord,
+  type WebResearchAttemptRecord,
+} from "./repositories/jobRepository.js";
+import { LibraryRepository, type LibraryItemPage } from "./repositories/libraryRepository.js";
+import {
+  ModelRepository,
+  type ModelPortraitRecord,
+  type ModelRecord,
+} from "./repositories/modelRepository.js";
+import { OutputRepository, type OutputRecord } from "./repositories/outputRepository.js";
+import {
+  PatternPipelineRepository,
+  type PatternPipelineStepRecord,
+  type PatternPipelineWithSteps,
+} from "./repositories/patternPipelineRepository.js";
+import {
+  PatternRepository,
+  type PatternListingResultRecord,
+  type PatternRecord,
+  type PrintPackRecord,
+} from "./repositories/patternRepository.js";
+import {
+  ProjectRepository,
+  type PlanningConfigSnapshotRecord,
+  type ProjectCoverSummary,
+  type ProjectRecord,
+} from "./repositories/projectRepository.js";
+import { ProviderRepository, type ProviderRecord } from "./repositories/providerRepository.js";
+import { SearchSourceRepository, type SearchSourceRecord } from "./repositories/searchSourceRepository.js";
+import {
+  StoryboardRepository,
+  type StoryboardItemRecord,
+  type StoryboardRecord,
+} from "./repositories/storyboardRepository.js";
+import {
+  UserContentRepository,
+  type SuiteForgeResultRecord,
+  type UserSuiteRecord,
+  type UserTemplateRecord,
+} from "./repositories/userContentRepository.js";
+
+export * from "./repositories/assetRepository.js";
+export * from "./repositories/editSessionRepository.js";
+export * from "./repositories/exportRepository.js";
+export * from "./repositories/jobRepository.js";
+export * from "./repositories/libraryRepository.js";
+export * from "./repositories/modelRepository.js";
+export * from "./repositories/outputRepository.js";
+export * from "./repositories/patternPipelineRepository.js";
+export * from "./repositories/patternRepository.js";
+export * from "./repositories/projectRepository.js";
+export * from "./repositories/providerRepository.js";
+export * from "./repositories/searchSourceRepository.js";
+export * from "./repositories/storyboardRepository.js";
+export * from "./repositories/userContentRepository.js";
 
-/** 写入 jobs.provider_task_id 的内部标记：请求已发出但 Provider 尚未返回结果。 */
-export const EXTERNAL_REQUEST_STARTED = "__EXTERNAL_REQUEST_STARTED__";
-
-export interface ProviderRecord {
-  id: string;
-  name: string;
-  baseUrl: string;
-  reasoningProtocol: ReasoningProtocolProfile;
-  encryptedApiKey: string;
-  models: ModelDefinition[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SearchSourceRecord {
-  id: string;
-  name: string;
-  kind: SearchSourceKind;
-  baseUrl: string;
-  encryptedApiKey: string | null;
-  priority: number;
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 用户自定义提示词模板（简化格式）；ID 形如 custom-xxxxxxxx，由 API 层生成。 */
-export interface UserTemplateRecord {
-  id: string;
-  name: string;
-  prompt: string;
-  defaultSize: "1024x1024" | "1024x1536";
-  supportsImageReference: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 用户导入的套图；payload 保存完整套图文档，索引列用于列表归类与搜索。 */
-export interface UserSuiteRecord {
-  id: string;
-  name: string;
-  l1: string;
-  l2: string;
-  leaf: string;
-  productFamily: string | null;
-  payload: SuiteDocumentInput;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 全局套图反推任务的结果草稿；确认入库后写入 user_suites 并置为 COMMITTED。 */
-export type SuiteForgeStatus = "DRAFT" | "COMMITTED";
-export interface SuiteForgeResultRecord {
-  jobId: string;
-  payload: SuiteDocumentInput;
-  status: SuiteForgeStatus;
-  suiteId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 全局模特库条目；spec 是定妆照 prompt 的唯一持久化真相，不绑定项目。 */
-export interface ModelRecord {
-  id: string;
-  name: string;
-  spec: ModelSpec;
-  notes: string;
-  referenceFacePath: string | null;
-  referenceFaceHash: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 模选定妆照；selected 在事务内先清后设，保证每模特至多一张。 */
-export interface ModelPortraitRecord {
-  id: string;
-  modelId: string;
-  jobId: string;
-  storagePath: string;
-  hash: string;
-  width: number | null;
-  height: number | null;
-  providerId: string;
-  imageModelId: string;
-  aspectRatio: ImageAspectRatio;
-  selected: boolean;
-  createdAt: string;
-}
-
-/** 全局花型库条目；来源血缘（提取源图 hash / 起稿任务 / 父花型）是自检与追溯的留痕基础。 */
-export interface PatternRecord {
-  id: string;
-  name: string;
-  sourceType: PatternSource;
-  sourceJobId: string | null;
-  sourceAssetHash: string | null;
-  parentPatternId: string | null;
-  storagePath: string | null;
-  fileHash: string | null;
-  width: number | null;
-  height: number | null;
-  tags: string[];
-  /** 可平铺判定；只有 PATTERN_TILE_CHECK 任务会改写它，花型图内容本身不被验缝修改。 */
-  tileable: TileableStatus;
-  /** 验缝归一化相似度 0..1；未校验为 null。 */
-  tileableScore: number | null;
-  /** 写入该判定时的算法版本；与当前版本不一致表示判定过期。 */
-  tileableCheckedWith: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 规格包产物文件；PRINT_FILE 为可投产 PNG，MOCKUP 为品类示意图，SEAMLESS_TILE 为满印无缝单元，MANIFEST 为溯源清单。 */
-export interface PrintPackFileRecord {
-  name: string;
-  kind: "PRINT_FILE" | "MOCKUP" | "MANIFEST" | "SEAMLESS_TILE";
-  storagePath: string;
-  hash: string;
-}
-
-/** 规格包领域记录；一任务一记录（job_id 唯一），文件清单与 manifest 在成功后写入。 */
-export interface PrintPackRecord {
-  id: string;
-  patternId: string;
-  jobId: string;
-  specId: string;
-  specVersion: string;
-  status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
-  files: PrintPackFileRecord[] | null;
-  manifest: Record<string, unknown> | null;
-  error: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 花型 Listing 文案结果；独立于 copywriting_results（后者归属项目域且 project_id 非空）。 */
-export interface PatternListingResultRecord {
-  jobId: string;
-  patternId: string;
-  platform: ListingPlatform;
-  copy: ListingCopy;
-  createdAt: string;
-}
-
-/** 成包流水线：一次「图案 × 品类规格 × 平台」的串联执行；步骤各自对应一个任务行。 */
-export interface PatternPipelineRecord {
-  id: string;
-  /** SOURCE 步骤完成后回填；从既有花型起链时创建即有值。 */
-  patternId: string | null;
-  specId: string;
-  specVersion: string;
-  layout: PodPrintLayout;
-  /** 平铺排列（仅 layout=TILE 生效）；创建时缺省直排，裁决出口 USE_MIRROR 改写为 MIRROR。 */
-  repeatLayout: PodRepeatLayout;
-  listingPlatform: ListingPlatform;
-  listingProviderId: string;
-  listingModelId: string;
-  listingHints: { sellingPoints: string | null; bannedWords: string | null };
-  status: PatternPipelineStatus;
-  /** AWAITING_INPUT 的原因，其它状态为 null。 */
-  blockReason: PatternPipelineBlockReason | null;
-  requestFingerprint: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 流水线步骤；position 决定推进顺序，job_id 是 worker 从完成任务反查流水线的唯一键。 */
-export interface PatternPipelineStepRecord {
-  id: string;
-  pipelineId: string;
-  step: PatternPipelineStepName;
-  position: number;
-  status: PatternPipelineStepStatus;
-  jobId: string | null;
-  /** 步骤补充事实（验缝分数、接缝风险提示等），不参与状态机。 */
-  detail: Record<string, unknown> | null;
-  error: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 流水线及其步骤（API 序列化用；步骤按 position 升序）。 */
-export interface PatternPipelineWithSteps extends PatternPipelineRecord {
-  steps: PatternPipelineStepRecord[];
-}
-
-export interface ProjectRecord {
-  id: string;
-  name: string;
-  category: string | null;
-  productDescription: string | null;
-  verifiedFacts: string[];
-  prohibitedClaims: string[];
-  brandGuidelines: Record<string, string>;
-  platformTargets: PlatformTarget[];
-  targetMarket: TargetMarket | null;
-  copyLanguage: string | null;
-  // 引用可空：Provider 可随时删除，删除时级联置空，项目进入"待重新选择模型"状态
-  reasoningProviderId: string | null;
-  reasoningModelId: string | null;
-  imageProviderId: string | null;
-  imageModelId: string | null;
-  // AI 分层导出使用的分割模型（如 fal.ai SAM 3）；未配置时分层导出任务直接失败
-  /** 分割模型引用；protocol 显式声明 API 协议（fal | grounded_sam），未配置时任务直接失败。 */
-  segmentationModel: { providerId: string; modelId: string; protocol: NonNullable<SegmentationModelRef["protocol"]> } | null;
-  defaultMode: StoryboardMode;
-  imageResolution: ImageResolution;
-  imageAspectRatio: ImageAspectRatio;
-  candidatesPerType: number;
-  webResearchEnabled: boolean;
-  archivedAt: string | null;
-  /**
-   * 规划修订号：规划相关项目事实（事实、品牌、平台、模型配置等）每次变化单调递增。
-   * 规划任务指纹纳入该值，保证项目更新后不会复用基于旧事实的规划结果。
-   */
-  planningRevision: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AssetRecord {
-  id: string;
-  projectId: string;
-  role: AssetRole;
-  storagePath: string;
-  hash: string;
-  originalName: string;
-  mimeType: string;
-  width: number | null;
-  height: number | null;
-  createdAt: string;
-}
-
-/** 资产库视图行：由 assets、outputs、model_portraits 与 layer_exports 合并派生，不落库。 */
-export interface LibraryItemRecord {
-  id: string;
-  source: LibraryItemSource;
-  kind: LibraryItemKind;
-  name: string;
-  projectId: string;
-  projectName: string;
-  mimeType: string;
-  hash: string;
-  width: number | null;
-  height: number | null;
-  storagePath: string;
-  role: AssetRole | null;
-  createdAt: string;
-}
-
-/** 资产库按模特身份内核筛选定妆照；维度取值与 ModelSpec 的身份层同一份枚举。 */
-export interface LibraryModelSpecFilter {
-  gender?: ModelSpec["gender"] | null;
-  age?: ModelSpec["age"] | null;
-  heritage?: ModelSpec["heritage"] | null;
-  stature?: ModelSpec["stature"] | null;
-  build?: ModelSpec["build"] | null;
-}
-
-export interface LibraryItemQuery {
-  kind?: LibraryItemKind | null;
-  q?: string | null;
-  /** 只看该项目的来源行；模特定妆照没有项目归属，因此不会命中。 */
-  projectId?: string | null;
-  /** 只看创建时间落在 [from, to] 内的来源行；ISO 日期时间字符串，两端都包含。 */
-  createdFrom?: string | null;
-  createdTo?: string | null;
-  /** 只看所属模特在该身份维度上取该值的定妆照；其余来源行没有模特规格，因此不会命中。 */
-  modelSpec?: LibraryModelSpecFilter | null;
-  cursor?: string | null;
-  limit?: number;
-}
-
-export interface LibraryItemPage {
-  items: LibraryItemRecord[];
-  nextCursor: string | null;
-  /** 当前筛选条件过滤来源行、再按 hash 去重后的完整数量，与游标位置无关，供前端显示稳定总数。 */
-  total: number;
-}
-
-export interface StoryboardRecord {
-  projectId: string;
-  version: number;
-  status: "DRAFT" | "CONFIRMED";
-  campaignStyleLock: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface StoryboardItemRecord {
-  id: string;
-  projectId: string;
-  storyboardVersion: number;
-  assetType: string;
-  displayName: string;
-  // 规划语义、不可变；历史行无值时为 null，由 UI 按"未标注"处理
-  shotRole: StoryboardShotRole | null;
-  templateVariant: string | null;
-  candidateCount: number;
-  imageProviderId: string | null;
-  imageModelId: string | null;
-  imageResolution: ImageResolution;
-  imageAspectRatio: ImageAspectRatio;
-  referencedAssets: string[];
-  mode: StoryboardMode;
-  status: "DRAFT" | "CONFIRMED" | "GENERATING" | "GENERATED";
-  promptInstruction: string;
-  compiledPrompt: string | null;
-  factClaims: string[];
-  riskFlags: string[];
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface JobRecord {
-  id: string;
-  /** 全局套图反推任务不绑定项目，projectId 为 null。 */
-  projectId: string | null;
-  storyboardItemId: string | null;
-  type: JobType;
-  status: JobStatus;
-  progress: number;
-  retryable: boolean;
-  input: Record<string, unknown>;
-  requestFingerprint: string | null;
-  providerId: string | null;
-  modelId: string | null;
-  estimatedCost: Record<string, unknown> | null;
-  actualCost: Record<string, unknown> | null;
-  cancelRequested: boolean;
-  providerTaskId: string | null;
-  error: Record<string, unknown> | null;
-  /** 运行中任务的进度明细；套图反推用它回报流式观察到的分镜数。 */
-  progressDetail: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** AI 帮写结果单独保存，避免把临时文案混入项目配置或通用任务成本字段。 */
-export interface CopywritingResultRecord {
-  jobId: string;
-  projectId: string;
-  target: CopywritingTarget;
-  content: string;
-  createdAt: string;
-}
-
-export type WebResearchAvailability = "DISABLED" | "UNAVAILABLE" | "AVAILABLE";
-export type WebResearchAttemptStatus = "SUCCEEDED" | "FAILED";
-
-export interface WebResearchAuditRecord {
-  jobId: string;
-  availability: WebResearchAvailability;
-  invocationCount: number;
-  successfulAttemptCount: number;
-  failedAttemptCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface WebResearchAttemptRecord {
-  id: string;
-  jobId: string;
-  query: string;
-  sourceId: string;
-  sourceName: string;
-  sourceKind: string;
-  status: WebResearchAttemptStatus;
-  resultCount: number;
-  errorMessage: string | null;
-  createdAt: string;
-}
-
-export interface GenerationSnapshot {
-  providerId: string;
-  modelId: string;
-  resolution: ImageResolution;
-  aspectRatio: ImageAspectRatio;
-  size: string;
-  candidateIndex: number;
-  operation?: EditOperation;
-  executionMode?: EditExecutionMode;
-  targetDescription?: string;
-  targetConfidence?: number;
-  sourceOutputId?: string;
-  maskHash?: string | null;
-  protectMaskHash?: string | null;
-  compositePolicy?: CompositePolicy;
-  referenceSelections?: ReferenceSelection[];
-  referenceHashes?: Record<string, string | null>;
-}
-
-export interface OutputRecord {
-  id: string;
-  projectId: string;
-  storyboardItemId: string;
-  jobId: string;
-  candidateIndex: number;
-  generationBatchId?: string | null;
-  generationSnapshot: GenerationSnapshot | null;
-  storagePath: string;
-  hash: string;
-  width?: number | null;
-  height?: number | null;
-  /** 外部生成请求的稳定幂等键；编辑版本和普通候选均可用。 */
-  generationKey?: string | null;
-  parentOutputId?: string | null;
-  rootOutputId?: string | null;
-  editSessionId?: string | null;
-  editTurnId?: string | null;
-  createdAt: string;
-}
-
-export interface PlanningConfigSnapshotPayload {
-  project: {
-    name: string;
-    category: string | null;
-    productDescription: string | null;
-    verifiedFacts: string[];
-    prohibitedClaims: string[];
-    brandGuidelines: Record<string, string>;
-    platformTargets: PlatformTarget[];
-    targetMarket: TargetMarket | null;
-    copyLanguage: string | null;
-    // 与 ProjectRecord 一致可空：快照可能来自引用被置空的项目，应用快照前由 API 层校验
-    reasoningProviderId: string | null;
-    reasoningModelId: string | null;
-    imageProviderId: string | null;
-    imageModelId: string | null;
-    defaultMode: StoryboardMode;
-    imageResolution: ImageResolution;
-    imageAspectRatio: ImageAspectRatio;
-    candidatesPerType: number;
-    webResearchEnabled: boolean;
-  };
-  planning: {
-    planningMode: "AI" | "MANUAL";
-    requestedTypes: string[];
-    // 手动规划可同时选择套图分镜；旧快照无此字段，保持可选以兼容历史数据
-    requestedSuiteShots?: string[];
-    targetImageCount: number | null;
-    userInstruction: string | null;
-  };
-}
-
-export interface PlanningConfigSnapshotRecord {
-  id: string;
-  projectId: string;
-  sourceJobId: string;
-  payload: PlanningConfigSnapshotPayload;
-  createdAt: string;
-}
-
-export interface EditSessionRecord {
-  id: string;
-  projectId: string;
-  currentOutputId: string;
-  status: EditSessionStatus;
-  memorySummary: {
-    summary?: string;
-    constraints?: string[];
-    /** 以输出节点为键保存分支记忆，避免同一会话中的兄弟分支互相污染。 */
-    scopes?: Record<string, { summary?: string; constraints?: string[] }>;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface EditTurnRecord {
-  id: string;
-  sessionId: string;
-  projectId: string;
-  baseOutputId: string;
-  status: EditTurnStatus;
-  message: string;
-  annotations: Record<string, unknown>;
-  editMaskPath: string | null;
-  editMaskHash: string | null;
-  protectMaskPath: string | null;
-  protectMaskHash: string | null;
-  referenceAssetIds: string[];
-  referenceSelections: ReferenceSelection[];
-  plan: Record<string, unknown> | null;
-  error: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-}
-export interface EditReferenceAssetRecord { id: string; projectId: string; sessionId: string; turnId: string | null; storagePath: string; hash: string; originalName: string; mimeType: string; purpose: ReferencePurpose; createdAt: string; expiresAt: string; }
-
-export interface ExportRecord {
-  id: string;
-  projectId: string;
-  jobId: string;
-  status: string;
-  storagePath: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** AI 分层元素：auto 来自视觉模型识别；manual 来自用户画框（bbox 为归一化坐标）。 */
-export interface LayerPlanElementRecord {
-  id: string;
-  name: string;
-  /** 视觉识别产出的英文分割提示，供只接受英文 prompt 的分割渠道（如 Gitee AI SAM 3）使用。 */
-  promptEn?: string;
-  source: "auto" | "manual";
-  bbox: { x: number; y: number; width: number; height: number } | null;
-}
-
-export interface LayerPlanRecord {
-  id: string;
-  projectId: string;
-  outputId: string;
-  jobId: string;
-  /** 创建 plan 时输出图的内容 hash；同 hash 的成功 plan 可直接复用。 */
-  outputHash: string;
-  status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
-  elements: LayerPlanElementRecord[];
-  error: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface LayerExportLayerFileRecord {
-  name: string;
-  kind: "element" | "background" | "composite";
-  storagePath: string;
-  hash: string;
-}
-
-export interface LayerExportRecord {
-  id: string;
-  projectId: string;
-  outputId: string;
-  jobId: string;
-  /** 识别方案引用；画框/提示词直接分层（无识别方案）时为 null。 */
-  planId: string | null;
-  status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
-  includeBackground: boolean;
-  psdStoragePath: string | null;
-  layerFiles: LayerExportLayerFileRecord[] | null;
-  error: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 首页列表封面：原图取最早 PRODUCT_TRUTH 图片；封面输出取最新输出。 */
-export interface ProjectCoverSummary {
-  productAssetId: string | null;
-  coverOutputId: string | null;
-  previewOutputIds: string[];
-  outputCount: number;
-}
-
-function emptyCover(): ProjectCoverSummary {
-  return { productAssetId: null, coverOutputId: null, previewOutputIds: [], outputCount: 0 };
-}
-
-type Row = Record<string, unknown>;
-const now = (): string => new Date().toISOString();
-const json = (value: unknown): string => JSON.stringify(value);
-const parse = <T>(value: unknown): T => JSON.parse(String(value)) as T;
-
-export class EcomRepository {
-  public constructor(private readonly db: SqliteDatabase) { }
-
-  public listProviders(): ProviderRecord[] { return (this.db.prepare("SELECT * FROM providers ORDER BY created_at DESC").all() as Row[]).map(mapProvider); }
-  public getProvider(id: string): ProviderRecord | undefined { const row = this.db.prepare("SELECT * FROM providers WHERE id = ?").get(id); return row ? mapProvider(row as Row) : undefined; }
-  public saveProvider(input: Omit<ProviderRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }): ProviderRecord {
-    const existing = input.id ? this.getProvider(input.id) : undefined;
-    const record: ProviderRecord = { ...input, id: input.id ?? randomUUID(), createdAt: existing?.createdAt ?? now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO providers (id,name,base_url,reasoning_protocol,encrypted_api_key,models_json,created_at,updated_at)
-      VALUES (@id,@name,@baseUrl,@reasoningProtocol,@encryptedApiKey,@models,@createdAt,@updatedAt)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name,base_url=excluded.base_url,reasoning_protocol=excluded.reasoning_protocol,encrypted_api_key=excluded.encrypted_api_key,models_json=excluded.models_json,updated_at=excluded.updated_at`)
-      .run({ ...record, models: json(record.models) });
-    return record;
-  }
-  /** 删除 Provider 并把引用它的项目置空（ Provider 只在生成时使用，项目随后重新选择模型即可）。 */
-  public deleteProvider(id: string): "deleted" | "missing" {
-    if (!this.getProvider(id)) return "missing";
-    const clear = this.db.transaction(() => {
-      this.db.prepare("UPDATE projects SET reasoning_provider_id=NULL, reasoning_model_id=NULL, updated_at=? WHERE reasoning_provider_id=?").run(now(), id);
-      this.db.prepare("UPDATE projects SET image_provider_id=NULL, image_model_id=NULL, updated_at=? WHERE image_provider_id=?").run(now(), id);
-      this.db.prepare("UPDATE projects SET segmentation_provider_id=NULL, segmentation_model_id=NULL, updated_at=? WHERE segmentation_provider_id=?").run(now(), id);
-      this.db.prepare("UPDATE storyboard_items SET image_provider_id=NULL, image_model_id=NULL, updated_at=? WHERE image_provider_id=?").run(now(), id);
-      this.db.prepare("UPDATE jobs SET status='CANCELLED', retryable=0, cancel_requested=1, updated_at=? WHERE provider_id=? AND status IN ('QUEUED','RUNNING')").run(now(), id);
-      this.db.prepare("DELETE FROM providers WHERE id=?").run(id);
-    });
-    clear();
-    return "deleted";
-  }
-
-  public listSearchSources(): SearchSourceRecord[] {
-    return (this.db.prepare("SELECT * FROM search_sources ORDER BY priority ASC, created_at ASC").all() as Row[]).map(mapSearchSource);
-  }
-  public getSearchSource(id: string): SearchSourceRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM search_sources WHERE id = ?").get(id);
-    return row ? mapSearchSource(row as Row) : undefined;
-  }
-  public saveSearchSource(input: Omit<SearchSourceRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }): SearchSourceRecord {
-    const existing = input.id ? this.getSearchSource(input.id) : undefined;
-    const record: SearchSourceRecord = { ...input, id: input.id ?? randomUUID(), createdAt: existing?.createdAt ?? now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO search_sources (id,name,kind,base_url,encrypted_api_key,priority,enabled,created_at,updated_at)
-      VALUES (@id,@name,@kind,@baseUrl,@encryptedApiKey,@priority,@enabled,@createdAt,@updatedAt)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,base_url=excluded.base_url,encrypted_api_key=excluded.encrypted_api_key,priority=excluded.priority,enabled=excluded.enabled,updated_at=excluded.updated_at`)
-      .run({ ...record, enabled: record.enabled ? 1 : 0 });
-    return record;
-  }
-  public deleteSearchSource(id: string): boolean {
-    return this.db.prepare("DELETE FROM search_sources WHERE id=?").run(id).changes > 0;
-  }
-
-  public listUserTemplates(): UserTemplateRecord[] {
-    return (this.db.prepare("SELECT * FROM user_templates ORDER BY created_at ASC").all() as Row[]).map(mapUserTemplate);
-  }
-  public getUserTemplate(id: string): UserTemplateRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM user_templates WHERE id = ?").get(id);
-    return row ? mapUserTemplate(row as Row) : undefined;
-  }
-  public saveUserTemplate(input: Omit<UserTemplateRecord, "createdAt" | "updatedAt"> & { id?: string }): UserTemplateRecord {
-    const existing = input.id ? this.getUserTemplate(input.id) : undefined;
-    const record: UserTemplateRecord = { ...input, id: input.id ?? randomUUID(), createdAt: existing?.createdAt ?? now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO user_templates (id,name,prompt,default_size,supports_image_reference,created_at,updated_at)
-      VALUES (@id,@name,@prompt,@defaultSize,@supportsImageReference,@createdAt,@updatedAt)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name,prompt=excluded.prompt,default_size=excluded.default_size,supports_image_reference=excluded.supports_image_reference,updated_at=excluded.updated_at`)
-      .run({ ...record, supportsImageReference: record.supportsImageReference ? 1 : 0 });
-    return record;
-  }
-  public deleteUserTemplate(id: string): boolean {
-    return this.db.prepare("DELETE FROM user_templates WHERE id=?").run(id).changes > 0;
-  }
-
-  public listUserSuites(): UserSuiteRecord[] {
-    return (this.db.prepare("SELECT * FROM user_suites ORDER BY created_at ASC").all() as Row[]).map(mapUserSuite);
-  }
-  public getUserSuite(id: string): UserSuiteRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM user_suites WHERE id = ?").get(id);
-    return row ? mapUserSuite(row as Row) : undefined;
-  }
-  public saveUserSuite(input: Omit<UserSuiteRecord, "createdAt" | "updatedAt"> & { id?: string }): UserSuiteRecord {
-    const existing = input.id ? this.getUserSuite(input.id) : undefined;
-    const record: UserSuiteRecord = { ...input, id: input.id ?? randomUUID(), createdAt: existing?.createdAt ?? now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO user_suites (id,name,l1,l2,leaf,product_family,payload_json,created_at,updated_at)
-      VALUES (@id,@name,@l1,@l2,@leaf,@productFamily,@payloadJson,@createdAt,@updatedAt)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name,l1=excluded.l1,l2=excluded.l2,leaf=excluded.leaf,product_family=excluded.product_family,payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
-      .run({
-        id: record.id,
-        name: record.name,
-        l1: record.l1,
-        l2: record.l2,
-        leaf: record.leaf,
-        productFamily: record.productFamily,
-        payloadJson: JSON.stringify(record.payload),
-        createdAt: record.createdAt,
-        updatedAt: record.updatedAt
-      });
-    return record;
-  }
-  public deleteUserSuite(id: string): boolean {
-    return this.db.prepare("DELETE FROM user_suites WHERE id=?").run(id).changes > 0;
-  }
-
-  /** 套图反推成功即落草稿；重复写同一 job 会覆盖为最新草稿。 */
-  public saveSuiteForgeResult(input: { jobId: string; payload: SuiteDocumentInput }): SuiteForgeResultRecord {
-    const createdAt = now();
-    const record: SuiteForgeResultRecord = { jobId: input.jobId, payload: input.payload, status: "DRAFT", suiteId: null, createdAt, updatedAt: createdAt };
-    this.db.prepare(`INSERT INTO suite_forge_results (job_id,payload_json,status,suite_id,created_at,updated_at)
-      VALUES (@jobId,@payload,'DRAFT',NULL,@createdAt,@updatedAt)
-      ON CONFLICT(job_id) DO UPDATE SET payload_json=excluded.payload_json,status='DRAFT',suite_id=NULL,updated_at=excluded.updated_at`)
-      .run({ jobId: record.jobId, payload: json(record.payload), createdAt, updatedAt: createdAt });
-    return record;
-  }
-  public getSuiteForgeResult(jobId: string): SuiteForgeResultRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM suite_forge_results WHERE job_id=?").get(jobId);
-    return row ? mapSuiteForgeResult(row as Row) : undefined;
-  }
-  /** 确认入库：记录已写入的 user_suites.id，状态转为 COMMITTED，草稿仍可回看。 */
-  public commitSuiteForgeResult(jobId: string, suiteId: string): SuiteForgeResultRecord | undefined {
-    const current = this.getSuiteForgeResult(jobId);
-    if (!current) return undefined;
-    const updatedAt = now();
-    this.db.prepare("UPDATE suite_forge_results SET status='COMMITTED',suite_id=?,updated_at=? WHERE job_id=?").run(suiteId, updatedAt, jobId);
-    return { ...current, status: "COMMITTED", suiteId, updatedAt };
-  }
-
-  // ---- 全局模特库 ----
-
-  public listModels(): ModelRecord[] { return (this.db.prepare("SELECT * FROM models ORDER BY updated_at DESC").all() as Row[]).map(mapModel); }
-  public getModel(id: string): ModelRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM models WHERE id=?").get(id);
-    return row ? mapModel(row as Row) : undefined;
-  }
-  public createModel(input: { name: string; spec: ModelSpec; notes: string }): ModelRecord {
-    const record: ModelRecord = { id: randomUUID(), name: input.name, spec: input.spec, notes: input.notes, referenceFacePath: null, referenceFaceHash: null, createdAt: now(), updatedAt: now() };
-    this.writeModel(record);
-    return record;
-  }
-  public updateModel(id: string, patch: { name?: string; spec?: ModelSpec; notes?: string }): ModelRecord | undefined {
-    const current = this.getModel(id);
-    if (!current) return undefined;
-    const record: ModelRecord = { ...current, ...patch, updatedAt: now() };
-    this.writeModel(record);
-    return record;
-  }
-  /** 上传/清除参考脸共用：path 与 hash 同时置空即清除；参考脸是模特的唯一身份基准。 */
-  public setModelReferenceFace(id: string, path: string | null, hash: string | null): ModelRecord | undefined {
-    const current = this.getModel(id);
-    if (!current) return undefined;
-    const record: ModelRecord = { ...current, referenceFacePath: path, referenceFaceHash: hash, updatedAt: now() };
-    this.writeModel(record);
-    return record;
-  }
-  public deleteModel(id: string): boolean {
-    return this.db.prepare("DELETE FROM models WHERE id=?").run(id).changes > 0;
-  }
-  private writeModel(record: ModelRecord): void {
-    this.db.prepare(`INSERT INTO models (id,name,spec_json,notes,reference_face_path,reference_face_hash,created_at,updated_at)
-      VALUES (@id,@name,@spec,@notes,@referenceFacePath,@referenceFaceHash,@createdAt,@updatedAt)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name,spec_json=excluded.spec_json,notes=excluded.notes,reference_face_path=excluded.reference_face_path,reference_face_hash=excluded.reference_face_hash,updated_at=excluded.updated_at`)
-      .run({ ...record, spec: json(record.spec) });
-  }
-
-  public listModelPortraits(modelId: string): ModelPortraitRecord[] {
-    return (this.db.prepare("SELECT * FROM model_portraits WHERE model_id=? ORDER BY created_at DESC, id DESC").all(modelId) as Row[]).map(mapModelPortrait);
-  }
-  public getModelPortrait(portraitId: string): ModelPortraitRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM model_portraits WHERE id=?").get(portraitId);
-    return row ? mapModelPortrait(row as Row) : undefined;
-  }
-  /** Worker 落库一张候选定妆照；同 hash 已存在时幂等返回既有行，避免重试产生重复图。 */
-  public createModelPortrait(input: Omit<ModelPortraitRecord, "id" | "selected" | "createdAt">): ModelPortraitRecord {
-    const existing = this.db.prepare("SELECT * FROM model_portraits WHERE model_id=? AND hash=? LIMIT 1").get(input.modelId, input.hash) as Row | undefined;
-    if (existing) return mapModelPortrait(existing);
-    const record: ModelPortraitRecord = { ...input, id: randomUUID(), selected: false, createdAt: now() };
-    this.db.prepare(`INSERT INTO model_portraits (id,model_id,job_id,storage_path,hash,width,height,provider_id,image_model_id,aspect_ratio,selected,created_at)
-      VALUES (@id,@modelId,@jobId,@storagePath,@hash,@width,@height,@providerId,@imageModelId,@aspectRatio,0,@createdAt)`).run(record);
-    return record;
-  }
-  /** 选定切换必须在事务内先清后设，配合部分唯一索引保证每模特至多一张选定。 */
-  public selectModelPortrait(modelId: string, portraitId: string): "selected" | "missing" {
-    const portrait = this.getModelPortrait(portraitId);
-    if (!portrait || portrait.modelId !== modelId) return "missing";
-    const write = this.db.transaction(() => {
-      this.db.prepare("UPDATE model_portraits SET selected=0 WHERE model_id=? AND selected=1").run(modelId);
-      this.db.prepare("UPDATE model_portraits SET selected=1 WHERE id=?").run(portraitId);
-    });
-    write();
-    return "selected";
-  }
-  public deleteModelPortrait(portraitId: string): boolean {
-    return this.db.prepare("DELETE FROM model_portraits WHERE id=?").run(portraitId).changes > 0;
-  }
-  /** 全部定妆照：模特列表一次取回后按模特分组，避免逐个模特各查一次。 */
-  public listAllModelPortraits(): ModelPortraitRecord[] {
-    return (this.db.prepare("SELECT * FROM model_portraits ORDER BY created_at DESC, id DESC").all() as Row[]).map(mapModelPortrait);
-  }
-  /** 指纹复用判定用：某次选角任务当前还挂着的候选定妆照。 */
-  public listModelPortraitsByJobId(jobId: string): ModelPortraitRecord[] {
-    return (this.db.prepare("SELECT * FROM model_portraits WHERE job_id=? ORDER BY created_at DESC, id DESC").all(jobId) as Row[]).map(mapModelPortrait);
-  }
-
-  // ---- 全局花型库 ----
-
-  public listPatterns(): PatternRecord[] { return (this.db.prepare("SELECT * FROM patterns ORDER BY created_at DESC, id DESC").all() as Row[]).map(mapPattern); }
-  /** 指纹复用判定用：某次提取/起稿任务当前还挂着的花型（用户删除后为空）。 */
-  public listPatternsByJobId(jobId: string): PatternRecord[] {
-    return (this.db.prepare("SELECT * FROM patterns WHERE source_job_id=? ORDER BY created_at DESC, id DESC").all(jobId) as Row[]).map(mapPattern);
-  }
-  /** 同一判定但只需布尔答案（API 的指纹复用）时用这条：EXISTS 一行即返回，不把候选行整表 map 出来。 */
-  public hasPatternArtifactsByJobId(jobId: string): boolean {
-    const row = this.db.prepare("SELECT 1 FROM patterns WHERE source_job_id=? AND storage_path IS NOT NULL AND file_hash IS NOT NULL LIMIT 1").get(jobId);
-    return row !== undefined;
-  }
-  public getPattern(id: string): PatternRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM patterns WHERE id=?").get(id);
-    return row ? mapPattern(row as Row) : undefined;
-  }
-  /** Worker 落一条花型；同 (sourceJobId, fileHash) 幂等返回既有行，重试不产生重复花型。 */
-  public createPattern(input: Omit<PatternRecord, "id" | "createdAt" | "updatedAt" | "tileable" | "tileableScore" | "tileableCheckedWith"> & Partial<Pick<PatternRecord, "id" | "tileable" | "tileableScore" | "tileableCheckedWith">>): PatternRecord {
-    const existing = input.sourceJobId && input.fileHash
-      ? this.db.prepare("SELECT * FROM patterns WHERE source_job_id=? AND file_hash=? LIMIT 1").get(input.sourceJobId, input.fileHash) as Row | undefined
-      : undefined;
-    if (existing) return mapPattern(existing);
-    // 新花型一律从 NONE 起步：可平铺是"已验过"的事实，不能在入库时就假定成立。
-    const record: PatternRecord = { tileable: "NONE", tileableScore: null, tileableCheckedWith: null, ...input, id: input.id ?? randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO patterns (id,name,source_type,source_job_id,source_asset_hash,parent_pattern_id,storage_path,file_hash,width,height,tags_json,tileable_status,tileable_score,tileable_checked_with,created_at,updated_at)
-      VALUES (@id,@name,@sourceType,@sourceJobId,@sourceAssetHash,@parentPatternId,@storagePath,@fileHash,@width,@height,@tags,@tileable,@tileableScore,@tileableCheckedWith,@createdAt,@updatedAt)`)
-      .run({ ...record, tags: json(record.tags) });
-    return record;
-  }
-  public updatePattern(id: string, patch: Partial<Pick<PatternRecord, "name" | "tags">>): PatternRecord | undefined {
-    const current = this.getPattern(id);
-    if (!current) return undefined;
-    const record: PatternRecord = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE patterns SET name=@name,tags_json=@tags,updated_at=@updatedAt WHERE id=@id")
-      .run({ id: record.id, name: record.name, tags: json(record.tags), updatedAt: record.updatedAt });
-    return record;
-  }
-  public deletePattern(id: string): boolean {
-    return this.db.prepare("DELETE FROM patterns WHERE id=?").run(id).changes > 0;
-  }
-
-  /** Worker 回填花型产物：文件落盘后一次性写入主图路径、hash 与尺寸；此前该行在资产库不可见。 */
-  public setPatternArtifact(id: string, artifact: { storagePath: string; fileHash: string; width: number | null; height: number | null }): PatternRecord | undefined {
-    const current = this.getPattern(id);
-    if (!current) return undefined;
-    const record: PatternRecord = { ...current, ...artifact, updatedAt: now() };
-    this.db.prepare("UPDATE patterns SET storage_path=@storagePath,file_hash=@fileHash,width=@width,height=@height,updated_at=@updatedAt WHERE id=@id")
-      .run({ id: record.id, storagePath: record.storagePath, fileHash: record.fileHash, width: record.width, height: record.height, updatedAt: record.updatedAt });
-    return record;
-  }
-
-  /**
-   * Worker 回写验缝判定；这是 tileable* 三列的唯一写入方。花型图内容不可变，所以判定只在
-   * 验缝算法版本变更时才需要重算，写入时一并记录算法版本以便识别过期判定。
-   */
-  public setPatternTileable(id: string, verdict: { status: TileableStatus; score: number | null; algorithmVersion: string }): PatternRecord | undefined {
-    const current = this.getPattern(id);
-    if (!current) return undefined;
-    const updatedAt = now();
-    this.db.prepare("UPDATE patterns SET tileable_status=@status,tileable_score=@score,tileable_checked_with=@algorithmVersion,updated_at=@updatedAt WHERE id=@id")
-      .run({ id, status: verdict.status, score: verdict.score, algorithmVersion: verdict.algorithmVersion, updatedAt });
-    return { ...current, tileable: verdict.status, tileableScore: verdict.score, tileableCheckedWith: verdict.algorithmVersion, updatedAt };
-  }
-
-  public createPrintPack(input: Omit<PrintPackRecord, "id" | "createdAt" | "updatedAt" | "status" | "files" | "manifest" | "error"> & Partial<Pick<PrintPackRecord, "status">>): PrintPackRecord {
-    const record: PrintPackRecord = { ...input, status: input.status ?? "QUEUED", files: null, manifest: null, error: null, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO print_packs (id,pattern_id,job_id,spec_id,spec_version,status,files_json,manifest_json,error_json,created_at,updated_at)
-      VALUES (@id,@patternId,@jobId,@specId,@specVersion,@status,@files,@manifest,@error,@createdAt,@updatedAt)`)
-      .run({ ...record, files: record.files ? json(record.files) : null, manifest: record.manifest ? json(record.manifest) : null, error: record.error ? json(record.error) : null });
-    return record;
-  }
-  public getPrintPack(id: string): PrintPackRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM print_packs WHERE id=?").get(id);
-    return row ? mapPrintPack(row as Row) : undefined;
-  }
-  public getPrintPackByJobId(jobId: string): PrintPackRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM print_packs WHERE job_id=?").get(jobId);
-    return row ? mapPrintPack(row as Row) : undefined;
-  }
-  public listPrintPacks(patternId: string): PrintPackRecord[] {
-    return (this.db.prepare("SELECT * FROM print_packs WHERE pattern_id=? ORDER BY created_at DESC, id DESC").all(patternId) as Row[]).map(mapPrintPack);
-  }
-  public updatePrintPack(id: string, patch: Partial<Pick<PrintPackRecord, "status" | "files" | "manifest" | "error">>): PrintPackRecord | undefined {
-    const current = this.getPrintPack(id);
-    if (!current) return undefined;
-    const record: PrintPackRecord = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE print_packs SET status=@status,files_json=@files,manifest_json=@manifest,error_json=@error,updated_at=@updatedAt WHERE id=@id")
-      .run({ id: record.id, status: record.status, files: record.files ? json(record.files) : null, manifest: record.manifest ? json(record.manifest) : null, error: record.error ? json(record.error) : null, updatedAt: record.updatedAt });
-    return record;
-  }
-  public deletePrintPack(id: string): boolean {
-    return this.db.prepare("DELETE FROM print_packs WHERE id=?").run(id).changes > 0;
-  }
-
-  public savePatternListingResult(input: Omit<PatternListingResultRecord, "createdAt">): PatternListingResultRecord {
-    const record: PatternListingResultRecord = { ...input, createdAt: now() };
-    this.db.prepare("INSERT OR REPLACE INTO pattern_listing_results (job_id,pattern_id,platform,content_json,created_at) VALUES (@jobId,@patternId,@platform,@copy,@createdAt)")
-      .run({ ...record, copy: json(record.copy) });
-    return record;
-  }
-  public getPatternListingResult(jobId: string): PatternListingResultRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM pattern_listing_results WHERE job_id=?").get(jobId);
-    return row ? mapPatternListingResult(row as Row) : undefined;
-  }
-
-  /**
-   * 建一条流水线及其全部步骤（同一事务，避免出现没有步骤的流水线）。
-   * 步骤由调用方给出（见 pattern-pipeline.ts 的 pipelineStepPlan）：从来源动作起链时含 SOURCE，
-   * 从既有花型起链时跳过它。首步若要立刻开跑，由调用方在建好后调 createPipelineStepJob 并入队。
-   */
-  public createPatternPipeline(input: Omit<PatternPipelineRecord, "id" | "createdAt" | "updatedAt" | "status" | "blockReason"> & { steps: Array<Pick<PatternPipelineStepRecord, "step" | "position">> }): PatternPipelineWithSteps {
-    const record: PatternPipelineRecord = { ...input, status: "QUEUED", blockReason: null, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    const steps: PatternPipelineStepRecord[] = input.steps.map((step) => ({ ...step, id: randomUUID(), pipelineId: record.id, status: "PENDING", jobId: null, detail: null, error: null, createdAt: record.createdAt, updatedAt: record.updatedAt }));
-    const insertPipeline = this.db.prepare(`INSERT INTO pattern_pipelines (id,pattern_id,spec_id,spec_version,layout,repeat_layout,listing_platform,listing_provider_id,listing_model_id,listing_hints_json,status,block_reason,request_fingerprint,created_at,updated_at)
-      VALUES (@id,@patternId,@specId,@specVersion,@layout,@repeatLayout,@listingPlatform,@listingProviderId,@listingModelId,@listingHints,@status,@blockReason,@requestFingerprint,@createdAt,@updatedAt)`);
-    const insertStep = this.db.prepare(`INSERT INTO pattern_pipeline_steps (id,pipeline_id,step,position,status,job_id,detail_json,error_json,created_at,updated_at)
-      VALUES (@id,@pipelineId,@step,@position,@status,@jobId,@detail,@error,@createdAt,@updatedAt)`);
-    const write = this.db.transaction(() => {
-      insertPipeline.run({ ...record, listingHints: json(record.listingHints) });
-      for (const step of steps) insertStep.run({ ...step, detail: null, error: null });
-    });
-    write();
-    return { ...record, steps };
-  }
-  public listPatternPipelines(patternId: string): PatternPipelineWithSteps[] {
-    const rows = this.db.prepare("SELECT * FROM pattern_pipelines WHERE pattern_id=? ORDER BY created_at DESC, id DESC").all(patternId) as Row[];
-    return rows.map((row) => this.withSteps(mapPatternPipeline(row)));
-  }
-  public getPatternPipeline(id: string): PatternPipelineWithSteps | undefined {
-    const row = this.db.prepare("SELECT * FROM pattern_pipelines WHERE id=?").get(id);
-    return row ? this.withSteps(mapPatternPipeline(row as Row)) : undefined;
-  }
-  /** 进行中的同参数流水线复用依据；已完成的不复用（用户重跑是有意义的意图，不该被静默吞掉）。 */
-  public findReusablePatternPipeline(fingerprint: string): PatternPipelineWithSteps | undefined {
-    const row = this.db.prepare("SELECT * FROM pattern_pipelines WHERE request_fingerprint=? AND status IN ('QUEUED','RUNNING','AWAITING_INPUT') ORDER BY created_at DESC, id DESC LIMIT 1").get(fingerprint);
-    return row ? this.withSteps(mapPatternPipeline(row as Row)) : undefined;
-  }
-  public updatePatternPipeline(id: string, patch: Partial<Pick<PatternPipelineRecord, "status" | "blockReason" | "patternId" | "layout" | "repeatLayout">>): PatternPipelineWithSteps | undefined {
-    const current = this.getPatternPipeline(id);
-    if (!current) return undefined;
-    const record = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE pattern_pipelines SET pattern_id=@patternId,layout=@layout,repeat_layout=@repeatLayout,status=@status,block_reason=@blockReason,updated_at=@updatedAt WHERE id=@id")
-      .run({ id, patternId: record.patternId, layout: record.layout, repeatLayout: record.repeatLayout, status: record.status, blockReason: record.blockReason, updatedAt: record.updatedAt });
-    return { ...current, patternId: record.patternId, layout: record.layout, repeatLayout: record.repeatLayout, status: record.status, blockReason: record.blockReason, updatedAt: record.updatedAt };
-  }
-  /** worker 从完成的任务反查流水线步骤；job_id 上有唯一索引，一条任务最多属于一个步骤。 */
-  public getPatternPipelineStepByJobId(jobId: string): PatternPipelineStepRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM pattern_pipeline_steps WHERE job_id=?").get(jobId);
-    return row ? mapPatternPipelineStep(row as Row) : undefined;
-  }
-  public updatePatternPipelineStep(id: string, patch: Partial<Pick<PatternPipelineStepRecord, "status" | "jobId" | "detail" | "error">>): PatternPipelineStepRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM pattern_pipeline_steps WHERE id=?").get(id);
-    if (!row) return undefined;
-    const record: PatternPipelineStepRecord = { ...mapPatternPipelineStep(row as Row), ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE pattern_pipeline_steps SET status=@status,job_id=@jobId,detail_json=@detail,error_json=@error,updated_at=@updatedAt WHERE id=@id")
-      .run({ id, status: record.status, jobId: record.jobId, detail: record.detail ? json(record.detail) : null, error: record.error ? json(record.error) : null, updatedAt: record.updatedAt });
-    return record;
-  }
-
-  private withSteps(pipeline: PatternPipelineRecord): PatternPipelineWithSteps {
-    const rows = this.db.prepare("SELECT * FROM pattern_pipeline_steps WHERE pipeline_id=? ORDER BY position ASC, id ASC").all(pipeline.id) as Row[];
-    return { ...pipeline, steps: rows.map(mapPatternPipelineStep) };
-  }
-
-  public listProjects(archived = false): ProjectRecord[] {
-    const order = archived ? "archived_at DESC, updated_at DESC" : "updated_at DESC";
-    return (this.db.prepare(`SELECT * FROM projects WHERE archived_at IS ${archived ? "NOT " : ""}NULL ORDER BY ${order}`).all() as Row[]).map(mapProject);
-  }
-  public listProjectCovers(projectIds: string[]): Map<string, ProjectCoverSummary> {
-    const covers = new Map<string, ProjectCoverSummary>();
-    for (const id of projectIds) covers.set(id, emptyCover());
-    if (projectIds.length === 0) return covers;
-    const placeholders = projectIds.map(() => "?").join(",");
-    const assetRows = this.db.prepare(
-      `SELECT id, project_id FROM assets
-       WHERE project_id IN (${placeholders}) AND role='PRODUCT_TRUTH' AND mime_type LIKE 'image/%'
-       ORDER BY created_at ASC, id ASC`
-    ).all(...projectIds) as Array<{ id: string; project_id: string }>;
-    for (const row of assetRows) {
-      const cover = covers.get(row.project_id);
-      if (cover && cover.productAssetId === null) cover.productAssetId = row.id;
-    }
-    const outputRows = this.db.prepare(
-      `SELECT id, project_id FROM outputs
-       WHERE project_id IN (${placeholders})
-       ORDER BY created_at DESC, id DESC`
-    ).all(...projectIds) as Array<{ id: string; project_id: string }>;
-    const grouped = new Map<string, Array<{ id: string }>>();
-    for (const row of outputRows) {
-      const list = grouped.get(row.project_id) ?? [];
-      list.push(row);
-      grouped.set(row.project_id, list);
-    }
-    for (const [projectId, outputs] of grouped) {
-      const cover = covers.get(projectId);
-      if (!cover) continue;
-      cover.outputCount = outputs.length;
-      cover.coverOutputId = outputs[0]?.id ?? null;
-      cover.previewOutputIds = outputs.filter((output) => output.id !== cover.coverOutputId).slice(0, 2).map((output) => output.id);
-    }
-    return covers;
-  }
-  public getProject(id: string): ProjectRecord | undefined { const row = this.db.prepare("SELECT * FROM projects WHERE id = ?").get(id); return row ? mapProject(row as Row) : undefined; }
-  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled" | "archivedAt" | "planningRevision" | "segmentationModel"> & Partial<Pick<ProjectRecord, "webResearchEnabled" | "archivedAt">> & { segmentationModel?: { providerId: string; modelId: string; protocol?: NonNullable<SegmentationModelRef["protocol"]> } | null }): ProjectRecord {
-    const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, archivedAt: input.archivedAt ?? null, planningRevision: 0, segmentationModel: input.segmentationModel ? { ...input.segmentationModel, protocol: input.segmentationModel.protocol ?? "fal" } : null, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,segmentation_provider_id,segmentation_model_id,segmentation_protocol,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,planning_revision,created_at,updated_at)
-      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@segmentationProviderId,@segmentationModelId,@segmentationProtocol,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@archivedAt,@planningRevision,@createdAt,@updatedAt)`)
-      .run({ ...record, webResearchEnabled: record.webResearchEnabled ? 1 : 0, platformTargets: json(record.platformTargets), verifiedFacts: json(record.verifiedFacts), prohibitedClaims: json(record.prohibitedClaims), brandGuidelines: json(record.brandGuidelines), segmentationProviderId: record.segmentationModel?.providerId ?? null, segmentationModelId: record.segmentationModel?.modelId ?? null, segmentationProtocol: record.segmentationModel?.protocol ?? null });
-    return record;
-  }
-  public updateProject(id: string, patch: Partial<Omit<ProjectRecord, "id" | "createdAt">>): ProjectRecord | undefined {
-    const current = this.getProject(id); if (!current) return undefined;
-    const next = { ...current, ...patch, planningRevision: nextPlanningRevision(current, patch), updatedAt: now() };
-    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,segmentation_provider_id=@segmentationProviderId,segmentation_model_id=@segmentationModelId,segmentation_protocol=@segmentationProtocol,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,archived_at=@archivedAt,planning_revision=@planningRevision,updated_at=@updatedAt WHERE id=@id`)
-      .run({ ...next, webResearchEnabled: next.webResearchEnabled ? 1 : 0, platformTargets: json(next.platformTargets), verifiedFacts: json(next.verifiedFacts), prohibitedClaims: json(next.prohibitedClaims), brandGuidelines: json(next.brandGuidelines), segmentationProviderId: next.segmentationModel?.providerId ?? null, segmentationModelId: next.segmentationModel?.modelId ?? null, segmentationProtocol: next.segmentationModel?.protocol ?? null });
-    return next;
-  }
-
-  public deleteArchivedProject(id: string): "deleted" | "not_archived" | "missing" {
-    const current = this.getProject(id);
-    if (!current) return "missing";
-    if (!current.archivedAt) return "not_archived";
-    const result = this.db.prepare("DELETE FROM projects WHERE id=? AND archived_at IS NOT NULL").run(id);
-    return result.changes > 0 ? "deleted" : "not_archived";
-  }
-
-  public listAssets(projectId: string): AssetRecord[] { return (this.db.prepare("SELECT * FROM assets WHERE project_id=? ORDER BY created_at").all(projectId) as Row[]).map(mapAsset); }
-
-  /**
-   * 资产库视图：assets、outputs、model_portraits 与 layer_exports 逐元素切图合并为一张派生表。
-   * **先按条件筛选来源行，再按内容 hash 去重**：同图在多个项目/来源重复时，命中的那条就是代表项，
-   * 而不是「先选出最新行、再把它过滤掉」——后者会让卡片显示不符合筛选条件的旧图。
-   * 过滤、去重、排序、游标分页全部下推 SQLite，只把当前页物化到 JS。
-   * 分页用 (createdAt,id) 合成游标（keyset），且游标只作用在去重后的代表项上，
-   * 否则上一页的代表项会把同 hash 的旧行顶成新代表项，同一张图跨页重复出现。
-   */
-  public listLibraryItems(query: LibraryItemQuery = {}): LibraryItemPage {
-    const limit = Math.min(Math.max(query.limit ?? 40, 1), 100);
-    const kind = query.kind ?? null;
-    const projectId = query.projectId ?? null;
-    const needle = query.q?.trim().toLowerCase() ?? "";
-    const cursor = decodeLibraryCursor(query.cursor ?? null);
-
-    // 分层导出把每个元素/背景切图作为独立生成产物纳入库；PSD 复合层（composite）二进制不可预览，排除。
-    // model_spec_json 只为定妆照行提供模特规格，供按身份维度筛选；其余来源行为 NULL，天然不命中身份筛选。
-    const librarySql = `
-      SELECT 'asset:' || a.id AS id, 'UPLOADED' AS source,
-             CASE WHEN a.role IN ('PRODUCT_TRUTH','PACKAGING') THEN 'PRODUCT' ELSE 'REFERENCE' END AS kind,
-             a.project_id AS project_id, p.name AS project_name, a.original_name AS name,
-             a.mime_type AS mime_type, a.storage_path AS storage_path, a.hash AS hash,
-             a.width AS width, a.height AS height, a.role AS role, a.created_at AS created_at,
-             NULL AS model_spec_json
-      FROM assets a JOIN projects p ON p.id = a.project_id
-      UNION ALL
-      SELECT 'output:' || o.id, 'GENERATED', 'GENERATED',
-             o.project_id, p.name, COALESCE(si.display_name, si.asset_type, '生成图'),
-             NULL, o.storage_path, o.hash, o.width, o.height, NULL, o.created_at,
-             NULL
-      FROM outputs o JOIN projects p ON p.id = o.project_id
-      LEFT JOIN storyboard_items si ON si.id = o.storyboard_item_id
-      UNION ALL
-      SELECT 'model:' || mp.id, 'MODEL', 'MODEL',
-             '', '模特库', m.name,
-             NULL, mp.storage_path, mp.hash, mp.width, mp.height, NULL, mp.created_at,
-             m.spec_json
-      FROM model_portraits mp JOIN models m ON m.id = mp.model_id
-      UNION ALL
-      SELECT 'layer:' || le.id || ':' || je.key, 'GENERATED', 'LAYER',
-             le.project_id, p.name,
-             COALESCE(si.display_name, si.asset_type, '生成图') || ' · ' || json_extract(je.value, '$.name'),
-             'image/png', json_extract(je.value, '$.storagePath'), json_extract(je.value, '$.hash'),
-             o.width, o.height, NULL, le.created_at,
-             NULL
-      FROM layer_exports le
-      JOIN projects p ON p.id = le.project_id
-      LEFT JOIN outputs o ON o.id = le.output_id
-      LEFT JOIN storyboard_items si ON si.id = o.storyboard_item_id
-      CROSS JOIN json_each(le.layer_files_json) je
-      WHERE le.status = 'SUCCEEDED' AND le.layer_files_json IS NOT NULL
-        AND json_extract(je.value, '$.hash') IS NOT NULL
-        AND json_extract(je.value, '$.storagePath') IS NOT NULL
-        AND (json_extract(je.value, '$.kind') IS NULL OR json_extract(je.value, '$.kind') <> 'composite')
-      UNION ALL
-      SELECT 'pattern:' || pt.id,
-             CASE WHEN pt.source_type = 'UPLOADED' THEN 'UPLOADED' ELSE 'GENERATED' END, 'PATTERN',
-             '', '花型工坊', pt.name,
-             'image/png', pt.storage_path, pt.file_hash, pt.width, pt.height, NULL, pt.created_at,
-             NULL
-      FROM patterns pt
-      WHERE pt.storage_path IS NOT NULL AND pt.file_hash IS NOT NULL
-      UNION ALL
-      SELECT 'pack:' || pk.id || ':' || je.key, 'GENERATED', 'PRINT_PACK',
-             '', '花型工坊', pt2.name || ' · ' || pk.spec_id,
-             'image/png', json_extract(je.value, '$.storagePath'), json_extract(je.value, '$.hash'),
-             NULL, NULL, NULL, pk.created_at,
-             NULL
-      FROM print_packs pk
-      JOIN patterns pt2 ON pt2.id = pk.pattern_id
-      CROSS JOIN json_each(pk.files_json) je
-      WHERE pk.status = 'SUCCEEDED' AND pk.files_json IS NOT NULL
-        AND json_extract(je.value, '$.kind') = 'PRINT_FILE'
-        AND json_extract(je.value, '$.hash') IS NOT NULL
-        AND json_extract(je.value, '$.storagePath') IS NOT NULL
-    `;
-
-    const sourceFilters: string[] = [];
-    const sourceParams: Record<string, string | number> = {};
-    if (kind) { sourceFilters.push("kind = @kind"); sourceParams.kind = kind; }
-    // 模特定妆照的项目归属是空串：按项目筛选时它不命中，也不会被伪造成某个真实项目。
-    if (projectId) { sourceFilters.push("project_id = @projectId"); sourceParams.projectId = projectId; }
-    // created_at 统一是 canonical ISO（now() 产出），与规范化后的入参做字典序比较即时间序比较。
-    if (query.createdFrom) { sourceFilters.push("created_at >= @createdFrom"); sourceParams.createdFrom = query.createdFrom; }
-    if (query.createdTo) { sourceFilters.push("created_at <= @createdTo"); sourceParams.createdTo = query.createdTo; }
-    // 身份维度取自模特实体的 spec；非定妆照行的 model_spec_json 为 NULL，与等值比较天然为假。
-    for (const dimension of LIBRARY_MODEL_SPEC_DIMENSIONS) {
-      const value = query.modelSpec?.[dimension];
-      if (!value) continue;
-      sourceFilters.push(`json_extract(model_spec_json, '$.${dimension}') = @modelSpec_${dimension}`);
-      sourceParams[`modelSpec_${dimension}`] = value;
-    }
-    if (needle) {
-      // LIKE 通配符转义保持与"子串包含"语义一致；LOWER 与前端既有的 ASCII 折叠口径相同
-      sourceParams.needle = `%${needle.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
-      sourceFilters.push("(LOWER(name) LIKE @needle ESCAPE '\\' OR LOWER(project_name) LIKE @needle ESCAPE '\\')");
-    }
-    const sourceWhere = sourceFilters.length > 0 ? `WHERE ${sourceFilters.join(" AND ")}` : "";
-
-    const pageFilters: string[] = [];
-    const params: Record<string, string | number> = { ...sourceParams, limit: limit + 1 };
-    if (cursor) {
-      params.cursorCreatedAt = cursor.createdAt;
-      params.cursorId = cursor.id;
-      pageFilters.push("(created_at < @cursorCreatedAt OR (created_at = @cursorCreatedAt AND id < @cursorId))");
-    }
-    const pageWhere = pageFilters.length > 0 ? `WHERE ${pageFilters.join(" AND ")}` : "";
-
-    const ctes = `
-      WITH library AS (${librarySql}),
-      filtered AS (SELECT * FROM library ${sourceWhere}),
-      ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY hash ORDER BY created_at DESC, id DESC) AS rn FROM filtered),
-      deduped AS (SELECT * FROM ranked WHERE rn = 1)
-    `;
-    const rows = this.db.prepare(`
-      ${ctes}
-      SELECT *, (SELECT COUNT(*) FROM deduped) AS total_count FROM deduped
-      ${pageWhere}
-      ORDER BY created_at DESC, id DESC
-      LIMIT @limit
-    `).all(params) as Row[];
-
-    const items = rows.slice(0, limit).map((row) => {
-      const source = String(row.source) as LibraryItemSource;
-      return {
-        id: String(row.id),
-        source,
-        kind: String(row.kind) as LibraryItemKind,
-        name: String(row.name ?? ""),
-        projectId: String(row.project_id),
-        projectName: String(row.project_name ?? ""),
-        mimeType: row.mime_type ? String(row.mime_type) : mimeTypeForPath(String(row.storage_path)),
-        hash: String(row.hash),
-        width: row.width === null || row.width === undefined ? null : Number(row.width),
-        height: row.height === null || row.height === undefined ? null : Number(row.height),
-        storagePath: String(row.storage_path),
-        role: row.role ? (String(row.role) as AssetRole) : null,
-        createdAt: String(row.created_at),
-      };
-    });
-    const nextCursor = rows.length > limit && items.length > 0 ? encodeLibraryCursor(items[items.length - 1]) : null;
-    // 游标越过末尾时当前页为空，但 total 仍要反映完整筛选结果，因此单独兜一次计数。
-    const total = rows.length > 0
-      ? Number(rows[0].total_count)
-      : Number((this.db.prepare(`${ctes} SELECT COUNT(*) AS total_count FROM deduped`).get(sourceParams) as Row | undefined)?.total_count ?? 0);
-    return { items, nextCursor, total };
-  }
-
-  /** 按内容 hash 找到任一来源文件的存储路径，供缩略图惰性生成。 */
-  public findLibrarySourcePath(hash: string): string | undefined {
-    const asset = this.db.prepare("SELECT storage_path FROM assets WHERE hash=? LIMIT 1").get(hash) as Row | undefined;
-    if (asset) return String(asset.storage_path);
-    const output = this.db.prepare("SELECT storage_path FROM outputs WHERE hash=? LIMIT 1").get(hash) as Row | undefined;
-    if (output) return String(output.storage_path);
-    const layer = this.db.prepare(
-      "SELECT json_extract(je.value, '$.storagePath') AS storage_path FROM layer_exports le, json_each(le.layer_files_json) je WHERE json_extract(je.value, '$.hash')=? LIMIT 1",
-    ).get(hash) as Row | undefined;
-    if (layer?.storage_path) return String(layer.storage_path);
-    // 模特定妆照同样进资产库：漏掉这一步，MODEL 条目的缩略图在惰性生成时会 404。
-    const portrait = this.db.prepare("SELECT storage_path FROM model_portraits WHERE hash=? LIMIT 1").get(hash) as Row | undefined;
-    if (portrait?.storage_path) return String(portrait.storage_path);
-    const pattern = this.db.prepare("SELECT storage_path FROM patterns WHERE file_hash=? LIMIT 1").get(hash) as Row | undefined;
-    if (pattern?.storage_path) return String(pattern.storage_path);
-    const packFile = this.db.prepare(
-      "SELECT json_extract(je.value, '$.storagePath') AS storage_path FROM print_packs pk, json_each(pk.files_json) je WHERE json_extract(je.value, '$.hash')=? LIMIT 1",
-    ).get(hash) as Row | undefined;
-    return packFile?.storage_path ? String(packFile.storage_path) : undefined;
-  }
-
-  /** 解析合成库 ID 指向的真实文件；返回 undefined 表示条目已不存在。 */
-  public resolveLibrarySource(itemId: string): { source: LibraryItemSource; storagePath: string; hash: string; mimeType: string; originalName: string; role: AssetRole | null } | undefined {
-    const separator = itemId.indexOf(":");
-    const prefix = separator < 0 ? "" : itemId.slice(0, separator);
-    const id = separator < 0 ? "" : itemId.slice(separator + 1);
-    if (prefix === "asset") {
-      const asset = this.getAsset(id);
-      if (!asset) return undefined;
-      return { source: "UPLOADED", storagePath: asset.storagePath, hash: asset.hash, mimeType: asset.mimeType, originalName: asset.originalName, role: asset.role };
-    }
-    if (prefix === "output") {
-      const output = this.getOutput(id);
-      if (!output) return undefined;
-      return { source: "GENERATED", storagePath: output.storagePath, hash: output.hash, mimeType: mimeTypeForPath(output.storagePath), originalName: basename(output.storagePath), role: null };
-    }
-    if (prefix === "layer") {
-      // 分层 ID 形如 layer:<layerExportId>:<index>，最后一段是数组下标。
-      const lastSeparator = id.lastIndexOf(":");
-      const exportId = lastSeparator < 0 ? id : id.slice(0, lastSeparator);
-      const index = Number(id.slice(lastSeparator + 1));
-      const file = Number.isInteger(index) && index >= 0 ? this.getLayerExport(exportId)?.layerFiles?.[index] : undefined;
-      if (!file || file.kind === "composite") return undefined;
-      return { source: "GENERATED", storagePath: file.storagePath, hash: file.hash, mimeType: "image/png", originalName: file.name, role: null };
-    }
-    if (prefix === "pattern") {
-      const pattern = this.getPattern(id);
-      if (!pattern?.storagePath || !pattern.fileHash) return undefined;
-      return { source: pattern.sourceType === "UPLOADED" ? "UPLOADED" : "GENERATED", storagePath: pattern.storagePath, hash: pattern.fileHash, mimeType: "image/png", originalName: pattern.name, role: null };
-    }
-    if (prefix === "pack") {
-      // 规格包 ID 形如 pack:<printPackId>:<index>，最后一段是文件数组下标；manifest 文件不作为可预览图。
-      const lastSeparator = id.lastIndexOf(":");
-      const packId = lastSeparator < 0 ? id : id.slice(0, lastSeparator);
-      const index = Number(id.slice(lastSeparator + 1));
-      const file = Number.isInteger(index) && index >= 0 ? this.getPrintPack(packId)?.files?.[index] : undefined;
-      if (!file || file.kind !== "PRINT_FILE") return undefined;
-      return { source: "GENERATED", storagePath: file.storagePath, hash: file.hash, mimeType: "image/png", originalName: file.name, role: null };
-    }
-    if (prefix === "model") {
-      const portrait = this.getModelPortrait(id);
-      if (!portrait) return undefined;
-      const castModel = this.getModel(portrait.modelId);
-      return {
-        source: "MODEL",
-        storagePath: portrait.storagePath,
-        hash: portrait.hash,
-        mimeType: mimeTypeForPath(portrait.storagePath),
-        originalName: castModel ? `${castModel.name} 定妆照` : "model-portrait",
-        role: null,
-      };
-    }
-    return undefined;
-  }
-  public getAsset(id: string): AssetRecord | undefined { const row = this.db.prepare("SELECT * FROM assets WHERE id=?").get(id); return row ? mapAsset(row as Row) : undefined; }
-  public createAsset(input: Omit<AssetRecord, "id" | "createdAt">): AssetRecord {
-    const record: AssetRecord = { ...input, id: randomUUID(), createdAt: now() };
-    this.db.prepare(`INSERT INTO assets (id,project_id,role,storage_path,hash,original_name,mime_type,width,height,created_at)
-      VALUES (@id,@projectId,@role,@storagePath,@hash,@originalName,@mimeType,@width,@height,@createdAt)`).run(record);
-    return record;
-  }
-
-  /** 先查后删：返回被删记录供 API 删除存储文件；不存在返回 undefined。 */
-  public deleteAsset(id: string): AssetRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM assets WHERE id=?").get(id);
-    if (!row) return undefined;
-    this.db.prepare("DELETE FROM assets WHERE id=?").run(id);
-    return mapAsset(row as Row);
-  }
-
-  public getStoryboard(projectId: string): StoryboardRecord | undefined { const row = this.db.prepare("SELECT * FROM storyboards WHERE project_id=?").get(projectId); return row ? mapStoryboard(row as Row) : undefined; }
-  public saveStoryboard(projectId: string, campaignStyleLock: string, status: StoryboardRecord["status"], items: Array<Omit<StoryboardItemRecord, "id" | "projectId" | "storyboardVersion" | "createdAt" | "updatedAt" | "imageProviderId" | "imageModelId" | "imageResolution" | "imageAspectRatio"> & Partial<Pick<StoryboardItemRecord, "imageProviderId" | "imageModelId" | "imageResolution" | "imageAspectRatio">>>): StoryboardRecord {
-    const project = this.getProject(projectId);
-    if (!project) throw new Error(`Project not found for storyboard ${projectId}`);
-    const previous = this.getStoryboard(projectId);
-    const storyboard: StoryboardRecord = { projectId, version: (previous?.version ?? 0) + 1, status, campaignStyleLock, createdAt: previous?.createdAt ?? now(), updatedAt: now() };
-    const write = this.db.transaction(() => {
-      this.db.prepare(`INSERT INTO storyboards (project_id,version,status,campaign_style_lock,created_at,updated_at) VALUES (@projectId,@version,@status,@campaignStyleLock,@createdAt,@updatedAt)
-        ON CONFLICT(project_id) DO UPDATE SET version=excluded.version,status=excluded.status,campaign_style_lock=excluded.campaign_style_lock,updated_at=excluded.updated_at`).run(storyboard);
-      const sortOffset = Number((this.db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS value FROM storyboard_items WHERE project_id=?").get(projectId) as { value: number }).value) + 1;
-      const insert = this.db.prepare(`INSERT INTO storyboard_items (id,project_id,storyboard_version,asset_type,display_name,shot_role,template_variant,candidate_count,image_provider_id,image_model_id,image_resolution,image_aspect_ratio,referenced_assets_json,mode,status,prompt_instruction,compiled_prompt,fact_claims_json,risk_flags_json,sort_order,created_at,updated_at)
-        VALUES (@id,@projectId,@storyboardVersion,@assetType,@displayName,@shotRole,@templateVariant,@candidateCount,@imageProviderId,@imageModelId,@imageResolution,@imageAspectRatio,@referencedAssets,@mode,@status,@promptInstruction,@compiledPrompt,@factClaims,@riskFlags,@sortOrder,@createdAt,@updatedAt)`);
-      items.forEach((item, index) => insert.run({
-        ...item,
-        shotRole: item.shotRole ?? null,
-        imageProviderId: item.imageProviderId ?? project.imageProviderId,
-        imageModelId: item.imageModelId ?? project.imageModelId,
-        imageResolution: item.imageResolution ?? project.imageResolution,
-        imageAspectRatio: item.imageAspectRatio ?? project.imageAspectRatio,
-        id: randomUUID(),
-        projectId,
-        storyboardVersion: storyboard.version,
-        sortOrder: sortOffset + (item.sortOrder ?? index),
-        referencedAssets: json(item.referencedAssets),
-        factClaims: json(item.factClaims),
-        riskFlags: json(item.riskFlags),
-        createdAt: storyboard.updatedAt,
-        updatedAt: storyboard.updatedAt
-      }));
-    }); write(); return storyboard;
-  }
-  public listStoryboardItems(projectId: string): StoryboardItemRecord[] { return (this.db.prepare("SELECT * FROM storyboard_items WHERE project_id=? ORDER BY sort_order").all(projectId) as Row[]).map(mapStoryboardItem); }
-  public getStoryboardItem(id: string): StoryboardItemRecord | undefined { const row = this.db.prepare("SELECT * FROM storyboard_items WHERE id=?").get(id); return row ? mapStoryboardItem(row as Row) : undefined; }
-  public deleteStoryboardItem(id: string): StoryboardItemRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM storyboard_items WHERE id=?").get(id);
-    if (!row) return undefined;
-    this.db.prepare("DELETE FROM storyboard_items WHERE id=?").run(id);
-    return mapStoryboardItem(row as Row);
-  }
-  public updateStoryboardItem(id: string, patch: Partial<Pick<StoryboardItemRecord, "assetType" | "displayName" | "templateVariant" | "candidateCount" | "imageProviderId" | "imageModelId" | "imageResolution" | "imageAspectRatio" | "referencedAssets" | "mode" | "promptInstruction" | "compiledPrompt" | "status" | "sortOrder" | "factClaims" | "riskFlags">>): StoryboardItemRecord | undefined {
-    const current = this.getStoryboardItem(id); if (!current) return undefined; const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare(`UPDATE storyboard_items SET asset_type=@assetType,display_name=@displayName,template_variant=@templateVariant,candidate_count=@candidateCount,image_provider_id=@imageProviderId,image_model_id=@imageModelId,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,referenced_assets_json=@referencedAssets,mode=@mode,status=@status,prompt_instruction=@promptInstruction,compiled_prompt=@compiledPrompt,fact_claims_json=@factClaims,risk_flags_json=@riskFlags,sort_order=@sortOrder,updated_at=@updatedAt WHERE id=@id`)
-      .run({ ...next, referencedAssets: json(next.referencedAssets), factClaims: json(next.factClaims), riskFlags: json(next.riskFlags) }); return next;
-  }
-  public confirmStoryboard(projectId: string): StoryboardRecord | undefined {
-    const current = this.getStoryboard(projectId); if (!current) return undefined;
-    const updatedAt = now();
-    const write = this.db.transaction(() => {
-      this.db.prepare("UPDATE storyboards SET status='CONFIRMED',updated_at=? WHERE project_id=?").run(updatedAt, projectId);
-      this.db.prepare("UPDATE storyboard_items SET status='CONFIRMED',updated_at=? WHERE project_id=? AND status='DRAFT'").run(updatedAt, projectId);
-    });
-    write(); return this.getStoryboard(projectId);
-  }
-
-  public createJob(input: Omit<JobRecord, "createdAt" | "updatedAt" | "progress" | "status" | "retryable" | "providerTaskId" | "error" | "requestFingerprint" | "providerId" | "modelId" | "estimatedCost" | "actualCost" | "cancelRequested" | "progressDetail"> & Partial<Pick<JobRecord, "status" | "progress" | "retryable" | "providerTaskId" | "error" | "requestFingerprint" | "providerId" | "modelId" | "estimatedCost" | "actualCost" | "cancelRequested" | "progressDetail">>): JobRecord {
-    const record: JobRecord = { ...input, status: input.status ?? "QUEUED", progress: input.progress ?? 0, retryable: input.retryable ?? true, requestFingerprint: input.requestFingerprint ?? null, providerId: input.providerId ?? null, modelId: input.modelId ?? null, estimatedCost: input.estimatedCost ?? null, actualCost: input.actualCost ?? null, cancelRequested: input.cancelRequested ?? false, providerTaskId: input.providerTaskId ?? null, error: input.error ?? null, progressDetail: input.progressDetail ?? null, createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO jobs (id,project_id,storyboard_item_id,type,status,progress,retryable,input_json,request_fingerprint,provider_id,model_id,estimated_cost_json,actual_cost_json,cancel_requested,provider_task_id,error_json,created_at,updated_at)
-      VALUES (@id,@projectId,@storyboardItemId,@type,@status,@progress,@retryable,@input,@requestFingerprint,@providerId,@modelId,@estimatedCost,@actualCost,@cancelRequested,@providerTaskId,@error,@createdAt,@updatedAt)`).run({ ...record, retryable: record.retryable ? 1 : 0, cancelRequested: record.cancelRequested ? 1 : 0, input: json(record.input), estimatedCost: record.estimatedCost ? json(record.estimatedCost) : null, actualCost: record.actualCost ? json(record.actualCost) : null, error: record.error ? json(record.error) : null }); return record;
-  }
-  public getJob(id: string): JobRecord | undefined { const row = this.db.prepare("SELECT * FROM jobs WHERE id=?").get(id); return row ? mapJob(row as Row) : undefined; }
-  public updateJob(id: string, patch: Partial<Pick<JobRecord, "status" | "progress" | "providerTaskId" | "error" | "retryable" | "actualCost" | "cancelRequested" | "progressDetail">>): JobRecord | undefined {
-    const current = this.getJob(id); if (!current) return undefined; const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE jobs SET status=@status,progress=@progress,retryable=@retryable,provider_task_id=@providerTaskId,error_json=@error,actual_cost_json=@actualCost,cancel_requested=@cancelRequested,progress_detail_json=@progressDetail,updated_at=@updatedAt WHERE id=@id")
-      .run({ ...next, retryable: next.retryable ? 1 : 0, cancelRequested: next.cancelRequested ? 1 : 0, actualCost: next.actualCost ? json(next.actualCost) : null, error: next.error ? json(next.error) : null, progressDetail: next.progressDetail ? json(next.progressDetail) : null }); return next;
-  }
-  /** 指纹去重同时覆盖项目任务与全局任务：projectId 为 null 时按 project_id IS NULL 匹配。 */
-  public findJobByFingerprint(projectId: string | null, fingerprint: string): JobRecord | undefined { const row = this.db.prepare("SELECT * FROM jobs WHERE project_id IS ? AND request_fingerprint=? AND status IN ('QUEUED','RUNNING','SUCCEEDED') ORDER BY created_at DESC LIMIT 1").get(projectId, fingerprint); return row ? mapJob(row as Row) : undefined; }
-  public recoverInterruptedJobs(): JobRecord[] {
-    const rows = this.db.prepare("SELECT * FROM jobs WHERE status='RUNNING'").all() as Row[];
-    const recovered = rows.filter((row) => row.provider_task_id !== EXTERNAL_REQUEST_STARTED);
-    const unverifiable = rows.filter((row) => row.provider_task_id === EXTERNAL_REQUEST_STARTED);
-    const updatedAt = now();
-    const unknownMessage = JSON.stringify({ message: "外部图像请求结果未知，已停止自动重试以避免重复计费" });
-    const write = this.db.transaction(() => {
-      this.db.prepare("UPDATE jobs SET status='QUEUED',progress=0,cancel_requested=0,progress_detail_json=NULL,updated_at=? WHERE status='RUNNING' AND (provider_task_id IS NULL OR provider_task_id<>?)").run(updatedAt, EXTERNAL_REQUEST_STARTED);
-      this.db.prepare("UPDATE jobs SET status='FAILED',progress=100,retryable=0,error_json=?,updated_at=? WHERE status='RUNNING' AND provider_task_id=?")
-        .run(unknownMessage, updatedAt, EXTERNAL_REQUEST_STARTED);
-      // 分层记录必须与 Job 同步进入终态，否则前端会一直看到 QUEUED/RUNNING 而任务其实已被重启或终止。
-      for (const row of recovered) {
-        this.db.prepare("UPDATE layer_plans SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
-        this.db.prepare("UPDATE layer_exports SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
-        // 规格包是纯本地合成，重启后随 Job 重新排队即可；pattern_extract/forge 无预建领域记录。
-        this.db.prepare("UPDATE print_packs SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
-      }
-      for (const row of unverifiable) {
-        this.db.prepare("UPDATE layer_plans SET status='FAILED',error_json=?,updated_at=? WHERE job_id=?").run(unknownMessage, updatedAt, row.id);
-        // 已写出 PSD 的导出记录是完成事实的持久化证据：Job 崩溃在终态写入前也不改判它，PSD 与图层文件仍然可下载。
-        this.db.prepare("UPDATE layer_exports SET status='FAILED',error_json=?,updated_at=? WHERE job_id=? AND psd_storage_path IS NULL").run(unknownMessage, updatedAt, row.id);
-      }
-    });
-    write();
-    return recovered.map((row) => mapJob({ ...row, status: "QUEUED", progress: 0, cancel_requested: 0 }));
-  }
-  public listJobs(projectId: string): JobRecord[] { return (this.db.prepare("SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapJob); }
-  /** 全局套图反推任务不绑定项目，无法走 listJobs；按 type 倒序取最近若干条供「最近反推」列表使用。 */
-  public listJobsByType(type: JobType, limit: number): JobRecord[] { return (this.db.prepare("SELECT * FROM jobs WHERE type=? ORDER BY created_at DESC LIMIT ?").all(type, limit) as Row[]).map(mapJob); }
-  public saveCopywritingResult(input: Omit<CopywritingResultRecord, "createdAt">): CopywritingResultRecord {
-    const record: CopywritingResultRecord = { ...input, createdAt: now() };
-    this.db.prepare("INSERT OR REPLACE INTO copywriting_results (job_id,project_id,target,content,created_at) VALUES (@jobId,@projectId,@target,@content,@createdAt)").run(record);
-    return record;
-  }
-  public getCopywritingResult(jobId: string): CopywritingResultRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM copywriting_results WHERE job_id=?").get(jobId);
-    return row ? mapCopywritingResult(row as Row) : undefined;
-  }
-  public createWebResearchAudit(jobId: string, availability: WebResearchAvailability): WebResearchAuditRecord {
-    const record: WebResearchAuditRecord = { jobId, availability, invocationCount: 0, successfulAttemptCount: 0, failedAttemptCount: 0, createdAt: now(), updatedAt: now() };
-    this.db.prepare("INSERT OR REPLACE INTO web_research_audits (job_id,availability,invocation_count,successful_attempt_count,failed_attempt_count,created_at,updated_at) VALUES (@jobId,@availability,@invocationCount,@successfulAttemptCount,@failedAttemptCount,@createdAt,@updatedAt)").run(record);
-    return record;
-  }
-  public recordWebResearchSearch(jobId: string): void {
-    this.db.prepare("UPDATE web_research_audits SET invocation_count=invocation_count+1,updated_at=? WHERE job_id=?").run(now(), jobId);
-  }
-  public recordWebResearchAttempt(input: Omit<WebResearchAttemptRecord, "id" | "createdAt">): WebResearchAttemptRecord {
-    const record: WebResearchAttemptRecord = { ...input, id: randomUUID(), createdAt: now() };
-    const column = record.status === "SUCCEEDED" ? "successful_attempt_count" : "failed_attempt_count";
-    const write = this.db.transaction(() => {
-      this.db.prepare("INSERT INTO web_research_attempts (id,job_id,query,source_id,source_name,source_kind,status,result_count,error_message,created_at) VALUES (@id,@jobId,@query,@sourceId,@sourceName,@sourceKind,@status,@resultCount,@errorMessage,@createdAt)").run(record);
-      this.db.prepare(`UPDATE web_research_audits SET ${column}=${column}+1,updated_at=? WHERE job_id=?`).run(now(), record.jobId);
-    });
-    write(); return record;
-  }
-  public getWebResearchAudit(jobId: string): WebResearchAuditRecord | undefined { const row = this.db.prepare("SELECT * FROM web_research_audits WHERE job_id=?").get(jobId); return row ? mapWebResearchAudit(row as Row) : undefined; }
-  /** 审计记录按插入顺序返回，避免同一毫秒内的随机 UUID 改变来源尝试顺序。 */
-  public listWebResearchAttempts(jobId: string): WebResearchAttemptRecord[] { return (this.db.prepare("SELECT * FROM web_research_attempts WHERE job_id=? ORDER BY rowid").all(jobId) as Row[]).map(mapWebResearchAttempt); }
-
-  public createOutput(input: Omit<OutputRecord, "id" | "createdAt">): OutputRecord {
-    const generationKey = input.generationKey ?? null;
-    if (generationKey) {
-      const existing = this.getOutputByGenerationKey(generationKey);
-      if (existing) return existing;
-    }
-    const record: OutputRecord = { ...input, generationBatchId: input.generationBatchId ?? null, generationKey, parentOutputId: input.parentOutputId ?? null, rootOutputId: input.rootOutputId ?? null, editSessionId: input.editSessionId ?? null, editTurnId: input.editTurnId ?? null, id: randomUUID(), createdAt: now() };
-    const result = this.db.prepare("INSERT OR IGNORE INTO outputs (id,project_id,storyboard_item_id,job_id,candidate_index,generation_batch_id,generation_key,generation_snapshot_json,storage_path,hash,width,height,created_at,parent_output_id,root_output_id,edit_session_id,edit_turn_id) VALUES (@id,@projectId,@storyboardItemId,@jobId,@candidateIndex,@generationBatchId,@generationKey,@generationSnapshot,@storagePath,@hash,@width,@height,@createdAt,@parentOutputId,@rootOutputId,@editSessionId,@editTurnId)")
-      .run({ ...record, width: record.width ?? null, height: record.height ?? null, generationSnapshot: record.generationSnapshot ? json(record.generationSnapshot) : null });
-    if (result.changes === 0 && generationKey) {
-      const existing = this.getOutputByGenerationKey(generationKey);
-      if (existing) return existing;
-      throw new Error(`Output generation key was rejected without an existing output: ${generationKey}`);
-    }
-    return record;
-  }
-  public getOutputByGenerationKey(generationKey: string): OutputRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM outputs WHERE generation_key=?").get(generationKey);
-    return row ? mapOutput(row as Row) : undefined;
-  }
-  public getOutput(id: string): OutputRecord | undefined { const row = this.db.prepare("SELECT * FROM outputs WHERE id=?").get(id); return row ? mapOutput(row as Row) : undefined; }
-  public listOutputs(projectId: string): OutputRecord[] { return (this.db.prepare("SELECT * FROM outputs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapOutput); }
-  public createPlanningConfigSnapshot(input: Omit<PlanningConfigSnapshotRecord, "id" | "createdAt">): PlanningConfigSnapshotRecord {
-    const existing = this.db.prepare("SELECT * FROM planning_config_snapshots WHERE source_job_id=?").get(input.sourceJobId) as Row | undefined;
-    if (existing) return mapPlanningConfigSnapshot(existing);
-    const record: PlanningConfigSnapshotRecord = { ...input, id: randomUUID(), createdAt: now() };
-    const write = this.db.transaction(() => {
-      this.db.prepare("INSERT INTO planning_config_snapshots (id,project_id,source_job_id,payload_json,created_at) VALUES (@id,@projectId,@sourceJobId,@payload,@createdAt)").run({ ...record, payload: json(record.payload) });
-      this.db.prepare("DELETE FROM planning_config_snapshots WHERE project_id=? AND id NOT IN (SELECT id FROM planning_config_snapshots WHERE project_id=? ORDER BY created_at DESC, rowid DESC LIMIT 20)").run(record.projectId, record.projectId);
-    });
-    write();
-    return record;
-  }
-  public listPlanningConfigSnapshots(projectId: string): PlanningConfigSnapshotRecord[] {
-    return (this.db.prepare("SELECT * FROM planning_config_snapshots WHERE project_id=? ORDER BY created_at DESC, rowid DESC LIMIT 20").all(projectId) as Row[]).map(mapPlanningConfigSnapshot);
-  }
-  public getPlanningConfigSnapshot(id: string): PlanningConfigSnapshotRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM planning_config_snapshots WHERE id=?").get(id);
-    return row ? mapPlanningConfigSnapshot(row as Row) : undefined;
-  }
-  public listEditOutputs(sessionId: string): OutputRecord[] { return (this.db.prepare("SELECT * FROM outputs WHERE edit_session_id=? ORDER BY created_at ASC").all(sessionId) as Row[]).map(mapOutput); }
-  public isOutputInEditSession(sessionId: string, outputId: string): boolean {
-    const row = this.db.prepare("SELECT 1 FROM edit_sessions s WHERE s.id=? AND (s.current_output_id=? OR EXISTS (SELECT 1 FROM outputs o WHERE o.id=? AND o.edit_session_id=s.id) OR EXISTS (SELECT 1 FROM outputs o WHERE o.edit_session_id=s.id AND o.root_output_id=?)) LIMIT 1").get(sessionId, outputId, outputId, outputId);
-    return Boolean(row);
-  }
-  public getEditSession(id: string): EditSessionRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM edit_sessions WHERE id=?").get(id);
-    return row ? mapEditSession(row as Row) : undefined;
-  }
-  public getActiveEditSession(projectId: string, outputId: string): EditSessionRecord | undefined {
-    const row = this.db.prepare("SELECT DISTINCT edit_sessions.* FROM edit_sessions LEFT JOIN outputs ON outputs.edit_session_id=edit_sessions.id WHERE edit_sessions.project_id=? AND edit_sessions.status='ACTIVE' AND (edit_sessions.current_output_id=? OR outputs.id=?) ORDER BY edit_sessions.updated_at DESC LIMIT 1").get(projectId, outputId, outputId);
-    return row ? mapEditSession(row as Row) : undefined;
-  }
-  public createEditSession(input: Omit<EditSessionRecord, "createdAt" | "updatedAt">): EditSessionRecord {
-    const record = { ...input, createdAt: now(), updatedAt: now() };
-    this.db.prepare("INSERT INTO edit_sessions (id,project_id,current_output_id,status,memory_summary_json,created_at,updated_at) VALUES (@id,@projectId,@currentOutputId,@status,@memorySummary,@createdAt,@updatedAt)").run({ ...record, memorySummary: json(record.memorySummary) });
-    return record;
-  }
-  public updateEditSession(id: string, patch: Partial<Pick<EditSessionRecord, "currentOutputId" | "status" | "memorySummary">>): EditSessionRecord | undefined {
-    const current = this.getEditSession(id); if (!current) return undefined;
-    const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE edit_sessions SET current_output_id=@currentOutputId,status=@status,memory_summary_json=@memorySummary,updated_at=@updatedAt WHERE id=@id").run({ ...next, memorySummary: json(next.memorySummary) });
-    return next;
-  }
-  public getEditTurn(id: string): EditTurnRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM edit_turns WHERE id=?").get(id);
-    return row ? mapEditTurn(row as Row) : undefined;
-  }
-  public listEditTurns(sessionId: string): EditTurnRecord[] { return (this.db.prepare("SELECT * FROM edit_turns WHERE session_id=? ORDER BY created_at ASC").all(sessionId) as Row[]).map(mapEditTurn); }
-  public createEditTurn(input: Omit<EditTurnRecord, "createdAt" | "updatedAt" | "referenceSelections"> & { referenceSelections?: ReferenceSelection[] }): EditTurnRecord {
-    const referenceSelections = input.referenceSelections ?? input.referenceAssetIds.map((id, order) => ({ id, source: "PROJECT" as const, purpose: "PRODUCT_APPEARANCE" as const, order }));
-    const record: EditTurnRecord = { ...input, referenceSelections, createdAt: now(), updatedAt: now() };
-    this.db.prepare("INSERT INTO edit_turns (id,session_id,project_id,base_output_id,status,message,annotations_json,edit_mask_path,edit_mask_hash,protect_mask_path,protect_mask_hash,reference_asset_ids_json,reference_selections_json,plan_json,error_json,created_at,updated_at) VALUES (@id,@sessionId,@projectId,@baseOutputId,@status,@message,@annotations,@editMaskPath,@editMaskHash,@protectMaskPath,@protectMaskHash,@referenceAssetIds,@referenceSelections,@plan,@error,@createdAt,@updatedAt)").run({ ...record, annotations: json(record.annotations), referenceAssetIds: json(record.referenceAssetIds), referenceSelections: json(record.referenceSelections), plan: record.plan ? json(record.plan) : null, error: record.error ? json(record.error) : null });
-    return record;
-  }
-  public listEditReferenceAssets(sessionId: string): EditReferenceAssetRecord[] { return (this.db.prepare("SELECT * FROM edit_reference_assets WHERE session_id=? ORDER BY created_at ASC").all(sessionId) as Row[]).map(mapEditReferenceAsset); }
-  public createEditReferenceAsset(input: Omit<EditReferenceAssetRecord, "createdAt">): EditReferenceAssetRecord { const record = { ...input, createdAt: now() }; this.db.prepare("INSERT INTO edit_reference_assets (id,project_id,session_id,turn_id,storage_path,hash,original_name,mime_type,purpose,created_at,expires_at) VALUES (@id,@projectId,@sessionId,@turnId,@storagePath,@hash,@originalName,@mimeType,@purpose,@createdAt,@expiresAt)").run(record); return record; }
-  public getEditReferenceAsset(id: string): EditReferenceAssetRecord | undefined { const row = this.db.prepare("SELECT * FROM edit_reference_assets WHERE id=?").get(id); return row ? mapEditReferenceAsset(row as Row) : undefined; }
-  public deleteEditReferenceAsset(id: string): void { this.db.prepare("DELETE FROM edit_reference_assets WHERE id=?").run(id); }
-  public attachEditReferenceAssets(sessionId: string, turnId: string, ids: string[]): void {
-    if (!ids.length) return;
-    const statement = this.db.prepare("UPDATE edit_reference_assets SET turn_id=? WHERE id=? AND session_id=? AND turn_id IS NULL");
-    const transaction = this.db.transaction(() => { for (const id of ids) statement.run(turnId, id, sessionId); });
-    transaction();
-  }
-  public listExpiredEditReferenceAssets(at = now()): EditReferenceAssetRecord[] { return (this.db.prepare("SELECT * FROM edit_reference_assets WHERE expires_at <= ?").all(at) as Row[]).map(mapEditReferenceAsset); }
-  public updateEditTurn(id: string, patch: Partial<Pick<EditTurnRecord, "status" | "plan" | "error">>): EditTurnRecord | undefined {
-    const current = this.getEditTurn(id); if (!current) return undefined;
-    const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE edit_turns SET status=@status,plan_json=@plan,error_json=@error,updated_at=@updatedAt WHERE id=@id").run({ ...next, plan: next.plan ? json(next.plan) : null, error: next.error ? json(next.error) : null });
-    return next;
-  }
-
-  public createExport(input: Omit<ExportRecord, "id" | "createdAt" | "updatedAt">): ExportRecord { const record = { ...input, id: randomUUID(), createdAt: now(), updatedAt: now() }; this.db.prepare("INSERT INTO exports (id,project_id,job_id,status,storage_path,created_at,updated_at) VALUES (@id,@projectId,@jobId,@status,@storagePath,@createdAt,@updatedAt)").run(record); return record; }
-  public getExport(id: string): ExportRecord | undefined { const row = this.db.prepare("SELECT * FROM exports WHERE id=?").get(id); return row ? mapExport(row as Row) : undefined; }
-  public getExportByJobId(jobId: string): ExportRecord | undefined { const row = this.db.prepare("SELECT * FROM exports WHERE job_id=?").get(jobId); return row ? mapExport(row as Row) : undefined; }
-  public updateExport(id: string, patch: Partial<Pick<ExportRecord, "status" | "storagePath">>): ExportRecord | undefined { const current = this.getExport(id); if (!current) return undefined; const next = { ...current, ...patch, updatedAt: now() }; this.db.prepare("UPDATE exports SET status=@status,storage_path=@storagePath,updated_at=@updatedAt WHERE id=@id").run(next); return next; }
-
-  public createLayerPlan(input: Omit<LayerPlanRecord, "id" | "createdAt" | "updatedAt">): LayerPlanRecord {
-    const record: LayerPlanRecord = { ...input, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare("INSERT INTO layer_plans (id,project_id,output_id,job_id,output_hash,status,elements_json,error_json,created_at,updated_at) VALUES (@id,@projectId,@outputId,@jobId,@outputHash,@status,@elements,@error,@createdAt,@updatedAt)")
-      .run({ ...record, elements: json(record.elements), error: record.error ? json(record.error) : null });
-    return record;
-  }
-  public getLayerPlan(id: string): LayerPlanRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_plans WHERE id=?").get(id); return row ? mapLayerPlan(row as Row) : undefined; }
-  public getLayerPlanByOutput(outputId: string): LayerPlanRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_plans WHERE output_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(outputId); return row ? mapLayerPlan(row as Row) : undefined; }
-  public getLayerPlanByJobId(jobId: string): LayerPlanRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_plans WHERE job_id=?").get(jobId); return row ? mapLayerPlan(row as Row) : undefined; }
-  public updateLayerPlan(id: string, patch: Partial<Pick<LayerPlanRecord, "status" | "elements" | "error">>): LayerPlanRecord | undefined {
-    const current = this.getLayerPlan(id); if (!current) return undefined;
-    const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE layer_plans SET status=@status,elements_json=@elements,error_json=@error,updated_at=@updatedAt WHERE id=@id")
-      .run({ ...next, elements: json(next.elements), error: next.error ? json(next.error) : null });
-    return next;
-  }
-  public createLayerExport(input: Omit<LayerExportRecord, "id" | "createdAt" | "updatedAt">): LayerExportRecord {
-    const record: LayerExportRecord = { ...input, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare("INSERT INTO layer_exports (id,project_id,output_id,job_id,plan_id,status,include_background,psd_storage_path,layer_files_json,error_json,created_at,updated_at) VALUES (@id,@projectId,@outputId,@jobId,@planId,@status,@includeBackground,@psdStoragePath,@layerFiles,@error,@createdAt,@updatedAt)")
-      .run({ ...record, includeBackground: record.includeBackground ? 1 : 0, layerFiles: record.layerFiles ? json(record.layerFiles) : null, error: record.error ? json(record.error) : null });
-    return record;
-  }
-  public getLayerExport(id: string): LayerExportRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_exports WHERE id=?").get(id); return row ? mapLayerExport(row as Row) : undefined; }
-  public getLayerExportByJobId(jobId: string): LayerExportRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_exports WHERE job_id=?").get(jobId); return row ? mapLayerExport(row as Row) : undefined; }
-  public getLayerExportByOutput(outputId: string): LayerExportRecord | undefined { const row = this.db.prepare("SELECT * FROM layer_exports WHERE output_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(outputId); return row ? mapLayerExport(row as Row) : undefined; }
-  /** 历史导出全集（新→旧）：行级文件与 PSD 均按记录 id 命名空间落盘，重跑不会覆盖，旧记录始终可回看。 */
-  public listLayerExportsByOutput(outputId: string): LayerExportRecord[] { const rows = this.db.prepare("SELECT * FROM layer_exports WHERE output_id=? ORDER BY created_at DESC, rowid DESC").all(outputId); return rows.map((row) => mapLayerExport(row as Row)); }
-  public updateLayerExport(id: string, patch: Partial<Pick<LayerExportRecord, "status" | "psdStoragePath" | "layerFiles" | "error">>): LayerExportRecord | undefined {
-    const current = this.getLayerExport(id); if (!current) return undefined;
-    const next = { ...current, ...patch, updatedAt: now() };
-    this.db.prepare("UPDATE layer_exports SET status=@status,psd_storage_path=@psdStoragePath,layer_files_json=@layerFiles,error_json=@error,updated_at=@updatedAt WHERE id=@id")
-      .run({ ...next, includeBackground: next.includeBackground ? 1 : 0, layerFiles: next.layerFiles ? json(next.layerFiles) : null, error: next.error ? json(next.error) : null });
-    return next;
-  }
-}
-
-function mapProvider(row: Row): ProviderRecord { return { id: String(row.id), name: String(row.name), baseUrl: String(row.base_url), reasoningProtocol: row.reasoning_protocol as ReasoningProtocolProfile, encryptedApiKey: String(row.encrypted_api_key), models: parse(row.models_json), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapSearchSource(row: Row): SearchSourceRecord { return { id: String(row.id), name: String(row.name), kind: row.kind as SearchSourceKind, baseUrl: String(row.base_url), encryptedApiKey: row.encrypted_api_key ? String(row.encrypted_api_key) : null, priority: Number(row.priority), enabled: Boolean(row.enabled), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-
-function mapUserTemplate(row: Row): UserTemplateRecord { return { id: String(row.id), name: String(row.name), prompt: String(row.prompt), defaultSize: row.default_size === "1024x1536" ? "1024x1536" : "1024x1024", supportsImageReference: Boolean(row.supports_image_reference), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapUserSuite(row: Row): UserSuiteRecord { return { id: String(row.id), name: String(row.name), l1: String(row.l1), l2: String(row.l2), leaf: String(row.leaf), productFamily: row.product_family == null ? null : String(row.product_family), payload: JSON.parse(String(row.payload_json)) as SuiteDocumentInput, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapSuiteForgeResult(row: Row): SuiteForgeResultRecord { return { jobId: String(row.job_id), payload: JSON.parse(String(row.payload_json)) as SuiteDocumentInput, status: row.status as SuiteForgeStatus, suiteId: row.suite_id == null ? null : String(row.suite_id), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapModel(row: Row): ModelRecord { return { id: String(row.id), name: String(row.name), spec: parse(row.spec_json), notes: String(row.notes ?? ""), referenceFacePath: row.reference_face_path == null ? null : String(row.reference_face_path), referenceFaceHash: row.reference_face_hash == null ? null : String(row.reference_face_hash), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapModelPortrait(row: Row): ModelPortraitRecord { return { id: String(row.id), modelId: String(row.model_id), jobId: String(row.job_id), storagePath: String(row.storage_path), hash: String(row.hash), width: row.width == null ? null : Number(row.width), height: row.height == null ? null : Number(row.height), providerId: String(row.provider_id), imageModelId: String(row.image_model_id), aspectRatio: row.aspect_ratio as ImageAspectRatio, selected: Boolean(row.selected), createdAt: String(row.created_at) }; }
 /**
- * 计算项目更新后的规划修订号：仅当 patch 中实际改变了规划相关事实时递增。
- * 规划提示词由这些字段派生，改名与归档不影响规划结果，因此不计入。
+ * 领域持久化的唯一门面：按聚合根组合各子仓库（providers、models、patterns、jobs、projects……）。
+ *
+ * 保留单一门面而不是让调用方直接持有子仓库，有两个原因：
+ * - SQLite 事务边界以「db 连接」为单位，门面是唯一能保证跨聚合写（如删除 Provider 级联清引用）
+ *   在同一连接上发生的地方；
+ * - pattern-pipeline.ts、suite-catalog.ts 与 api/worker 依赖这里的聚合读取口组合出领域流程，
+ *   门面让它们不必感知仓库拆分。
  */
-const PLANNING_REVISION_FIELDS = [
-  "category", "productDescription", "verifiedFacts", "prohibitedClaims", "brandGuidelines",
-  "platformTargets", "targetMarket", "copyLanguage",
-  "reasoningProviderId", "reasoningModelId", "imageProviderId", "imageModelId", "segmentationModel",
-  "defaultMode", "imageResolution", "imageAspectRatio", "candidatesPerType", "webResearchEnabled",
-] as const;
+export class EcomRepository {
+  private readonly providers: ProviderRepository;
+  private readonly searchSources: SearchSourceRepository;
+  private readonly userContent: UserContentRepository;
+  private readonly models: ModelRepository;
+  private readonly patterns: PatternRepository;
+  private readonly pipelines: PatternPipelineRepository;
+  private readonly projects: ProjectRepository;
+  private readonly assets: AssetRepository;
+  private readonly storyboards: StoryboardRepository;
+  private readonly jobs: JobRepository;
+  private readonly outputs: OutputRepository;
+  private readonly editSessions: EditSessionRepository;
+  private readonly exports: ExportRepository;
+  private readonly library: LibraryRepository;
 
-function nextPlanningRevision(current: ProjectRecord, patch: Partial<Omit<ProjectRecord, "id" | "createdAt">>): number {
-  const changed = PLANNING_REVISION_FIELDS.some((field) => field in patch && !stableEquals(current[field], patch[field]));
-  return changed ? current.planningRevision + 1 : current.planningRevision;
-}
+  public constructor(db: SqliteDatabase) {
+    this.providers = new ProviderRepository(db);
+    this.searchSources = new SearchSourceRepository(db);
+    this.userContent = new UserContentRepository(db);
+    this.models = new ModelRepository(db);
+    this.patterns = new PatternRepository(db);
+    this.pipelines = new PatternPipelineRepository(db);
+    this.projects = new ProjectRepository(db);
+    this.assets = new AssetRepository(db);
+    this.storyboards = new StoryboardRepository(db, this.projects);
+    this.jobs = new JobRepository(db);
+    this.outputs = new OutputRepository(db);
+    this.editSessions = new EditSessionRepository(db);
+    this.exports = new ExportRepository(db);
+    this.library = new LibraryRepository(db, {
+      getAsset: (id) => this.assets.getAsset(id),
+      getOutput: (id) => this.outputs.getOutput(id),
+      getLayerExport: (id) => this.exports.getLayerExport(id),
+      getPattern: (id) => this.patterns.getPattern(id),
+      getPrintPack: (id) => this.patterns.getPrintPack(id),
+      getModelPortrait: (id) => this.models.getModelPortrait(id),
+      getModel: (id) => this.models.getModel(id),
+    });
+  }
 
-/** 结构化等值比较：对象键序无关，避免同内容的 brandGuidelines 触发误递增。 */
-function stableEquals(left: unknown, right: unknown): boolean {
-  if (left === right) return true;
-  return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
-}
+  // ---- providers ----
+  public listProviders(): ProviderRecord[] { return this.providers.listProviders(); }
+  public getProvider(id: string): ProviderRecord | undefined { return this.providers.getProvider(id); }
+  public saveProvider(input: Parameters<ProviderRepository["saveProvider"]>[0]): ProviderRecord { return this.providers.saveProvider(input); }
+  public deleteProvider(id: string): "deleted" | "missing" { return this.providers.deleteProvider(id); }
 
-function mapProject(row: Row): ProjectRecord {  return {
-    id: String(row.id),
-    name: String(row.name),
-    category: row.category ? String(row.category) : null,
-    productDescription: row.product_description ? String(row.product_description) : null,
-    verifiedFacts: parse(row.verified_facts_json ?? "[]"),
-    prohibitedClaims: parse(row.prohibited_claims_json ?? "[]"),
-    brandGuidelines: parse(row.brand_guidelines_json ?? "{}"),
-    platformTargets: parse(row.platform_targets_json),
-    targetMarket: row.target_market ? row.target_market as TargetMarket : null,
-    copyLanguage: row.copy_language ? String(row.copy_language) : null,
-    reasoningProviderId: row.reasoning_provider_id ? String(row.reasoning_provider_id) : null,
-    reasoningModelId: row.reasoning_model_id ? String(row.reasoning_model_id) : null,
-    imageProviderId: row.image_provider_id ? String(row.image_provider_id) : null,
-    imageModelId: row.image_model_id ? String(row.image_model_id) : null,
-    segmentationModel: row.segmentation_provider_id && row.segmentation_model_id ? { providerId: String(row.segmentation_provider_id), modelId: String(row.segmentation_model_id), protocol: row.segmentation_protocol === "grounded_sam" || row.segmentation_protocol === "seedream_layerize" ? row.segmentation_protocol : "fal" } : null,
-    defaultMode: row.default_mode as StoryboardMode,
-    imageResolution: (row.image_resolution as ImageResolution | undefined) ?? "1K",
-    imageAspectRatio: (row.image_aspect_ratio as ImageAspectRatio | undefined) ?? "AUTO",
-    candidatesPerType: Number(row.candidates_per_type ?? 1),
-    webResearchEnabled: Boolean(row.web_research_enabled),
-    archivedAt: row.archived_at ? String(row.archived_at) : null,
-    planningRevision: Number(row.planning_revision ?? 0),
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at)
-  };
-}
-function mapAsset(row: Row): AssetRecord {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    role: row.role as AssetRole,
-    storagePath: String(row.storage_path),
-    hash: String(row.hash),
-    originalName: String(row.original_name),
-    mimeType: String(row.mime_type),
-    width: row.width === null || row.width === undefined ? null : Number(row.width),
-    height: row.height === null || row.height === undefined ? null : Number(row.height),
-    createdAt: String(row.created_at)
-  };
-}
-/** 上传素材按用途归入商品/参考；生成结果与模特定妆照单列，不参与用途映射。 */
-function basename(storagePath: string): string {
-  const slash = storagePath.lastIndexOf("/");
-  return slash < 0 ? storagePath : storagePath.slice(slash + 1);
-}
-function mimeTypeForPath(storagePath: string): string {
-  const dot = storagePath.lastIndexOf(".");
-  const ext = dot < 0 ? "" : storagePath.slice(dot).toLowerCase();
-  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
-  if (ext === ".webp") return "image/webp";
-  if (ext === ".gif") return "image/gif";
-  return "image/png";
-}
-/** 身份内核里可参与资产库筛选的维度；顺序固定，SQL 条件与参数名由它派生。 */
-const LIBRARY_MODEL_SPEC_DIMENSIONS = ["gender", "age", "heritage", "stature", "build"] as const;
+  // ---- search sources ----
+  public listSearchSources(): SearchSourceRecord[] { return this.searchSources.listSearchSources(); }
+  public getSearchSource(id: string): SearchSourceRecord | undefined { return this.searchSources.getSearchSource(id); }
+  public saveSearchSource(input: Parameters<SearchSourceRepository["saveSearchSource"]>[0]): SearchSourceRecord { return this.searchSources.saveSearchSource(input); }
+  public deleteSearchSource(id: string): boolean { return this.searchSources.deleteSearchSource(id); }
 
-function encodeLibraryCursor(item: LibraryItemRecord): string {
-  return Buffer.from(`${item.createdAt}\u0000${item.id}`, "utf8").toString("base64url");
+  // ---- user templates / suites / suite forge drafts ----
+  public listUserTemplates(): UserTemplateRecord[] { return this.userContent.listUserTemplates(); }
+  public getUserTemplate(id: string): UserTemplateRecord | undefined { return this.userContent.getUserTemplate(id); }
+  public saveUserTemplate(input: Parameters<UserContentRepository["saveUserTemplate"]>[0]): UserTemplateRecord { return this.userContent.saveUserTemplate(input); }
+  public deleteUserTemplate(id: string): boolean { return this.userContent.deleteUserTemplate(id); }
+  public listUserSuites(): UserSuiteRecord[] { return this.userContent.listUserSuites(); }
+  public getUserSuite(id: string): UserSuiteRecord | undefined { return this.userContent.getUserSuite(id); }
+  public saveUserSuite(input: Parameters<UserContentRepository["saveUserSuite"]>[0]): UserSuiteRecord { return this.userContent.saveUserSuite(input); }
+  public deleteUserSuite(id: string): boolean { return this.userContent.deleteUserSuite(id); }
+  public saveSuiteForgeResult(input: Parameters<UserContentRepository["saveSuiteForgeResult"]>[0]): SuiteForgeResultRecord { return this.userContent.saveSuiteForgeResult(input); }
+  public getSuiteForgeResult(jobId: string): SuiteForgeResultRecord | undefined { return this.userContent.getSuiteForgeResult(jobId); }
+  public commitSuiteForgeResult(jobId: string, suiteId: string): SuiteForgeResultRecord | undefined { return this.userContent.commitSuiteForgeResult(jobId, suiteId); }
+
+  // ---- models & portraits ----
+  public listModels(): ModelRecord[] { return this.models.listModels(); }
+  public getModel(id: string): ModelRecord | undefined { return this.models.getModel(id); }
+  public createModel(input: Parameters<ModelRepository["createModel"]>[0]): ModelRecord { return this.models.createModel(input); }
+  public updateModel(id: string, patch: Parameters<ModelRepository["updateModel"]>[1]): ModelRecord | undefined { return this.models.updateModel(id, patch); }
+  public setModelReferenceFace(id: string, path: string | null, hash: string | null): ModelRecord | undefined { return this.models.setModelReferenceFace(id, path, hash); }
+  public deleteModel(id: string): boolean { return this.models.deleteModel(id); }
+  public listModelPortraits(modelId: string): ModelPortraitRecord[] { return this.models.listModelPortraits(modelId); }
+  public getModelPortrait(portraitId: string): ModelPortraitRecord | undefined { return this.models.getModelPortrait(portraitId); }
+  public createModelPortrait(input: Parameters<ModelRepository["createModelPortrait"]>[0]): ModelPortraitRecord { return this.models.createModelPortrait(input); }
+  public selectModelPortrait(modelId: string, portraitId: string): "selected" | "missing" { return this.models.selectModelPortrait(modelId, portraitId); }
+  public deleteModelPortrait(portraitId: string): boolean { return this.models.deleteModelPortrait(portraitId); }
+  public listAllModelPortraits(): ModelPortraitRecord[] { return this.models.listAllModelPortraits(); }
+  public listModelPortraitsByJobId(jobId: string): ModelPortraitRecord[] { return this.models.listModelPortraitsByJobId(jobId); }
+
+  // ---- patterns / print packs / listing results ----
+  public listPatterns(): PatternRecord[] { return this.patterns.listPatterns(); }
+  public listPatternsByJobId(jobId: string): PatternRecord[] { return this.patterns.listPatternsByJobId(jobId); }
+  public hasPatternArtifactsByJobId(jobId: string): boolean { return this.patterns.hasPatternArtifactsByJobId(jobId); }
+  public getPattern(id: string): PatternRecord | undefined { return this.patterns.getPattern(id); }
+  public createPattern(input: Parameters<PatternRepository["createPattern"]>[0]): PatternRecord { return this.patterns.createPattern(input); }
+  public updatePattern(id: string, patch: Parameters<PatternRepository["updatePattern"]>[1]): PatternRecord | undefined { return this.patterns.updatePattern(id, patch); }
+  public deletePattern(id: string): boolean { return this.patterns.deletePattern(id); }
+  public setPatternArtifact(id: string, artifact: Parameters<PatternRepository["setPatternArtifact"]>[1]): PatternRecord | undefined { return this.patterns.setPatternArtifact(id, artifact); }
+  public setPatternTileable(id: string, verdict: Parameters<PatternRepository["setPatternTileable"]>[1]): PatternRecord | undefined { return this.patterns.setPatternTileable(id, verdict); }
+  public createPrintPack(input: Parameters<PatternRepository["createPrintPack"]>[0]): PrintPackRecord { return this.patterns.createPrintPack(input); }
+  public getPrintPack(id: string): PrintPackRecord | undefined { return this.patterns.getPrintPack(id); }
+  public getPrintPackByJobId(jobId: string): PrintPackRecord | undefined { return this.patterns.getPrintPackByJobId(jobId); }
+  public listPrintPacks(patternId: string): PrintPackRecord[] { return this.patterns.listPrintPacks(patternId); }
+  public updatePrintPack(id: string, patch: Parameters<PatternRepository["updatePrintPack"]>[1]): PrintPackRecord | undefined { return this.patterns.updatePrintPack(id, patch); }
+  public deletePrintPack(id: string): boolean { return this.patterns.deletePrintPack(id); }
+  public savePatternListingResult(input: Parameters<PatternRepository["savePatternListingResult"]>[0]): PatternListingResultRecord { return this.patterns.savePatternListingResult(input); }
+  public getPatternListingResult(jobId: string): PatternListingResultRecord | undefined { return this.patterns.getPatternListingResult(jobId); }
+
+  // ---- pattern pipelines ----
+  public createPatternPipeline(input: Parameters<PatternPipelineRepository["createPatternPipeline"]>[0]): PatternPipelineWithSteps { return this.pipelines.createPatternPipeline(input); }
+  public listPatternPipelines(patternId: string): PatternPipelineWithSteps[] { return this.pipelines.listPatternPipelines(patternId); }
+  public getPatternPipeline(id: string): PatternPipelineWithSteps | undefined { return this.pipelines.getPatternPipeline(id); }
+  public findReusablePatternPipeline(fingerprint: string): PatternPipelineWithSteps | undefined { return this.pipelines.findReusablePatternPipeline(fingerprint); }
+  public updatePatternPipeline(id: string, patch: Parameters<PatternPipelineRepository["updatePatternPipeline"]>[1]): PatternPipelineWithSteps | undefined { return this.pipelines.updatePatternPipeline(id, patch); }
+  public getPatternPipelineStepByJobId(jobId: string): PatternPipelineStepRecord | undefined { return this.pipelines.getPatternPipelineStepByJobId(jobId); }
+  public updatePatternPipelineStep(id: string, patch: Parameters<PatternPipelineRepository["updatePatternPipelineStep"]>[1]): PatternPipelineStepRecord | undefined { return this.pipelines.updatePatternPipelineStep(id, patch); }
+
+  // ---- projects & planning snapshots ----
+  public listProjects(archived = false): ProjectRecord[] { return this.projects.listProjects(archived); }
+  public listProjectCovers(projectIds: string[]): Map<string, ProjectCoverSummary> { return this.projects.listProjectCovers(projectIds); }
+  public getProject(id: string): ProjectRecord | undefined { return this.projects.getProject(id); }
+  public createProject(input: Parameters<ProjectRepository["createProject"]>[0]): ProjectRecord { return this.projects.createProject(input); }
+  public updateProject(id: string, patch: Parameters<ProjectRepository["updateProject"]>[1]): ProjectRecord | undefined { return this.projects.updateProject(id, patch); }
+  public deleteArchivedProject(id: string): "deleted" | "not_archived" | "missing" { return this.projects.deleteArchivedProject(id); }
+  public createPlanningConfigSnapshot(input: Parameters<ProjectRepository["createPlanningConfigSnapshot"]>[0]): PlanningConfigSnapshotRecord { return this.projects.createPlanningConfigSnapshot(input); }
+  public listPlanningConfigSnapshots(projectId: string): PlanningConfigSnapshotRecord[] { return this.projects.listPlanningConfigSnapshots(projectId); }
+  public getPlanningConfigSnapshot(id: string): PlanningConfigSnapshotRecord | undefined { return this.projects.getPlanningConfigSnapshot(id); }
+
+  // ---- assets ----
+  public listAssets(projectId: string): AssetRecord[] { return this.assets.listAssets(projectId); }
+  public getAsset(id: string): AssetRecord | undefined { return this.assets.getAsset(id); }
+  public createAsset(input: Parameters<AssetRepository["createAsset"]>[0]): AssetRecord { return this.assets.createAsset(input); }
+  public deleteAsset(id: string): AssetRecord | undefined { return this.assets.deleteAsset(id); }
+
+  // ---- library view ----
+  public listLibraryItems(query?: Parameters<LibraryRepository["listLibraryItems"]>[0]): LibraryItemPage { return this.library.listLibraryItems(query); }
+  public findLibrarySourcePath(hash: string): string | undefined { return this.library.findLibrarySourcePath(hash); }
+  public resolveLibrarySource(itemId: string): ReturnType<LibraryRepository["resolveLibrarySource"]> { return this.library.resolveLibrarySource(itemId); }
+
+  // ---- storyboard ----
+  public getStoryboard(projectId: string): StoryboardRecord | undefined { return this.storyboards.getStoryboard(projectId); }
+  public saveStoryboard(...args: Parameters<StoryboardRepository["saveStoryboard"]>): StoryboardRecord { return this.storyboards.saveStoryboard(...args); }
+  public listStoryboardItems(projectId: string): StoryboardItemRecord[] { return this.storyboards.listStoryboardItems(projectId); }
+  public getStoryboardItem(id: string): StoryboardItemRecord | undefined { return this.storyboards.getStoryboardItem(id); }
+  public deleteStoryboardItem(id: string): StoryboardItemRecord | undefined { return this.storyboards.deleteStoryboardItem(id); }
+  public updateStoryboardItem(id: string, patch: Parameters<StoryboardRepository["updateStoryboardItem"]>[1]): StoryboardItemRecord | undefined { return this.storyboards.updateStoryboardItem(id, patch); }
+  public confirmStoryboard(projectId: string): StoryboardRecord | undefined { return this.storyboards.confirmStoryboard(projectId); }
+
+  // ---- jobs / copywriting results / web research audit ----
+  public createJob(input: Parameters<JobRepository["createJob"]>[0]): JobRecord { return this.jobs.createJob(input); }
+  public getJob(id: string): JobRecord | undefined { return this.jobs.getJob(id); }
+  public updateJob(id: string, patch: Parameters<JobRepository["updateJob"]>[1]): JobRecord | undefined { return this.jobs.updateJob(id, patch); }
+  public findJobByFingerprint(projectId: string | null, fingerprint: string): JobRecord | undefined { return this.jobs.findJobByFingerprint(projectId, fingerprint); }
+  public recoverInterruptedJobs(): JobRecord[] { return this.jobs.recoverInterruptedJobs(); }
+  public listJobs(projectId: string): JobRecord[] { return this.jobs.listJobs(projectId); }
+  public listJobsByType(type: Parameters<JobRepository["listJobsByType"]>[0], limit: number): JobRecord[] { return this.jobs.listJobsByType(type, limit); }
+  public saveCopywritingResult(input: Parameters<JobRepository["saveCopywritingResult"]>[0]): CopywritingResultRecord { return this.jobs.saveCopywritingResult(input); }
+  public getCopywritingResult(jobId: string): CopywritingResultRecord | undefined { return this.jobs.getCopywritingResult(jobId); }
+  public createWebResearchAudit(jobId: string, availability: Parameters<JobRepository["createWebResearchAudit"]>[1]): WebResearchAuditRecord { return this.jobs.createWebResearchAudit(jobId, availability); }
+  public recordWebResearchSearch(jobId: string): void { return this.jobs.recordWebResearchSearch(jobId); }
+  public recordWebResearchAttempt(input: Parameters<JobRepository["recordWebResearchAttempt"]>[0]): WebResearchAttemptRecord { return this.jobs.recordWebResearchAttempt(input); }
+  public getWebResearchAudit(jobId: string): WebResearchAuditRecord | undefined { return this.jobs.getWebResearchAudit(jobId); }
+  public listWebResearchAttempts(jobId: string): WebResearchAttemptRecord[] { return this.jobs.listWebResearchAttempts(jobId); }
+
+  // ---- outputs ----
+  public createOutput(input: Parameters<OutputRepository["createOutput"]>[0]): OutputRecord { return this.outputs.createOutput(input); }
+  public getOutputByGenerationKey(generationKey: string): OutputRecord | undefined { return this.outputs.getOutputByGenerationKey(generationKey); }
+  public getOutput(id: string): OutputRecord | undefined { return this.outputs.getOutput(id); }
+  public listOutputs(projectId: string): OutputRecord[] { return this.outputs.listOutputs(projectId); }
+  public listEditOutputs(sessionId: string): OutputRecord[] { return this.outputs.listEditOutputs(sessionId); }
+  public isOutputInEditSession(sessionId: string, outputId: string): boolean { return this.outputs.isOutputInEditSession(sessionId, outputId); }
+
+  // ---- edit sessions / turns / reference assets ----
+  public getEditSession(id: string): EditSessionRecord | undefined { return this.editSessions.getEditSession(id); }
+  public getActiveEditSession(projectId: string, outputId: string): EditSessionRecord | undefined { return this.editSessions.getActiveEditSession(projectId, outputId); }
+  public createEditSession(input: Parameters<EditSessionRepository["createEditSession"]>[0]): EditSessionRecord { return this.editSessions.createEditSession(input); }
+  public updateEditSession(id: string, patch: Parameters<EditSessionRepository["updateEditSession"]>[1]): EditSessionRecord | undefined { return this.editSessions.updateEditSession(id, patch); }
+  public getEditTurn(id: string): EditTurnRecord | undefined { return this.editSessions.getEditTurn(id); }
+  public listEditTurns(sessionId: string): EditTurnRecord[] { return this.editSessions.listEditTurns(sessionId); }
+  public createEditTurn(input: Parameters<EditSessionRepository["createEditTurn"]>[0]): EditTurnRecord { return this.editSessions.createEditTurn(input); }
+  public updateEditTurn(id: string, patch: Parameters<EditSessionRepository["updateEditTurn"]>[1]): EditTurnRecord | undefined { return this.editSessions.updateEditTurn(id, patch); }
+  public listEditReferenceAssets(sessionId: string): EditReferenceAssetRecord[] { return this.editSessions.listEditReferenceAssets(sessionId); }
+  public createEditReferenceAsset(input: Parameters<EditSessionRepository["createEditReferenceAsset"]>[0]): EditReferenceAssetRecord { return this.editSessions.createEditReferenceAsset(input); }
+  public getEditReferenceAsset(id: string): EditReferenceAssetRecord | undefined { return this.editSessions.getEditReferenceAsset(id); }
+  public deleteEditReferenceAsset(id: string): void { return this.editSessions.deleteEditReferenceAsset(id); }
+  public attachEditReferenceAssets(sessionId: string, turnId: string, ids: string[]): void { return this.editSessions.attachEditReferenceAssets(sessionId, turnId, ids); }
+  public listExpiredEditReferenceAssets(at?: Parameters<EditSessionRepository["listExpiredEditReferenceAssets"]>[0]): EditReferenceAssetRecord[] { return this.editSessions.listExpiredEditReferenceAssets(at); }
+
+  // ---- exports & layer plans/exports ----
+  public createExport(input: Parameters<ExportRepository["createExport"]>[0]): ExportRecord { return this.exports.createExport(input); }
+  public getExport(id: string): ExportRecord | undefined { return this.exports.getExport(id); }
+  public getExportByJobId(jobId: string): ExportRecord | undefined { return this.exports.getExportByJobId(jobId); }
+  public updateExport(id: string, patch: Parameters<ExportRepository["updateExport"]>[1]): ExportRecord | undefined { return this.exports.updateExport(id, patch); }
+  public createLayerPlan(input: Parameters<ExportRepository["createLayerPlan"]>[0]): LayerPlanRecord { return this.exports.createLayerPlan(input); }
+  public getLayerPlan(id: string): LayerPlanRecord | undefined { return this.exports.getLayerPlan(id); }
+  public getLayerPlanByOutput(outputId: string): LayerPlanRecord | undefined { return this.exports.getLayerPlanByOutput(outputId); }
+  public getLayerPlanByJobId(jobId: string): LayerPlanRecord | undefined { return this.exports.getLayerPlanByJobId(jobId); }
+  public updateLayerPlan(id: string, patch: Parameters<ExportRepository["updateLayerPlan"]>[1]): LayerPlanRecord | undefined { return this.exports.updateLayerPlan(id, patch); }
+  public createLayerExport(input: Parameters<ExportRepository["createLayerExport"]>[0]): LayerExportRecord { return this.exports.createLayerExport(input); }
+  public getLayerExport(id: string): LayerExportRecord | undefined { return this.exports.getLayerExport(id); }
+  public getLayerExportByJobId(jobId: string): LayerExportRecord | undefined { return this.exports.getLayerExportByJobId(jobId); }
+  public getLayerExportByOutput(outputId: string): LayerExportRecord | undefined { return this.exports.getLayerExportByOutput(outputId); }
+  public listLayerExportsByOutput(outputId: string): LayerExportRecord[] { return this.exports.listLayerExportsByOutput(outputId); }
+  public updateLayerExport(id: string, patch: Parameters<ExportRepository["updateLayerExport"]>[1]): LayerExportRecord | undefined { return this.exports.updateLayerExport(id, patch); }
 }
-function decodeLibraryCursor(cursor: string | null): { createdAt: string; id: string } | null {
-  if (!cursor) return null;
-  const decoded = Buffer.from(cursor, "base64url").toString("utf8");
-  const separator = decoded.indexOf("\u0000");
-  if (separator < 0) return null;
-  return { createdAt: decoded.slice(0, separator), id: decoded.slice(separator + 1) };
-}
-function mapStoryboard(row: Row): StoryboardRecord { return { projectId: String(row.project_id), version: Number(row.version), status: row.status as StoryboardRecord["status"], campaignStyleLock: String(row.campaign_style_lock), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapStoryboardItem(row: Row): StoryboardItemRecord {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    storyboardVersion: Number(row.storyboard_version),
-    assetType: String(row.asset_type),
-    displayName: String(row.display_name ?? row.asset_type),
-    shotRole: row.shot_role ? (String(row.shot_role) as StoryboardShotRole) : null,
-    templateVariant: row.template_variant ? String(row.template_variant) : null,
-    candidateCount: Number(row.candidate_count ?? 1),
-    imageProviderId: row.image_provider_id ? String(row.image_provider_id) : null,
-    imageModelId: row.image_model_id ? String(row.image_model_id) : null,
-    imageResolution: row.image_resolution as ImageResolution,
-    imageAspectRatio: row.image_aspect_ratio as ImageAspectRatio,
-    referencedAssets: parse(row.referenced_assets_json ?? "[]"),
-    mode: row.mode as StoryboardMode,
-    status: row.status as StoryboardItemRecord["status"],
-    promptInstruction: String(row.prompt_instruction),
-    compiledPrompt: row.compiled_prompt ? String(row.compiled_prompt) : null,
-    factClaims: parse(row.fact_claims_json),
-    riskFlags: parse(row.risk_flags_json),
-    sortOrder: Number(row.sort_order),
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at)
-  };
-}
-function mapJob(row: Row): JobRecord { return { id: String(row.id), projectId: row.project_id == null ? null : String(row.project_id), storyboardItemId: row.storyboard_item_id ? String(row.storyboard_item_id) : null, type: row.type as JobType, status: row.status as JobStatus, progress: Number(row.progress), retryable: Boolean(row.retryable), input: parse(row.input_json), requestFingerprint: row.request_fingerprint ? String(row.request_fingerprint) : null, providerId: row.provider_id ? String(row.provider_id) : null, modelId: row.model_id ? String(row.model_id) : null, estimatedCost: row.estimated_cost_json ? parse(row.estimated_cost_json) : null, actualCost: row.actual_cost_json ? parse(row.actual_cost_json) : null, cancelRequested: Boolean(row.cancel_requested), providerTaskId: row.provider_task_id ? String(row.provider_task_id) : null, error: row.error_json ? parse(row.error_json) : null, progressDetail: row.progress_detail_json ? parse(row.progress_detail_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapCopywritingResult(row: Row): CopywritingResultRecord { return { jobId: String(row.job_id), projectId: String(row.project_id), target: row.target as CopywritingTarget, content: String(row.content), createdAt: String(row.created_at) }; }
-function mapPattern(row: Row): PatternRecord { return { id: String(row.id), name: String(row.name), sourceType: row.source_type as PatternSource, sourceJobId: row.source_job_id == null ? null : String(row.source_job_id), sourceAssetHash: row.source_asset_hash == null ? null : String(row.source_asset_hash), parentPatternId: row.parent_pattern_id == null ? null : String(row.parent_pattern_id), storagePath: row.storage_path == null ? null : String(row.storage_path), fileHash: row.file_hash == null ? null : String(row.file_hash), width: row.width == null ? null : Number(row.width), height: row.height == null ? null : Number(row.height), tags: parse(row.tags_json ?? "[]"), tileable: (row.tileable_status ?? "NONE") as TileableStatus, tileableScore: row.tileable_score == null ? null : Number(row.tileable_score), tileableCheckedWith: row.tileable_checked_with == null ? null : String(row.tileable_checked_with), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapPrintPack(row: Row): PrintPackRecord { return { id: String(row.id), patternId: String(row.pattern_id), jobId: String(row.job_id), specId: String(row.spec_id), specVersion: String(row.spec_version), status: row.status as PrintPackRecord["status"], files: row.files_json ? parse(row.files_json) : null, manifest: row.manifest_json ? parse(row.manifest_json) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapPatternListingResult(row: Row): PatternListingResultRecord { return { jobId: String(row.job_id), patternId: String(row.pattern_id), platform: String(row.platform) as ListingPlatform, copy: parse(row.content_json) as ListingCopy, createdAt: String(row.created_at) }; }
-function mapPatternPipeline(row: Row): PatternPipelineRecord {
-  const hints = row.listing_hints_json ? parse(row.listing_hints_json) as { sellingPoints?: string | null; bannedWords?: string | null } : {};
-  return {
-    id: String(row.id),
-    patternId: row.pattern_id == null ? null : String(row.pattern_id),
-    specId: String(row.spec_id),
-    specVersion: String(row.spec_version),
-    layout: row.layout as PodPrintLayout,
-    repeatLayout: row.repeat_layout as PodRepeatLayout,
-    listingPlatform: row.listing_platform as ListingPlatform,
-    listingProviderId: String(row.listing_provider_id),
-    listingModelId: String(row.listing_model_id),
-    listingHints: { sellingPoints: hints.sellingPoints ?? null, bannedWords: hints.bannedWords ?? null },
-    status: row.status as PatternPipelineStatus,
-    blockReason: row.block_reason == null ? null : String(row.block_reason) as PatternPipelineBlockReason,
-    requestFingerprint: row.request_fingerprint == null ? null : String(row.request_fingerprint),
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at),
-  };
-}
-function mapPatternPipelineStep(row: Row): PatternPipelineStepRecord {
-  return {
-    id: String(row.id),
-    pipelineId: String(row.pipeline_id),
-    step: String(row.step) as PatternPipelineStepName,
-    position: Number(row.position),
-    status: String(row.status) as PatternPipelineStepStatus,
-    jobId: row.job_id == null ? null : String(row.job_id),
-    detail: row.detail_json ? parse(row.detail_json) : null,
-    error: row.error_json ? parse(row.error_json) : null,
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at),
-  };
-}
-function mapWebResearchAudit(row: Row): WebResearchAuditRecord { return { jobId: String(row.job_id), availability: row.availability as WebResearchAvailability, invocationCount: Number(row.invocation_count), successfulAttemptCount: Number(row.successful_attempt_count), failedAttemptCount: Number(row.failed_attempt_count), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapWebResearchAttempt(row: Row): WebResearchAttemptRecord { return { id: String(row.id), jobId: String(row.job_id), query: String(row.query), sourceId: String(row.source_id), sourceName: String(row.source_name), sourceKind: String(row.source_kind), status: row.status as WebResearchAttemptStatus, resultCount: Number(row.result_count), errorMessage: row.error_message ? String(row.error_message) : null, createdAt: String(row.created_at) }; }
-function mapOutput(row: Row): OutputRecord {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    storyboardItemId: String(row.storyboard_item_id),
-    jobId: String(row.job_id),
-    candidateIndex: Number(row.candidate_index ?? 1),
-    generationBatchId: row.generation_batch_id ? String(row.generation_batch_id) : null,
-    generationSnapshot: row.generation_snapshot_json ? parse(row.generation_snapshot_json) : null,
-    storagePath: String(row.storage_path),
-    hash: String(row.hash),
-    width: row.width === null || row.width === undefined ? null : Number(row.width),
-    height: row.height === null || row.height === undefined ? null : Number(row.height),
-    generationKey: row.generation_key ? String(row.generation_key) : null,
-    parentOutputId: row.parent_output_id ? String(row.parent_output_id) : null,
-    rootOutputId: row.root_output_id ? String(row.root_output_id) : null,
-    editSessionId: row.edit_session_id ? String(row.edit_session_id) : null,
-    editTurnId: row.edit_turn_id ? String(row.edit_turn_id) : null,
-    createdAt: String(row.created_at)
-  };
-}
-function mapPlanningConfigSnapshot(row: Row): PlanningConfigSnapshotRecord {
-  return { id: String(row.id), projectId: String(row.project_id), sourceJobId: String(row.source_job_id), payload: parse(row.payload_json), createdAt: String(row.created_at) };
-}
-function mapEditSession(row: Row): EditSessionRecord { return { id: String(row.id), projectId: String(row.project_id), currentOutputId: String(row.current_output_id), status: row.status as EditSessionStatus, memorySummary: parse(row.memory_summary_json ?? "{}"), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapEditTurn(row: Row): EditTurnRecord { const ids = parse(row.reference_asset_ids_json ?? "[]") as string[]; const selections = parse(row.reference_selections_json ?? "[]") as ReferenceSelection[]; return { id: String(row.id), sessionId: String(row.session_id), projectId: String(row.project_id), baseOutputId: String(row.base_output_id), status: row.status as EditTurnStatus, message: String(row.message), annotations: parse(row.annotations_json ?? "{}"), editMaskPath: row.edit_mask_path ? String(row.edit_mask_path) : null, editMaskHash: row.edit_mask_hash ? String(row.edit_mask_hash) : null, protectMaskPath: row.protect_mask_path ? String(row.protect_mask_path) : null, protectMaskHash: row.protect_mask_hash ? String(row.protect_mask_hash) : null, referenceAssetIds: ids, referenceSelections: selections.length ? selections : ids.map((id, order) => ({ id, source: "PROJECT", purpose: "PRODUCT_APPEARANCE", order })), plan: row.plan_json ? parse(row.plan_json) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapEditReferenceAsset(row: Row): EditReferenceAssetRecord { return { id: String(row.id), projectId: String(row.project_id), sessionId: String(row.session_id), turnId: row.turn_id ? String(row.turn_id) : null, storagePath: String(row.storage_path), hash: String(row.hash), originalName: String(row.original_name), mimeType: String(row.mime_type), purpose: row.purpose as ReferencePurpose, createdAt: String(row.created_at), expiresAt: String(row.expires_at) }; }
-function mapExport(row: Row): ExportRecord { return { id: String(row.id), projectId: String(row.project_id), jobId: String(row.job_id), status: String(row.status), storagePath: row.storage_path ? String(row.storage_path) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapLayerPlan(row: Row): LayerPlanRecord { return { id: String(row.id), projectId: String(row.project_id), outputId: String(row.output_id), jobId: String(row.job_id), outputHash: String(row.output_hash), status: row.status as LayerPlanRecord["status"], elements: parse(row.elements_json ?? "[]"), error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
-function mapLayerExport(row: Row): LayerExportRecord { return { id: String(row.id), projectId: String(row.project_id), outputId: String(row.output_id), jobId: String(row.job_id), planId: row.plan_id == null ? null : String(row.plan_id), status: row.status as LayerExportRecord["status"], includeBackground: Boolean(row.include_background), psdStoragePath: row.psd_storage_path ? String(row.psd_storage_path) : null, layerFiles: row.layer_files_json ? parse(row.layer_files_json) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }

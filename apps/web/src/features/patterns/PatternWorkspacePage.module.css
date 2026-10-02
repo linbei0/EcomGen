@@ -254,6 +254,27 @@
   white-space: nowrap;
 }
 
+/* ⓘ 说明入口：与套图工坊 blockInfo 同款交互（悬停展开长说明，不常驻占位）。 */
+.tileInfo {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  cursor: help;
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+
+.tileInfo:hover,
+.tileInfo:focus-visible {
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
 .packStage {
   align-self: stretch;
   flex: 1;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertProjectAssetCapacity, assertProjectAssetHashUnique } from "./app.js";
+import { assertProjectAssetCapacity, assertProjectAssetHashUnique } from "./helpers.js";
 
 function repository(roles: string[], hashes: string[] = []) {
   return {

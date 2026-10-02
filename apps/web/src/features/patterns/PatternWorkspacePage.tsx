@@ -1,8 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { App, Button, Image, Input, Popconfirm, Popover, Progress, Select, Skeleton, Slider } from "antd";
-import { ArrowLeft, ChevronRight, Download, Package, Pencil, Trash2 } from "lucide-react";
+import { App, Button, Image, Input, Popconfirm, Popover, Progress, Select, Skeleton, Slider, Tooltip } from "antd";
+import { ArrowLeft, ChevronRight, Download, Info, Package, Pencil, Trash2 } from "lucide-react";
 import { REPEAT_UNIT_PLACEMENTS, TILEABILITY_ALGORITHM_VERSION, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESETS } from "@ecomgen/contracts";
 import { PATTERN_VARIANT_AXIS_LABELS, PATTERN_VARIANT_PRESET_LABELS } from "@ecomgen/ecom-skill";
 
@@ -60,6 +60,24 @@ const TILE_LAYOUT_HINTS: Record<Pattern["tileable"], string> = {
 
 /** 镜像排列的代价提示：它是验缝失败花型的诚实出路（构造性无缝），但翻转对称是真实的视觉代价。 */
 const MIRROR_REPEAT_HINT = "镜像排列按构造无缝（无需验缝通过），但图案会上下左右翻转对称：含文字、人物侧脸或明显朝向的花型慎用。错位排列（半落/三落/错砖）的接缝风险与直排相同。";
+
+/**
+ * 平铺舞台的 ⓘ 说明：解释性长文收进悬停层按需展开（对齐套图工坊 BlockHead 的做法），
+ * 排列与验缝各说各的，不再合成一段挤在舞台底部常驻占位。
+ */
+const REPEAT_INFO = "排列决定花型的重复摆放方式，不改动图稿本身。半落、三落、错砖以错位打散重复感，接缝风险与直排相同；镜像上下左右翻转图案、按构造无缝，验缝未通过也能满印。";
+const TILE_CHECK_INFO = "验缝只判定、不改动图稿：比对左右边缘列与上下边缘行的差异，给出「可平铺 / 接缝明显」。满印品类需要可平铺花型，单区域印花（如 T 恤前片）不需要。";
+
+/** ⓘ 说明入口：与 blockInfo 同款交互——悬停展开、cursor: help、焦点可见。 */
+function TileInfo({ label, hint }: { label: string; hint: string }) {
+  return (
+    <Tooltip title={hint}>
+      <button type="button" className={styles.tileInfo} aria-label={`${label}说明`}>
+        <Info size={13} strokeWidth={1.75} aria-hidden />
+      </button>
+    </Tooltip>
+  );
+}
 
 /**
  * 花型工作区：/patterns/:patternId 全屏详情视图，取代旧的 420px 详情抽屉。
@@ -396,6 +414,7 @@ function TileStage({ pattern }: { pattern: Pattern }) {
       <div className={styles.tileControls}>
         <span className={styles.tileControlsLabel}>排列</span>
         <RepeatLayoutChipRow value={repeatLayout} onChange={setRepeatLayout} variant="rail" ariaLabel="平铺排列" />
+        <TileInfo label="排列" hint={REPEAT_INFO} />
       </div>
       <div className={styles.tileControls}>
         <span className={styles.tileControlsLabel}>平铺尺寸</span>
@@ -431,10 +450,8 @@ function TileStage({ pattern }: { pattern: Pattern }) {
             {stale ? "按当前算法重算" : "验缝"}
           </Button>
         ) : null}
+        <TileInfo label="验缝" hint={TILE_CHECK_INFO} />
       </div>
-      <p className={styles.wsHint}>
-        排列只改摆放与翻转、不改图稿：错位类的接缝风险与直排相同，镜像按构造无缝。验缝只判定、不改动图稿：比对左右边缘列与上下边缘行的差异，据此给出「可平铺 / 接缝明显」。满印品类需要可平铺花型，单区域印花（如 T 恤前片）不需要。
-      </p>
     </div>
   );
 }
