@@ -28,6 +28,10 @@ export function registerJobRoutes(app: FastifyInstance, ctx: ApiContext): void {
     if (job.status !== "FAILED" || !job.retryable) {
       throw new ApiError(409, "CONFLICT", `只有失败的任务可以重试，当前状态：${job.status}`);
     }
+    // 起稿类任务必须走槽位级失败补偿：通用重试会换新任务并重跑全输入，等于重复生成已成功候选。
+    if (job.type === "PATTERN_DRAFT_GENERATE" || job.type === "PATTERN_DRAFT_EDIT" || job.type === "PATTERN_DRAFT_CUTOUT" || job.type === "PATTERN_DRAFT_PROCESS") {
+      throw new ApiError(409, "CONFLICT", "起稿任务请使用 /pattern-drafts/{draftId}/batches/{batchId}/retry-failed 只补偿失败槽位");
+    }
     const input = job.type === "GENERATE" ? { ...job.input, revision: "retry" } : job.input;
     // 分层任务重试必须同时重建分层记录，否则 Worker 按新 jobId 找不到对应记录会立即失败。
     let createLayerRecord: ((retryJobId: string) => void) | undefined;

@@ -1,9 +1,9 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { App, Button, Image, Input, Popconfirm, Popover, Progress, Select, Skeleton, Slider, Tooltip } from "antd";
 import { ArrowLeft, ChevronRight, Download, Info, Package, Pencil, Trash2 } from "lucide-react";
-import { REPEAT_UNIT_PLACEMENTS, TILEABILITY_ALGORITHM_VERSION, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESETS } from "@ecomgen/contracts";
+import { TILEABILITY_ALGORITHM_VERSION, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESETS } from "@ecomgen/contracts";
 import { PATTERN_VARIANT_AXIS_LABELS, PATTERN_VARIANT_PRESET_LABELS } from "@ecomgen/ecom-skill";
 
 import {
@@ -37,7 +37,7 @@ import { jobErrorText } from "../../lib/jobError";
 import { modelOptions, parseModelKey } from "../../lib/modelOptions";
 import { panelBackdrop } from "./heroPatterns";
 import { PatternPipelineSection } from "./PatternPipelineSection";
-import { BackgroundModeSelect, CopyRow, ImageModelSelect, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, podSpecOptionLabel, RepeatLayoutChipRow, SOURCE_LABELS, SectionHead, StatusPill, stageText, statusLabel, statusTone, tileableBadge } from "./shared";
+import { BackgroundModeSelect, CopyRow, ImageModelSelect, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, podSpecOptionLabel, RepeatLayoutChipRow, SOURCE_LABELS, SectionHead, StatusPill, TiledPatternStage, stageText, statusLabel, statusTone, tileableBadge } from "./shared";
 import styles from "./PatternWorkspacePage.module.css";
 
 /** 衍生可选底版：源图在，所以"跟随源图"也在；顺序即默认优先顺序。 */
@@ -329,9 +329,9 @@ function ArtworkStage({ pattern }: { pattern: Pattern }) {
 /**
  * 平铺舞台：按平铺排列满铺预览 + 排列切换 + 平铺尺寸滑杆，观察拼接是否连贯。
  *
- * 预览用内联 SVG pattern 复刻成包时的单元几何（REPEAT_UNIT_PLACEMENTS 是与 worker 共用的
- * 唯一真相源）：越界摆放位额外画 -1 单元偏移的副本，让裁掉的部分从对侧补回——这正是
- * "单元无缝"的构造方式，预览与成包产物因此所见即所得。纯矢量无 canvas 库，切换零请求零费用。
+ * 预览复用 `TiledPatternStage`（与起稿工作台、成包几何共用 REPEAT_UNIT_PLACEMENTS 唯一真相源），
+ * 越界摆放位额外画 -1 单元偏移的副本，让裁掉的部分从对侧补回——这正是"单元无缝"的构造方式，
+ * 预览与成包产物因此所见即所得。纯矢量无 canvas 库，切换零请求零费用。
  *
  * 验缝入口在这里而不是动作栏：判定只在"整块连续印花"的语境下才有意义，而这个舞台就是那个语境。
  * 判定是花型内容的确定性函数，所以当判定已按当前算法版本算出时不再提供按钮——重跑只会得到同一
@@ -347,8 +347,6 @@ function TileStage({ pattern }: { pattern: Pattern }) {
   const checkJob = useJobStatus(checkJobId ?? undefined);
   const badge = tileableBadge(pattern.tileable);
   const stale = pattern.tileable !== "NONE" && pattern.tileableCheckedWith !== TILEABILITY_ALGORITHM_VERSION;
-  // useId 带冒号不能直接进 url(#…) 片段引用，剥掉非安全字符；剩余部分仍保证唯一。
-  const fillId = `tile-pattern-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   // 验缝终态结算：失败如实报错撤卡；成功失效花型列表让徽标与分数刷新。
   useEffect(() => {
@@ -373,43 +371,10 @@ function TileStage({ pattern }: { pattern: Pattern }) {
     );
   }
   const running = createCheck.isPending || (checkJob.data ? checkJob.data.status === "QUEUED" || checkJob.data.status === "RUNNING" : false);
-  const unit = REPEAT_UNIT_PLACEMENTS[repeatLayout];
-  const unitWidth = tileSize * unit.columns;
-  const unitHeight = tileSize * unit.rows;
   return (
     <div className={styles.tileStageWrap}>
       <div className={styles.tileStage}>
-        <svg className={styles.tileStageSvg} role="img" aria-label="平铺预览">
-          <defs>
-            <pattern id={fillId} patternUnits="userSpaceOnUse" width={unitWidth} height={unitHeight}>
-              {/*
-                每个摆放位画四份（本位与 -1 单元的横/竖/对角副本）：pattern 会裁掉出界内容，
-                偏移副本恰好把裁掉的部分从对侧补回，形成无缝环绕。
-              */}
-              {unit.placements.flatMap((placement, index) =>
-                [0, -1].flatMap((shiftX) =>
-                  [0, -1].map((shiftY) => {
-                    const x = placement.dx * tileSize + shiftX * unitWidth;
-                    const y = placement.dy * tileSize + shiftY * unitHeight;
-                    return (
-                      <image
-                        key={`${index}:${shiftX}:${shiftY}`}
-                        href={pattern.imageUrl}
-                        x={0}
-                        y={0}
-                        width={tileSize}
-                        height={tileSize}
-                        preserveAspectRatio="none"
-                        transform={`translate(${x + (placement.flipX ? tileSize : 0)} ${y + (placement.flipY ? tileSize : 0)}) scale(${placement.flipX ? -1 : 1} ${placement.flipY ? -1 : 1})`}
-                      />
-                    );
-                  }),
-                ),
-              )}
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill={`url(#${fillId})`} />
-        </svg>
+        <TiledPatternStage imageUrl={pattern.imageUrl} layout={repeatLayout} tileSize={tileSize} className={styles.tileStageSvg} />
       </div>
       <div className={styles.tileControls}>
         <span className={styles.tileControlsLabel}>排列</span>

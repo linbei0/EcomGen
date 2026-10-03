@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import sharp from "sharp";
-import type { PatternRecord, PrintPackRecord, ProviderRecord } from "@ecomgen/core";
+import type { PatternRecord, PrintPackRecord } from "@ecomgen/core";
 import type { EcomRepository } from "@ecomgen/core";
 import { requestFingerprint, settlePipelineStep } from "@ecomgen/core";
 import { defaultPatternName, PATTERN_FORGE_PROMPT_VERSION, PATTERN_VARIANT_PROMPT_VERSION, presetBelongsToAxis } from "@ecomgen/ecom-skill";
@@ -19,29 +19,30 @@ import {
   POD_MOCKUP_SCENE_VERSION,
   POD_PRINT_SPECS,
   POD_PRINT_SPEC_VERSION,
-  SEGMENTATION_PROTOCOLS,
   TILEABILITY_ALGORITHM_VERSION,
   getPodPrintSpec,
-  supportsTransparentBackground,
 } from "@ecomgen/contracts";
-import type { PatternBackgroundMode, SegmentationProtocol } from "@ecomgen/contracts";
+import type { PatternBackgroundMode } from "@ecomgen/contracts";
 import type { ApiContext } from "../context.js";
 import { ApiError } from "../errors.js";
 import {
+  assertTransparentBackground,
   contentHash,
   ensurePattern,
   imageDimensions,
   markDomainRecordFailed,
   missing,
+  readImageMultipart,
+  resolveSegmentationModel,
   reusableFingerprintedJob,
   verifyCopywritingModel,
   verifyModel,
 } from "../helpers.js";
 import { parseBody } from "../http-input.js";
-import { enumValue, parameter, readOptionalText, readText } from "../input-normalizers.js";
+import { parameter, readOptionalText, readText } from "../input-normalizers.js";
 import { readPatternPipelineAnswers, startPatternPipeline, validatePatternPipelineAnswers } from "./patternPipelines.js";
 
-function publicPattern(record: PatternRecord) {
+export function publicPattern(record: PatternRecord) {
   return {
     id: record.id,
     name: record.name,
@@ -76,48 +77,12 @@ function publicPrintPack(record: PrintPackRecord) {
   };
 }
 
-/** 花型提取的分割模型解析：与项目分层同语义——协议从模型声明派生，请求显式协议仅做一致性校验。 */
-function resolvePatternSegmentationModel(repository: EcomRepository, providerId: string, modelId: string, requestedProtocol: string | null | undefined): { provider: ProviderRecord; model: { id: string }; protocol: SegmentationProtocol } {
-  const provider = repository.getProvider(providerId);
-  if (!provider) missing("provider", providerId);
-  const model = provider.models.find((candidate) => candidate.id === modelId);
-  if (!model) throw new ApiError(400, "VALIDATION_ERROR", "segmentation model is not declared by the selected provider");
-  if (!model.segmentationProtocol) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected segmentation model has no segmentation API configured");
-  const requested = requestedProtocol ? enumValue(requestedProtocol, [...SEGMENTATION_PROTOCOLS], "protocol") : undefined;
-  if (requested && requested !== model.segmentationProtocol) throw new ApiError(400, "VALIDATION_ERROR", `protocol must match the model's declared protocol (${model.segmentationProtocol})`);
-  if (model.segmentationProtocol === "seedream_layerize") throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "花型提取不支持 Seedream 图层拆分协议，请选择 SAM 类分割模型");
-  return { provider, model, protocol: model.segmentationProtocol };
-}
-
 /**
- * 透明底是参数级能力，不是提示词风格：模型给不了就在入队前拒绝，而不是让用户为一次注定画成棋盘格的调用付费。
- * 只有显式选 TRANSPARENT 才校验——SOURCE 的语义是"跟随源图"，源图是否透明由 worker 解码判定，
- * 那时源图案已经在库里，报错信息也能说清是"源的透明底保不住"。
- */
-function assertTransparentBackgroundAvailable(repository: EcomRepository, providerId: string, modelId: string, mode: PatternBackgroundMode | undefined): void {
-  if (mode !== "TRANSPARENT") return;
-  const declared = repository.getProvider(providerId)?.models.find((candidate) => candidate.id === modelId);
-  if (declared && supportsTransparentBackground(declared.id)) return;
-  throw new ApiError(422, "CAPABILITY_UNSUPPORTED", `模型 ${modelId} 不支持透明底，请改用 gpt-image-1 / 1.5 / 2 系列，或把底版改成白底`);
-}
-
-/**
- * 源入口（提取 / 上传）共用的 multipart 收集：一个 image/* 文件 + 一组文本字段。
- * 收集规则只写这一份——两个路由各抄一遍的话，将来加同一条字段约束必然漏一处。
- * fileLabel 同时拼进三条错误信息与缺省文件名（如 "source image" / "pattern image"）。
+ * 源入口（提取 / 上传）共用的取件：收集规则在 helpers.readImageMultipart，这里只负责本入口要求的
+ * 「必须有文件」判定，并把缺失文件名拼进错误信息（如 "source image" / "pattern image"）。
  */
 async function readSingleImageMultipart(request: FastifyRequest, fileLabel: string): Promise<{ upload: { filename: string; buffer: Buffer }; fields: Record<string, string> }> {
-  let upload: { filename: string; buffer: Buffer } | null = null;
-  const fields: Record<string, string> = {};
-  for await (const part of request.parts()) {
-    if (part.type === "file") {
-      if (!part.mimetype.startsWith("image/")) throw new ApiError(400, "VALIDATION_ERROR", "Only image files are supported");
-      if (upload) throw new ApiError(400, "VALIDATION_ERROR", `A single ${fileLabel} is required`);
-      upload = { filename: part.filename || fileLabel, buffer: await part.toBuffer() };
-      continue;
-    }
-    fields[part.fieldname] = typeof part.value === "string" ? part.value : String(part.value ?? "");
-  }
+  const { upload, fields } = await readImageMultipart(request);
   if (!upload) throw new ApiError(400, "VALIDATION_ERROR", `A ${fileLabel} is required`);
   return { upload, fields };
 }
@@ -172,7 +137,7 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     const { upload, fields } = await readSingleImageMultipart(request, "source image");
     const providerId = readText(fields.providerId, "providerId");
     const modelId = readText(fields.modelId, "modelId");
-    const { protocol } = resolvePatternSegmentationModel(repository, providerId, modelId, readOptionalText(fields.protocol));
+    const { protocol } = resolveSegmentationModel(repository, providerId, modelId, "花型提取", readOptionalText(fields.protocol));
     const brief = optionalBoundedText(readOptionalText(fields.brief), MAX_PATTERN_BRIEF_LENGTH, "brief");
     const name = optionalBoundedText(readOptionalText(fields.name), MAX_PATTERN_NAME_LENGTH, "name");
     const tags = parsePatternTags(readOptionalText(fields.tags));
@@ -225,7 +190,7 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     const body = parseBody(CreatePatternForgeJobInput, request.body);
     verifyModel(repository, body.providerId, body.imageModelId, "image");
     const background = body.background ?? "WHITE";
-    assertTransparentBackgroundAvailable(repository, body.providerId, body.imageModelId, background);
+    assertTransparentBackground(repository, body.providerId, body.imageModelId, background);
     const candidateCount = body.candidateCount ?? 1;
     const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
     // background 进指纹：它改的是编译后的提示词，不进指纹就会让"同主题不同底版"的两个请求互相复用。
@@ -293,7 +258,7 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     // 契约把 preset 限死为枚举，轴向归属在编译层单点判定，避免两处各写一份预设清单。
     if (!presetBelongsToAxis(body.axis, body.preset)) throw new ApiError(400, "VALIDATION_ERROR", `预设 ${body.preset} 不属于轴向 ${body.axis}`);
     const background = body.background ?? "SOURCE";
-    assertTransparentBackgroundAvailable(repository, body.providerId, body.imageModelId, background);
+    assertTransparentBackground(repository, body.providerId, body.imageModelId, background);
     const candidateCount = body.candidateCount ?? 1;
     const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
     const fingerprint = requestFingerprint({ type: "PATTERN_VARIANT", patternId: pattern.id, patternHash: pattern.fileHash, axis: body.axis, preset: body.preset, extra: body.extra ?? null, background, providerId: body.providerId, imageModelId: body.imageModelId, candidateCount, name: body.name ?? null, promptVersion: PATTERN_VARIANT_PROMPT_VERSION, idempotencyKey });

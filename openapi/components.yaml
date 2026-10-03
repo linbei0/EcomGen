@@ -111,6 +111,34 @@ components:
       schema:
         type: string
         pattern: "^[a-z0-9][a-z0-9._-]{0,127}$"
+    DraftId:
+      name: draftId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DraftBatchId:
+      name: batchId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DraftMediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DraftCandidateId:
+      name: candidateId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     Cursor:
       name: cursor
       in: query

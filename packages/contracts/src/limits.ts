@@ -65,6 +65,26 @@ export const MAX_PATTERN_STYLE_LENGTH = 60;
  */
 export const PATTERN_VARIANT_CANDIDATES_MAX = 4;
 
+// ---- AI 起稿工作台（创作草稿）----
+
+/** 创作草稿名称长度上限；未命名时由服务端生成默认名。 */
+export const MAX_PATTERN_DRAFT_NAME_LENGTH = 60;
+
+/** 单批创作的候选张数上限（生成与改稿共用）。 */
+export const PATTERN_DRAFT_CANDIDATES_MAX = 4;
+
+/** 一个草稿可挂载的参考/蒙版媒体数量上限；参考越多越需显式用途，避免无界堆图。 */
+export const PATTERN_DRAFT_MEDIA_MAX = 12;
+
+/** 单次提交实际下发的参考图数量上限。 */
+export const PATTERN_DRAFT_REFERENCES_MAX = 6;
+
+/** 改稿指令（整图/局部/接缝）长度上限。 */
+export const MAX_DRAFT_INSTRUCTION_LENGTH = 2000;
+
+/** 接缝改稿的跨边带宽（像素）上限；超宽会把整图变成重绘，失去定向修缝语义。 */
+export const DRAFT_SEAM_BAND_MAX = 256;
+
 // ---- Listing 文案平台硬约束（首版跨境三平台）----
 // 数值来自平台官方规范（见 docs/reference/pod-domain-research.md 第 3 节），
 // 生成与校验共用同一份数值，改平台规则时只动这里。

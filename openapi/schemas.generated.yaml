@@ -119,6 +119,10 @@ components:
         - PATTERN_VARIANT
         - PATTERN_TILE_CHECK
         - PRINT_PACK
+        - PATTERN_DRAFT_GENERATE
+        - PATTERN_DRAFT_EDIT
+        - PATTERN_DRAFT_CUTOUT
+        - PATTERN_DRAFT_PROCESS
     JobStatus:
       type: string
       enum:
@@ -4392,3 +4396,613 @@ components:
       properties:
         resolution:
           $ref: "#/components/schemas/PatternPipelineResolution"
+    DraftComposeType:
+      type: string
+      enum:
+        - PLACEMENT
+        - REPEAT
+    DraftMediaRole:
+      type: string
+      enum:
+        - REFERENCE
+        - MASK
+    DraftMediaSource:
+      type: string
+      enum:
+        - UPLOAD
+        - PATTERN
+    DraftBackground:
+      type: string
+      enum:
+        - WHITE
+        - TRANSPARENT
+    DraftBatchOperation:
+      type: string
+      enum:
+        - GENERATE
+        - EDIT_WHOLE
+        - EDIT_LOCAL
+        - RECOLOR
+        - PALETTE_VARIANT
+        - CUTOUT
+        - SEAM_EDIT
+    DraftSlotStatus:
+      type: string
+      enum:
+        - QUEUED
+        - RUNNING
+        - SUCCEEDED
+        - FAILED
+        - CANCELLED
+    DraftSeamEdge:
+      type: string
+      enum:
+        - LEFT_RIGHT
+        - TOP_BOTTOM
+    DraftRecolorParams:
+      type: object
+      required:
+        - hueShift
+        - saturationPct
+        - brightnessPct
+      properties:
+        hueShift:
+          minimum: -180
+          maximum: 180
+          default: 0
+          type: number
+        saturationPct:
+          minimum: 0
+          maximum: 300
+          default: 100
+          type: number
+        brightnessPct:
+          minimum: 10
+          maximum: 400
+          default: 100
+          type: number
+    DraftSeamEdit:
+      type: object
+      required:
+        - edge
+        - band
+      properties:
+        edge:
+          $ref: "#/components/schemas/DraftSeamEdge"
+        band:
+          minimum: 4
+          maximum: 256
+          default: 48
+          type: integer
+    DraftConditions:
+      type: object
+      required:
+        - theme
+        - aspectRatio
+        - background
+        - candidateCount
+      properties:
+        theme:
+          maxLength: 2000
+          default: ""
+          type: string
+        aspectRatio:
+          $ref: "#/components/schemas/ImageAspectRatio"
+        background:
+          $ref: "#/components/schemas/DraftBackground"
+        candidateCount:
+          minimum: 1
+          maximum: 4
+          default: 1
+          type: integer
+        providerId:
+          format: uuid
+          type: string
+        imageModelId:
+          minLength: 1
+          type: string
+        repeatLayout:
+          $ref: "#/components/schemas/PodRepeatLayout"
+    PatternDraft:
+      type: object
+      required:
+        - id
+        - name
+        - composeType
+        - conditions
+        - revision
+        - selectedCandidateId
+        - compareCandidateId
+        - archivedAt
+        - candidateCount
+        - previewUrl
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        name:
+          type: string
+        composeType:
+          $ref: "#/components/schemas/DraftComposeType"
+        conditions:
+          $ref: "#/components/schemas/DraftConditions"
+        revision:
+          type: integer
+        selectedCandidateId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        compareCandidateId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        archivedAt:
+          anyOf:
+            - format: date-time
+              type: string
+            - type: "null"
+        candidateCount:
+          default: 0
+          type: integer
+        previewUrl:
+          anyOf:
+            - type: string
+            - type: "null"
+        createdAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+    PatternDraftList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatternDraft"
+    CreatePatternDraftInput:
+      type: object
+      properties:
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        composeType:
+          $ref: "#/components/schemas/DraftComposeType"
+    UpdatePatternDraftInput:
+      type: object
+      required:
+        - expectedRevision
+      properties:
+        expectedRevision:
+          minimum: 1
+          type: integer
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        conditions:
+          $ref: "#/components/schemas/DraftConditions"
+        selectedCandidateId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        compareCandidateId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        archived:
+          type: boolean
+    DraftMedia:
+      type: object
+      required:
+        - id
+        - draftId
+        - role
+        - source
+        - sourcePatternId
+        - ordinal
+        - url
+        - thumbUrl
+        - fileName
+        - mimeType
+        - width
+        - height
+        - notes
+        - createdAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        draftId:
+          format: uuid
+          type: string
+        role:
+          $ref: "#/components/schemas/DraftMediaRole"
+        source:
+          $ref: "#/components/schemas/DraftMediaSource"
+        sourcePatternId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        ordinal:
+          anyOf:
+            - type: integer
+            - type: "null"
+        url:
+          type: string
+        thumbUrl:
+          type: string
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        width:
+          anyOf:
+            - type: integer
+            - type: "null"
+        height:
+          anyOf:
+            - type: integer
+            - type: "null"
+        notes:
+          anyOf:
+            - type: string
+            - type: "null"
+        createdAt:
+          format: date-time
+          type: string
+    DraftMediaList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftMedia"
+    DraftCandidateTileable:
+      type: object
+      required:
+        - status
+        - score
+        - algorithmVersion
+        - horizontal
+        - vertical
+      properties:
+        status:
+          $ref: "#/components/schemas/TileableStatus"
+        score:
+          anyOf:
+            - type: number
+            - type: "null"
+        algorithmVersion:
+          anyOf:
+            - type: string
+            - type: "null"
+        horizontal:
+          anyOf:
+            - type: number
+            - type: "null"
+        vertical:
+          anyOf:
+            - type: number
+            - type: "null"
+    DraftCandidate:
+      type: object
+      required:
+        - id
+        - draftId
+        - batchId
+        - slotIndex
+        - parentCandidateId
+        - url
+        - thumbUrl
+        - width
+        - height
+        - mimeType
+        - transform
+        - hasAlpha
+        - tileable
+        - createdAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        draftId:
+          format: uuid
+          type: string
+        batchId:
+          format: uuid
+          type: string
+        slotIndex:
+          type: integer
+        parentCandidateId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        url:
+          type: string
+        thumbUrl:
+          type: string
+        width:
+          anyOf:
+            - type: integer
+            - type: "null"
+        height:
+          anyOf:
+            - type: integer
+            - type: "null"
+        mimeType:
+          type: string
+        transform:
+          $ref: "#/components/schemas/DraftBatchOperation"
+        hasAlpha:
+          type: boolean
+        tileable:
+          $ref: "#/components/schemas/DraftCandidateTileable"
+        createdAt:
+          format: date-time
+          type: string
+    DraftCandidateList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftCandidate"
+    DraftSlot:
+      type: object
+      required:
+        - index
+        - status
+        - attempt
+        - jobId
+        - candidateId
+        - error
+        - updatedAt
+      properties:
+        index:
+          type: integer
+        status:
+          $ref: "#/components/schemas/DraftSlotStatus"
+        attempt:
+          type: integer
+        jobId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        candidateId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        error:
+          anyOf:
+            - type: object
+              patternProperties:
+                ^(.*)$: {}
+            - type: "null"
+        updatedAt:
+          format: date-time
+          type: string
+    DraftBatch:
+      type: object
+      required:
+        - id
+        - draftId
+        - operation
+        - parentCandidateId
+        - providerId
+        - imageModelId
+        - candidateCount
+        - instruction
+        - estimatedCost
+        - actualCost
+        - snapshot
+        - createdAt
+        - slots
+      properties:
+        id:
+          format: uuid
+          type: string
+        draftId:
+          format: uuid
+          type: string
+        operation:
+          $ref: "#/components/schemas/DraftBatchOperation"
+        parentCandidateId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        providerId:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        imageModelId:
+          anyOf:
+            - type: string
+            - type: "null"
+        candidateCount:
+          type: integer
+        instruction:
+          anyOf:
+            - type: string
+            - type: "null"
+        estimatedCost:
+          anyOf:
+            - type: object
+              patternProperties:
+                ^(.*)$: {}
+            - type: "null"
+        actualCost:
+          anyOf:
+            - type: object
+              patternProperties:
+                ^(.*)$: {}
+            - type: "null"
+        snapshot:
+          type: object
+          patternProperties:
+            ^(.*)$: {}
+        createdAt:
+          format: date-time
+          type: string
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftSlot"
+    DraftBatchList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftBatch"
+    CreateDraftBatchInput:
+      type: object
+      required:
+        - clientKey
+        - operation
+        - candidateCount
+      properties:
+        clientKey:
+          minLength: 1
+          maxLength: 120
+          type: string
+        operation:
+          $ref: "#/components/schemas/DraftBatchOperation"
+        candidateCount:
+          minimum: 1
+          maximum: 4
+          default: 1
+          type: integer
+        providerId:
+          format: uuid
+          type: string
+        imageModelId:
+          minLength: 1
+          type: string
+        theme:
+          maxLength: 2000
+          type: string
+        aspectRatio:
+          $ref: "#/components/schemas/ImageAspectRatio"
+        background:
+          $ref: "#/components/schemas/DraftBackground"
+        repeatLayout:
+          $ref: "#/components/schemas/PodRepeatLayout"
+        references:
+          maxItems: 6
+          type: array
+          items:
+            format: uuid
+            type: string
+        parentCandidateId:
+          format: uuid
+          type: string
+        instruction:
+          maxLength: 2000
+          type: string
+        maskMediaId:
+          format: uuid
+          type: string
+        invertMask:
+          type: boolean
+        recolor:
+          $ref: "#/components/schemas/DraftRecolorParams"
+        palette:
+          maxItems: 8
+          type: array
+          items:
+            minLength: 4
+            maxLength: 9
+            type: string
+        seam:
+          $ref: "#/components/schemas/DraftSeamEdit"
+    DraftJobRef:
+      type: object
+      required:
+        - id
+        - type
+        - status
+        - progress
+      properties:
+        id:
+          format: uuid
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        progress:
+          type: integer
+    CreateDraftBatchResponse:
+      type: object
+      required:
+        - batch
+        - job
+        - reused
+      properties:
+        batch:
+          $ref: "#/components/schemas/DraftBatch"
+        job:
+          anyOf:
+            - $ref: "#/components/schemas/DraftJobRef"
+            - type: "null"
+        reused:
+          type: boolean
+    RetryDraftBatchResponse:
+      type: object
+      required:
+        - batch
+        - job
+        - reused
+      properties:
+        batch:
+          $ref: "#/components/schemas/DraftBatch"
+        job:
+          $ref: "#/components/schemas/DraftJobRef"
+        reused:
+          type: boolean
+    FinalizeDraftCandidateInput:
+      type: object
+      required:
+        - clientKey
+      properties:
+        name:
+          minLength: 1
+          maxLength: 60
+          type: string
+        clientKey:
+          minLength: 1
+          maxLength: 120
+          type: string
+    FinalizeDraftCandidateResponse:
+      type: object
+      required:
+        - pattern
+        - reused
+      properties:
+        pattern:
+          $ref: "#/components/schemas/Pattern"
+        reused:
+          type: boolean

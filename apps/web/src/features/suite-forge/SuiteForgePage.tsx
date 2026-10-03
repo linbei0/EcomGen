@@ -45,6 +45,7 @@ import { useSuiteCategories } from "../../api/hooks/useSuites";
 import { AppTopbar } from "../../components/AppTopbar";
 import { fadeUp, staggerContainer } from "../../design/motion";
 import { errorText } from "../../lib/errorText";
+import { useFileDropTarget } from "../../lib/fileDrop";
 import { formatShortDate } from "../../lib/format";
 import { clearForgeJobId, loadForgeJobId, saveForgeJobId } from "../../lib/forgeJobState";
 import { modelOptions } from "../../lib/modelOptions";
@@ -183,7 +184,6 @@ export function SuiteForgePage() {
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
-  const [dragging, setDragging] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [name, setName] = useState("");
@@ -271,6 +271,7 @@ export function SuiteForgePage() {
     },
     [reportRejected],
   );
+  const { dragging, dropProps } = useFileDropTarget(addFiles);
 
   const moveFile = useCallback((from: number, to: number) => {
     if (from === to) return;
@@ -441,16 +442,7 @@ export function SuiteForgePage() {
                     inputRef.current?.click();
                   }
                 }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setDragging(false);
-                  addFiles(event.dataTransfer.files);
-                }}
+                {...dropProps}
               >
                 <input
                   ref={inputRef}

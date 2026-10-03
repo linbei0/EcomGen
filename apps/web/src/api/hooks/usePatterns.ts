@@ -13,7 +13,6 @@ export type ListingPlatform = components["schemas"]["ListingPlatform"];
 export type PodPrintLayout = components["schemas"]["PodPrintLayout"];
 export type PodRepeatLayout = components["schemas"]["PodRepeatLayout"];
 export type CreatePatternExtractBody = components["schemas"]["CreatePatternExtractJobInput"];
-export type CreatePatternForgeBody = components["schemas"]["CreatePatternForgeJobInput"];
 export type CreatePrintPackBody = components["schemas"]["CreatePrintPackJobInput"];
 export type CreatePatternListingBody = components["schemas"]["CreatePatternListingJobInput"];
 export type CreatePatternDeriveBody = components["schemas"]["CreatePatternDeriveJobInput"];
@@ -75,20 +74,6 @@ export function useCreatePatternExtractJob() {
         body: { ...body, file: undefined as unknown as string },
         bodySerializer: () => form,
       });
-      return { job: await unwrap(result), reused: result.response.status === 200 };
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: qk.patterns });
-    },
-  });
-}
-
-/** 发起 AI 起稿；同主题参数复用既有任务。 */
-export function useCreatePatternForgeJob() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ body }: { body: CreatePatternForgeBody }) => {
-      const result = await api.POST("/patterns/forge-jobs", { body });
       return { job: await unwrap(result), reused: result.response.status === 200 };
     },
     onSuccess: () => {

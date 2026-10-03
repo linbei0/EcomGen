@@ -19,6 +19,7 @@ import {
   MIN_TARGET_IMAGE_COUNT,
   SEGMENTATION_PROTOCOLS,
   roleForUserAssetKind,
+  supportsTransparentBackground,
 } from "@ecomgen/contracts";
 import type { AssetRole, JobType, SegmentationProtocol, UserAssetKind } from "@ecomgen/contracts";
 import { ApiError } from "./errors.js";
@@ -44,6 +45,35 @@ export function verifyCopywritingModel(repository: EcomRepository, providerId: s
   const model = provider.models.find((candidate) => candidate.id === modelId);
   if (!model) throw new ApiError(400, "VALIDATION_ERROR", "Configured reasoning model is not declared by its provider");
   if (!model.supportsVision) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected reasoning model must support Vision for AI copywriting");
+}
+
+/**
+ * 分割模型解析：协议一律从模型声明派生，请求里显式带的协议只做一致性校验。
+ * `purpose`（如"花型提取"/"去底"）进错误信息，让用户知道是哪个入口拒绝的。
+ */
+export function resolveSegmentationModel(repository: EcomRepository, providerId: string | null | undefined, modelId: string | null | undefined, purpose: string, requestedProtocol?: string | null): { providerId: string; modelId: string; protocol: SegmentationProtocol } {
+  if (!providerId || !modelId) throw new ApiError(400, "VALIDATION_ERROR", `${purpose}需要选择分割模型`);
+  const provider = repository.getProvider(providerId);
+  if (!provider) missing("provider", providerId);
+  const model = provider.models.find((candidate) => candidate.id === modelId);
+  if (!model) throw new ApiError(400, "VALIDATION_ERROR", "segmentation model is not declared by the selected provider");
+  if (!model.segmentationProtocol) throw new ApiError(422, "CAPABILITY_UNSUPPORTED", "Selected segmentation model has no segmentation API configured");
+  const requested = requestedProtocol ? enumValue(requestedProtocol, [...SEGMENTATION_PROTOCOLS], "protocol") : undefined;
+  if (requested && requested !== model.segmentationProtocol) throw new ApiError(400, "VALIDATION_ERROR", `protocol must match the model's declared protocol (${model.segmentationProtocol})`);
+  if (model.segmentationProtocol === "seedream_layerize") throw new ApiError(422, "CAPABILITY_UNSUPPORTED", `${purpose}不支持 Seedream 图层拆分协议，请选择 SAM 类分割模型`);
+  return { providerId, modelId, protocol: model.segmentationProtocol };
+}
+
+/**
+ * 透明底是参数级能力，不是提示词风格：模型给不了就在入队前拒绝，而不是让用户为一次注定画成棋盘格的调用付费。
+ * 只有显式选 TRANSPARENT 才校验——SOURCE 的语义是"跟随源图"，源图是否透明由 worker 解码判定，
+ * 那时源图案已经在库里，报错信息也能说清是"源的透明底保不住"。
+ */
+export function assertTransparentBackground(repository: EcomRepository, providerId: string | null | undefined, modelId: string | null | undefined, mode: string | null | undefined): void {
+  if (mode !== "TRANSPARENT") return;
+  const declared = providerId && modelId ? repository.getProvider(providerId)?.models.find((candidate) => candidate.id === modelId) : undefined;
+  if (declared && supportsTransparentBackground(declared.id)) return;
+  throw new ApiError(422, "CAPABILITY_UNSUPPORTED", `模型 ${modelId ?? ""} 不支持透明底，请改用 gpt-image-1 / 1.5 / 2 系列，或把底版改成白底`);
 }
 
 /**
@@ -98,7 +128,8 @@ export async function writeThumbnail(storage: LocalAssetStore, hash: string, con
 }
 
 // requestedId 用于 404 文案带上真实请求标识：sendStored 不知道路由参数名，由各端点自行传入。
-export async function sendStored(request: FastifyRequest, reply: FastifyReply, storage: LocalAssetStore, record: { storagePath: string | null; mimeType?: string; hash?: string } | undefined, name: string, requestedId: string): Promise<unknown> {
+// filename 只在需要给浏览器一个有意义的名字时传（草稿候选/参考件），其余端点按 URL 即可识别。
+export async function sendStored(request: FastifyRequest, reply: FastifyReply, storage: LocalAssetStore, record: { storagePath: string | null; mimeType?: string; hash?: string } | undefined, name: string, requestedId: string, options: { filename?: string } = {}): Promise<unknown> {
   if (!record || !record.storagePath) missing(name, requestedId);
   const etag = record.hash ? `"${record.hash}"` : undefined;
   if (etag && request.headers["if-none-match"] === etag) return reply.code(304).send();
@@ -108,9 +139,34 @@ export async function sendStored(request: FastifyRequest, reply: FastifyReply, s
     .header("cache-control", "public, max-age=31536000, immutable")
     .header("accept-ranges", "bytes")
     .header("content-length", size)
-    .header("etag", etag ?? `W/"${size}"`)
-    .send(storage.stream(record.storagePath));
+    .header("etag", etag ?? `W/"${size}"`);
+  if (options.filename) {
+    const encoded = encodeURIComponent(options.filename);
+    reply.header("content-disposition", `inline; filename="${encoded}"; filename*=UTF-8''${encoded}`);
+  }
+  reply.send(storage.stream(record.storagePath));
   return reply;
+}
+
+/**
+ * 收集 multipart 里的零个或一个 image/* 文件与全部文本字段。
+ *
+ * 上传类路由只该有这一份收集规则：每个路由各抄一遍的话，将来补一条字段约束必然漏掉某处。
+ * 缺文件不做判定——「是否必需」由各路由自己决定（引用来源可以从花型库拷贝，本来就没有文件）。
+ */
+export async function readImageMultipart(request: FastifyRequest): Promise<{ upload: { filename: string; buffer: Buffer; mimetype: string } | null; fields: Record<string, string> }> {
+  let upload: { filename: string; buffer: Buffer; mimetype: string } | null = null;
+  const fields: Record<string, string> = {};
+  for await (const part of request.parts()) {
+    if (part.type === "file") {
+      if (!part.mimetype.startsWith("image/")) throw new ApiError(400, "VALIDATION_ERROR", "Only image files are supported");
+      if (upload) throw new ApiError(400, "VALIDATION_ERROR", "A single image file is supported");
+      upload = { filename: part.filename || "image.png", buffer: await part.toBuffer(), mimetype: part.mimetype };
+      continue;
+    }
+    fields[part.fieldname] = typeof part.value === "string" ? part.value : String(part.value ?? "");
+  }
+  return { upload, fields };
 }
 
 export function mimeForPath(path: string): string { if (path.endsWith(".png")) return "image/png"; if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg"; if (path.endsWith(".webp")) return "image/webp"; if (path.endsWith(".zip")) return "application/zip"; if (path.endsWith(".psd")) return "image/vnd.adobe.photoshop"; return "application/octet-stream"; }

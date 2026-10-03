@@ -1892,3 +1892,343 @@ paths:
                 $ref: "#/components/schemas/Pattern"
         "400":
           $ref: "#/components/responses/ValidationError"
+  /pattern-drafts:
+    get:
+      operationId: listPatternDrafts
+      parameters:
+        - name: archived
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Pattern drafts (active by default; archived only when ?archived is present).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternDraftList"
+    post:
+      operationId: createPatternDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatternDraftInput"
+      responses:
+        "201":
+          description: Draft created with default conditions and auto name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternDraft"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /pattern-drafts/{draftId}:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+    get:
+      operationId: getPatternDraft
+      responses:
+        "200":
+          description: Draft with conditions, revision and view selection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternDraft"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updatePatternDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePatternDraftInput"
+      responses:
+        "200":
+          description: Autosaved draft; revision incremented.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatternDraft"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deletePatternDraft
+      responses:
+        "204":
+          description: Draft records and draft-owned files removed; formal patterns untouched.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /pattern-drafts/{draftId}/media:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+    get:
+      operationId: listDraftMedia
+      responses:
+        "200":
+          description: Reference and mask media owned by the draft.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftMediaList"
+    post:
+      operationId: createDraftMedia
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                file:
+                  type: string
+                  format: binary
+                role:
+                  type: string
+                  enum:
+                    - REFERENCE
+                    - MASK
+                source:
+                  type: string
+                  enum:
+                    - UPLOAD
+                    - PATTERN
+                patternId:
+                  type: string
+                  format: uuid
+                notes:
+                  type: string
+      responses:
+        "201":
+          description: Immutable media snapshot stored under the draft.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftMedia"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /pattern-drafts/{draftId}/media/{mediaId}:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+      - $ref: "#/components/parameters/DraftMediaId"
+    patch:
+      operationId: updateDraftMedia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+      responses:
+        "200":
+          description: Updated reference notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftMedia"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteDraftMedia
+      responses:
+        "204":
+          description: Media removed; files referenced by a submitted batch are retained.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /pattern-drafts/{draftId}/candidates/{candidateId}:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+      - $ref: "#/components/parameters/DraftCandidateId"
+    delete:
+      operationId: deleteDraftCandidate
+      responses:
+        "204":
+          description: Candidate removed; the formal pattern it was finalized into is unaffected.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /pattern-drafts/{draftId}/batches:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+    get:
+      operationId: listDraftBatches
+      responses:
+        "200":
+          description: Batch history with slots, partial success and cost when known.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftBatchList"
+    post:
+      operationId: createDraftBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDraftBatchInput"
+      responses:
+        "202":
+          description: Batch accepted; one job per batch targeting stable slot indices.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDraftBatchResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /pattern-drafts/{draftId}/batches/{batchId}/retry-failed:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+      - $ref: "#/components/parameters/DraftBatchId"
+    post:
+      operationId: retryFailedDraftBatch
+      responses:
+        "202":
+          description: Failed slots requeued; successful candidates untouched.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetryDraftBatchResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /pattern-drafts/{draftId}/candidates:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+    get:
+      operationId: listDraftCandidates
+      responses:
+        "200":
+          description: Candidates with lineage, transform and tile evidence.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftCandidateList"
+  /pattern-drafts/{draftId}/candidates/{candidateId}/edits:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+      - $ref: "#/components/parameters/DraftCandidateId"
+    post:
+      operationId: createDraftCandidateEdit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDraftBatchInput"
+      responses:
+        "202":
+          description: Edit batch accepted; produces a new candidate linked to its parent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDraftBatchResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/CapabilityUnsupported"
+  /pattern-drafts/{draftId}/candidates/{candidateId}/tile-check:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+      - $ref: "#/components/parameters/DraftCandidateId"
+    post:
+      operationId: checkDraftCandidateTileability
+      responses:
+        "202":
+          description: Deterministic tile check job; verdict and per-axis evidence are written to the candidate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftJobRef"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /pattern-drafts/{draftId}/candidates/{candidateId}/finalize:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+      - $ref: "#/components/parameters/DraftCandidateId"
+    post:
+      operationId: finalizeDraftCandidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizeDraftCandidateInput"
+      responses:
+        "200":
+          description: This candidate was already finalized; the existing pattern is returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinalizeDraftCandidateResponse"
+        "201":
+          description: Selected candidate copied into the formal pattern library; no production pipeline started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinalizeDraftCandidateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /files/pattern-drafts/{draftId}/candidates/{candidateId}:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+      - $ref: "#/components/parameters/DraftCandidateId"
+    get:
+      operationId: downloadDraftCandidateFile
+      responses:
+        "200":
+          description: Native candidate PNG at its stored resolution and alpha.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /files/pattern-drafts/{draftId}/media/{mediaId}:
+    parameters:
+      - $ref: "#/components/parameters/DraftId"
+      - $ref: "#/components/parameters/DraftMediaId"
+    get:
+      operationId: downloadDraftMediaFile
+      responses:
+        "200":
+          description: Stored reference or mask image.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"

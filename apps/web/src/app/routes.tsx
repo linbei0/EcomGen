@@ -25,6 +25,12 @@ const PatternsPage = lazy(() =>
 const PatternWorkspacePage = lazy(() =>
   import("../features/patterns/PatternWorkspacePage").then((module) => ({ default: module.PatternWorkspacePage })),
 );
+const PatternDraftWorkspacePage = lazy(() =>
+  import("../features/pattern-drafts/PatternDraftWorkspacePage").then((module) => ({ default: module.PatternDraftWorkspacePage })),
+);
+const PatternDraftsPage = lazy(() =>
+  import("../features/pattern-drafts/PatternDraftsPage").then((module) => ({ default: module.PatternDraftsPage })),
+);
 
 function RouteFallback() {
   return (
@@ -89,6 +95,24 @@ export const router = createBrowserRouter([
     element: (
       <Suspense fallback={<RouteFallback />}>
         <PatternWorkspacePage />
+      </Suspense>
+    ),
+  },
+  {
+    // 草稿列表：未定稿创作有自己的目的地，不与正式花型同屏。
+    path: "/pattern-drafts",
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <PatternDraftsPage />
+      </Suspense>
+    ),
+  },
+  {
+    // AI 起稿工作台：围绕一个创作主题的可恢复草稿，候选定稿后才进入正式花型库。
+    path: "/pattern-drafts/:draftId",
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <PatternDraftWorkspacePage />
       </Suspense>
     ),
   },

@@ -7,8 +7,12 @@ import { SettingsDrawer } from "../features/providers/SettingsDrawer";
 import { HealthBadge } from "./HealthBadge";
 import styles from "./AppTopbar.module.css";
 
-/** 顶栏可标记的页面分区；工作台不在导航项里，它必须携带项目 ID。 */
-export type AppTopbarSection = "home" | "forge" | "patterns" | "library" | "models" | "workbench";
+/**
+ * 顶栏可标记的页面分区；工作台不在导航项里，它必须携带项目 ID。
+ * `drafts` 只用于标记"当前在草稿页"——草稿属于花型工坊，不作为全局目的地列出，
+ * 入口在花型工坊页头；缺了它，草稿页会把自己的上级「花型工坊」也藏掉。
+ */
+export type AppTopbarSection = "home" | "forge" | "patterns" | "drafts" | "library" | "models" | "workbench";
 
 /** 全局可达的分区入口，数组顺序即展示顺序。 */
 const NAV_SECTIONS: Array<{ section: AppTopbarSection; path: string; label: string; icon: ReactNode }> = [

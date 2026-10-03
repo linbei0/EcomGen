@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { EventEnvelope, JobType } from "@ecomgen/contracts";
 
 export const QUEUE_NAME = process.env.ECOMGEN_QUEUE_NAME ?? "ecomgen";
-export type EcomJobKind = "plan" | "copywrite" | "generate" | "export" | "edit_plan" | "edit_generate" | "layer_plan" | "layer_export" | "suite_forge" | "model_cast" | "pattern_extract" | "pattern_forge" | "pattern_derive" | "pattern_variant" | "pattern_tile_check" | "print_pack";
+export type EcomJobKind = "plan" | "copywrite" | "generate" | "export" | "edit_plan" | "edit_generate" | "layer_plan" | "layer_export" | "suite_forge" | "model_cast" | "pattern_extract" | "pattern_forge" | "pattern_derive" | "pattern_variant" | "pattern_tile_check" | "print_pack" | "pattern_draft_generate" | "pattern_draft_edit" | "pattern_draft_cutout" | "pattern_draft_process";
 export interface EcomJobPayload { jobId: string; kind: EcomJobKind; }
 
 /**
@@ -30,6 +30,10 @@ const QUEUE_KIND_BY_JOB_TYPE: Record<Exclude<JobType, "EXPORT">, EcomJobKind> = 
   PATTERN_VARIANT: "pattern_variant",
   PATTERN_TILE_CHECK: "pattern_tile_check",
   PRINT_PACK: "print_pack",
+  PATTERN_DRAFT_GENERATE: "pattern_draft_generate",
+  PATTERN_DRAFT_EDIT: "pattern_draft_edit",
+  PATTERN_DRAFT_CUTOUT: "pattern_draft_cutout",
+  PATTERN_DRAFT_PROCESS: "pattern_draft_process",
 };
 export function queueKindForJobType(type: JobType): EcomJobKind {
   return type === "EXPORT" ? "export" : QUEUE_KIND_BY_JOB_TYPE[type];
@@ -50,9 +54,12 @@ export async function enqueue(queue: Queue<EcomJobPayload>, payload: EcomJobPayl
   // model_cast 选角同为付费生图，与 generate 一致不自动重跑。
   // pattern_extract 的分割调用与 pattern_forge、pattern_variant 的生图调用同为按次计费，同样不自动重跑。
   // pattern_derive、pattern_tile_check 与 print_pack 同为 Worker 本地 sharp 确定性运算，无外部计费，可以自动重跑。
+  // pattern_draft_generate（生图）、pattern_draft_edit（生成式改稿）、pattern_draft_cutout（分割去底）同为按次计费，
+  // 一律 1 次尝试：失败补偿走显式的失败槽位重试，绝不靠 BullMQ 自动重跑。
+  // pattern_draft_process 是本地确定性处理（调色/验缝/重复合成），无外部计费，可以自动重跑。
   // 规划与图层识别耗时分钟级，完整重跑代价高，最多尝试 2 次（失败后自动重跑 1 次）。
   // 套图反推同为纯推理视觉任务、无付费图生图，按 plan 处理：最多尝试 2 次。
-  const attempts = payload.kind === "generate" || payload.kind === "edit_generate" || payload.kind === "layer_export" || payload.kind === "model_cast" || payload.kind === "pattern_extract" || payload.kind === "pattern_forge" || payload.kind === "pattern_variant" ? 1 : payload.kind === "plan" || payload.kind === "layer_plan" || payload.kind === "suite_forge" ? 2 : 3;
+  const attempts = payload.kind === "generate" || payload.kind === "edit_generate" || payload.kind === "layer_export" || payload.kind === "model_cast" || payload.kind === "pattern_extract" || payload.kind === "pattern_forge" || payload.kind === "pattern_variant" || payload.kind === "pattern_draft_generate" || payload.kind === "pattern_draft_edit" || payload.kind === "pattern_draft_cutout" ? 1 : payload.kind === "plan" || payload.kind === "layer_plan" || payload.kind === "suite_forge" ? 2 : 3;
   const options: JobsOptions = { jobId: payload.jobId, attempts, backoff: { type: "exponential", delay: 1000 } };
   await queue.add(payload.kind, payload, options);
 }

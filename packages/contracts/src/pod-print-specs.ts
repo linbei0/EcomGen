@@ -17,7 +17,7 @@ export const POD_PRINT_SPEC_VERSION = "2026.09";
  * 与 specVersion 分开演进——规格目录未变而场景重绘时，api 侧用它判定旧规格包
  * 的示意图已过期（manifest.mockupScene 不等于当前版本即不复用），重新成包得到新渲染。
  */
-export const POD_MOCKUP_SCENE_VERSION = "2026.09.1";
+export const POD_MOCKUP_SCENE_VERSION = "2026.10.1";
 
 export const POD_PRINT_SPECS: readonly PodPrintSpec[] = [
   {

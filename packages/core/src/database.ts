@@ -735,6 +735,131 @@ function migrate(database: SqliteDatabase): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pattern_pipeline_steps_job ON pattern_pipeline_steps(job_id) WHERE job_id IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_pattern_pipeline_steps_pipeline ON pattern_pipeline_steps(pipeline_id, position);
   `);
+  // AI 起稿工作台：创作草稿及其批次/槽位/候选，与正式 patterns 严格分离。
+  // 候选只有经显式定稿才写成 patterns 行；草稿删除级联清空草稿域数据，不触及正式花型。
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS pattern_drafts (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      compose_type TEXT NOT NULL,
+      conditions_json TEXT NOT NULL DEFAULT '{}',
+      revision INTEGER NOT NULL DEFAULT 1,
+      selected_candidate_id TEXT,
+      compare_candidate_id TEXT,
+      archived_at TEXT,
+      -- 参考图编号的发号器：只增不减，删除参考图不回收编号，因此编号允许出现空档。
+      next_media_ordinal INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_pattern_drafts_updated ON pattern_drafts(archived_at, updated_at DESC);
+    CREATE TABLE IF NOT EXISTS draft_media (
+      id TEXT PRIMARY KEY,
+      draft_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      source TEXT NOT NULL,
+      source_pattern_id TEXT,
+      storage_path TEXT NOT NULL,
+      file_hash TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      width INTEGER,
+      height INTEGER,
+      original_name TEXT NOT NULL,
+      notes TEXT,
+      -- 仅参考图有编号；蒙版为 NULL，不占用编号。
+      ordinal INTEGER,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (draft_id) REFERENCES pattern_drafts(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_draft_media_draft ON draft_media(draft_id, created_at);
+    CREATE TABLE IF NOT EXISTS draft_batches (
+      id TEXT PRIMARY KEY,
+      draft_id TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      parent_candidate_id TEXT,
+      provider_id TEXT,
+      image_model_id TEXT,
+      candidate_count INTEGER NOT NULL DEFAULT 1,
+      instruction TEXT,
+      snapshot_json TEXT NOT NULL,
+      client_key TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (draft_id) REFERENCES pattern_drafts(id) ON DELETE CASCADE
+    );
+    -- 同 key 且同 payload 复用批次；同 key 异 payload 由 API 判定为冲突。唯一约束是这条规则的持久化兜底。
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_draft_batches_client_key ON draft_batches(draft_id, client_key);
+    CREATE INDEX IF NOT EXISTS idx_draft_batches_draft ON draft_batches(draft_id, created_at);
+    CREATE TABLE IF NOT EXISTS draft_slots (
+      batch_id TEXT NOT NULL,
+      slot_index INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      attempt INTEGER NOT NULL DEFAULT 1,
+      job_id TEXT,
+      error_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (batch_id, slot_index),
+      FOREIGN KEY (batch_id) REFERENCES draft_batches(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_draft_slots_job ON draft_slots(job_id);
+    CREATE TABLE IF NOT EXISTS draft_candidates (
+      id TEXT PRIMARY KEY,
+      draft_id TEXT NOT NULL,
+      batch_id TEXT NOT NULL,
+      slot_index INTEGER NOT NULL,
+      parent_candidate_id TEXT,
+      storage_path TEXT NOT NULL,
+      file_hash TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      width INTEGER,
+      height INTEGER,
+      transform TEXT NOT NULL,
+      has_alpha INTEGER NOT NULL DEFAULT 0,
+      tileable_status TEXT NOT NULL DEFAULT 'NONE',
+      tileable_score REAL,
+      tileable_checked_with TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (draft_id) REFERENCES pattern_drafts(id) ON DELETE CASCADE,
+      FOREIGN KEY (batch_id) REFERENCES draft_batches(id) ON DELETE CASCADE
+    );
+    -- 一个槽位成功产物至多一份：迟到产物或并发写入触发唯一冲突而不是产生第二份候选。
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_draft_candidates_slot ON draft_candidates(batch_id, slot_index);
+    CREATE INDEX IF NOT EXISTS idx_draft_candidates_draft ON draft_candidates(draft_id, created_at);
+  `);
+  // 候选验缝证据：逐轴得分让界面能指出是哪条边接不上；判定仍由 PATTERN_DRAFT_PROCESS 唯一写入。
+  if (!columnNames(database, "draft_candidates").has("tileable_horizontal")) {
+    database.exec("ALTER TABLE draft_candidates ADD COLUMN tileable_horizontal REAL");
+  }
+  if (!columnNames(database, "draft_candidates").has("tileable_vertical")) {
+    database.exec("ALTER TABLE draft_candidates ADD COLUMN tileable_vertical REAL");
+  }
+  // 参考图不再按用途分类：旧库的 usages_json 一次性移除，避免留下永不读写的列。
+  if (columnNames(database, "draft_media").has("usages_json")) {
+    database.exec("ALTER TABLE draft_media DROP COLUMN usages_json");
+  }
+  // 引用编号：只在参考图上分配，旧库按 created_at 一次性回填，之后删除不回填也不重排。
+  // 发号器单独存 next_media_ordinal，不用 MAX(ordinal)+1 现算——删掉最大号再上传会回收该号，
+  // 已经写进主题框的「@图N」就会被重新解释成另一张图。
+  if (!columnNames(database, "draft_media").has("ordinal")) {
+    database.exec("ALTER TABLE draft_media ADD COLUMN ordinal INTEGER");
+    database.exec(`
+      UPDATE draft_media SET ordinal = (
+        SELECT COUNT(*) FROM draft_media AS earlier
+        WHERE earlier.draft_id = draft_media.draft_id
+          AND earlier.role = 'REFERENCE'
+          AND (earlier.created_at < draft_media.created_at OR (earlier.created_at = draft_media.created_at AND earlier.id <= draft_media.id))
+      ) WHERE role = 'REFERENCE'
+    `);
+  }
+  if (!columnNames(database, "pattern_drafts").has("next_media_ordinal")) {
+    database.exec("ALTER TABLE pattern_drafts ADD COLUMN next_media_ordinal INTEGER NOT NULL DEFAULT 1");
+    database.exec("UPDATE pattern_drafts SET next_media_ordinal = 1 + COALESCE((SELECT MAX(ordinal) FROM draft_media WHERE draft_media.draft_id = pattern_drafts.id), 0)");
+  }
+  // 定稿来源：同候选重复定稿必须复用同一 Pattern，唯一索引是幂等的最终防线。
+  if (!columnNames(database, "patterns").has("source_draft_candidate_id")) {
+    database.exec("ALTER TABLE patterns ADD COLUMN source_draft_candidate_id TEXT");
+  }
+  database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_patterns_source_draft_candidate ON patterns(source_draft_candidate_id) WHERE source_draft_candidate_id IS NOT NULL");
   // 资产库视图：生成结果此前未记录尺寸，旧行保持 NULL，由前端按占位比例兜底。
   if (!columnNames(database, "outputs").has("width")) {
     database.exec("ALTER TABLE outputs ADD COLUMN width INTEGER");

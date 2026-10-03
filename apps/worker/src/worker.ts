@@ -10,6 +10,7 @@ import { executeCopywriting } from "./job-copywrite.js";
 import { executeSuiteForge } from "./job-suite-forge.js";
 import { executeModelCast } from "./job-model-cast.js";
 import { executePatternDerive, executePatternExtract, executePatternForge, executePatternTileCheck, executePatternVariant } from "./job-patterns.js";
+import { executeDraftCutout, executeDraftEdit, executeDraftGenerate, executeDraftProcess } from "./job-pattern-drafts.js";
 import { executePrintPack } from "./job-print-pack.js";
 import { executeGeneration } from "./job-generation.js";
 import { executeEditGeneration, executeEditPlan } from "./job-edit.js";
@@ -65,6 +66,10 @@ const worker = new Worker<EcomJobPayload>(QUEUE_NAME, async (queueJob) => {
     else if (queueJob.data.kind === "pattern_derive") await executePatternDerive(ctx, job);
     else if (queueJob.data.kind === "pattern_variant") await executePatternVariant(ctx, job, cancellation.signal);
     else if (queueJob.data.kind === "pattern_tile_check") await executePatternTileCheck(ctx, job);
+    else if (queueJob.data.kind === "pattern_draft_generate") await executeDraftGenerate(ctx, job, cancellation.signal);
+    else if (queueJob.data.kind === "pattern_draft_edit") await executeDraftEdit(ctx, job, cancellation.signal);
+    else if (queueJob.data.kind === "pattern_draft_cutout") await executeDraftCutout(ctx, job, cancellation.signal);
+    else if (queueJob.data.kind === "pattern_draft_process") await executeDraftProcess(ctx, job);
     else if (queueJob.data.kind === "print_pack") await executePrintPack(ctx, job);
     else await executeExport(ctx, job);
     // 终态与清空外部请求标记在同一条 UPDATE 内原子完成：标记一旦设置就只在终态消失，

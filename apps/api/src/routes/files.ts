@@ -8,13 +8,13 @@ export function registerFileRoutes(app: FastifyInstance, ctx: ApiContext): void 
   app.get("/api/v1/files/assets/:assetId", async (request, reply) => sendStored(request, reply, storage, repository.getAsset(parameter(request, "assetId")), "asset", parameter(request, "assetId")));
   app.get("/api/v1/files/edit-reference-assets/:referenceAssetId", async (request, reply) => sendStored(request, reply, storage, repository.getEditReferenceAsset(parameter(request, "referenceAssetId")), "reference asset", parameter(request, "referenceAssetId")));
   app.get("/api/v1/files/outputs/:outputId", async (request, reply) => sendStored(request, reply, storage, repository.getOutput(parameter(request, "outputId")), "output", parameter(request, "outputId")));
-  // 缩略图按内容 hash 寻址，跨项目共享；命中缓存直接流式返回，未命中（含历史图片）现场生成后落盘。
+  // 缩略图按内容 hash 寻址，跨项目与草稿共享；命中缓存直接流式返回，未命中（含历史图片）现场生成后落盘。
   app.get("/api/v1/files/thumbnails/:hash", async (request, reply) => {
     const hash = parameter(request, "hash");
     const thumbnailPath = storage.thumbnailPath(hash);
     if (!(await storage.exists(thumbnailPath))) {
-      const sourcePath = repository.findLibrarySourcePath(hash);
-      if (!sourcePath) missing("library image", hash);
+      const sourcePath = repository.findImageSourcePath(hash);
+      if (!sourcePath) missing("image", hash);
       await storage.putThumbnail(hash, await renderThumbnail(await storage.read(sourcePath)));
     }
     return sendStored(request, reply, storage, { storagePath: thumbnailPath, mimeType: "image/webp", hash }, "thumbnail", hash);

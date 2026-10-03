@@ -29,6 +29,12 @@ export const qk = {
   patternListingJob: (patternId: string, jobId: string) => ["patterns", patternId, "listing-jobs", jobId] as const,
   /** 成包流水线：列表按花型隔离；重跑/裁决/取消后失效这一条列表键即完成刷新。 */
   patternPipelines: (patternId: string) => ["patterns", patternId, "pipelines"] as const,
+  /** AI 起稿草稿：列表、单草稿、媒体、批次与候选；候选/批次按草稿隔离，失效一条键即完成刷新。 */
+  patternDrafts: ["pattern-drafts"] as const,
+  patternDraft: (id: string) => ["pattern-drafts", id] as const,
+  draftMedia: (id: string) => ["pattern-drafts", id, "media"] as const,
+  draftBatches: (id: string) => ["pattern-drafts", id, "batches"] as const,
+  draftCandidates: (id: string) => ["pattern-drafts", id, "candidates"] as const,
   projects: (archived?: boolean) => ["projects", { archived: archived ?? false }] as const,
   project: (id: string) => ["projects", id] as const,
   /** 资产库分页查询：类型/关键词/来源项目/素材用途全部进 key，筛选变化即从首个游标重新查询。 */

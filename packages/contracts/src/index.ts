@@ -6,6 +6,7 @@ export * from "./limits.js";
 export * from "./segmentation.js";
 export * from "./edit-operations.js";
 export * from "./image-model-capabilities.js";
+export * from "./draft-references.js";
 import type { AssetRole, ImageAspectRatio, ImageResolution, UserAssetKind } from "./enums.js";
 
 export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
@@ -53,6 +54,7 @@ export * from "./api-schemas.js";
 export * from "./api-requests.js";
 export * from "./model-schemas.js";
 export * from "./pod-schemas.js";
+export * from "./pattern-draft-schemas.js";
 export * from "./pod-print-specs.js";
 export * from "./pod-repeat.js";
 export * from "./pod-tileability.js";

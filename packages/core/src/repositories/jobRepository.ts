@@ -101,11 +101,15 @@ export class JobRepository {
         this.db.prepare("UPDATE layer_exports SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
         // 规格包是纯本地合成，重启后随 Job 重新排队即可；pattern_extract/forge 无预建领域记录。
         this.db.prepare("UPDATE print_packs SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=?").run(updatedAt, row.id);
+        // 起稿槽位同理：Job 回到 QUEUED，槽位也回到 QUEUED，否则刷新后批次会永远停在 RUNNING。
+        this.db.prepare("UPDATE draft_slots SET status='QUEUED',error_json=NULL,updated_at=? WHERE job_id=? AND status='RUNNING'").run(updatedAt, row.id);
       }
       for (const row of unverifiable) {
         this.db.prepare("UPDATE layer_plans SET status='FAILED',error_json=?,updated_at=? WHERE job_id=?").run(unknownMessage, updatedAt, row.id);
         // 已写出 PSD 的导出记录是完成事实的持久化证据：Job 崩溃在终态写入前也不改判它，PSD 与图层文件仍然可下载。
         this.db.prepare("UPDATE layer_exports SET status='FAILED',error_json=?,updated_at=? WHERE job_id=? AND psd_storage_path IS NULL").run(unknownMessage, updatedAt, row.id);
+        // 上游结果未知：槽位记为 FAILED，由用户显式走 retry-failed 补偿；已成功槽位不受影响。
+        this.db.prepare("UPDATE draft_slots SET status='FAILED',error_json=?,updated_at=? WHERE job_id=? AND status='RUNNING'").run(unknownMessage, updatedAt, row.id);
       }
     });
     write();
@@ -114,6 +118,18 @@ export class JobRepository {
   public listJobs(projectId: string): JobRecord[] { return (this.db.prepare("SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC").all(projectId) as Row[]).map(mapJob); }
   /** 全局套图反推任务不绑定项目，无法走 listJobs；按 type 倒序取最近若干条供「最近反推」列表使用。 */
   public listJobsByType(type: JobType, limit: number): JobRecord[] { return (this.db.prepare("SELECT * FROM jobs WHERE type=? ORDER BY created_at DESC LIMIT ?").all(type, limit) as Row[]).map(mapJob); }
+  /**
+   * 按 id 批量取任务，返回 Map 供调用方按槽位 jobId 直接命中。
+   *
+   * 起稿批次列表会逐批次展开槽位，逐槽 getJob 把"列批次"退化成 N+1 查询；这里一次取全。
+   */
+  public listJobsByIds(ids: readonly string[]): Map<string, JobRecord> {
+    const unique = [...new Set(ids)];
+    if (!unique.length) return new Map();
+    const placeholders = unique.map(() => "?").join(",");
+    const rows = this.db.prepare(`SELECT * FROM jobs WHERE id IN (${placeholders})`).all(...unique) as Row[];
+    return new Map(rows.map((row) => { const job = mapJob(row); return [job.id, job]; }));
+  }
   public saveCopywritingResult(input: Omit<CopywritingResultRecord, "createdAt">): CopywritingResultRecord {
     const record: CopywritingResultRecord = { ...input, createdAt: now() };
     this.db.prepare("INSERT OR REPLACE INTO copywriting_results (job_id,project_id,target,content,created_at) VALUES (@jobId,@projectId,@target,@content,@createdAt)").run(record);

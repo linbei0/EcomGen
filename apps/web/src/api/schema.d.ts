@@ -1494,6 +1494,246 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pattern-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPatternDrafts"];
+        put?: never;
+        post: operations["createPatternDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getPatternDraft"];
+        put?: never;
+        post?: never;
+        delete: operations["deletePatternDraft"];
+        options?: never;
+        head?: never;
+        patch: operations["updatePatternDraft"];
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listDraftMedia"];
+        put?: never;
+        post: operations["createDraftMedia"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}/media/{mediaId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                mediaId: components["parameters"]["DraftMediaId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteDraftMedia"];
+        options?: never;
+        head?: never;
+        patch: operations["updateDraftMedia"];
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}/candidates/{candidateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteDraftCandidate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listDraftBatches"];
+        put?: never;
+        post: operations["createDraftBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}/batches/{batchId}/retry-failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                batchId: components["parameters"]["DraftBatchId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["retryFailedDraftBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listDraftCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}/candidates/{candidateId}/edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createDraftCandidateEdit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}/candidates/{candidateId}/tile-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["checkDraftCandidateTileability"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pattern-drafts/{draftId}/candidates/{candidateId}/finalize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["finalizeDraftCandidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/files/pattern-drafts/{draftId}/candidates/{candidateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        get: operations["downloadDraftCandidateFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/files/pattern-drafts/{draftId}/media/{mediaId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                mediaId: components["parameters"]["DraftMediaId"];
+            };
+            cookie?: never;
+        };
+        get: operations["downloadDraftMediaFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1523,7 +1763,7 @@ export interface components {
         /** @enum {string} */
         CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION" | "LISTING";
         /** @enum {string} */
-        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE" | "MODEL_CAST" | "PATTERN_EXTRACT" | "PATTERN_FORGE" | "PATTERN_DERIVE" | "PATTERN_VARIANT" | "PATTERN_TILE_CHECK" | "PRINT_PACK";
+        JobType: "PLAN" | "COPYWRITE" | "GENERATE" | "EXPORT" | "EDIT_PLAN" | "EDIT_GENERATE" | "LAYER_PLAN" | "LAYER_EXPORT" | "SUITE_FORGE" | "MODEL_CAST" | "PATTERN_EXTRACT" | "PATTERN_FORGE" | "PATTERN_DERIVE" | "PATTERN_VARIANT" | "PATTERN_TILE_CHECK" | "PRINT_PACK" | "PATTERN_DRAFT_GENERATE" | "PATTERN_DRAFT_EDIT" | "PATTERN_DRAFT_CUTOUT" | "PATTERN_DRAFT_PROCESS";
         /** @enum {string} */
         JobStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
         /** @enum {string} */
@@ -3069,6 +3309,217 @@ export interface components {
         ContinuePatternPipelineInput: {
             resolution: components["schemas"]["PatternPipelineResolution"];
         };
+        /** @enum {string} */
+        DraftComposeType: "PLACEMENT" | "REPEAT";
+        /** @enum {string} */
+        DraftMediaRole: "REFERENCE" | "MASK";
+        /** @enum {string} */
+        DraftMediaSource: "UPLOAD" | "PATTERN";
+        /** @enum {string} */
+        DraftBackground: "WHITE" | "TRANSPARENT";
+        /** @enum {string} */
+        DraftBatchOperation: "GENERATE" | "EDIT_WHOLE" | "EDIT_LOCAL" | "RECOLOR" | "PALETTE_VARIANT" | "CUTOUT" | "SEAM_EDIT";
+        /** @enum {string} */
+        DraftSlotStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+        /** @enum {string} */
+        DraftSeamEdge: "LEFT_RIGHT" | "TOP_BOTTOM";
+        DraftRecolorParams: {
+            /** @default 0 */
+            hueShift: number;
+            /** @default 100 */
+            saturationPct: number;
+            /** @default 100 */
+            brightnessPct: number;
+        };
+        DraftSeamEdit: {
+            edge: components["schemas"]["DraftSeamEdge"];
+            /** @default 48 */
+            band: number;
+        };
+        DraftConditions: {
+            /** @default  */
+            theme: string;
+            aspectRatio: components["schemas"]["ImageAspectRatio"];
+            background: components["schemas"]["DraftBackground"];
+            /** @default 1 */
+            candidateCount: number;
+            /** Format: uuid */
+            providerId?: string;
+            imageModelId?: string;
+            repeatLayout?: components["schemas"]["PodRepeatLayout"];
+        };
+        PatternDraft: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            composeType: components["schemas"]["DraftComposeType"];
+            conditions: components["schemas"]["DraftConditions"];
+            revision: number;
+            selectedCandidateId: string | null;
+            compareCandidateId: string | null;
+            archivedAt: string | null;
+            /** @default 0 */
+            candidateCount: number;
+            previewUrl: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PatternDraftList: {
+            items: components["schemas"]["PatternDraft"][];
+        };
+        CreatePatternDraftInput: {
+            name?: string;
+            composeType?: components["schemas"]["DraftComposeType"];
+        };
+        UpdatePatternDraftInput: {
+            expectedRevision: number;
+            name?: string;
+            conditions?: components["schemas"]["DraftConditions"];
+            selectedCandidateId?: string | null;
+            compareCandidateId?: string | null;
+            archived?: boolean;
+        };
+        DraftMedia: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            draftId: string;
+            role: components["schemas"]["DraftMediaRole"];
+            source: components["schemas"]["DraftMediaSource"];
+            sourcePatternId: string | null;
+            ordinal: number | null;
+            url: string;
+            thumbUrl: string;
+            fileName: string;
+            mimeType: string;
+            width: number | null;
+            height: number | null;
+            notes: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DraftMediaList: {
+            items: components["schemas"]["DraftMedia"][];
+        };
+        DraftCandidateTileable: {
+            status: components["schemas"]["TileableStatus"];
+            score: number | null;
+            algorithmVersion: string | null;
+            horizontal: number | null;
+            vertical: number | null;
+        };
+        DraftCandidate: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            draftId: string;
+            /** Format: uuid */
+            batchId: string;
+            slotIndex: number;
+            parentCandidateId: string | null;
+            url: string;
+            thumbUrl: string;
+            width: number | null;
+            height: number | null;
+            mimeType: string;
+            transform: components["schemas"]["DraftBatchOperation"];
+            hasAlpha: boolean;
+            tileable: components["schemas"]["DraftCandidateTileable"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DraftCandidateList: {
+            items: components["schemas"]["DraftCandidate"][];
+        };
+        DraftSlot: {
+            index: number;
+            status: components["schemas"]["DraftSlotStatus"];
+            attempt: number;
+            jobId: string | null;
+            candidateId: string | null;
+            error: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        DraftBatch: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            draftId: string;
+            operation: components["schemas"]["DraftBatchOperation"];
+            parentCandidateId: string | null;
+            providerId: string | null;
+            imageModelId: string | null;
+            candidateCount: number;
+            instruction: string | null;
+            estimatedCost: {
+                [key: string]: unknown;
+            } | null;
+            actualCost: {
+                [key: string]: unknown;
+            } | null;
+            snapshot: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            slots: components["schemas"]["DraftSlot"][];
+        };
+        DraftBatchList: {
+            items: components["schemas"]["DraftBatch"][];
+        };
+        CreateDraftBatchInput: {
+            clientKey: string;
+            operation: components["schemas"]["DraftBatchOperation"];
+            /** @default 1 */
+            candidateCount: number;
+            /** Format: uuid */
+            providerId?: string;
+            imageModelId?: string;
+            theme?: string;
+            aspectRatio?: components["schemas"]["ImageAspectRatio"];
+            background?: components["schemas"]["DraftBackground"];
+            repeatLayout?: components["schemas"]["PodRepeatLayout"];
+            references?: string[];
+            /** Format: uuid */
+            parentCandidateId?: string;
+            instruction?: string;
+            /** Format: uuid */
+            maskMediaId?: string;
+            invertMask?: boolean;
+            recolor?: components["schemas"]["DraftRecolorParams"];
+            palette?: string[];
+            seam?: components["schemas"]["DraftSeamEdit"];
+        };
+        DraftJobRef: {
+            /** Format: uuid */
+            id: string;
+            type: string;
+            status: string;
+            progress: number;
+        };
+        CreateDraftBatchResponse: {
+            batch: components["schemas"]["DraftBatch"];
+            job: components["schemas"]["DraftJobRef"] | null;
+            reused: boolean;
+        };
+        RetryDraftBatchResponse: {
+            batch: components["schemas"]["DraftBatch"];
+            job: components["schemas"]["DraftJobRef"];
+            reused: boolean;
+        };
+        FinalizeDraftCandidateInput: {
+            name?: string;
+            clientKey: string;
+        };
+        FinalizeDraftCandidateResponse: {
+            pattern: components["schemas"]["Pattern"];
+            reused: boolean;
+        };
     };
     responses: {
         /** @description Request does not match the schema. */
@@ -3134,6 +3585,10 @@ export interface components {
         PipelineId: string;
         PipelineStep: components["schemas"]["PatternPipelineStepName"];
         SuiteId: string;
+        DraftId: string;
+        DraftBatchId: string;
+        DraftMediaId: string;
+        DraftCandidateId: string;
         Cursor: string;
     };
     requestBodies: never;
@@ -5890,6 +6345,502 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationError"];
+        };
+    };
+    listPatternDrafts: {
+        parameters: {
+            query?: {
+                archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pattern drafts (active by default; archived only when ?archived is present). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternDraftList"];
+                };
+            };
+        };
+    };
+    createPatternDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePatternDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Draft created with default conditions and auto name. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternDraft"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+        };
+    };
+    getPatternDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft with conditions, revision and view selection. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternDraft"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deletePatternDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft records and draft-owned files removed; formal patterns untouched. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updatePatternDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePatternDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Autosaved draft; revision incremented. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatternDraft"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listDraftMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reference and mask media owned by the draft. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftMediaList"];
+                };
+            };
+        };
+    };
+    createDraftMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file?: string;
+                    /** @enum {string} */
+                    role: "REFERENCE" | "MASK";
+                    /** @enum {string} */
+                    source?: "UPLOAD" | "PATTERN";
+                    /** Format: uuid */
+                    patternId?: string;
+                    notes?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Immutable media snapshot stored under the draft. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftMedia"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteDraftMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                mediaId: components["parameters"]["DraftMediaId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Media removed; files referenced by a submitted batch are retained. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateDraftMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                mediaId: components["parameters"]["DraftMediaId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    notes?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated reference notes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftMedia"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteDraftCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Candidate removed; the formal pattern it was finalized into is unaffected. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listDraftBatches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Batch history with slots, partial success and cost when known. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftBatchList"];
+                };
+            };
+        };
+    };
+    createDraftBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDraftBatchInput"];
+            };
+        };
+        responses: {
+            /** @description Batch accepted; one job per batch targeting stable slot indices. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateDraftBatchResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    retryFailedDraftBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                batchId: components["parameters"]["DraftBatchId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Failed slots requeued; successful candidates untouched. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetryDraftBatchResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listDraftCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Candidates with lineage, transform and tile evidence. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftCandidateList"];
+                };
+            };
+        };
+    };
+    createDraftCandidateEdit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDraftBatchInput"];
+            };
+        };
+        responses: {
+            /** @description Edit batch accepted; produces a new candidate linked to its parent. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateDraftBatchResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["CapabilityUnsupported"];
+        };
+    };
+    checkDraftCandidateTileability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deterministic tile check job; verdict and per-axis evidence are written to the candidate. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftJobRef"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    finalizeDraftCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinalizeDraftCandidateInput"];
+            };
+        };
+        responses: {
+            /** @description This candidate was already finalized; the existing pattern is returned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinalizeDraftCandidateResponse"];
+                };
+            };
+            /** @description Selected candidate copied into the formal pattern library; no production pipeline started. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinalizeDraftCandidateResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    downloadDraftCandidateFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                candidateId: components["parameters"]["DraftCandidateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Native candidate PNG at its stored resolution and alpha. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadDraftMediaFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["DraftId"];
+                mediaId: components["parameters"]["DraftMediaId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stored reference or mask image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
 }

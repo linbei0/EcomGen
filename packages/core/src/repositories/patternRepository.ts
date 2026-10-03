@@ -22,6 +22,8 @@ export interface PatternRecord {
   tileableScore: number | null;
   /** 写入该判定时的算法版本；与当前版本不一致表示判定过期。 */
   tileableCheckedWith: string | null;
+  /** 定稿来源：由哪个创作候选定稿而来；唯一，重复定稿同候选复用同一 Pattern。 */
+  sourceDraftCandidateId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -75,18 +77,25 @@ export class PatternRepository {
     const row = this.db.prepare("SELECT * FROM patterns WHERE id=?").get(id);
     return row ? mapPattern(row as Row) : undefined;
   }
-  /** Worker 落一条花型；同 (sourceJobId, fileHash) 幂等返回既有行，重试不产生重复花型。 */
-  public createPattern(input: Omit<PatternRecord, "id" | "createdAt" | "updatedAt" | "tileable" | "tileableScore" | "tileableCheckedWith"> & Partial<Pick<PatternRecord, "id" | "tileable" | "tileableScore" | "tileableCheckedWith">>): PatternRecord {
-    const existing = input.sourceJobId && input.fileHash
-      ? this.db.prepare("SELECT * FROM patterns WHERE source_job_id=? AND file_hash=? LIMIT 1").get(input.sourceJobId, input.fileHash) as Row | undefined
-      : undefined;
+  /** Worker 落一条花型；同 (sourceJobId, fileHash) 或同来源候选幂等返回既有行，重试/重复定稿不产生重复花型。 */
+  public createPattern(input: Omit<PatternRecord, "id" | "createdAt" | "updatedAt" | "tileable" | "tileableScore" | "tileableCheckedWith" | "sourceDraftCandidateId"> & Partial<Pick<PatternRecord, "id" | "tileable" | "tileableScore" | "tileableCheckedWith" | "sourceDraftCandidateId">>): PatternRecord {
+    const existing = input.sourceDraftCandidateId
+      ? this.db.prepare("SELECT * FROM patterns WHERE source_draft_candidate_id=? LIMIT 1").get(input.sourceDraftCandidateId) as Row | undefined
+      : input.sourceJobId && input.fileHash
+        ? this.db.prepare("SELECT * FROM patterns WHERE source_job_id=? AND file_hash=? LIMIT 1").get(input.sourceJobId, input.fileHash) as Row | undefined
+        : undefined;
     if (existing) return mapPattern(existing);
     // 新花型一律从 NONE 起步：可平铺是"已验过"的事实，不能在入库时就假定成立。
-    const record: PatternRecord = { tileable: "NONE", tileableScore: null, tileableCheckedWith: null, ...input, id: input.id ?? randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO patterns (id,name,source_type,source_job_id,source_asset_hash,parent_pattern_id,storage_path,file_hash,width,height,tags_json,tileable_status,tileable_score,tileable_checked_with,created_at,updated_at)
-      VALUES (@id,@name,@sourceType,@sourceJobId,@sourceAssetHash,@parentPatternId,@storagePath,@fileHash,@width,@height,@tags,@tileable,@tileableScore,@tileableCheckedWith,@createdAt,@updatedAt)`)
+    const record: PatternRecord = { tileable: "NONE", tileableScore: null, tileableCheckedWith: null, sourceDraftCandidateId: null, ...input, id: input.id ?? randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO patterns (id,name,source_type,source_job_id,source_asset_hash,parent_pattern_id,storage_path,file_hash,width,height,tags_json,tileable_status,tileable_score,tileable_checked_with,source_draft_candidate_id,created_at,updated_at)
+      VALUES (@id,@name,@sourceType,@sourceJobId,@sourceAssetHash,@parentPatternId,@storagePath,@fileHash,@width,@height,@tags,@tileable,@tileableScore,@tileableCheckedWith,@sourceDraftCandidateId,@createdAt,@updatedAt)`)
       .run({ ...record, tags: json(record.tags) });
     return record;
+  }
+  /** 定稿幂等读取：某创作候选已经入库的正式花型（删掉花型后为空，允许重新定稿）。 */
+  public getPatternByDraftCandidateId(candidateId: string): PatternRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM patterns WHERE source_draft_candidate_id=? LIMIT 1").get(candidateId);
+    return row ? mapPattern(row as Row) : undefined;
   }
   public updatePattern(id: string, patch: Partial<Pick<PatternRecord, "name" | "tags">>): PatternRecord | undefined {
     const current = this.getPattern(id);
@@ -165,6 +174,6 @@ export class PatternRepository {
   }
 }
 
-function mapPattern(row: Row): PatternRecord { return { id: String(row.id), name: String(row.name), sourceType: row.source_type as PatternSource, sourceJobId: row.source_job_id == null ? null : String(row.source_job_id), sourceAssetHash: row.source_asset_hash == null ? null : String(row.source_asset_hash), parentPatternId: row.parent_pattern_id == null ? null : String(row.parent_pattern_id), storagePath: row.storage_path == null ? null : String(row.storage_path), fileHash: row.file_hash == null ? null : String(row.file_hash), width: row.width == null ? null : Number(row.width), height: row.height == null ? null : Number(row.height), tags: parse(row.tags_json ?? "[]"), tileable: (row.tileable_status ?? "NONE") as TileableStatus, tileableScore: row.tileable_score == null ? null : Number(row.tileable_score), tileableCheckedWith: row.tileable_checked_with == null ? null : String(row.tileable_checked_with), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function mapPattern(row: Row): PatternRecord { return { id: String(row.id), name: String(row.name), sourceType: row.source_type as PatternSource, sourceJobId: row.source_job_id == null ? null : String(row.source_job_id), sourceAssetHash: row.source_asset_hash == null ? null : String(row.source_asset_hash), parentPatternId: row.parent_pattern_id == null ? null : String(row.parent_pattern_id), storagePath: row.storage_path == null ? null : String(row.storage_path), fileHash: row.file_hash == null ? null : String(row.file_hash), width: row.width == null ? null : Number(row.width), height: row.height == null ? null : Number(row.height), tags: parse(row.tags_json ?? "[]"), tileable: (row.tileable_status ?? "NONE") as TileableStatus, tileableScore: row.tileable_score == null ? null : Number(row.tileable_score), tileableCheckedWith: row.tileable_checked_with == null ? null : String(row.tileable_checked_with), sourceDraftCandidateId: row.source_draft_candidate_id == null ? null : String(row.source_draft_candidate_id), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapPrintPack(row: Row): PrintPackRecord { return { id: String(row.id), patternId: String(row.pattern_id), jobId: String(row.job_id), specId: String(row.spec_id), specVersion: String(row.spec_version), status: row.status as PrintPackRecord["status"], files: row.files_json ? parse(row.files_json) : null, manifest: row.manifest_json ? parse(row.manifest_json) : null, error: row.error_json ? parse(row.error_json) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
 function mapPatternListingResult(row: Row): PatternListingResultRecord { return { jobId: String(row.job_id), patternId: String(row.pattern_id), platform: String(row.platform) as ListingPlatform, copy: parse(row.content_json) as ListingCopy, createdAt: String(row.created_at) }; }

@@ -31,6 +31,14 @@ export interface TileabilityVerdict {
   score: number;
 }
 
+/** 逐轴分数：水平轴=逐行比较首列/末列（左右接缝），垂直轴=逐列比较首行/末行（上下接缝）。 */
+export interface TileabilityAxes {
+  horizontal: number;
+  vertical: number;
+  width: number;
+  height: number;
+}
+
 /**
  * 可平铺分数：两个轴各自算 `1 - (环绕色差 - 图内最大相邻色差) / 255`，取较小值。
  * 1 表示环绕跳变不大于图内任何一条相邻跳变（接缝无从分辨），0 表示环绕跳变比图内最强边还大 255。
@@ -81,9 +89,18 @@ export function verdictForScore(score: number): TileableStatus {
   return score >= TILEABILITY_VERIFIED_MIN ? "VERIFIED" : "FAILED";
 }
 
-/** 判定入口：解码为 RGBA 后打分并比较阈值。只读像素，同输入恒同输出。 */
+/** 判定入口：只关心结论与总分的调用方用它；需要分轴证据的用 verifyTileableDetailed。 */
 export async function verifyTileable(png: Buffer): Promise<TileabilityVerdict> {
+  const { status, score } = await verifyTileableDetailed(png);
+  return { status, score };
+}
+
+/** 带证据的判定：除总分外给出两个轴各自得分，界面据此指出是哪条边接不上。 */
+export async function verifyTileableDetailed(png: Buffer): Promise<TileabilityVerdict & TileabilityAxes> {
   const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const score = scoreTileability(data, info.width, info.height);
-  return { status: verdictForScore(score), score };
+  if (info.width < 3 || info.height < 3) return { status: "FAILED", score: 0, horizontal: 0, vertical: 0, width: info.width, height: info.height };
+  const horizontal = axisScore(data, info.width, info.height, true);
+  const vertical = axisScore(data, info.width, info.height, false);
+  const score = Math.min(horizontal, vertical);
+  return { status: verdictForScore(score), score, horizontal, vertical, width: info.width, height: info.height };
 }

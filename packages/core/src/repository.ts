@@ -32,6 +32,15 @@ import {
   type PatternPipelineWithSteps,
 } from "./repositories/patternPipelineRepository.js";
 import {
+  PatternDraftRepository,
+  type DraftBatchRecord,
+  type DraftCandidateRecord,
+  type DraftMediaRecord,
+  type DraftSlotRecord,
+  type PatternDraftRecord,
+  type UpdateDraftResult,
+} from "./repositories/patternDraftRepository.js";
+import {
   PatternRepository,
   type PatternListingResultRecord,
   type PatternRecord,
@@ -64,6 +73,7 @@ export * from "./repositories/jobRepository.js";
 export * from "./repositories/libraryRepository.js";
 export * from "./repositories/modelRepository.js";
 export * from "./repositories/outputRepository.js";
+export * from "./repositories/patternDraftRepository.js";
 export * from "./repositories/patternPipelineRepository.js";
 export * from "./repositories/patternRepository.js";
 export * from "./repositories/projectRepository.js";
@@ -87,6 +97,7 @@ export class EcomRepository {
   private readonly userContent: UserContentRepository;
   private readonly models: ModelRepository;
   private readonly patterns: PatternRepository;
+  private readonly drafts: PatternDraftRepository;
   private readonly pipelines: PatternPipelineRepository;
   private readonly projects: ProjectRepository;
   private readonly assets: AssetRepository;
@@ -103,6 +114,7 @@ export class EcomRepository {
     this.userContent = new UserContentRepository(db);
     this.models = new ModelRepository(db);
     this.patterns = new PatternRepository(db);
+    this.drafts = new PatternDraftRepository(db);
     this.pipelines = new PatternPipelineRepository(db);
     this.projects = new ProjectRepository(db);
     this.assets = new AssetRepository(db);
@@ -180,6 +192,40 @@ export class EcomRepository {
   public deletePrintPack(id: string): boolean { return this.patterns.deletePrintPack(id); }
   public savePatternListingResult(input: Parameters<PatternRepository["savePatternListingResult"]>[0]): PatternListingResultRecord { return this.patterns.savePatternListingResult(input); }
   public getPatternListingResult(jobId: string): PatternListingResultRecord | undefined { return this.patterns.getPatternListingResult(jobId); }
+  public getPatternByDraftCandidateId(candidateId: string): PatternRecord | undefined { return this.patterns.getPatternByDraftCandidateId(candidateId); }
+
+  // ---- pattern drafts ----
+  public listPatternDrafts(includeArchived = false): PatternDraftRecord[] { return this.drafts.listDrafts(includeArchived); }
+  public getPatternDraft(id: string): PatternDraftRecord | undefined { return this.drafts.getDraft(id); }
+  public createPatternDraft(input: Parameters<PatternDraftRepository["createDraft"]>[0]): PatternDraftRecord { return this.drafts.createDraft(input); }
+  public updatePatternDraft(id: string, patch: Parameters<PatternDraftRepository["updateDraft"]>[1], expectedRevision: number): UpdateDraftResult { return this.drafts.updateDraft(id, patch, expectedRevision); }
+  public setPatternDraftSelectedCandidate(id: string, selectedCandidateId: string | null): PatternDraftRecord | undefined { return this.drafts.setDraftSelectedCandidate(id, selectedCandidateId); }
+  public deletePatternDraft(id: string): boolean { return this.drafts.deleteDraft(id); }
+  public listDraftMedia(draftId: string): DraftMediaRecord[] { return this.drafts.listMedia(draftId); }
+  public getDraftMedia(id: string): DraftMediaRecord | undefined { return this.drafts.getMedia(id); }
+  public countDraftMedia(draftId: string, role: Parameters<PatternDraftRepository["countMedia"]>[1]): number { return this.drafts.countMedia(draftId, role); }
+  public createDraftMedia(input: Parameters<PatternDraftRepository["createMedia"]>[0]): DraftMediaRecord { return this.drafts.createMedia(input); }
+  public updateDraftMedia(id: string, patch: Parameters<PatternDraftRepository["updateMedia"]>[1]): DraftMediaRecord | undefined { return this.drafts.updateMedia(id, patch); }
+  public deleteDraftMedia(id: string): boolean { return this.drafts.deleteMedia(id); }
+  public listDraftBatches(draftId: string): DraftBatchRecord[] { return this.drafts.listBatches(draftId); }
+  public getDraftBatch(id: string): DraftBatchRecord | undefined { return this.drafts.getBatch(id); }
+  public getDraftBatchByClientKey(draftId: string, clientKey: string): DraftBatchRecord | undefined { return this.drafts.getBatchByClientKey(draftId, clientKey); }
+  public createDraftBatch(input: Parameters<PatternDraftRepository["createBatch"]>[0]): { batch: DraftBatchRecord; slots: DraftSlotRecord[] } { return this.drafts.createBatch(input); }
+  public listDraftSlots(batchId: string): DraftSlotRecord[] { return this.drafts.listSlots(batchId); }
+  public listDraftSlotsByJobId(jobId: string): DraftSlotRecord[] { return this.drafts.listSlotsByJobId(jobId); }
+  public updateDraftSlot(batchId: string, index: number, patch: Parameters<PatternDraftRepository["updateSlot"]>[2]): DraftSlotRecord | undefined { return this.drafts.updateSlot(batchId, index, patch); }
+  public assignDraftSlotsToJob(batchId: string, indices: number[], jobId: string, bumpAttempt = true): DraftSlotRecord[] { return this.drafts.assignSlotsToJob(batchId, indices, jobId, bumpAttempt); }
+  public listDraftCandidates(draftId: string): DraftCandidateRecord[] { return this.drafts.listCandidates(draftId); }
+  public listDraftCandidatesByBatch(batchId: string): DraftCandidateRecord[] { return this.drafts.listCandidatesByBatch(batchId); }
+  public getDraftCandidate(id: string): DraftCandidateRecord | undefined { return this.drafts.getCandidate(id); }
+  public summarizeDraftCandidates(draftIds: string[]): ReturnType<PatternDraftRepository["summarizeCandidates"]> { return this.drafts.summarizeCandidates(draftIds); }
+  public listDraftCandidateSlotIndices(batchId: string): number[] { return this.drafts.listCandidateSlotIndices(batchId); }
+  public createDraftCandidate(input: Parameters<PatternDraftRepository["createCandidate"]>[0]): DraftCandidateRecord { return this.drafts.createCandidate(input); }
+  public setDraftCandidateTileable(id: string, verdict: Parameters<PatternDraftRepository["setCandidateTileable"]>[1]): DraftCandidateRecord | undefined { return this.drafts.setCandidateTileable(id, verdict); }
+  public listChildDraftCandidates(parentCandidateId: string): string[] { return this.drafts.listChildCandidateIds(parentCandidateId); }
+  public listDraftParentBatches(draftId: string, candidateId: string): string[] { return this.drafts.listParentBatches(draftId, candidateId); }
+  public isDraftStoragePathReferenced(draftId: string, storagePath: string): boolean { return this.drafts.isStoragePathReferenced(draftId, storagePath); }
+  public deleteDraftCandidate(id: string): boolean { return this.drafts.deleteCandidate(id); }
 
   // ---- pattern pipelines ----
   public createPatternPipeline(input: Parameters<PatternPipelineRepository["createPatternPipeline"]>[0]): PatternPipelineWithSteps { return this.pipelines.createPatternPipeline(input); }
@@ -210,6 +256,11 @@ export class EcomRepository {
   // ---- library view ----
   public listLibraryItems(query?: Parameters<LibraryRepository["listLibraryItems"]>[0]): LibraryItemPage { return this.library.listLibraryItems(query); }
   public findLibrarySourcePath(hash: string): string | undefined { return this.library.findLibrarySourcePath(hash); }
+  /**
+   * 缩略图惰性生成的统一切入口：按内容 hash 在草稿域与资产库域依次查源文件。
+   * 两个域各自只查自己的表，组合放在门面上，避免任一仓储越界读别人的表。
+   */
+  public findImageSourcePath(hash: string): string | undefined { return this.drafts.findImageSourcePath(hash) ?? this.library.findLibrarySourcePath(hash); }
   public resolveLibrarySource(itemId: string): ReturnType<LibraryRepository["resolveLibrarySource"]> { return this.library.resolveLibrarySource(itemId); }
 
   // ---- storyboard ----
@@ -229,6 +280,7 @@ export class EcomRepository {
   public recoverInterruptedJobs(): JobRecord[] { return this.jobs.recoverInterruptedJobs(); }
   public listJobs(projectId: string): JobRecord[] { return this.jobs.listJobs(projectId); }
   public listJobsByType(type: Parameters<JobRepository["listJobsByType"]>[0], limit: number): JobRecord[] { return this.jobs.listJobsByType(type, limit); }
+  public listJobsByIds(ids: readonly string[]): Map<string, JobRecord> { return this.jobs.listJobsByIds(ids); }
   public saveCopywritingResult(input: Parameters<JobRepository["saveCopywritingResult"]>[0]): CopywritingResultRecord { return this.jobs.saveCopywritingResult(input); }
   public getCopywritingResult(jobId: string): CopywritingResultRecord | undefined { return this.jobs.getCopywritingResult(jobId); }
   public createWebResearchAudit(jobId: string, availability: Parameters<JobRepository["createWebResearchAudit"]>[1]): WebResearchAuditRecord { return this.jobs.createWebResearchAudit(jobId, availability); }

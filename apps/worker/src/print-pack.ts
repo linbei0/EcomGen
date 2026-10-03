@@ -5,7 +5,8 @@
  * Worker 执行器只负责读写文件与元数据。放大允许（印刷文件需要图案铺满可印区），
  * 重采样核固定 lanczos3 并随 manifest 声明，不虚构"无损放大"。
  */
-import { REPEAT_UNIT_PLACEMENTS, type PodRepeatLayout } from "@ecomgen/contracts";
+import { REPEAT_UNIT_PLACEMENTS, type PodRepeatLayout, type RepeatUnitPlacement } from "@ecomgen/contracts";
+import type { RepeatUnitPlacementPixels } from "./repeat-unit.js";
 
 export interface PrintPackPlacement {
   /** 重采样后的图稿尺寸（像素）。 */
@@ -39,12 +40,17 @@ export function computePrintPackPlacement(
   return { width, height, left, top };
 }
 
-export interface PrintPackTilePlacement {
-  /** 该枚花型在重复单元内的左上角（像素）。 */
-  left: number;
-  top: number;
-  flipX: boolean;
-  flipY: boolean;
+/** 该枚花型在重复单元内的左上角（像素）；就是合成端消费的摆放位，不另立一份定义。 */
+export type PrintPackTilePlacement = RepeatUnitPlacementPixels;
+
+/** 把契约里的单元摆放（dx/dy 为花型边长的倍数）折算成像素：两处几何只差一个基准尺寸。 */
+function placementPixels(placements: readonly RepeatUnitPlacement[], tileWidth: number, tileHeight: number): PrintPackTilePlacement[] {
+  return placements.map((placement) => ({
+    left: Math.round(placement.dx * tileWidth),
+    top: Math.round(placement.dy * tileHeight),
+    flipX: placement.flipX,
+    flipY: placement.flipY,
+  }));
 }
 
 export interface PrintPackTileLayout {
@@ -91,12 +97,7 @@ export function computePrintPackTileLayout(
   const tileHeight = Math.max(1, Math.round(sourceHeight * scale));
   const unitWidth = Math.max(1, Math.round(tileWidth * unit.columns));
   const unitHeight = Math.max(1, Math.round(tileHeight * unit.rows));
-  const placements = unit.placements.map((placement) => ({
-    left: Math.round(placement.dx * tileWidth),
-    top: Math.round(placement.dy * tileHeight),
-    flipX: placement.flipX,
-    flipY: placement.flipY,
-  }));
+  const placements = placementPixels(unit.placements, tileWidth, tileHeight);
   const columns = Math.ceil(canvasWidthPx / unitWidth);
   const rows = Math.ceil(canvasHeightPx / unitHeight);
   const left = Math.round((canvasWidthPx - columns * unitWidth) / 2);
@@ -120,11 +121,6 @@ export function computeRepeatUnitGeometry(sourceWidth: number, sourceHeight: num
   return {
     unitWidth: Math.max(1, Math.round(sourceWidth * unit.columns)),
     unitHeight: Math.max(1, Math.round(sourceHeight * unit.rows)),
-    placements: unit.placements.map((placement) => ({
-      left: Math.round(placement.dx * sourceWidth),
-      top: Math.round(placement.dy * sourceHeight),
-      flipX: placement.flipX,
-      flipY: placement.flipY,
-    })),
+    placements: placementPixels(unit.placements, sourceWidth, sourceHeight),
   };
 }

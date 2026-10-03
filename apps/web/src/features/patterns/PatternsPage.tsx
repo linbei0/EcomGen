@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { App, Button, Input, Modal, Progress, Select, Skeleton, Upload } from "antd";
+import { App, Button, Input, Modal, Progress, Select, Skeleton, Tooltip, Upload } from "antd";
 import {
   Check,
   FileUp,
   Grid2x2,
+  Layers,
   ListFilter,
   Package,
   PackageCheck,
@@ -20,11 +21,8 @@ import {
   X,
 } from "lucide-react";
 
-import { PATTERN_FORGE_CANDIDATES_MAX } from "@ecomgen/contracts";
-
 import {
   useCreatePatternExtractJob,
-  useCreatePatternForgeJob,
   useCreatePatternListingJob,
   useCreatePrintPackJob,
   useDeletePattern,
@@ -33,10 +31,11 @@ import {
   useUploadPattern,
   type ListingPlatform,
   type Pattern,
-  type PatternBackgroundMode,
   type PodPrintLayout,
   type PodRepeatLayout,
 } from "../../api/hooks/usePatterns";
+import { usePatternDrafts } from "../../api/hooks/usePatternDrafts";
+import { StartDraftDialog } from "../pattern-drafts/StartDraftDialog";
 import { useJobStatus } from "../../api/hooks/useJobs";
 import { useProviders } from "../../api/hooks/useProviders";
 import { qk } from "../../api/queryKeys";
@@ -44,13 +43,10 @@ import { AppTopbar } from "../../components/AppTopbar";
 import { errorText } from "../../lib/errorText";
 import { jobErrorText } from "../../lib/jobError";
 import { parseModelKey, segmentationModelOptions } from "../../lib/modelOptions";
+import { relativeTime } from "../../lib/format";
 import { panelBackdrop, placeholderBackdrop } from "./heroPatterns";
-import { BackgroundModeSelect, EMPTY_PIPELINE_ANSWERS, ImageModelSelect, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, PipelineAnswersBlock, missingPipelineAnswer, podSpecOptionLabel, RepeatLayoutChipRow, SOURCE_FILTERS, SOURCE_LABELS, stageText, StatusPill, statusLabel, statusTone, tileableBadge, toPipelineAnswers, useImageModelOptions, type PipelineAnswerDraft } from "./shared";
+import { EMPTY_PIPELINE_ANSWERS, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, PipelineAnswersBlock, missingPipelineAnswer, podSpecOptionLabel, RepeatLayoutChipRow, SOURCE_FILTERS, SOURCE_LABELS, stageText, StatusPill, statusLabel, statusTone, tileableBadge, toPipelineAnswers, type PipelineAnswerDraft } from "./shared";
 import styles from "./PatternsPage.module.css";
-
-/** 起稿可选底版：契约把起稿的 background 收窄掉了 SOURCE（没有源图），这里与之对齐。 */
-type ForgeBackgroundMode = Exclude<PatternBackgroundMode, "SOURCE">;
-const FORGE_BACKGROUND_MODES = ["WHITE", "TRANSPARENT"] as const;
 
 type ActiveJobKind = "EXTRACT" | "FORGE";
 
@@ -111,7 +107,8 @@ export function PatternsPage() {
 
   const [extractOpen, setExtractOpen] = useState(false);
   const [extractPresetFile, setExtractPresetFile] = useState<File | null>(null);
-  const [forgeOpen, setForgeOpen] = useState(false);
+  const [startDraftOpen, setStartDraftOpen] = useState(false);
+  const draftsQuery = usePatternDrafts();
   const [activeJobs, setActiveJobs] = useState<ActiveJob[]>(loadActiveJobs);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
@@ -128,6 +125,9 @@ export function PatternsPage() {
   const [batchListingOpen, setBatchListingOpen] = useState(false);
 
   const patterns = useMemo(() => patternsQuery.data?.items ?? [], [patternsQuery.data]);
+  const drafts = useMemo(() => draftsQuery.data?.items ?? [], [draftsQuery.data]);
+  // 页头草稿入口的悬停详情：只报最近一份，完整列表在草稿页。
+  const latestDraft = useMemo(() => [...drafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null, [drafts]);
   const allTags = useMemo(() => Array.from(new Set(patterns.flatMap((pattern) => pattern.tags))).sort(), [patterns]);
   const visiblePatterns = useMemo(
     () =>
@@ -301,10 +301,19 @@ export function PatternsPage() {
                 {activeJobs.length} 个任务进行中
               </span>
             ) : null}
+            {latestDraft ? (
+              <Tooltip
+                title={`最近：${latestDraft.name}${latestDraft.candidateCount > 0 ? ` · ${latestDraft.candidateCount} 张候选` : ""} · ${relativeTime(latestDraft.updatedAt)}`}
+              >
+                <Button icon={<Layers size={15} strokeWidth={2} />} onClick={() => navigate("/pattern-drafts")}>
+                  草稿 · {drafts.length}
+                </Button>
+              </Tooltip>
+            ) : null}
             <Button type="primary" icon={<Search size={15} strokeWidth={2} />} onClick={() => openExtract(null)}>
               从商品图提取
             </Button>
-            <Button icon={<Sparkles size={15} strokeWidth={2} />} onClick={() => setForgeOpen(true)}>
+            <Button icon={<Sparkles size={15} strokeWidth={2} />} onClick={() => setStartDraftOpen(true)}>
               AI 起稿
             </Button>
             <UploadButton />
@@ -385,7 +394,7 @@ export function PatternsPage() {
                 <Button type="primary" icon={<Search size={15} strokeWidth={2} />} onClick={() => openExtract(null)}>
                   从商品图提取
                 </Button>
-                <Button icon={<Sparkles size={15} strokeWidth={2} />} onClick={() => setForgeOpen(true)}>
+                <Button icon={<Sparkles size={15} strokeWidth={2} />} onClick={() => setStartDraftOpen(true)}>
                   AI 起稿
                 </Button>
               </div>
@@ -479,10 +488,14 @@ export function PatternsPage() {
         }}
         onStarted={(job, reused, title) => trackJob({ job, reused, kind: "EXTRACT", title })}
       />
-      <ForgeDialog
-        open={forgeOpen}
-        onClose={() => setForgeOpen(false)}
-        onStarted={(job, reused, title) => trackJob({ job, reused, kind: "FORGE", title })}
+      <StartDraftDialog
+        open={startDraftOpen}
+        onClose={() => setStartDraftOpen(false)}
+        onCreated={(draft) => {
+          setStartDraftOpen(false);
+          queryClient.invalidateQueries({ queryKey: qk.patternDrafts });
+          navigate(`/pattern-drafts/${draft.id}`);
+        }}
       />
 
       <BatchPackDialog
@@ -870,133 +883,6 @@ function ExtractDialog({
         placeholder="补充描述（可选），例如：只留杯壁图案、去掉杯把和底座"
         value={brief}
         onChange={(event) => setBrief(event.target.value)}
-      />
-      <PipelineAnswersBlock draft={pipeline} onChange={setPipeline} />
-    </Modal>
-  );
-}
-
-/** AI 起稿：主题/风格/候选数；每张候选各自成为独立花型，无选中语义。 */
-function ForgeDialog({
-  open,
-  onClose,
-  onStarted,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onStarted: (job: { id: string }, reused: boolean, title: string) => void;
-}) {
-  const { message } = App.useApp();
-  const imageOptions = useImageModelOptions();
-  const forge = useCreatePatternForgeJob();
-
-  const [modelKey, setModelKey] = useState<string | null>(null);
-  const [theme, setTheme] = useState("");
-  const [style, setStyle] = useState("");
-  const [candidateCount, setCandidateCount] = useState(1);
-  // 底版缺省跟着模型能力走：支持透明底就默认透明底（花型印在承印物上要透出底色），
-  // 但用户一旦自己选过就不再覆盖他的选择。
-  const [background, setBackground] = useState<ForgeBackgroundMode>("WHITE");
-  const [backgroundTouched, setBackgroundTouched] = useState(false);
-  const [pipeline, setPipeline] = useState<PipelineAnswerDraft>(EMPTY_PIPELINE_ANSWERS);
-
-  const selectedModel = imageOptions.find((option) => option.value === modelKey);
-
-  useEffect(() => {
-    if (backgroundTouched || !selectedModel) return;
-    setBackground(selectedModel.transparentBackground ? "TRANSPARENT" : "WHITE");
-  }, [backgroundTouched, selectedModel]);
-
-  const submit = () => {
-    if (!theme.trim()) {
-      message.warning("请描述图案主题");
-      return;
-    }
-    if (!modelKey) {
-      message.warning("请选择生图模型");
-      return;
-    }
-    const missing = missingPipelineAnswer(pipeline);
-    if (missing) {
-      message.warning(missing);
-      return;
-    }
-    const { providerId, modelId } = parseModelKey(modelKey);
-    const answers = toPipelineAnswers(pipeline);
-    forge.mutate(
-      {
-        body: {
-          providerId,
-          imageModelId: modelId,
-          theme: theme.trim(),
-          ...(style.trim() ? { style: style.trim() } : {}),
-          background,
-          candidateCount,
-          ...(answers ? { pipeline: answers } : {}),
-        },
-      },
-      {
-        onSuccess: ({ job, reused }) => {
-          onStarted(job, reused, theme.trim());
-          setTheme("");
-          setStyle("");
-          setCandidateCount(1);
-          // 底版清回"未选过"：下一次起稿仍按当时所选模型的能力给默认值。
-          setBackgroundTouched(false);
-          setPipeline(EMPTY_PIPELINE_ANSWERS);
-        },
-        onError: (error) => message.error(errorText(error)),
-      },
-    );
-  };
-
-  return (
-    <Modal
-      title="AI 起稿"
-      open={open}
-      onCancel={onClose}
-      onOk={submit}
-      okText="开始起稿"
-      confirmLoading={forge.isPending}
-      okButtonProps={{ disabled: !theme.trim() || !modelKey }}
-      destroyOnHidden
-    >
-      <Input.TextArea
-        rows={3}
-        placeholder="图案主题，例如：水彩野花束、奶油色底、留白呼吸感"
-        value={theme}
-        onChange={(event) => setTheme(event.target.value)}
-      />
-      <Input
-        style={{ marginTop: 12 }}
-        placeholder="风格画种（可选），例如 watercolor / line art / geometric"
-        value={style}
-        onChange={(event) => setStyle(event.target.value)}
-      />
-      <div style={{ marginTop: 12 }}>
-        <ImageModelSelect value={modelKey} onChange={setModelKey} storageKey="ecomgen.patterns.forgeModel" />
-      </div>
-      <div style={{ marginTop: 12 }}>
-        <BackgroundModeSelect
-          value={background}
-          onChange={(mode) => {
-            setBackgroundTouched(true);
-            setBackground(mode);
-          }}
-          modes={FORGE_BACKGROUND_MODES}
-          fallback="WHITE"
-          transparentAvailable={Boolean(selectedModel?.transparentBackground)}
-        />
-      </div>
-      <Select
-        style={{ width: "100%", marginTop: 12 }}
-        aria-label="候选数量"
-        value={candidateCount}
-        onChange={setCandidateCount}
-        options={Array.from({ length: PATTERN_FORGE_CANDIDATES_MAX }, (_, index) => ({
-          value: index + 1,
-          label: `生成 ${index + 1} 张候选`,
-        }))}
       />
       <PipelineAnswersBlock draft={pipeline} onChange={setPipeline} />
     </Modal>

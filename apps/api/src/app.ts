@@ -17,6 +17,7 @@ import { registerJobRoutes } from "./routes/jobs.js";
 import { registerMetaRoutes } from "./routes/meta.js";
 import { registerModelRoutes } from "./routes/models.js";
 import { registerOutputRoutes } from "./routes/outputs.js";
+import { registerPatternDraftRoutes } from "./routes/patternDrafts.js";
 import { registerPatternPipelineRoutes } from "./routes/patternPipelines.js";
 import { registerPatternRoutes } from "./routes/patterns.js";
 import { registerProjectRoutes } from "./routes/projects.js";
@@ -130,6 +131,7 @@ export async function buildApi(options: ApiOptions): Promise<FastifyInstance> {
   registerSuiteForgeRoutes(app, ctx);
   registerModelRoutes(app, ctx);
   registerPatternRoutes(app, ctx);
+  registerPatternDraftRoutes(app, ctx);
   registerPatternPipelineRoutes(app, ctx);
   registerProviderRoutes(app, ctx);
   registerSearchSourceRoutes(app, ctx);

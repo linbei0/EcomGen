@@ -11,7 +11,7 @@ export class LocalAssetStore {
   }
 
   public async initialize(): Promise<void> {
-    await Promise.all(["assets", "outputs", "exports", "edits", "layers", "thumbs", "tmp", "suite-forge", "patterns", "print-packs"].map((part) => mkdir(join(this.root, part), { recursive: true })));
+    await Promise.all(["assets", "outputs", "exports", "edits", "layers", "thumbs", "tmp", "suite-forge", "patterns", "print-packs", "drafts"].map((part) => mkdir(join(this.root, part), { recursive: true })));
   }
 
   public async putAsset(projectId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
@@ -96,6 +96,32 @@ export class LocalAssetStore {
   /** 提取/起稿的源图留痕：同 job 的源图与产物共居 patterns/<patternId>/，保证来源可追溯。 */
   public async putPatternSource(patternId: string, originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
     return this.putPatternArtifact(patternId, "source", content, this.safeExtension(originalName) || ".png");
+  }
+
+  /**
+   * 创作草稿的参考或蒙版媒体；按 draft 聚合在 `drafts/<draftId>/media|masks/`。
+   * 上传与花型库引用都拷贝为草稿自有快照，原花型改名/删除不改写已提交批次。
+   */
+  public async putDraftMedia(draftId: string, role: "REFERENCE" | "MASK", originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const folder = role === "MASK" ? "masks" : "media";
+    const relativePath = join("drafts", draftId, folder, `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(originalName)}`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
+  /** 创作候选图稿：以 candidateId 稳定寻址，路径不因重试变化；候选像素一经写入不可变。 */
+  public async putDraftCandidate(draftId: string, candidateId: string, content: Buffer, extension = ".png"): Promise<{ path: string; hash: string }> {
+    const hash = createHash("sha256").update(content).digest("hex");
+    const relativePath = join("drafts", draftId, "candidates", `${candidateId}-${hash.slice(0, 12)}${this.safeExtension(extension)}`);
+    await this.write(relativePath, content);
+    return { path: relativePath, hash };
+  }
+
+  /** 永久删除草稿的全部本地产物（drafts/<draftId>/ 整目录）；正式花型路径不在该命名空间下，不会被连带删除。 */
+  public async deleteDraft(draftId: string): Promise<void> {
+    this.assertSingleSegment(draftId, "Draft id");
+    await this.deleteNamespaceChild("drafts", draftId);
   }
 
   /** 规格包产物（印刷图稿 PNG 与 manifest/ZIP）；按 printPack 聚合，随规格包删除级联清理。 */

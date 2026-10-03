@@ -1,10 +1,11 @@
 import { App, Image, Popconfirm } from "antd";
 import { LibraryBig, Palette, Package, ShieldCheck, Trash2, Upload as UploadIcon, type LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 
 import type { Asset, ProjectDetail, UserAssetKind } from "../../api/adapters/projectDetail";
 import { useDeleteAsset, useUploadAsset } from "../../api/hooks/useAssets";
 import { errorText } from "../../lib/errorText";
+import { useFileDropTarget } from "../../lib/fileDrop";
 import { kindForRole, USER_ASSET_KIND_META, USER_ASSET_KIND_ORDER } from "../../lib/roles";
 import { LibraryPickerDialog } from "../library/LibraryPickerDialog";
 import styles from "./workbench.module.css";
@@ -18,7 +19,6 @@ export function AssetsStage({
 }) {
   const { notification } = App.useApp();
   const [kind, setKind] = useState<UserAssetKind>("PRODUCT");
-  const [dragOver, setDragOver] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const upload = useUploadAsset();
   const removeAsset = useDeleteAsset();
@@ -53,6 +53,8 @@ export function AssetsStage({
     void uploadFiles(images);
   };
 
+  const { dragging, dropProps } = useFileDropTarget(sendFiles);
+
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       const images = Array.from(event.clipboardData?.files ?? []).filter(
@@ -65,12 +67,6 @@ export function AssetsStage({
     document.addEventListener("paste", onPaste);
     return () => document.removeEventListener("paste", onPaste);
   }, [detail.id, kind]);
-
-  const onDrop = (event: DragEvent<HTMLLabelElement>) => {
-    event.preventDefault();
-    setDragOver(false);
-    sendFiles(event.dataTransfer.files);
-  };
 
   const onPick = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) sendFiles(event.target.files);
@@ -98,16 +94,7 @@ export function AssetsStage({
         ))}
       </div>
 
-      <label
-        className={styles.dropzone}
-        data-over={dragOver}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-      >
+      <label className={styles.dropzone} data-over={dragging} {...dropProps}>
         <input
           type="file"
           accept="image/*"

@@ -19,6 +19,15 @@ import {
   PatternPipelineStatus, PatternPipelineBlockReason, PatternPipelineResolution, PatternPipelineAnswers, CreatePatternPipelineInput, ContinuePatternPipelineInput,
 } from "./pod-schemas.js";
 import { PodRepeatLayout } from "./pod-repeat.js";
+// 起稿工作台契约同理：显式列出 schema，避免裸元组常量混入 components。
+import {
+  DraftComposeType, DraftMediaRole, DraftMediaSource, DraftBackground, DraftBatchOperation,
+  DraftSlotStatus, DraftSeamEdge, DraftRecolorParams, DraftSeamEdit, DraftConditions,
+  PatternDraft, PatternDraftList, CreatePatternDraftInput, UpdatePatternDraftInput, DraftMedia, DraftMediaList,
+  DraftCandidateTileable, DraftCandidate, DraftCandidateList, DraftSlot, DraftBatch, DraftBatchList,
+  CreateDraftBatchInput, DraftJobRef, CreateDraftBatchResponse, RetryDraftBatchResponse,
+  FinalizeDraftCandidateInput, FinalizeDraftCandidateResponse,
+} from "./pattern-draft-schemas.js";
 import { EventEnvelope, ModelCapabilities, ModelDefinition } from "./legacy-schemas.js";
 
 /** All schemas emitted into OpenAPI components.schemas. */
@@ -37,6 +46,12 @@ export const API_SCHEMA_REGISTRY = {
   CreatePatternDeriveJobInput, TileableStatus, CreatePatternVariantJobInput, PatternVariantAxis, PatternVariantPreset, PatternBackgroundMode,
   PatternPipeline, PatternPipelineList, PatternPipelineStep, PatternPipelineStepName, PatternPipelineStepStatus,
   PatternPipelineStatus, PatternPipelineBlockReason, PatternPipelineResolution, PatternPipelineAnswers, CreatePatternPipelineInput, ContinuePatternPipelineInput,
+  DraftComposeType, DraftMediaRole, DraftMediaSource, DraftBackground, DraftBatchOperation,
+  DraftSlotStatus, DraftSeamEdge, DraftRecolorParams, DraftSeamEdit, DraftConditions,
+  PatternDraft, PatternDraftList, CreatePatternDraftInput, UpdatePatternDraftInput, DraftMedia, DraftMediaList,
+  DraftCandidateTileable, DraftCandidate, DraftCandidateList, DraftSlot, DraftBatch, DraftBatchList,
+  CreateDraftBatchInput, DraftJobRef, CreateDraftBatchResponse, RetryDraftBatchResponse,
+  FinalizeDraftCandidateInput, FinalizeDraftCandidateResponse,
 } as const;
 
 export type ApiSchemaName = keyof typeof API_SCHEMA_REGISTRY;

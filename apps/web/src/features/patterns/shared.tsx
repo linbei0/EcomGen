@@ -2,11 +2,11 @@
  * 花型墙与花型工作区共享的常量与小部件。
  * 两个路由分属不同 chunk，常量与 ListingModelSelect/CopyRow 这类两处都要用的件放这里，避免复制。
  */
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import { App, Button, Checkbox, Select } from "antd";
 import { Copy } from "lucide-react";
 
-import { POD_REPEAT_LAYOUT_LABELS } from "@ecomgen/contracts";
+import { POD_REPEAT_LAYOUT_LABELS, REPEAT_UNIT_PLACEMENTS, TILEABILITY_ALGORITHM_VERSION, TILEABILITY_VERIFIED_MIN, type DraftCandidateTileable, type DraftComposeType } from "@ecomgen/contracts";
 import { PATTERN_BACKGROUND_MODE_LABELS } from "@ecomgen/ecom-skill";
 import { usePodPrintSpecs } from "../../api/hooks/usePatterns";
 import { useProviders } from "../../api/hooks/useProviders";
@@ -44,6 +44,36 @@ export const POD_PRINT_LAYOUT_OPTIONS: Array<{ value: PodPrintLayout; label: str
 /** 平铺排列（仅满印生效）：标签唯一来源是 contracts/pod-repeat.ts，这里只把记录摊成选项数组。 */
 export const POD_REPEAT_LAYOUT_OPTIONS: Array<{ value: PodRepeatLayout; label: string }> = (Object.entries(POD_REPEAT_LAYOUT_LABELS) as Array<[PodRepeatLayout, string]>).map(([value, label]) => ({ value, label }));
 
+/**
+ * 接缝判定的一致呈现：颜色区分通过/未通过，逐轴分数指出是哪条边接不上。
+ *
+ * 判定是花型内容的确定性函数，算法版本不同即视为过期（重跑只会得到同一结果，所以过期必须说出来）。
+ * 起稿候选面板与重复预览共用这一份，同一个事实不出现两种说法。
+ */
+export function TileVerdict({ tileable, className }: { tileable: DraftCandidateTileable; className?: string }) {
+  const base: CSSProperties = { display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 12 };
+  if (tileable.status === "NONE" || tileable.score == null) return <span className={className} style={{ ...base, color: "var(--text-2)" }}>未检测</span>;
+  if (tileable.algorithmVersion !== TILEABILITY_ALGORITHM_VERSION) return <span className={className} style={{ ...base, color: "var(--text-2)" }}>判定已过期，请重新检测</span>;
+  const ok = tileable.status === "VERIFIED";
+  return (
+    <span className={className} style={{ ...base, color: ok ? "var(--success)" : "var(--danger)" }}>
+      <span>{ok ? "接缝通过" : "接缝未通过"} · 综合 {tileable.score.toFixed(2)}</span>
+      <TileabilityAxis label="横向" value={tileable.horizontal} />
+      <TileabilityAxis label="纵向" value={tileable.vertical} />
+    </span>
+  );
+}
+
+function TileabilityAxis({ label, value }: { label: string; value: number | null }) {
+  if (value == null) return null;
+  const ok = value >= TILEABILITY_VERIFIED_MIN;
+  return <span style={{ color: ok ? "var(--success)" : "var(--danger)" }}>{label} {value.toFixed(2)} {ok ? "通过" : "未通过"}</span>;
+}
+
+/** 创作类型：新建对话框、工作台只读展示与草稿列表徽标共用的唯一清单。 */
+export const DRAFT_COMPOSE_TYPE_LABELS: Record<DraftComposeType, string> = { PLACEMENT: "单幅印花", REPEAT: "连续花型" };
+export const DRAFT_COMPOSE_TYPE_OPTIONS: Array<{ value: DraftComposeType; label: string }> = (Object.entries(DRAFT_COMPOSE_TYPE_LABELS) as Array<[DraftComposeType, string]>).map(([value, label]) => ({ value, label }));
+
 /** 规格目录选项的统一标签：尺寸与 DPI 是选规格时真正要看的两个数，四处下拉共用一份拼法。 */
 export function podSpecOptionLabel(spec: PodPrintSpec): string {
   return `${spec.label}（${spec.widthPx}×${spec.heightPx} · ${spec.dpi}DPI）`;
@@ -70,6 +100,58 @@ export function RepeatLayoutChipRow({ value, onChange, variant = "wall", ariaLab
   ariaLabel?: string;
 }) {
   return <OptionChipRow value={value} onChange={onChange} variant={variant} ariaLabel={ariaLabel} options={POD_REPEAT_LAYOUT_OPTIONS} />;
+}
+
+/**
+ * 平铺预览：用内联 SVG pattern 复刻成包时的单元几何（REPEAT_UNIT_PLACEMENTS 是与 worker 共用的唯一真相源）。
+ *
+ * 每个摆放位画四份（本位与 -1 单元的横/竖/对角副本）：pattern 会裁掉出界内容，偏移副本恰好把
+ * 裁掉的部分从对侧补回，形成无缝环绕。错位与镜像翻转只有 SVG transform 表达得出来——这正是
+ * 这里用 SVG 而不是 CSS background-repeat 的原因，后者只能直排平铺。
+ */
+export function TiledPatternStage({ imageUrl, layout, tileSize, className, style, ariaLabel = "平铺预览" }: {
+  imageUrl: string;
+  layout: PodRepeatLayout;
+  /** 单枚花型的显示边长（px）；重复单元的宽高由该排列的 columns/rows 推得。 */
+  tileSize: number;
+  className?: string;
+  style?: CSSProperties;
+  ariaLabel?: string;
+}) {
+  const unit = REPEAT_UNIT_PLACEMENTS[layout];
+  const unitWidth = tileSize * unit.columns;
+  const unitHeight = tileSize * unit.rows;
+  // useId 带冒号不能直接进 url(#…) 片段引用，剥掉非安全字符；剩余部分仍保证唯一。
+  const fillId = `tile-pattern-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return (
+    <svg className={className} style={style} role="img" aria-label={ariaLabel}>
+      <defs>
+        <pattern id={fillId} patternUnits="userSpaceOnUse" width={unitWidth} height={unitHeight}>
+          {unit.placements.flatMap((placement, index) =>
+            [0, -1].flatMap((shiftX) =>
+              [0, -1].map((shiftY) => {
+                const x = placement.dx * tileSize + shiftX * unitWidth;
+                const y = placement.dy * tileSize + shiftY * unitHeight;
+                return (
+                  <image
+                    key={`${index}:${shiftX}:${shiftY}`}
+                    href={imageUrl}
+                    x={0}
+                    y={0}
+                    width={tileSize}
+                    height={tileSize}
+                    preserveAspectRatio="none"
+                    transform={`translate(${x + (placement.flipX ? tileSize : 0)} ${y + (placement.flipY ? tileSize : 0)}) scale(${placement.flipX ? -1 : 1} ${placement.flipY ? -1 : 1})`}
+                  />
+                );
+              }),
+            ),
+          )}
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#${fillId})`} />
+    </svg>
+  );
 }
 
 function OptionChipRow<V extends string>({ value, onChange, variant, ariaLabel, options }: {

@@ -1,0 +1,187 @@
+/*
+ * 引用输入框的像素对齐契约。
+ *
+ * 镜像层（画引用底色）必须和 textarea（画文字）在字符位置上完全重合，因此
+ * --ref-size / --ref-line / --ref-pad-y / --ref-pad-x 只在这里定义一次，两侧共用；
+ * --ref-gutter 由组件实测 textarea 被滚动条占掉的宽度后写入，避免猜浏览器滚动条宽度。
+ * 改这里的任何一项都要同时想清楚另一侧——单边改动会让引用底色和文字错开。
+ */
+.refField {
+  --ref-size: 14px;
+  --ref-line: 22px;
+  --ref-pad-y: 4px;
+  --ref-pad-x: 11px;
+  --ref-gutter: 0px;
+  position: relative;
+  border-radius: var(--radius-s);
+  /* 底色画在镜像层之下：textarea 本身透明，引用 chip 的底色才透得出来。 */
+  background: var(--bg-2);
+}
+
+.refMetrics {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  padding: var(--ref-pad-y) var(--ref-pad-x);
+  padding-right: calc(var(--ref-pad-x) + var(--ref-gutter));
+  font-family: inherit;
+  font-size: var(--ref-size);
+  line-height: var(--ref-line);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  tab-size: 4;
+  /* 文字透明，只留 mark 的底色；文字由上层 textarea 画，避免同一处文字叠两次。 */
+  color: transparent;
+}
+
+.refMeasure {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.refMirror {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/*
+ * 引用 chip 只能改不参与布局的属性：底色、圆角、下划线、box-shadow 的外扩都不影响字符位置，
+ * 而内边距、字距、字号会——chip 是画在文字底下的，镜像一错位就和 textarea 的文字分家。
+ * 底色取三成强调色（在真实 Chromium 渲染里比对过 20%/26%/32%/40%）：再淡像普通文字，
+ * 再浓会盖过正文；圆角 5px 比胶囊形更贴合紧贴字形的方盒。
+ */
+.refToken,
+.refTokenDangling {
+  /* mark 有 UA 默认的黑字黄底，必须显式压掉，否则会和 textarea 的文字叠成双层。 */
+  color: transparent;
+  border-radius: 5px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.refToken {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/*
+ * 指向已删除的参考图：提交会被拒绝，所以先在输入框里显形。
+ * 除底色外加一条波浪下划线——只靠颜色表达状态对色觉障碍不友好，波形是更明确的“这里有错”。
+ */
+.refTokenDangling {
+  background: color-mix(in srgb, var(--danger) 30%, transparent);
+  text-decoration: underline wavy color-mix(in srgb, var(--danger) 90%, transparent);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+
+.refInput {
+  position: relative;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--ref-pad-y) var(--ref-pad-x);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--text-1);
+  caret-color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--ref-size);
+  line-height: var(--ref-line);
+  /* 常驻预留滚动条位置：否则内容变长的一瞬间换行宽度会突变，镜像立刻错位。 */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  resize: none;
+  outline: none;
+}
+
+.refInput::-webkit-scrollbar {
+  width: 8px;
+}
+
+.refInput::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 4px;
+}
+
+.refInput::placeholder {
+  color: var(--text-3);
+}
+
+.refInput:focus {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.refInput:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.refField[data-disabled="true"] {
+  opacity: 0.7;
+}
+
+.refPicker {
+  position: absolute;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 186px;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-s);
+  background: var(--bg-3);
+  box-shadow: var(--shadow-pop);
+}
+
+.refPickerItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.refPickerItem[data-active="true"] {
+  background: var(--accent-subtle);
+}
+
+.refPickerThumb {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: 1px solid var(--line-1);
+  border-radius: 3px;
+  background: var(--bg-0);
+  object-fit: cover;
+}
+
+.refPickerOrdinal {
+  flex: none;
+  font-weight: 600;
+}
+
+.refPickerName {
+  overflow: hidden;
+  color: var(--text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

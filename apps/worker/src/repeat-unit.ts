@@ -17,9 +17,17 @@ export interface RepeatUnitSource {
   height: number;
 }
 
+/** 单元内一枚花型的像素摆放位；布局计算方与这里的合成方共用同一个形状，避免两处各自演化。 */
+export interface RepeatUnitPlacementPixels {
+  left: number;
+  top: number;
+  flipX: boolean;
+  flipY: boolean;
+}
+
 export async function composeRepeatUnit(
   source: RepeatUnitSource,
-  unit: { unitWidth: number; unitHeight: number; placements: ReadonlyArray<{ left: number; top: number; flipX: boolean; flipY: boolean }> },
+  unit: { unitWidth: number; unitHeight: number; placements: readonly RepeatUnitPlacementPixels[] },
 ): Promise<Buffer> {
   const variants = new Map<string, Buffer>();
   const variantFor = async (flipX: boolean, flipY: boolean): Promise<Buffer> => {
