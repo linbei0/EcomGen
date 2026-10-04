@@ -21,13 +21,19 @@ describe("pattern variant prompt", () => {
     expect(watercolor).not.toBe(lineArt);
     expect(watercolor).not.toBe(grid);
 
-    // 补充描述只是插在模板片段之后，不替换模板
-    const fragment = watercolor.split(" Keep the artwork's")[0]!;
+    // 顺序固定为「输入图角色 → 预设片段 → 补充描述 → 护栏 → 排除项」：补充描述只是插入，
+    // 不替换模板，也不越过护栏。
     const withExtra = compilePatternVariantPrompt({ axis: "STYLE", preset: "WATERCOLOR", extra: "偏冷色调" });
-    expect(withExtra.startsWith(fragment)).toBe(true);
-    expect(withExtra).toContain("偏冷色调");
+    const presetAt = withExtra.indexOf("Repaint with translucent watercolor");
+    const extraAt = withExtra.indexOf("偏冷色调");
+    const guardrailAt = withExtra.indexOf("Change only what the instruction asks for");
+    expect(presetAt).toBeGreaterThanOrEqual(0);
+    expect(extraAt).toBeGreaterThan(presetAt);
+    expect(guardrailAt).toBeGreaterThan(extraAt);
+    // 输入图角色先声明：只有一个图像输入时不说清角色，模型会把它当成风格参考而非待改的图。
+    expect(withExtra.indexOf("Image 1 is the source pattern artwork")).toBe(0);
     // 模板自带的保持约束在任何预设下都存在：改了画风不该顺手改主题与配色。
-    for (const prompt of [watercolor, lineArt, grid, withExtra]) expect(prompt).toContain("Keep the artwork's theme, subject matter and overall color character");
+    for (const prompt of [watercolor, lineArt, grid, withExtra]) expect(prompt).toContain("the artwork's theme, subject matter, motif positions, composition and overall color character all stay as they are");
   });
 
   it("轴向归属判定与契约的预设表一致，且每个预设都有标签", () => {
@@ -63,7 +69,8 @@ describe("pattern variant prompt", () => {
     expect(transparent).toContain("fully transparent background");
     expect(transparent).toContain("no drawn checkerboard");
     for (const prompt of [source, white, transparent]) {
-      expect(prompt).toContain("Keep the artwork's theme, subject matter and overall color character");
+      expect(prompt).toContain("Change only what the instruction asks for");
+      expect(prompt).toContain("no elements are added or removed");
     }
     // 三句护栏互不同时出现：底版是单选，不是叠加。
     expect(source).not.toContain("pure-white");

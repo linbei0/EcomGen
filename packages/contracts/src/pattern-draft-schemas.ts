@@ -8,7 +8,6 @@ import {
   MAX_PATTERN_BRIEF_LENGTH,
   MAX_PATTERN_DRAFT_NAME_LENGTH,
   PATTERN_DRAFT_CANDIDATES_MAX,
-  PATTERN_DRAFT_REFERENCES_MAX,
 } from "./limits.js";
 import { Pattern, TileableStatus } from "./pod-schemas.js";
 import { PodRepeatLayout } from "./pod-repeat.js";
@@ -25,8 +24,12 @@ export const DRAFT_COMPOSE_TYPES = ["PLACEMENT", "REPEAT"] as const;
 export const DraftComposeType = stringEnumSchema(DRAFT_COMPOSE_TYPES, "#/components/schemas/DraftComposeType");
 export type DraftComposeType = Static<typeof DraftComposeType>;
 
-/** 草稿媒体的角色：编辑参考或已绘制选区蒙版；蒙版与参考坐标语义不同，必须分开。 */
-export const DRAFT_MEDIA_ROLES = ["REFERENCE", "MASK"] as const;
+/**
+ * 草稿媒体的角色：编辑参考，或用户在候选图上画下的改稿笔迹。
+ *
+ * 笔迹与参考分开：参考是"照它画"的素材，笔迹是"这里要改"的标注，坐标语义与用途都不同。
+ */
+export const DRAFT_MEDIA_ROLES = ["REFERENCE", "ANNOTATION"] as const;
 export const DraftMediaRole = stringEnumSchema(DRAFT_MEDIA_ROLES, "#/components/schemas/DraftMediaRole");
 export type DraftMediaRole = Static<typeof DraftMediaRole>;
 
@@ -42,10 +45,15 @@ export type DraftBackground = Static<typeof DraftBackground>;
 
 /**
  * 批次操作类型：一次提交对应一种操作。
- * GENERATE 从条件与参考生成；EDIT_* 基于父候选产生新候选；RECOLOR 为本地确定性处理；
- * CUTOUT 走分割产生真实 alpha；SEAM_EDIT 为定向接缝改稿（成对边合并为跨边选区）。
+ *
+ * `EDIT` 是唯一的改稿：对父候选施加一句说明，**可选**附一版用户直接画在候选图上的笔迹。
+ * 画了笔迹，模型拿到的是"原图叠着笔迹"的源图，笔迹指到哪就改哪；没画就是对整张图改稿——
+ * 所以不存在单独的"整图修改"，它就是没画笔迹的改稿（见 ADR-0005）。
+ *
+ * 颜色意图不占操作位：配色是说明文本里的色值本身（`#aabbcc`，见 draft-palettes.ts）。原 `PALETTE_VARIANT`
+ * 没有指令框，也就没有任何办法限定作用范围，只能整张图变色——这正是它被并入 `EDIT` 的原因。
  */
-export const DRAFT_BATCH_OPERATIONS = ["GENERATE", "EDIT_WHOLE", "EDIT_LOCAL", "RECOLOR", "PALETTE_VARIANT", "CUTOUT", "SEAM_EDIT"] as const;
+export const DRAFT_BATCH_OPERATIONS = ["GENERATE", "EDIT", "RECOLOR", "CUTOUT", "SEAM_EDIT"] as const;
 export const DraftBatchOperation = stringEnumSchema(DRAFT_BATCH_OPERATIONS, "#/components/schemas/DraftBatchOperation");
 export type DraftBatchOperation = Static<typeof DraftBatchOperation>;
 
@@ -213,7 +221,7 @@ export const DraftBatchList = Type.Object({ items: Type.Array(schemaRef(DraftBat
 export type DraftBatchList = Static<typeof DraftBatchList>;
 
 /**
- * 提交批次：把当前表单完整快照 + 参考用途一并下发。
+ * 提交批次：把当前表单整体快照，参考图下发集由服务端按 dispatchedReferenceOrdinals 推导。
  * 生成/生成式改稿需要 providerId + imageModelId；RECOLOR 等本地处理可省略模型。
  */
 export const CreateDraftBatchInput = Type.Object({
@@ -226,14 +234,15 @@ export const CreateDraftBatchInput = Type.Object({
   aspectRatio: Type.Optional(schemaRef(ImageAspectRatio)),
   background: Type.Optional(schemaRef(DraftBackground)),
   repeatLayout: Type.Optional(schemaRef(PodRepeatLayout)),
-  // 参考图只按媒体 id 声明：上传即参与，不再要求调用方先给用途分类。
-  references: Type.Optional(Type.Array(Type.String({ format: "uuid" }), { maxItems: PATTERN_DRAFT_REFERENCES_MAX })),
   parentCandidateId: Type.Optional(Type.String({ format: "uuid" })),
+  /** 改稿说明；`@图N` 引用参考图、`#aabbcc` 这样的色值表达配色意图，两者都由说明文本承载。 */
   instruction: Type.Optional(Type.String({ maxLength: MAX_DRAFT_INSTRUCTION_LENGTH })),
-  maskMediaId: Type.Optional(Type.String({ format: "uuid" })),
-  invertMask: Type.Optional(Type.Boolean()),
+  /**
+   * 用户在候选图上画的改稿笔迹。**可选**：给了就是"按笔迹改"，不给就是对整张图改。
+   * 这个字段有没有值，是"整图"与"按笔迹"的唯一区别。
+   */
+  annotationMediaId: Type.Optional(Type.String({ format: "uuid" })),
   recolor: Type.Optional(schemaRef(DraftRecolorParams)),
-  palette: Type.Optional(Type.Array(Type.String({ minLength: 4, maxLength: 9 }), { maxItems: 8 })),
   seam: Type.Optional(schemaRef(DraftSeamEdit)),
 }, { $id: "#/components/schemas/CreateDraftBatchInput" });
 export type CreateDraftBatchInput = Static<typeof CreateDraftBatchInput>;

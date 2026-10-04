@@ -25,6 +25,7 @@ vi.mock("@ecomgen/jobs", async (importOriginal) => {
 
 import type { FastifyInstance } from "fastify";
 import { EcomRepository, LocalAssetStore, openDatabase } from "@ecomgen/core";
+import { MAX_DRAFT_MEDIA_NOTES_LENGTH } from "@ecomgen/contracts";
 import { buildApi } from "./app.js";
 import { enqueue } from "@ecomgen/jobs";
 
@@ -116,6 +117,23 @@ describe("pattern draft API", () => {
   });
 
 
+  it("参考图备注可改，超过上限被拒", async () => {
+    const draftId = await createDraft();
+    const created = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/media`, ...multipart({ role: "REFERENCE", notes: "这条会成为提示词里的说明" }, { name: "ref.png", content: await samplePng(), type: "image/png" }) });
+    expect(created.statusCode).toBe(201);
+    const mediaId = created.json<{ id: string; notes: string }>().id;
+    expect(created.json<{ notes: string }>().notes).toBe("这条会成为提示词里的说明");
+
+    // 备注逐条进提示词，长度必须像改稿指令一样有界。
+    const tooLong = await app.inject({ method: "PATCH", url: `/api/v1/pattern-drafts/${draftId}/media/${mediaId}`, payload: { notes: "字".repeat(MAX_DRAFT_MEDIA_NOTES_LENGTH + 1) } });
+    expect(tooLong.statusCode).toBe(400);
+
+    const updated = await app.inject({ method: "PATCH", url: `/api/v1/pattern-drafts/${draftId}/media/${mediaId}`, payload: { notes: "改过的备注" } });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json<{ notes: string }>().notes).toBe("改过的备注");
+  });
+
+
   it("提交批次：建槽位、入队方向正确、同 key 同 payload 复用、异 payload 冲突", async () => {
     const draftId = await createDraft();
     const provider = saveImageProvider();
@@ -202,5 +220,170 @@ describe("pattern draft API", () => {
     repository.updateJob(job.id, { status: "FAILED", progress: 100, error: { message: "x" } });
     const retry = await app.inject({ method: "POST", url: `/api/v1/jobs/${job.id}/retry` });
     expect(retry.statusCode).toBe(409);
+  });
+});
+
+describe("参考图下发", () => {
+  /** 上传一张参考图并返回它的引用编号。 */
+  async function uploadReference(draftId: string): Promise<number> {
+    const response = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/media`, ...multipart({ role: "REFERENCE", source: "UPLOAD" }, { name: "ref.png", content: await samplePng(), type: "image/png" }) });
+    expect(response.statusCode).toBe(201);
+    return response.json<{ ordinal: number }>().ordinal;
+  }
+
+  /** 备一个父候选，改稿操作需要一个被改的对象。 */
+  async function seedCandidate(draftId: string, providerId: string): Promise<string> {
+    const created = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/batches`, payload: batchBody(providerId, { candidateCount: 1 }) });
+    const batchId = created.json<{ batch: { id: string } }>().batch.id;
+    const candidateId = randomUUID();
+    const stored = await storage.putDraftCandidate(draftId, candidateId, await samplePng());
+    repository.createDraftCandidate({ id: candidateId, draftId, batchId, slotIndex: 1, parentCandidateId: null, storagePath: stored.path, fileHash: stored.hash, mimeType: "image/png", width: 16, height: 16, transform: "GENERATE", hasAlpha: false });
+    return candidateId;
+  }
+
+  function snapshotOf(batchId: string): { references?: Array<{ ordinal: number }> } {
+    return repository.getDraftBatch(batchId)!.snapshot as { references?: Array<{ ordinal: number }> };
+  }
+
+  it("起稿下发全部参考图；改稿只下发说明里 @ 到的那一张", async () => {
+    const draftId = await createDraft();
+    const provider = saveImageProvider();
+    const first = await uploadReference(draftId);
+    const second = await uploadReference(draftId);
+
+    const generated = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/batches`, payload: batchBody(provider.id, { candidateCount: 1 }) });
+    expect(snapshotOf(generated.json<{ batch: { id: string } }>().batch.id).references?.map((row) => row.ordinal)).toEqual([first, second]);
+
+    const candidateId = await seedCandidate(draftId, provider.id);
+    const cited = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/candidates/${candidateId}/edits`, payload: { clientKey: "edit-cited", operation: "EDIT", candidateCount: 1, providerId: provider.id, imageModelId: "image", instruction: `照 @图${second} 的配色调暖一点` } });
+    expect(cited.statusCode).toBe(202);
+    expect(snapshotOf(cited.json<{ batch: { id: string } }>().batch.id).references?.map((row) => row.ordinal)).toEqual([second]);
+
+    const uncited = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/candidates/${candidateId}/edits`, payload: { clientKey: "edit-uncited", operation: "EDIT", candidateCount: 1, providerId: provider.id, imageModelId: "image", instruction: "整体调暖一点" } });
+    expect(uncited.statusCode).toBe(202);
+    expect(snapshotOf(uncited.json<{ batch: { id: string } }>().batch.id).references).toEqual([]);
+  });
+
+  it("改稿拒绝引用不存在的编号；接缝改稿不接受任何 @图N", async () => {
+    const draftId = await createDraft();
+    const provider = saveImageProvider();
+    await uploadReference(draftId);
+    const candidateId = await seedCandidate(draftId, provider.id);
+    const editUrl = `/api/v1/pattern-drafts/${draftId}/candidates/${candidateId}/edits`;
+    const base = { candidateCount: 1, providerId: provider.id, imageModelId: "image" };
+
+    // 接缝改稿的下发集是空集，写了引用必然落到"编号不存在"上；这里确认它确实被拒。
+    const seam = await app.inject({ method: "POST", url: editUrl, payload: { ...base, clientKey: "s", operation: "SEAM_EDIT", seam: { edge: "LEFT_RIGHT", band: 48 }, instruction: "参考 @图1" } });
+    expect(seam.statusCode).toBe(400);
+
+    // 编号不存在：提示要指名道姓说是哪个编号，用户才改得对。
+    const missing = await app.inject({ method: "POST", url: editUrl, payload: { ...base, clientKey: "m", operation: "EDIT", instruction: "照 @图9 调暖" } });
+    expect(missing.statusCode).toBe(400);
+    expect(missing.json<{ error: { message: string } }>().error.message).toContain("@图9");
+  });
+
+  it("改稿的笔迹只在是笔迹媒体时才收，候选数按操作生效", async () => {
+    const draftId = await createDraft();
+    const provider = saveImageProvider();
+    await uploadReference(draftId);
+    const candidateId = await seedCandidate(draftId, provider.id);
+    const editUrl = `/api/v1/pattern-drafts/${draftId}/candidates/${candidateId}/edits`;
+    const base = { providerId: provider.id, imageModelId: "image", instruction: "把这朵花改成粉色" };
+    const upload = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/media`, ...multipart({ role: "ANNOTATION", source: "UPLOAD" }, { name: "marks.png", content: await samplePng(), type: "image/png" }) });
+    expect(upload.statusCode, upload.body).toBe(201);
+    const annotationMediaId = upload.json<{ id: string }>().id;
+
+    // 参考图不能当笔迹用：两者坐标语义不同，认错了只会把一张素材当标注叠上去。
+    const reference = repository.listDraftMedia(draftId).find((item) => item.role === "REFERENCE")!;
+    const wrongKind = await app.inject({ method: "POST", url: editUrl, payload: { ...base, clientKey: "x", operation: "EDIT", candidateCount: 1, annotationMediaId: reference.id } });
+    expect(wrongKind.statusCode).toBe(400);
+
+    // 只有改稿读笔迹；其他操作带着它只会静默无效，快照里还会留一份误导性记录。
+    const misplaced = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/batches`, payload: { ...batchBody(provider.id, { clientKey: "g" }), annotationMediaId } });
+    expect(misplaced.statusCode).toBe(400);
+
+    const marked = await app.inject({ method: "POST", url: editUrl, payload: { ...base, clientKey: "l", operation: "EDIT", candidateCount: 3, annotationMediaId } });
+    expect(marked.statusCode, marked.body).toBe(202);
+    const markedBatch = marked.json<{ batch: { id: string } }>().batch.id;
+    expect(repository.listDraftSlots(markedBatch)).toHaveLength(3);
+    expect(snapshotOf(markedBatch)).toMatchObject({ annotation: { mediaId: annotationMediaId } });
+
+    // 确定性处理出 N 张等于同一张，不产生无谓的付费调用。
+    const recolor = await app.inject({ method: "POST", url: editUrl, payload: { ...base, clientKey: "r", operation: "RECOLOR", candidateCount: 3, instruction: undefined, recolor: { hueShift: 10, saturationPct: 100, brightnessPct: 100 } } });
+    expect(recolor.statusCode).toBe(202);
+    expect(repository.listDraftSlots(recolor.json<{ batch: { id: string } }>().batch.id)).toHaveLength(1);
+  });
+
+  it("不画笔迹的改稿就是整图改稿，快照里不带笔迹", async () => {
+    const draftId = await createDraft();
+    const provider = saveImageProvider();
+    const candidateId = await seedCandidate(draftId, provider.id);
+    const response = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/candidates/${candidateId}/edits`, payload: { clientKey: "whole", operation: "EDIT", candidateCount: 2, providerId: provider.id, imageModelId: "image", instruction: "整体调暖一点" } });
+    expect(response.statusCode, response.body).toBe(202);
+    const batchId = response.json<{ batch: { id: string } }>().batch.id;
+    expect(repository.listDraftSlots(batchId)).toHaveLength(2);
+    expect(snapshotOf(batchId)).toMatchObject({ annotation: null });
+  });
+
+  /*
+   * 说明里的色值不再有"写坏了"这一档：色值就是 `#d9a441` 这样的文本本身，凑不满 3/4/6/8 位
+   * 十六进制就压根不是 token（也就没有中间状态可拒绝），原来的 400 校验随之取消。
+   * 这条钉住"带色值的说明照常受理"，免得哪天又把校验加回来拦掉合法颜色。
+   */
+  it("说明里的色值照常受理", async () => {
+    const draftId = await createDraft();
+    const provider = saveImageProvider();
+    const candidateId = await seedCandidate(draftId, provider.id);
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/v1/pattern-drafts/${draftId}/candidates/${candidateId}/edits`,
+      payload: { candidateCount: 1, providerId: provider.id, imageModelId: "image", clientKey: "palette", operation: "EDIT", instruction: "把叶子换成 #c94f4f，花心 #d9a441" },
+    });
+    expect(response.statusCode, response.body).toBe(202);
+  });
+
+  /*
+   * 笔迹在界面上看不到也删不掉，额度就必须自己回收，否则用户改到第 N 次会撞上一句"最多保留 N 张"
+   * 却没有任何办法腾位置。回收的判据是"还有没有任务会读它"，所以两边都要钉住：
+   * 批次还能补偿时必须留着（删了那次补偿会读不到文件），批次全部成功之后必须收掉。
+   */
+  it("改稿笔迹用完即收：批次还能跑就留着，批次全部成功后随下一次上传清掉", async () => {
+    const draftId = await createDraft();
+    const provider = saveImageProvider();
+    const candidateId = await seedCandidate(draftId, provider.id);
+    const uploadMarks = async (): Promise<string> => {
+      const response = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/media`, ...multipart({ role: "ANNOTATION", source: "UPLOAD" }, { name: "marks.png", content: await samplePng(), type: "image/png" }) });
+      expect(response.statusCode, response.body).toBe(201);
+      return response.json<{ id: string }>().id;
+    };
+    const annotations = () => repository.listDraftMedia(draftId).filter((media) => media.role === "ANNOTATION");
+
+    const inFlight = await uploadMarks();
+    const marked = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/candidates/${candidateId}/edits`, payload: { clientKey: "a", operation: "EDIT", candidateCount: 1, providerId: provider.id, imageModelId: "image", instruction: "把这朵花改成粉色", annotationMediaId: inFlight } });
+    expect(marked.statusCode, marked.body).toBe(202);
+    const batchId = marked.json<{ batch: { id: string } }>().batch.id;
+
+    // 槽位还在队列里，Worker 随时要读这张笔迹：下一次上传不能把它收走。
+    await uploadMarks();
+    expect(annotations().map((media) => media.id)).toContain(inFlight);
+
+    // 本批全部成功后补偿已无从触发（补偿只领失败槽位），这张笔迹不会再被读到，下次上传顺手清掉；
+    // 上一次那张没被任何批次引用的上传同理，一起收走。
+    for (const slot of repository.listDraftSlots(batchId)) repository.updateDraftSlot(batchId, slot.index, { status: "SUCCEEDED" });
+    await uploadMarks();
+    expect(annotations().map((media) => media.id)).not.toContain(inFlight);
+    expect(annotations()).toHaveLength(1);
+  });
+
+  it("参考图与改稿笔迹各按自己的额度计数，互不挤占", async () => {
+    const draftId = await createDraft();
+    for (let index = 0; index < 6; index += 1) await uploadReference(draftId);
+
+    const overflow = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/media`, ...multipart({ role: "REFERENCE", source: "UPLOAD" }, { name: "extra.png", content: await samplePng(), type: "image/png" }) });
+    expect(overflow.statusCode).toBe(400);
+
+    // 参考图额度用满不影响笔迹：否则改稿改多了就再也传不进参考图。
+    const marks = await app.inject({ method: "POST", url: `/api/v1/pattern-drafts/${draftId}/media`, ...multipart({ role: "ANNOTATION", source: "UPLOAD" }, { name: "marks.png", content: await samplePng(), type: "image/png" }) });
+    expect(marks.statusCode, marks.body).toBe(201);
   });
 });

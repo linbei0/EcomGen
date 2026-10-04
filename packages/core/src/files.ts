@@ -99,12 +99,12 @@ export class LocalAssetStore {
   }
 
   /**
-   * 创作草稿的参考或蒙版媒体；按 draft 聚合在 `drafts/<draftId>/media|masks/`。
+   * 创作草稿的参考或改稿笔迹媒体；按 draft 聚合在 `drafts/<draftId>/media|annotations/`。
    * 上传与花型库引用都拷贝为草稿自有快照，原花型改名/删除不改写已提交批次。
    */
-  public async putDraftMedia(draftId: string, role: "REFERENCE" | "MASK", originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
+  public async putDraftMedia(draftId: string, role: "REFERENCE" | "ANNOTATION", originalName: string, content: Buffer): Promise<{ path: string; hash: string }> {
     const hash = createHash("sha256").update(content).digest("hex");
-    const folder = role === "MASK" ? "masks" : "media";
+    const folder = role === "ANNOTATION" ? "annotations" : "media";
     const relativePath = join("drafts", draftId, folder, `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(originalName)}`);
     await this.write(relativePath, content);
     return { path: relativePath, hash };

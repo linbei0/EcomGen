@@ -7,6 +7,7 @@ export * from "./segmentation.js";
 export * from "./edit-operations.js";
 export * from "./image-model-capabilities.js";
 export * from "./draft-references.js";
+export * from "./draft-palettes.js";
 import type { AssetRole, ImageAspectRatio, ImageResolution, UserAssetKind } from "./enums.js";
 
 export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;

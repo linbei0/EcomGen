@@ -1361,6 +1361,32 @@ describe("源入口接「接着成包」", () => {
     expect(pipeline.steps.slice(1).every((entry) => entry.status === "PENDING" && entry.jobId === null)).toBe(true);
   });
 
+  it("生成式提取走生图模型：底版能力提交前校验，mode 与底版进任务快照", async () => {
+    // DEFAULT_MODELS 的 image 模型不支持透明底（supportsTransparentBackground 按 id 家族判定）
+    const provider = saveProvider();
+    const boundary = "----ecomgen-test-boundary";
+    const files = { field: "file", filename: "source.png", mimeType: "image/png", content: await pngBuffer() };
+
+    // 要透明底而模型给不了：提交即拒，且发生在落源图之前，不留半个花型
+    const transparent = await app.inject({
+      method: "POST",
+      url: "/api/v1/patterns/extract-jobs",
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, files, { mode: "GENERATE", providerId: provider.id, modelId: "image" }),
+    });
+    expect(transparent.statusCode).toBe(422);
+
+    const white = await app.inject({
+      method: "POST",
+      url: "/api/v1/patterns/extract-jobs",
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, files, { mode: "GENERATE", providerId: provider.id, modelId: "image", background: "WHITE" }),
+    });
+    expect(white.statusCode).toBe(202);
+    const job = repository.getJob(white.json<{ id: string }>().id)!;
+    expect(job.input).toMatchObject({ mode: "GENERATE", background: "WHITE", imageProviderId: provider.id, imageModelId: "image", segmentationProviderId: null });
+  });
+
   it("上传带上成包答案：图案已在库里，直接按既有花型起跑验缝", async () => {
     const provider = segmentationProvider();
     const boundary = "----ecomgen-test-boundary";

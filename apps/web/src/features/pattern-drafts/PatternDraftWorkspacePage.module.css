@@ -72,9 +72,15 @@
   padding: 8px;
 }
 
-.backdropChecker { background: repeating-conic-gradient(#1b1e23 0% 25%, #22262c 0% 50%) 50% / 24px 24px; }
-.backdropWhite { background: #ffffff; }
-.backdropBlack { background: #000000; }
+/* 预览底色（棋盘/白/黑）的定义已移到 backdrop.module.css：主图查看与绘制舞台共用同一份，
+   两处各写一份迟早会漂移。 */
+
+/* 绘制态画布上方的说明。此前是一个描边+底色的强调色标签，摆在工具栏上像一枚按钮，
+   而它其实只是一句提示；改成一档普通文字，跟旁边的底色切换读成同一行。 */
+.canvasHint {
+  font-size: 12px;
+  color: var(--text-2);
+}
 
 .stageImg {
   max-width: 100%;
@@ -217,26 +223,6 @@
 .recordRow { border: 1px solid var(--line-1); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; }
 .recordHead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
-/* 色板：颜色球与删除按钮绑成一个整体，删除按钮贴在颜色块右上角。 */
-.swatch { position: relative; display: inline-flex; }
-.swatchRemove {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  line-height: 1;
-  font-size: 12px;
-  border-radius: 50%;
-  border: 1px solid var(--line-2);
-  background: var(--bg-2);
-  color: var(--text-2);
-  cursor: pointer;
-}
-.swatchRemove:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
-.swatchRemove:disabled { opacity: 0.35; cursor: not-allowed; }
-
 .slotLine { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .slotChip {
   font-size: 11px;
@@ -253,7 +239,10 @@
 /* 标题与 ⓘ 同行：ⓘ 是图标，不能让它独占一行把标题和内容隔开。 */
 .sectionTitle { display: flex; align-items: center; gap: 5px; font-size: 12px; text-transform: none; letter-spacing: 0.02em; opacity: 0.72; margin: 0 0 6px; font-weight: 600; }
 
-.hint { font-size: 11px; opacity: 0.62; line-height: 1.5; }
+/* 提示文字用颜色档位而不是叠透明度：token 的对比度保证是给颜色本身的，再叠一层 opacity
+   等于把它按比例拉回背景色。这一档取 --text-2：这一页的提示多是"要知道才能不出错"的内容，
+   不该低于正文一档就变成最暗的文字。 */
+.hint { font-size: 11px; color: var(--text-2); line-height: 1.5; }
 
 .sliderRow { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 
@@ -331,12 +320,35 @@
 .dropHint { font-size: 11px; color: var(--text-3); }
 
 .refList { display: flex; flex-direction: column; gap: 8px; }
-.refItem { display: flex; align-items: center; gap: 8px; }
+
+/* 参考图卡片：上行是编号/缩略图/文件名/操作，下行是整行宽的备注。
+   备注必须独占一行——它以前和缩略图、两个竖排按钮挤在同一行，可读宽度只剩几十像素。 */
+.refItem { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line-1); border-radius: 6px; }
+.refHead { display: flex; align-items: center; gap: 8px; }
 /* 编号是引用语法的锚点，要比文件名更显眼，否则用户不知道在主题里该 @ 几。 */
 .refBadge { flex: none; min-width: 34px; padding: 1px 5px; border: 1px solid var(--line-2); border-radius: 4px; background: var(--bg-3); color: var(--text-2); font-family: var(--font-mono); font-size: 11px; text-align: center; }
-.refThumb { width: 44px; height: 44px; object-fit: cover; border-radius: 4px; background: #101216; }
-.refMeta { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
-.refName { font-size: 11px; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.refThumb { flex: none; width: 36px; height: 36px; object-fit: cover; border-radius: 4px; background: #101216; }
+.refName { flex: 1 1 auto; min-width: 0; font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.refActions { flex: none; display: flex; align-items: center; }
+
+.refNote { display: flex; align-items: flex-start; gap: 4px; font-size: 12px; }
+/* antd Paragraph 渲染成 p，元素选择器不参与哈希，这里能直接命中它并让它吃掉剩余宽度。
+   字号必须显式压到 12px：Typography 自带 14px，不压就和这一栏其它文字不在一个层次上。 */
+.refNote > p { flex: 1 1 auto; min-width: 0; margin-bottom: 0; font-size: 12px; line-height: 1.5; }
+.refNoteAdd { align-self: flex-start; color: var(--text-2); }
+.refNoteEdit { display: flex; flex-direction: column; gap: 2px; }
+.refNoteHint { font-size: 11px; color: var(--text-2); }
+
+/* 改稿的绘制态占据主图区：画布与说明同屏，改完不必在弹窗与主图之间来回对照。
+   高度交给 flex 而不是让内容撑开：画布与说明都变高时，滚动要落在这块内部，不能把整个工作台推出视口。
+   这里不再加虚线外框：绘制态由工具栏那一行说明与下方的画布/面板本身就能读出来，
+   再套一圈框等于把"整块界面"变成一个被贴上去的盒子。
+   横向留 4px：这块是 overflow:auto，横向留白为 0 时，色块贴在最左侧的状态环会被裁掉半边。 */
+.editDraw { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; align-items: stretch; padding: 10px 4px; overflow: auto; }
+
+/* 说明面板不参与收缩：画布占的是"剩余高度"，剩得少时不能让面板被压扁，
+   那会把输入框和提交按钮挤没，而它们才是这一步真正要操作的东西。 */
+.editPanel { flex: none; }
 
 .centerState {
   display: flex;

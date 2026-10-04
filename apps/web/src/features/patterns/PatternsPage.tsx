@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { App, Button, Input, Modal, Progress, Select, Skeleton, Tooltip, Upload } from "antd";
+import { App, Button, Input, Modal, Progress, Segmented, Select, Skeleton, Tooltip, Upload } from "antd";
 import {
   Check,
   FileUp,
@@ -42,10 +42,11 @@ import { qk } from "../../api/queryKeys";
 import { AppTopbar } from "../../components/AppTopbar";
 import { errorText } from "../../lib/errorText";
 import { jobErrorText } from "../../lib/jobError";
-import { parseModelKey, segmentationModelOptions } from "../../lib/modelOptions";
+import { PATTERN_EXTRACT_BACKGROUNDS } from "@ecomgen/contracts";
+import { parseModelKey, modelOptions, segmentationModelOptions } from "../../lib/modelOptions";
 import { relativeTime } from "../../lib/format";
 import { panelBackdrop, placeholderBackdrop } from "./heroPatterns";
-import { EMPTY_PIPELINE_ANSWERS, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, PipelineAnswersBlock, missingPipelineAnswer, podSpecOptionLabel, RepeatLayoutChipRow, SOURCE_FILTERS, SOURCE_LABELS, stageText, StatusPill, statusLabel, statusTone, tileableBadge, toPipelineAnswers, type PipelineAnswerDraft } from "./shared";
+import { BackgroundModeSelect, EMPTY_PIPELINE_ANSWERS, ImageModelSelect, LayoutChipRow, LISTING_PLATFORM_OPTIONS, ListingModelSelect, PipelineAnswersBlock, missingPipelineAnswer, podSpecOptionLabel, RepeatLayoutChipRow, SOURCE_FILTERS, SOURCE_LABELS, stageText, StatusPill, statusLabel, statusTone, tileableBadge, toPipelineAnswers, type PipelineAnswerDraft } from "./shared";
 import styles from "./PatternsPage.module.css";
 
 type ActiveJobKind = "EXTRACT" | "FORGE";
@@ -767,7 +768,13 @@ function PlaceholderCard({
   );
 }
 
-/** 提取入花：源图 + 分割模型 + 可选名称/补充描述；分割模型记忆最近一次选择。整页拖入的单张图经 initialFile 预填。 */
+/**
+ * 提取入花：源图 + 提取模型 + 可选名称/补充描述；模型记忆最近一次选择。整页拖入的单张图经 initialFile 预填。
+ *
+ * 两条提取路共用这一个弹窗，方式由用户显式选择：分割抠图的像素取自商品图（产物与实物逐像素一致），
+ * 生成重绘由生图模型摊平重绘（适合透视/褶皱/光影重的实拍，色彩细节可能与实物有差）。
+ * 模型下拉与底版随方式切换——底版只在生成路出现，且透明档跟随模型能力禁用（复用衍生那套联动）。
+ */
 function ExtractDialog({
   open,
   initialFile,
@@ -782,10 +789,14 @@ function ExtractDialog({
   const { message } = App.useApp();
   const providersQuery = useProviders();
   const segmentationOptions = useMemo(() => segmentationModelOptions(providersQuery.data?.items ?? []), [providersQuery.data]);
+  const imageOptions = useMemo(() => modelOptions(providersQuery.data?.items ?? [], "image"), [providersQuery.data]);
   const extract = useCreatePatternExtractJob();
 
   const [file, setFile] = useState<File | null>(initialFile);
+  const [mode, setMode] = useState<"SEGMENT" | "GENERATE">("SEGMENT");
   const [modelKey, setModelKey] = useState<string | null>(null);
+  const [imageModelKey, setImageModelKey] = useState<string | null>(null);
+  const [background, setBackground] = useState<"TRANSPARENT" | "WHITE">("TRANSPARENT");
   const [name, setName] = useState("");
   const [brief, setBrief] = useState("");
   const [pipeline, setPipeline] = useState<PipelineAnswerDraft>(EMPTY_PIPELINE_ANSWERS);
@@ -801,13 +812,21 @@ function ExtractDialog({
     setModelKey(window.localStorage.getItem("ecomgen.patterns.segmentation") ?? segmentationOptions[0]!.value);
   }, [modelKey, segmentationOptions]);
 
+  // Provider 列表加载完成前按"支持透明底"处理：加载窗口里的"不知道"不等于"不支持"，
+  // 否则刚打开弹窗就会把默认的透明底改写成白底。
+  const transparentAvailable = imageOptions.find((option) => option.value === imageModelKey)?.transparentBackground ?? true;
+
   const submit = () => {
     if (!file) {
       message.warning("请选择一张带图案的商品图");
       return;
     }
-    if (!modelKey) {
+    if (mode === "SEGMENT" && !modelKey) {
       message.warning("请选择分割模型");
+      return;
+    }
+    if (mode === "GENERATE" && !imageModelKey) {
+      message.warning("请选择生图模型");
       return;
     }
     const missing = missingPipelineAnswer(pipeline);
@@ -815,7 +834,7 @@ function ExtractDialog({
       message.warning(missing);
       return;
     }
-    const { providerId, modelId } = parseModelKey(modelKey);
+    const { providerId, modelId } = parseModelKey(mode === "SEGMENT" ? modelKey! : imageModelKey!);
     const title = name.trim() || file.name;
     const answers = toPipelineAnswers(pipeline);
     extract.mutate(
@@ -824,6 +843,8 @@ function ExtractDialog({
         body: {
           providerId,
           modelId,
+          mode,
+          ...(mode === "GENERATE" ? { background } : {}),
           ...(name.trim() ? { name: name.trim() } : {}),
           ...(brief.trim() ? { brief: brief.trim() } : {}),
           ...(answers ? { pipeline: answers } : {}),
@@ -851,7 +872,7 @@ function ExtractDialog({
       onOk={submit}
       okText="开始提取"
       confirmLoading={extract.isPending}
-      okButtonProps={{ disabled: !file || !modelKey }}
+      okButtonProps={{ disabled: !file || (mode === "SEGMENT" ? !modelKey : !imageModelKey) }}
       destroyOnHidden
     >
       {file ? (
@@ -860,17 +881,46 @@ function ExtractDialog({
       <Upload accept="image/*" showUploadList={false} maxCount={1} beforeUpload={(picked) => { setFile(picked); return false; }}>
         <Button icon={<FileUp size={15} strokeWidth={2} />}>{file ? "重新选择商品图" : "选择商品图（含清晰图案）"}</Button>
       </Upload>
-      <Select
-        style={{ width: "100%", marginTop: 12 }}
-        placeholder="分割模型"
-        aria-label="分割模型"
-        value={modelKey}
-        onChange={(key) => {
-          setModelKey(key);
-          window.localStorage.setItem("ecomgen.patterns.segmentation", key);
-        }}
-        options={segmentationOptions.map((option) => ({ value: option.value, label: option.label }))}
+      <Segmented
+        block
+        style={{ marginTop: 12 }}
+        value={mode}
+        onChange={(value) => setMode(value as "SEGMENT" | "GENERATE")}
+        options={[{ value: "SEGMENT", label: "分割抠图" }, { value: "GENERATE", label: "生成重绘" }]}
       />
+      <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-3)" }}>
+        {mode === "SEGMENT"
+          ? "像素取自商品图本身，产物与实物逐像素一致。"
+          : "由生图模型把图案摊平重绘成图稿，适合透视、褶皱、光影重的实拍；色彩与细节可能与实物有差。"}
+      </div>
+      {mode === "SEGMENT" ? (
+        <Select
+          style={{ width: "100%", marginTop: 12 }}
+          placeholder="分割模型"
+          aria-label="分割模型"
+          value={modelKey}
+          onChange={(key) => {
+            setModelKey(key);
+            window.localStorage.setItem("ecomgen.patterns.segmentation", key);
+          }}
+          options={segmentationOptions.map((option) => ({ value: option.value, label: option.label }))}
+        />
+      ) : (
+        <>
+          <div style={{ marginTop: 12 }}>
+            <ImageModelSelect value={imageModelKey} onChange={setImageModelKey} storageKey="ecomgen.patterns.extractImage" label="生图模型" />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <BackgroundModeSelect
+              value={background}
+              onChange={setBackground}
+              modes={PATTERN_EXTRACT_BACKGROUNDS}
+              fallback="WHITE"
+              transparentAvailable={transparentAvailable}
+            />
+          </div>
+        </>
+      )}
       <Input
         style={{ marginTop: 12 }}
         placeholder="花型名称（可选）"

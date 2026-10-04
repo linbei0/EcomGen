@@ -366,21 +366,21 @@ export class PatternDraftRepository {
   /**
    * 该存储路径是否被本草稿的任一已提交批次快照引用。
    *
-   * 快照里只有参考图与蒙版携带存储路径（候选只以 id 出现，见 resolveReferences 与 submitDraftBatch 的
+   * 快照里只有参考图与改稿笔迹携带存储路径（候选只以 id 出现，见 draftReferenceRows 与 submitDraftBatch 的
    * snapshot 构造），所以用 json_extract 直接命中这两个位置，不再把整份快照字符串化后做子串扫描。
    */
   public isStoragePathReferenced(draftId: string, storagePath: string): boolean {
     const row = this.db.prepare(
       `SELECT 1 AS hit FROM draft_batches
         WHERE draft_id=? AND (
-          json_extract(snapshot_json, '$.mask.storagePath')=?
+          json_extract(snapshot_json, '$.annotation.storagePath')=?
           OR EXISTS (SELECT 1 FROM json_each(snapshot_json, '$.references') WHERE json_extract(value, '$.storagePath')=?)
         ) LIMIT 1`,
     ).get(draftId, storagePath, storagePath) as Row | undefined;
     return Boolean(row);
   }
 
-  /** 按内容 hash 找一张草稿图（参考图/蒙版/候选）的存储路径，供缩略图惰性生成。 */
+  /** 按内容 hash 找一张草稿图（参考图/改稿笔迹/候选）的存储路径，供缩略图惰性生成。 */
   public findImageSourcePath(hash: string): string | undefined {
     const media = this.db.prepare("SELECT storage_path FROM draft_media WHERE file_hash=? LIMIT 1").get(hash) as Row | undefined;
     if (media?.storage_path) return String(media.storage_path);

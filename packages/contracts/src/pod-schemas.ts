@@ -182,10 +182,26 @@ export type PatternBackgroundMode = Static<typeof PatternBackgroundMode>;
 // 分割 Provider 三元组必须显式提供——花型工坊是全局页，没有项目级分割配置可继承。
 // seedream_layerize 面向多元素图层拆分，不适用单主体花型提取，协议集合在此收窄。
 const PATTERN_EXTRACT_PROTOCOLS = SEGMENTATION_PROTOCOLS.filter((protocol) => protocol !== "seedream_layerize");
+
+/**
+ * 提取方式。两条路的产物语义不同，界面必须让用户知道自己选的是哪条：
+ * - `SEGMENT`（缺省）：分割模型出选区，像素一律取自商品图（PIXEL_PROTECTED 纪律）。
+ * - `GENERATE`：生图模型把商品上的图案摊平重绘成图稿，适合透视、褶皱、光影重的实拍；
+ *   代价是像素不再取自商品图，色彩与细节可能与实物有差。
+ */
+export const PATTERN_EXTRACT_MODES = ["SEGMENT", "GENERATE"] as const;
+export const PatternExtractMode = stringEnumSchema(PATTERN_EXTRACT_MODES, "#/components/schemas/PatternExtractMode");
+export type PatternExtractMode = Static<typeof PatternExtractMode>;
+
+// 生成提取的底版只留两档：「跟随源图」对商品实拍没有意义（那正是要剥离的东西）。
+export const PATTERN_EXTRACT_BACKGROUNDS = ["TRANSPARENT", "WHITE"] as const;
+
 export const CreatePatternExtractJobInput = Type.Object({
   providerId: Type.String({ format: "uuid" }),
-  modelId: Type.String({ minLength: 1 }),
-  protocol: Type.Optional(Type.Union(PATTERN_EXTRACT_PROTOCOLS.map((value) => Type.Literal(value)), { description: "分割协议；与 Provider 声明矛盾时拒绝。" })),
+  modelId: Type.String({ minLength: 1, description: "提取模型；SEGMENT 指分割模型，GENERATE 指生图模型。" }),
+  mode: Type.Optional(Type.Union(PATTERN_EXTRACT_MODES.map((value) => Type.Literal(value)), { description: "提取方式；缺省 SEGMENT。" })),
+  protocol: Type.Optional(Type.Union(PATTERN_EXTRACT_PROTOCOLS.map((value) => Type.Literal(value)), { description: "分割协议；仅 SEGMENT 生效，与 Provider 声明矛盾时拒绝。" })),
+  background: Type.Optional(Type.Union(PATTERN_EXTRACT_BACKGROUNDS.map((value) => Type.Literal(value)), { description: "生成提取的底版；缺省 TRANSPARENT，仅 GENERATE 生效。TRANSPARENT 要求模型支持。" })),
   file: Type.String({ format: "binary", description: "带图案的商品实拍图。" }),
   name: Type.Optional(Type.String({ minLength: 1, maxLength: MAX_PATTERN_NAME_LENGTH })),
   brief: Type.Optional(Type.String({ maxLength: MAX_PATTERN_BRIEF_LENGTH, description: "补充描述，例如「只留杯壁图案、去掉杯把和底座」，进入分割文本提示。" })),

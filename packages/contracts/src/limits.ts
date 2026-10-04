@@ -73,20 +73,40 @@ export const MAX_PATTERN_DRAFT_NAME_LENGTH = 60;
 /** 单批创作的候选张数上限（生成与改稿共用）。 */
 export const PATTERN_DRAFT_CANDIDATES_MAX = 4;
 
-/** 一个草稿可挂载的参考/蒙版媒体数量上限；参考越多越需显式用途，避免无界堆图。 */
-export const PATTERN_DRAFT_MEDIA_MAX = 12;
-
-/** 单次提交实际下发的参考图数量上限。 */
+/**
+ * 一个草稿可保留的参考图数量上限。上传与下发共用同一数值：
+ * 上传上限一旦高于下发上限，攒够的参考图会让每一次起稿都在提交时才失败。
+ */
 export const PATTERN_DRAFT_REFERENCES_MAX = 6;
 
-/** 改稿指令（整图/局部/接缝）长度上限。 */
+/**
+ * 一个草稿可保留的改稿笔迹数量上限。
+ *
+ * 每次带笔迹的改稿都会新增一张，且只要它的批次还可能重试失败槽位，文件就必须留在磁盘上，
+ * 所以它按创作历史的长短单独给额度，不与参考图共用计数。
+ *
+ * 上传时会先收掉再也不会被读到的旧笔迹（见 API 的 pruneDraftAnnotations），所以这个上限
+ * 只用来挡住真正失控的增长；撞上它意味着同一草稿里有一大堆批次还挂着失败槽位。
+ */
+export const PATTERN_DRAFT_ANNOTATIONS_MAX = 24;
+
+/** 改稿指令（整图/按笔迹/接缝）长度上限。 */
 export const MAX_DRAFT_INSTRUCTION_LENGTH = 2000;
+
+/**
+ * 参考图备注长度上限。
+ *
+ * 备注会逐条写进提示词，与改稿指令同属"要进模型上下文"的文本，所以同样有界：
+ * 六张参考图都不设限，单次起稿的提示词长度就无法预估。600 字足够写清一张图的用途
+ * （草图预填的那句约 110 字），也仍在一个能读完的长度里。
+ */
+export const MAX_DRAFT_MEDIA_NOTES_LENGTH = 600;
 
 /** 接缝改稿的跨边带宽（像素）上限；超宽会把整图变成重绘，失去定向修缝语义。 */
 export const DRAFT_SEAM_BAND_MAX = 256;
 
 // ---- Listing 文案平台硬约束（首版跨境三平台）----
-// 数值来自平台官方规范（见 docs/reference/pod-domain-research.md 第 3 节），
+// 数值来自平台官方规范，
 // 生成与校验共用同一份数值，改平台规则时只动这里。
 
 export const LISTING_PLATFORMS = ["ETSY", "AMAZON", "TIKTOK_SHOP"] as const;

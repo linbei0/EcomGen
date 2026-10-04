@@ -15,8 +15,8 @@ import type {
   ImageResolution,
   SegmentationProtocol,
 } from "@ecomgen/contracts";
-import { compileDraftEditPrompt, compileDraftGeneratePrompt, compileDraftPalettePrompt } from "@ecomgen/ecom-skill";
-import { assertEditCapabilities, assertMaskDimensions, compositeMaskedEdit, providerMaskFor } from "./edit-imaging.js";
+import { compileDraftEditPrompt, compileDraftGeneratePrompt } from "@ecomgen/ecom-skill";
+import { assertEditCapabilities, paintOverImage } from "./edit-imaging.js";
 import { applyRecolor, type RecolorParams } from "./pattern-derive.js";
 import { hasTransparentPixels, resolvePatternBackground, verifyPatternBackground } from "./pattern-background.js";
 import { applySeamEdit, buildSeamCanvas, compileSeamEditPrompt } from "./seam-edit.js";
@@ -55,12 +55,11 @@ interface DraftSnapshot {
   aspectRatio?: ImageAspectRatio;
   background?: "WHITE" | "TRANSPARENT";
   instruction?: string;
-  invertMask?: boolean;
   recolor?: RecolorParams;
-  palette?: string[];
   seam?: { edge: DraftSeamEdge; band: number };
   references?: DraftSnapshotReference[];
-  mask?: { storagePath: string; mimeType: string } | null;
+  /** 用户画在源图上的改稿笔迹；缺失表示这次是对整张图改稿。 */
+  annotation?: { storagePath: string; mimeType: string } | null;
   parentCandidateId?: string | null;
   segmentation?: { providerId: string; modelId: string; protocol: SegmentationProtocol } | null;
 }
@@ -195,6 +194,22 @@ function referenceHints(snapshot: DraftSnapshot): Array<{ ordinal: number; notes
   }));
 }
 
+/** 把验缝判定连同当前算法版本写回候选；判定是本地确定性计算，各执行器在拿到新像素后调用。 */
+function writeTileableVerdict(repository: WorkerContext["repository"], candidateId: string, verdict: Awaited<ReturnType<typeof verifyTileableDetailed>>): void {
+  repository.setDraftCandidateTileable(candidateId, { status: verdict.status, score: verdict.score, horizontal: verdict.horizontal, vertical: verdict.vertical, algorithmVersion: TILEABILITY_ALGORITHM_VERSION });
+}
+
+/**
+ * REPEAT 草稿下，任何生成式改稿都可能破坏平铺几何，所以结论必须跟着这一张新候选重新得出，
+ * 而不是让用户在"未检测"与上一张的通过状态之间自己猜；判定是本地计算，不产生费用。
+ * 非 REPEAT 草稿不写结论，新候选保持"未检测"的默认值。
+ */
+async function tileVerdictAfterStore(ctx: WorkerContext, draft: PatternDraftRecord, image: Buffer): Promise<SlotWorkResult["afterStore"]> {
+  if (draft.composeType !== "REPEAT") return undefined;
+  const verdict = await verifyTileableDetailed(image);
+  return (candidateId) => writeTileableVerdict(ctx.repository, candidateId, verdict);
+}
+
 /** 起稿生成：按主题 + 多用途参考生成候选。参考确实作为图像输入下发；用途同时进入 Prompt 与快照。 */
 export async function executeDraftGenerate(ctx: WorkerContext, job: JobRecord, signal: AbortSignal): Promise<void> {
   const { imageModelForJob, imageGeneratorFor, throwIfCancelled } = ctx;
@@ -228,10 +243,10 @@ export async function executeDraftGenerate(ctx: WorkerContext, job: JobRecord, s
   });
 }
 
-/** 生成式改稿：整图 / 色板变体 / 局部 / 接缝，全部基于父候选产生新候选并保留父候选。 */
+/** 生成式改稿：改稿（可带选区）/ 接缝，基于父候选产生新候选并保留父候选。 */
 export async function executeDraftEdit(ctx: WorkerContext, job: JobRecord, signal: AbortSignal): Promise<void> {
   const { imageModelForJob, imageGeneratorFor, throwIfCancelled, repository, storage } = ctx;
-  const { batch, snapshot } = await loadBatchContext(ctx, job);
+  const { batch, draft, snapshot } = await loadBatchContext(ctx, job);
   throwIfCancelled(job);
   const parentId = snapshot.parentCandidateId ?? (typeof job.input.parentCandidateId === "string" ? job.input.parentCandidateId : "");
   const parent = repository.getDraftCandidate(parentId);
@@ -253,19 +268,30 @@ export async function executeDraftEdit(ctx: WorkerContext, job: JobRecord, signa
     signal,
   };
 
-  if (batch.operation === "EDIT_LOCAL") {
-    if (!capabilities.supportsMaskEdit) throw new Error("CAPABILITY_UNSUPPORTED: 当前模型不支持遮罩局部编辑");
-    assertEditCapabilities(capabilities, "PRECISE_INPAINT", "MASKED", true, references.length);
-    const maskPath = snapshot.mask?.storagePath;
-    if (!maskPath) throw new Error("局部改稿缺少已保存的选区蒙版");
-    const mask = await storage.read(maskPath);
-    await assertMaskDimensions(parentImage, mask);
-    const providerMask = await providerMaskFor(parentImage, mask);
-    const prompt = compileDraftEditPrompt({ operation: "EDIT_LOCAL", instruction: snapshot.instruction ?? "", references: referenceHints(snapshot) });
+  if (batch.operation === "EDIT") {
+    /*
+     * 有笔迹就叠成源图，没有就对父候选本身改稿——这是"整图"与"按笔迹"唯一的区别。
+     *
+     * 两者曾在契约里是不同的操作，但除了"下发哪张源图"这一点之外行为完全一致，分开只会让两边
+     * 各自漂移：改稿说明的措辞、参考图下发、候选数、REPEAT 验缝原本就已经共用同一套逻辑。
+     */
+    const annotationPath = snapshot.annotation?.storagePath;
+    const sourceImage = annotationPath ? await paintOverImage(parentImage, await storage.read(annotationPath)) : parentImage;
+    const prompt = compileDraftEditPrompt({
+      annotated: Boolean(annotationPath),
+      instruction: snapshot.instruction ?? "",
+      // 底色要求和起稿走同一个来源：原色板提示词里那句写死的"保持透明"，现在由这里如实表达。
+      background,
+      references: referenceHints(snapshot),
+    });
+
+    assertEditCapabilities(capabilities, "SCENE_ADJUST", "MODEL_DIRECTED", false, references.length);
     await runDraftSlots(ctx, job, batch, snapshot, async (slotIndex) => {
-      const result = await runPaidDraftCall(ctx, job, () => generator.editImage({ ...common, prompt, sourceImage: { data: parentImage, filename: "candidate.png", mimeType: "image/png" }, mask: { data: providerMask, filename: "mask.png", mimeType: "image/png" }, ...(references.length ? { referenceImages: references } : {}), idempotencyKey: generationKeyFor(job.id, slotIndex) }));
-      // 选区外像素必须逐像素保持：生成结果只作为选区内前景，按 alpha-aware 合成贴回父候选。
-      return { image: await compositeMaskedEdit(parentImage, result.image, mask) };
+      const result = await runPaidDraftCall(ctx, job, () => generator.editImage({ ...common, prompt, sourceImage: { data: sourceImage, filename: "candidate.png", mimeType: "image/png" }, ...(references.length ? { referenceImages: references } : {}), idempotencyKey: generationKeyFor(job.id, slotIndex) }));
+      // 合成无从兜底：整张图都交给了模型，背景究竟有没有守住透明，只能靠这次校验如实报出来。
+      let warning: string | undefined;
+      try { await verifyPatternBackground(backgroundPlan, result.image, "衍生"); } catch (error) { warning = errorMessage(error); }
+      return { image: result.image, warning, afterStore: await tileVerdictAfterStore(ctx, draft, result.image) };
     });
     return;
   }
@@ -280,21 +306,14 @@ export async function executeDraftEdit(ctx: WorkerContext, job: JobRecord, signa
       const repaired = await applySeamEdit(parentImage, result.image, context);
       // 每次修复都重新检测，且不继承原候选的通过状态；检测结论写在新候选上。
       const verdict = await verifyTileableDetailed(repaired);
-      return { image: repaired, afterStore: (candidateId) => repository.setDraftCandidateTileable(candidateId, { status: verdict.status, score: verdict.score, horizontal: verdict.horizontal, vertical: verdict.vertical, algorithmVersion: TILEABILITY_ALGORITHM_VERSION }) };
+      return { image: repaired, afterStore: (candidateId) => writeTileableVerdict(repository, candidateId, verdict) };
     });
     return;
   }
 
-  const prompt = batch.operation === "PALETTE_VARIANT"
-    ? compileDraftPalettePrompt({ palette: snapshot.palette ?? [], instruction: snapshot.instruction, references: referenceHints(snapshot) })
-    : compileDraftEditPrompt({ operation: "EDIT_WHOLE", instruction: snapshot.instruction ?? "", references: referenceHints(snapshot) });
-  assertEditCapabilities(capabilities, "SCENE_ADJUST", "MODEL_DIRECTED", false, references.length);
-  await runDraftSlots(ctx, job, batch, snapshot, async (slotIndex) => {
-    const result = await runPaidDraftCall(ctx, job, () => generator.editImage({ ...common, prompt, sourceImage: { data: parentImage, filename: "candidate.png", mimeType: "image/png" }, ...(references.length ? { referenceImages: references } : {}), idempotencyKey: generationKeyFor(job.id, slotIndex) }));
-    let warning: string | undefined;
-    try { await verifyPatternBackground(backgroundPlan, result.image, "衍生"); } catch (error) { warning = errorMessage(error); }
-    return { image: result.image, warning };
-  });
+  // 这个执行器只接 EDIT 与 SEAM_EDIT（见 API 的 DRAFT_JOB_BY_OPERATION）。落到这里说明任务被派错了队列，
+  // 明确报错而不是静默什么都不做——静默会让一个错误的映射看起来像"生成没出结果"。
+  throw new Error(`UNSUPPORTED_OPERATION: 改稿执行器不支持 ${batch.operation}`);
 }
 
 /** 真实去底：用分割模型得到主体蒙版，像素取自父候选本身（PIXEL_PROTECTED），输出真实 alpha。 */
@@ -338,7 +357,7 @@ export async function executeDraftProcess(ctx: WorkerContext, job: JobRecord): P
     const source = await storage.read(candidate.storagePath);
     await updateJob(job, { progress: 40 });
     const verdict = await verifyTileableDetailed(source);
-    repository.setDraftCandidateTileable(candidate.id, { status: verdict.status, score: verdict.score, horizontal: verdict.horizontal, vertical: verdict.vertical, algorithmVersion: TILEABILITY_ALGORITHM_VERSION });
+    writeTileableVerdict(repository, candidate.id, verdict);
     await updateJob(job, { progress: 95 });
     return;
   }

@@ -799,6 +799,28 @@ try {
   const resolvedPackStep = resolvedDone.steps.find((step) => step.step === "PRINT_PACK");
   const resolvedPackJob = await requestJson(`${base}/jobs/${resolvedPackStep.jobId}`, "GET");
   assert.equal(resolvedPackJob.input.layout, "CENTERED");
+  // 生成式提取：同一端点带 mode=GENERATE，走生图模型重绘（mock 的 images/edits 端点）。
+  // mock-image 不支持透明底（按 id 家族判定），底版按白底提交，验证生图路径的编排与落库。
+  const generateExtractForm = new FormData();
+  generateExtractForm.append("mode", "GENERATE");
+  generateExtractForm.append("providerId", provider.id);
+  generateExtractForm.append("modelId", "mock-image");
+  generateExtractForm.append("background", "WHITE");
+  generateExtractForm.append("name", "生成提取的花型");
+  generateExtractForm.append("file", new Blob([patternSourcePng()], { type: "image/png" }), "cup.png");
+  const generateExtractResponse = await fetch(`${base}/patterns/extract-jobs`, { method: "POST", body: generateExtractForm });
+  const generateExtractText = await generateExtractResponse.text();
+  assert.equal(generateExtractResponse.status, 202, generateExtractText);
+  const generateExtractJob = JSON.parse(generateExtractText);
+  assert.equal(generateExtractJob.type, "PATTERN_EXTRACT");
+  const generateExtractDone = await waitJob(base, generateExtractJob.id);
+  assert.equal(generateExtractDone.status, "SUCCEEDED");
+  const generateExtractPattern = (await requestJson(`${base}/patterns`, "GET")).items.find((item) => item.sourceJobId === generateExtractJob.id);
+  assert.ok(generateExtractPattern, "generate extract must produce a visible pattern");
+  assert.equal((await fetch(new URL(generateExtractPattern.imageUrl, base))).status, 200);
+  // 同表单重发命中请求指纹：200 复用既有任务，不重复计费
+  const duplicateGenerateExtract = await fetch(`${base}/patterns/extract-jobs`, { method: "POST", body: generateExtractForm });
+  assert.equal(duplicateGenerateExtract.status, 200);
   // 取消传播：上游永不返回时，取消必须真正断开在途请求，而不是等超时后再丢弃已计费的结果。
   // 已生成的分镜被服务端冻结 Prompt，因此这里用一个独立项目构造该请求，顺带不干扰主链路的产物计数。
   const cancelProject = await requestJson(`${base}/projects`, "POST", {
@@ -837,7 +859,7 @@ try {
   // 取消不是瞬时错误：重发一次就是再付一次费，因此上游只允许收到一次请求。
   assert.equal(cancellation.hangingRequests, 1);
   assert.equal((await requestJson(`${base}/projects/${cancelProject.id}/outputs`, "GET")).length, 0);
-  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge -> model cast & select -> pattern extract/forge/upload/derive & print pack (centered + tile + mockup) & listing & packaging pipeline (full chain + seam-risk stop & resolution) -> cancel aborts in-flight generation");
+  console.log("Mock E2E passed: plan -> confirm -> generate -> export -> custom template MANUAL plan & generate -> suite forge -> model cast & select -> pattern extract (segment + generate) /forge/upload/derive & print pack (centered + tile + mockup) & listing & packaging pipeline (full chain + seam-risk stop & resolution) -> cancel aborts in-flight generation");
 } finally {
   await Promise.all(children.map(stop));
   if (mock) await new Promise((resolveClose) => mock.close(resolveClose));

@@ -4,7 +4,7 @@ import sharp from "sharp";
 import type { PatternRecord, PrintPackRecord } from "@ecomgen/core";
 import type { EcomRepository } from "@ecomgen/core";
 import { requestFingerprint, settlePipelineStep } from "@ecomgen/core";
-import { defaultPatternName, PATTERN_FORGE_PROMPT_VERSION, PATTERN_VARIANT_PROMPT_VERSION, presetBelongsToAxis } from "@ecomgen/ecom-skill";
+import { defaultPatternName, PATTERN_EXTRACT_PROMPT_VERSION, PATTERN_FORGE_PROMPT_VERSION, PATTERN_LISTING_PROMPT_VERSION, PATTERN_VARIANT_PROMPT_VERSION, presetBelongsToAxis } from "@ecomgen/ecom-skill";
 import {
   CreatePatternDeriveJobInput,
   CreatePatternForgeJobInput,
@@ -15,6 +15,8 @@ import {
   MAX_PATTERN_BRIEF_LENGTH,
   MAX_PATTERN_NAME_LENGTH,
   MAX_PATTERN_TAG_LENGTH,
+  PATTERN_EXTRACT_BACKGROUNDS,
+  PATTERN_EXTRACT_MODES,
   PATTERN_TAGS_MAX,
   POD_MOCKUP_SCENE_VERSION,
   POD_PRINT_SPECS,
@@ -39,7 +41,7 @@ import {
   verifyModel,
 } from "../helpers.js";
 import { parseBody } from "../http-input.js";
-import { parameter, readOptionalText, readText } from "../input-normalizers.js";
+import { enumValue, parameter, readOptionalText, readText } from "../input-normalizers.js";
 import { readPatternPipelineAnswers, startPatternPipeline, validatePatternPipelineAnswers } from "./patternPipelines.js";
 
 export function publicPattern(record: PatternRecord) {
@@ -132,12 +134,17 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     const record = repository.updatePattern(current.id, patch) ?? current;
     return publicPattern(record);
   });
-  // 提取：源图以 multipart 上传并作为来源血缘留痕；分割 Provider 由页面自选（全局页没有项目配置可继承）。
+  // 提取：源图以 multipart 上传并作为来源血缘留痕；提取模型由页面自选（全局页没有项目配置可继承）。
   app.post("/api/v1/patterns/extract-jobs", async (request, reply) => {
     const { upload, fields } = await readSingleImageMultipart(request, "source image");
     const providerId = readText(fields.providerId, "providerId");
     const modelId = readText(fields.modelId, "modelId");
-    const { protocol } = resolveSegmentationModel(repository, providerId, modelId, "花型提取", readOptionalText(fields.protocol));
+    // 两条提取路共用一个端点与请求形状，只有模型校验与底版语义随 mode 分叉：
+    // SEGMENT 校验分割三元组，GENERATE 校验生图模型与透明底能力（复用衍生的同一套判定）。
+    const mode = fields.mode === undefined ? "SEGMENT" : enumValue(fields.mode, PATTERN_EXTRACT_MODES, "mode");
+    const background = mode === "GENERATE"
+      ? (fields.background === undefined ? "TRANSPARENT" : enumValue(fields.background, PATTERN_EXTRACT_BACKGROUNDS, "background"))
+      : null;
     const brief = optionalBoundedText(readOptionalText(fields.brief), MAX_PATTERN_BRIEF_LENGTH, "brief");
     const name = optionalBoundedText(readOptionalText(fields.name), MAX_PATTERN_NAME_LENGTH, "name");
     const tags = parsePatternTags(readOptionalText(fields.tags));
@@ -145,8 +152,15 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     // 成包答案先校验：请求要失败就该在落源图、建任务之前失败，不留半个花型。
     const answers = readPatternPipelineAnswers(fields.pipeline);
     if (answers) validatePatternPipelineAnswers(repository, answers);
+    // 模型校验也在落源图之前：换一个不存在的模型不该留下孤儿源图目录。
+    const protocol = mode === "SEGMENT" ? resolveSegmentationModel(repository, providerId, modelId, "花型提取", readOptionalText(fields.protocol)).protocol : null;
+    if (mode === "GENERATE") {
+      verifyModel(repository, providerId, modelId, "image");
+      assertTransparentBackground(repository, providerId, modelId, background);
+    }
     const sourceHash = contentHash(upload.buffer);
-    const fingerprint = requestFingerprint({ type: "PATTERN_EXTRACT", providerId, modelId, protocol, sourceHash, brief: brief ?? null, name: name ?? null, tags, idempotencyKey });
+    // promptVersion 进指纹：提取提示词修订后，同输入的旧任务不再被判为可复用。
+    const fingerprint = requestFingerprint({ type: "PATTERN_EXTRACT", mode, background, promptVersion: PATTERN_EXTRACT_PROMPT_VERSION, providerId, modelId, protocol, sourceHash, brief: brief ?? null, name: name ?? null, tags, idempotencyKey });
     const existing = repository.findJobByFingerprint(null, fingerprint);
     // 在途照常复用；SUCCEEDED 花型被删后按同指纹重提必须新建，否则只会复用一个不再产出花型的旧任务。
     if (existing && reusableFingerprintedJob(existing, repository.hasPatternArtifactsByJobId(existing.id))) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
@@ -154,7 +168,7 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     const patternId = randomUUID();
     // 源图先落 patterns/<id>/ 作为血缘留痕：提取成功后与花型同目录，删除花型时一并清理。
     const storedSource = await storage.putPatternSource(patternId, upload.filename, upload.buffer);
-    const job = repository.createJob({ id: jobId, projectId: null, storyboardItemId: null, type: "PATTERN_EXTRACT", input: { patternId, sourcePath: storedSource.path, sourceHash: storedSource.hash, name: name ?? null, brief: brief ?? null, tags, segmentationProviderId: providerId, segmentationModelId: modelId, segmentationProtocol: protocol }, requestFingerprint: fingerprint, providerId, modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const job = repository.createJob({ id: jobId, projectId: null, storyboardItemId: null, type: "PATTERN_EXTRACT", input: { patternId, sourcePath: storedSource.path, sourceHash: storedSource.hash, name: name ?? null, brief: brief ?? null, tags, mode, protocol, background, segmentationProviderId: mode === "SEGMENT" ? providerId : null, segmentationModelId: mode === "SEGMENT" ? modelId : null, imageProviderId: mode === "GENERATE" ? providerId : null, imageModelId: mode === "GENERATE" ? modelId : null }, requestFingerprint: fingerprint, providerId, modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     repository.createPattern({ id: patternId, name: name ?? defaultPatternName(brief ?? upload.filename.replace(/\.[^.]+$/, "")), sourceType: "EXTRACTED", sourceJobId: jobId, sourceAssetHash: storedSource.hash, parentPatternId: null, storagePath: null, fileHash: null, width: null, height: null, tags });
     // 流水线必须在入队之前建好并绑上 SOURCE 步骤：Worker 可能在本请求返回前就完成提取，
     // 那时若还没有步骤行，推进就找不到落点，整条链永远不会启动。
@@ -298,7 +312,8 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     const body = parseBody(CreatePatternListingJobInput, request.body);
     verifyCopywritingModel(repository, body.providerId, body.modelId);
     const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
-    const fingerprint = requestFingerprint({ type: "COPYWRITE", target: "LISTING", patternId: pattern.id, patternHash: pattern.fileHash, platform: body.platform, sellingPoints: body.sellingPoints ?? null, mustIncludeWords: body.mustIncludeWords ?? null, bannedWords: body.bannedWords ?? null, providerId: body.providerId, modelId: body.modelId, idempotencyKey });
+    // 提示词版本进指纹：改了写作规则后，同输入的旧任务不能再被复用成"新规则的产物"。
+    const fingerprint = requestFingerprint({ type: "COPYWRITE", target: "LISTING", patternId: pattern.id, patternHash: pattern.fileHash, platform: body.platform, sellingPoints: body.sellingPoints ?? null, mustIncludeWords: body.mustIncludeWords ?? null, bannedWords: body.bannedWords ?? null, promptVersion: PATTERN_LISTING_PROMPT_VERSION, providerId: body.providerId, modelId: body.modelId, idempotencyKey });
     const existing = repository.findJobByFingerprint(null, fingerprint);
     if (existing) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
     const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "COPYWRITE", input: { target: "LISTING", patternId: pattern.id, platform: body.platform, sellingPoints: body.sellingPoints ?? null, mustIncludeWords: body.mustIncludeWords ?? null, bannedWords: body.bannedWords ?? null }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });

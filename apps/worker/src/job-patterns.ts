@@ -23,6 +23,7 @@ import type {
 import {
   compilePatternExtractPrompt,
   compilePatternForgePrompt,
+  compilePatternGenerateExtractPrompt,
   compilePatternVariantPrompt,
   defaultPatternName,
   defaultVariantName,
@@ -38,23 +39,60 @@ import { multiplyAlpha } from "./layer-composite.js";
 import type { WorkerContext } from "./context.js";
 
 export async function executePatternExtract(ctx: WorkerContext, job: JobRecord, signal: AbortSignal): Promise<void> {
-  const { repository, storage, secrets, updateJob, throwIfCancelled, providerFor } = ctx;
+  const { repository, storage, secrets, updateJob, throwIfCancelled, providerFor, imageModelForJob, imageGeneratorFor } = ctx;
   throwIfCancelled(job);
-  // 分割快照与源图路径都在入队时写入 input；执行只认快照，排队后改配置不影响本次执行。
-  const input = job.input as { patternId?: unknown; sourcePath?: unknown; brief?: unknown; segmentationProviderId?: unknown; segmentationModelId?: unknown; segmentationProtocol?: unknown };
+  // 提取快照与源图路径都在入队时写入 input；执行只认快照，排队后改配置不影响本次执行。
+  // mode 缺省按 SEGMENT 处理：与契约的缺省语义一致。
+  const input = job.input as { patternId?: unknown; sourcePath?: unknown; brief?: unknown; mode?: unknown; background?: unknown; protocol?: unknown; segmentationProviderId?: unknown; segmentationModelId?: unknown };
   const pattern = repository.getPattern(typeof input.patternId === "string" ? input.patternId : "");
   if (!pattern) throw new Error(`Pattern record missing for extract job ${job.id}`);
   const sourcePath = typeof input.sourcePath === "string" ? input.sourcePath : "";
   if (!sourcePath) throw new Error("Pattern extract job has no source image snapshot");
-  if (!isSegmentationProtocol(input.segmentationProtocol)) throw new Error("Pattern extract job is missing its segmentation snapshot");
-  const protocol: SegmentationProtocol = input.segmentationProtocol;
+  const source = await storage.read(sourcePath);
+
+  if (input.mode === "GENERATE") {
+    /*
+     * 生成式提取：生图模型把商品上的图案摊平重绘成图稿。
+     *
+     * 与分割提取的关键差异在产物语义——这里不再有"像素取自原图"的 PIXEL_PROTECTED 承诺，
+     * 模型重绘正是本路径存在的理由（透视/褶皱/光影重的实拍分割给不了干净图稿）；
+     * 铁律只剩一条：底版承诺必须校验，透明底丢失不可见但会污染下游成包。
+     */
+    const { provider, model } = imageModelForJob(job);
+    const generator = imageGeneratorFor(provider, model);
+    const background = input.background === "WHITE" ? "WHITE" : "TRANSPARENT";
+    const backgroundPlan = resolvePatternBackground({ mode: background, model });
+    const prompt = compilePatternGenerateExtractPrompt({ brief: typeof input.brief === "string" ? input.brief : undefined, background });
+    await updateJob(job, { progress: 15, providerTaskId: EXTERNAL_REQUEST_STARTED });
+    const result = await generator.editImage({
+      model: model.id,
+      prompt,
+      sourceImage: { data: source, filename: "product.png", mimeType: mimeForStoragePath(sourcePath) },
+      ...(model.imageApiKind === "gemini" ? { imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: "1K" as ImageResolution } : {}),
+      ...(highInputFidelityForOpenAiImageModel(model.id) ? { inputFidelity: "high" as const } : {}),
+      ...(backgroundPlan.transparent ?? {}),
+      idempotencyKey: generationKeyFor(job.id, 1),
+      signal,
+    });
+    throwIfCancelled(job);
+    // 与起稿/衍生同一条纪律：产物先落盘（钱已花出去，图留在库里至少还能用），承诺未兑现再让任务失败。
+    const stored = await storage.putPatternArtifact(pattern.id, "pattern", result.image);
+    const { width, height } = await outputDerivatives(storage, stored.hash, result.image);
+    const updated = repository.setPatternArtifact(pattern.id, { storagePath: stored.path, fileHash: stored.hash, width, height });
+    if (!updated) throw new Error(`Pattern record disappeared for extract job ${job.id}`);
+    await verifyPatternBackground(backgroundPlan, result.image, "提取");
+    await updateJob(job, { progress: 95 });
+    return;
+  }
+
+  if (!isSegmentationProtocol(input.protocol)) throw new Error("Pattern extract job is missing its segmentation snapshot");
+  const protocol: SegmentationProtocol = input.protocol;
   // seedream_layerize 是多元素图层拆分，与单主体提取语义不符：快照若带该协议直接显式失败。
   if (protocol === "seedream_layerize") throw new Error("Pattern extraction does not support the seedream_layerize protocol");
   const segmentationProviderId = typeof input.segmentationProviderId === "string" ? input.segmentationProviderId : "";
   const segmentationModelId = typeof input.segmentationModelId === "string" ? input.segmentationModelId : "";
   if (!segmentationProviderId || !segmentationModelId) throw new Error("Pattern extract job is missing its segmentation snapshot");
   const provider = providerFor(segmentationProviderId);
-  const source = await storage.read(sourcePath);
   const meta = await sharp(source).metadata();
   if (!meta.width || !meta.height) throw new Error("Source image dimensions are unavailable");
   await updateJob(job, { progress: 15 });

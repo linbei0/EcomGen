@@ -1,0 +1,180 @@
+/*
+ * 根容器自己排纵向间距，而不是用 antd Space：绘制态要它把父容器的剩余高度接下来
+ * （见下面的 .stageFill），而 Space 的 display/内联样式不受这里控制。
+ */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/*
+ * 画布舞台：画布在其中按比例缩放并居中。
+ *
+ * 早前的写法是画布 `width: min(100%, 自然宽)`，1024 见方的草图直接撑满弹窗并溢出屏幕：
+ * 既看不出画布边界，底部控件也点不到。这里给舞台一个确定高度，画布由 JS 按容器实际尺寸
+ * 做 contain 缩放，任何比例都完整可见；坐标映射仍按元素的实际矩形换算，导出仍是原生分辨率。
+ *
+ * 底色不在这里写死：透明像素要露出用户选的那块地面（见 backdrop.module.css），
+ * 硬编码近黑底会让透明花型看起来像"图变黑了"。
+ */
+.stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 撑满剩余高度。basis 取 0 而不是 auto：这样舞台的高度完全由父容器决定，
+   不会因为"量到的画布尺寸反过来抬高舞台"而形成互相追着涨的循环。
+   min-height 是下限：可用高度再小也不把画布压成一条，那时改为让外层滚动。 */
+.stageFill { flex: 1 1 0; min-height: 160px; }
+
+/* 画布边界必须可见：改稿的笔迹层与白底草图都靠这圈描边定位，否则画布和舞台糊成一片。 */
+.frame {
+  position: relative;
+  flex: none;
+  box-shadow: 0 0 0 1px var(--line-2), 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.underlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.committed { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/*
+ * 选框层：矩形/椭圆/套索画在这里，不吃指针事件（交互统一由 preview 层接）。
+ *
+ * 它刻意不跟着 overlay 降透明度：框是细线，本来就挡不住底图，而它同时是"框住哪里"的唯一提示，
+ * 淡到 0.45 在花哨的底图上会看不清；手柄也必须是不透明的，否则拖不准。
+ * 手柄只画在显示层，导出时另走一份不含手柄的绘制。
+ */
+.marks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/*
+ * 有底图时画布怎么叠在底图上。
+ *
+ * tracing：画布半透明压盖。白底草图用这种——底图只是描摹参考，压过之后正好是硫酸纸的手感。
+ * overlay：改稿的笔迹以半透明色洗叠在底图上。没画到的地方画布是透明的，底图原样透出；
+ *   画到的地方是一层用户挑的笔色——画的时候要看得见底图，否则一笔就把要改的地方盖住。
+ * 这里不能用 screen（此前用的就是它）：screen 只会提亮，永远不可能把某个像素压暗，
+ * 于是在白底图上白笔迹与底色同为白——"画了却看不见"就是这么来的；换成彩色笔迹也救不了，
+ * screen(白, 任何色) 仍是白。笔迹必须是"能压暗也能提亮"的普通叠加。
+ */
+.committed[data-underlay-mode="tracing"] { opacity: 0.72; }
+.committed[data-underlay-mode="overlay"] { opacity: 0.45; }
+
+.preview { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+/* 拖拽中的形状要与落笔后长得一样：不跟着降透明度的话，矩形在拖动时是实色、一松手就变淡，
+   看起来像"提交时把颜色改了"。 */
+.preview[data-underlay-mode="overlay"] { opacity: 0.45; }
+
+/*
+ * 光标全部由属性决定，不由 JS 直写 style.cursor：那样写进去的光标没有人负责复位，
+ * 切工具或指针离开画布之后会残留成与实际动作不符的形状。
+ *
+ * 画笔与擦除的笔径提示不是光标，而是画在画布上的虚线圆环（见 `paintFootprint`）。
+ * 这里曾经放过电商生图编辑那组固定半径 11 的圆圈光标，现在撤掉了：光标是一张改不了尺寸的图片，
+ * 笔径在 4~240 之间调它始终是同一个圈，不仅不说明粗细，笔径小于 22 时还比实际笔迹大，
+ * 反而误导。形状类工具仍用十字：那是在拖框，十字比圆圈更能说明"从哪拉到哪"。
+ */
+
+/* 悬停已有选框时的手柄光标：与拖动的方向一一对应。 */
+.preview[data-hover="move"] { cursor: move; }
+.preview[data-hover="nw"], .preview[data-hover="se"] { cursor: nwse-resize; }
+.preview[data-hover="ne"], .preview[data-hover="sw"] { cursor: nesw-resize; }
+.preview[data-hover="n"], .preview[data-hover="s"] { cursor: ns-resize; }
+.preview[data-hover="e"], .preview[data-hover="w"] { cursor: ew-resize; }
+
+/* 笔色条：颜色是画的过程中反复要换的，贴在画布下方而不是挤进顶部工具栏。 */
+.footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 22px; }
+
+.swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  cursor: pointer;
+}
+/*
+ * 色块的状态环用 box-shadow 画，并显式关掉 outline。
+ *
+ * 浏览器给按钮的默认焦点环是 `outline: auto`：它在 Windows 上画的是固定小圆角的方框、
+ * 不跟随 border-radius，套在这枚圆形色块外面就是一个突兀的方框。只改 outline 的颜色压不住它
+ * （`auto` 环由平台绘制），只能整个换成 box-shadow —— 严格跟随圆角，且不占布局、不会被相邻色块挤开。
+ * 关掉 outline 的同时必须自己补环，否则键盘用户会失去焦点位置。
+ *
+ * 选择器带上状态而不是只写类名：全局 `:focus-visible` 给的是同权重（都是 0,1,0）的
+ * `outline: 2px solid`，谁赢只看两个 CSS chunk 的加载顺序，打包顺序一变就会翻回来。
+ * 带状态是 0,2,0，与顺序无关。
+ */
+.swatch:focus,
+.swatch:focus-visible,
+.swatchCustom:focus,
+.swatchCustom:focus-visible,
+.swatchCustom input:focus,
+.swatchCustom input:focus-visible { outline: none; }
+
+/*
+ * 当前色用中性环，而不是像设计系统其它地方那样用强调色。
+ *
+ * 这一行里每一格本来就是任意颜色，而强调色（琥珀）自己就在预设里：琥珀环套在琥珀色块上，
+ * 环与色块糊成一片，反而看不出哪一格是当前色。中性色对全部预设色都有对比度。
+ */
+.swatch[data-active="true"],
+.swatchCustom[data-active="true"] { box-shadow: 0 0 0 2px var(--text-1); }
+
+/* 键盘焦点另用一枚外圈：它与"当前色"含义不同（焦点在哪 vs 选中的是哪一格），要能分辨。
+   单独聚焦时是琥珀环；聚焦的正好是当前色时是"中性环 + 琥珀外环"两枚，两个状态同时可见。 */
+.swatch:focus-visible,
+.swatchCustom:has(input:focus-visible) { box-shadow: 0 0 0 2px var(--accent); }
+
+.swatch[data-active="true"]:focus-visible,
+.swatchCustom[data-active="true"]:has(input:focus-visible) {
+  box-shadow: 0 0 0 2px var(--text-1), 0 0 0 4px var(--accent);
+}
+
+/* 自定义色槽位：未选用时显示彩虹环，选用后这一格换成当前色。 */
+.swatchCustom {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  background: conic-gradient(#ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+}
+.swatchCustom input { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+
+/* 文本用文字色阶而不是叠透明度：token 保证的是颜色本身，叠 opacity 会把它拉回背景色。
+   这一档是要读的内容（画布尺寸与它背后的说明），取 --text-2；--text-3 留给真正次要的标注。 */
+.meta { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-2); }
+.dims { font-family: var(--font-mono); }
+.info { display: inline-grid; place-items: center; cursor: help; }
+
+/* 当前缩放倍率。只是读数，不是按钮：还原动作在工具栏里，同一个动作不该有两个入口。 */
+.zoom { font-family: var(--font-mono); }
+
+/* 平移中给一个明确的抓取光标；否则右键拖拽没有任何正在生效的反馈。
+   画布自己的 crosshair 会盖住舞台的光标（指针在画布上时，生效的是最上层那个元素），
+   所以这里一并压过去。 */
+.stage[data-panning="true"],
+.stage[data-panning="true"] .preview { cursor: grabbing; }

@@ -20,7 +20,11 @@ export async function createOutpaintCanvas(source: Buffer, expansion: { top: num
   return { image, mask, width, height, left: expansion.left, top: expansion.top };
 }
 
-export async function assertMaskDimensions(source: Buffer, mask: Buffer): Promise<void> { const [sourceMeta, maskMeta] = await Promise.all([sharp(source).metadata(), sharp(mask).metadata()]); if (!sourceMeta.width || !sourceMeta.height || sourceMeta.width !== maskMeta.width || sourceMeta.height !== maskMeta.height) throw new Error("MASK_DIMENSION_MISMATCH"); }
+/** 叠加层必须与底图同尺寸：错位的标注会以"看起来生效了"的方式改错地方。 */
+export async function assertSameDimensions(source: Buffer, overlay: Buffer): Promise<void> {
+  const [sourceMeta, overlayMeta] = await Promise.all([sharp(source).metadata(), sharp(overlay).metadata()]);
+  if (!sourceMeta.width || !sourceMeta.height || sourceMeta.width !== overlayMeta.width || sourceMeta.height !== overlayMeta.height) throw new Error("IMAGE_DIMENSION_MISMATCH");
+}
 
 /**
  * 生成图的透明度必须被保留，而不是被选区蒙版顶替。
@@ -51,10 +55,16 @@ async function compositeAlphaAware(source: Buffer, generated: Buffer, width: num
   return sharp(output, { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
 
-/** 解析选区灰度并按 protectMask 扣除保留区；返回与目标尺寸一致的 1 通道像素。 */
+/**
+ * 解析选区灰度并按 protectMask 扣除保留区；返回与目标尺寸一致的 1 通道像素。
+ *
+ * blur 大于 0 时做对称模糊：边界外也被影响，这正是自然融合需要的过渡；
+ * blur 为 0（硬边界合成）时跳过模糊，选区外逐像素不变。
+ */
 async function resolvedMaskPixels(editMask: Buffer, protectMask: Buffer | undefined, width: number, height: number, blur = 0): Promise<Buffer> {
-  const mask = sharp(editMask).greyscale().removeAlpha().resize(width, height, { fit: "fill" });
-  const pixels = blur > 0 ? await mask.blur(blur).raw().toBuffer() : await mask.raw().toBuffer();
+  // 单独成函数是为了在需要两份时各起一条流水线：同一个 sharp 实例派生出的两个分支互相干扰。
+  const mask = () => sharp(editMask).greyscale().removeAlpha().resize(width, height, { fit: "fill" });
+  const pixels = await (blur > 0 ? mask().blur(blur) : mask()).raw().toBuffer();
   if (!protectMask) return pixels;
   const protect = await sharp(protectMask).greyscale().removeAlpha().resize(width, height, { fit: "fill" }).raw().toBuffer();
   for (let index = 0; index < pixels.length; index += 1) pixels[index] = Math.max(0, pixels[index]! - protect[index]!);
@@ -92,4 +102,19 @@ export async function providerMaskFor(source: Buffer, editMask: Buffer, protectM
     const target = index * 4; rgba[target] = 0; rgba[target + 1] = 0; rgba[target + 2] = 0; rgba[target + 3] = 255 - editable;
   }
   return sharp(rgba, { raw: { width: meta.width, height: meta.height, channels: 4 } }).png().toBuffer();
+}
+
+/**
+ * 用户画在候选图上的笔迹 → 交给模型的改稿源图。
+ *
+ * 合成而不是把两张图分别下发：模型要改的是"这一张画面上的这一块"，分成两路下发时，笔迹落在
+ * 哪个坐标只能靠模型自己对上，位置只能靠猜。叠成一张，位置就是像素本身。
+ *
+ * 笔迹的不透明度按原样保留：用户画下的浓淡就是他要表达的指示强度，这里不替他加重或减弱。
+ * 两侧都显式补 alpha：透明底花型要能承载笔迹，输出也必须把原有的透明原样带出来。
+ */
+export async function paintOverImage(source: Buffer, annotation: Buffer): Promise<Buffer> {
+  await assertSameDimensions(source, annotation);
+  // 笔迹在上传时已归一化为 PNG，composite 直接吃原 buffer，不再完整编码一遍。
+  return sharp(source).ensureAlpha().composite([{ input: await sharp(annotation).ensureAlpha().toBuffer(), blend: "over" }]).png().toBuffer();
 }

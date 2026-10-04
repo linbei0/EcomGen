@@ -29,14 +29,14 @@ EcomGen 是面向个人卖家的电商 AI 生成套图工具。当前后端优�
 
 ```bash
 pnpm install
-pnpm build
-pnpm build:affected
+pnpm build            # 全量构建（见「验证层级」，不是默认收尾步骤）
+pnpm build:affected   # 改动包 + 上游依赖
 pnpm dev:api
 pnpm dev:worker
 pnpm dev:web
-pnpm test
-pnpm test:affected
-pnpm test:e2e:mock
+pnpm test             # 全量测试（见「验证层级」，不是默认收尾步骤）
+pnpm test:affected    # 改动包 + 依赖方，日常默认入口
+pnpm test:e2e:mock    # 任务编排 / Provider / 导出改动
 pnpm lint:openapi
 pnpm gen:openapi
 pnpm gen:check
@@ -89,18 +89,19 @@ pnpm build:affected   # 改动包 + 上游依赖（构建要先有上游 dist）
 - 基线默认 `origin/main`，按 `ECOMGEN_BASE_REF` → `origin/main` → `main` 依次探测；基线不可达时显式失败，不静默改变范围。
 - 只改测试文件时不牵连依赖方；`*.md` 与 `docs/` 不计入改动集合。
 - 改动根级共享配置（`pnpm-lock.yaml`、`pnpm-workspace.yaml`、根 `package.json`、`tsconfig.base.json`、`scripts/`、`Dockerfile`、`docker-compose.yml`、`openapi*`）会自动升级为全量，因为这些文件的影响面无法从依赖图推导。
-- `pnpm test` 与 `pnpm build` 保留为全量入口，用于合并前和根级共享配置改动。
+- `pnpm test` 与 `pnpm build` 是全量入口，只有两种情况用：改动命中上面那份根级共享配置清单（`scripts/affected.mjs` 会自动升级，不靠人判断），或者用户明确要求。除此之外不要用它们。
 - 选中集合为空但仍有工作区文件改动时 `scripts/affected.mjs` 报错退出：过滤结果不可信比没跑测试更危险。作用域策略只能通过命令行 flag 传入，已实测 pnpm 11.19.0 会静默忽略配置文件里的同名字段。
 
 ### 验证层级
 
 | 改动                       | 必须运行                                                      |
 | ------------------------ | --------------------------------------------------------- |
-| 任意改动                     | `pnpm test:affected`                                      |
+| 任意改动                     | `pnpm test:affected`（默认入口，范围化）                            |
 | 领域逻辑或持久化                 | 对应 package 的用例，由 `test:affected` 覆盖                       |
 | `packages/contracts/src` | `pnpm gen:openapi && pnpm gen:check && pnpm lint:openapi` |
 | 任务编排、Provider 或导出        | `pnpm test:e2e:mock`                                      |
-| 合并前 / 推送前                | `pnpm build && pnpm test`                                 |
+| 纯界面 / 样式 / 文案            | 该包类型检查或构建；观感靠实际渲染确认，不跑测试套件                                |
+| 根级共享配置改动，或用户明确要求         | `pnpm build && pnpm test`                                 |
 
 契约对账（`gen:check`、`lint:openapi`）只在 contracts 或 `openapi.yaml` 真正改动时才有意义，不作为无关改动的固定步骤。
 

@@ -1,5 +1,58 @@
 import { describe, expect, it } from "vitest";
-import { API_SCHEMA_REGISTRY, ImageResolution, resolveImageSize, schemaRef, supportsTransparentBackground } from "./index.js";
+import { API_SCHEMA_REGISTRY, ImageResolution, dispatchedReferenceOrdinals, findDraftPalettes, resolveImageSize, rewriteDraftPalettes, schemaRef, supportsTransparentBackground } from "./index.js";
+
+describe("参考图下发", () => {
+  const availableOrdinals = [1, 3, 7];
+
+  it("起稿下发全部参考图，顺序按编号升序", () => {
+    expect(dispatchedReferenceOrdinals({ operation: "GENERATE", availableOrdinals: [7, 1, 3] })).toEqual([1, 3, 7]);
+  });
+
+  it("改稿只下发说明里 @ 到的参考图，重复引用只算一次", () => {
+    expect(dispatchedReferenceOrdinals({ operation: "EDIT", instruction: "照 @图7 的配色，@图7 的构图", availableOrdinals })).toEqual([7]);
+    // 说明里没有 @ 引用就是不下发任何参考图。
+    expect(dispatchedReferenceOrdinals({ operation: "EDIT", instruction: "调暖一点", availableOrdinals })).toEqual([]);
+  });
+
+  it("不下发参考图的操作一律返回空，即使文本里写了引用", () => {
+    for (const operation of ["SEAM_EDIT", "RECOLOR", "CUTOUT"] as const) {
+      expect(dispatchedReferenceOrdinals({ operation, instruction: "照 @图1 做", availableOrdinals })).toEqual([]);
+    }
+  });
+
+  it("引用不存在的编号时原样返回，由调用方按引用不存在拒绝，而不是静默丢弃", () => {
+    expect(dispatchedReferenceOrdinals({ operation: "EDIT", instruction: "照 @图9", availableOrdinals })).toEqual([9]);
+    // 裸的「图3」不是引用语法，不该被当成下发依据。
+    expect(dispatchedReferenceOrdinals({ operation: "EDIT", instruction: "照图3 的感觉", availableOrdinals })).toEqual([]);
+  });
+});
+
+describe("配色 token", () => {
+  it("认 3/4/6/8 位色值，保留出现顺序", () => {
+    const matches = findDraftPalettes("把叶子改成 #4f7dc9 的配色，花心用 #fff，描边 #aabbccdd");
+    expect(matches.map((match) => match.color)).toEqual(["#4f7dc9", "#fff", "#aabbccdd"]);
+    expect(matches[1]!.start).toBeGreaterThan(matches[0]!.end);
+  });
+
+  /*
+   * 正文里 `#` 太常见，所以长度卡死才是"这算不算颜色"的分界线；而且长写法必须整体命中，
+   * 否则 `#11223344` 会被六位规则截成 `#112233` 加一串残字，颜色悄悄变了值。
+   */
+  it("正文里的 # 不是颜色，长度不对的十六进制也不是", () => {
+    expect(findDraftPalettes("第 #2 版、#标签，共 3 项")).toEqual([]);
+    expect(findDraftPalettes("#12345")).toEqual([]);
+    expect(findDraftPalettes("#1234567")).toEqual([]);
+    expect(findDraftPalettes("#11223344").map((match) => match.color)).toEqual(["#11223344"]);
+  });
+
+  it("改写成配色组，并如实报告是否出现过配色", () => {
+    const rewritten = rewriteDraftPalettes("把叶子改成 #4f7dc9 的配色");
+    expect(rewritten.text).toBe("把叶子改成 [配色 #4f7dc9] 的配色");
+    expect(rewritten.hasPalette).toBe(true);
+    // 没有 token 时逐字节原样返回，调用方据此决定要不要追加意图句。
+    expect(rewriteDraftPalettes("整体提亮")).toEqual({ text: "整体提亮", hasPalette: false });
+  });
+});
 
 describe("contracts", () => {
   it("maps project-level aspect ratios to the OpenAI-compatible size family", () => {

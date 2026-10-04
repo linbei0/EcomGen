@@ -1,9 +1,14 @@
 import type { PatternBackgroundMode, PodPrintCategory } from "@ecomgen/contracts";
 
+import { PATTERN_FLAT_PRINT_REGISTER, PATTERN_NEGATIVE_CONSTRAINTS, patternBackgroundClause } from "./pattern-prompt-fragments.js";
+
 /**
  * 花型工坊的确定性 prompt 编译层（同 model-cast.ts 的设计立场）：
  * 起稿/提取的提示词是输入的纯函数——同输入重算逐字节一致，任务指纹因此可复现；
  * 模板固化在本文件，不经 LLM 改写，也不允许业务代码在旁边另拼一份。
+ *
+ * 底版、印刷 register 与排除项来自 pattern-prompt-fragments.ts：那些片段与 AI 起稿工作台共用，
+ * 措辞依据（官方提示词指南）也记在那里。
  */
 
 export interface PatternForgeInput {
@@ -32,8 +37,6 @@ const CATEGORY_COMPOSITION: Partial<Record<PodPrintCategory, string>> = {
   PHONE_CASE: "Compose as a compact vertical motif that survives a small, curved print surface.",
 };
 
-const FORGE_NEGATIVE_CONSTRAINTS = "No watermark, no signature, no text or letters, no product mockup, no background scene: the artwork itself only.";
-
 /**
  * 起稿提示词版本：必须进入任务指纹（api 侧）。
  *
@@ -41,7 +44,7 @@ const FORGE_NEGATIVE_CONSTRAINTS = "No watermark, no signature, no text or lette
  * 不把版本写进指纹，改模板后同输入的旧任务会被判为可复用，用户拿到旧模板的产物，
  * 而且没有任何地方说明为什么。修订下面任何一句都必须递增这个常量。
  */
-export const PATTERN_FORGE_PROMPT_VERSION = "2026.10.1";
+export const PATTERN_FORGE_PROMPT_VERSION = "2026.10.2";
 
 /**
  * 底版模式的中文标签，起稿与衍生两处的选择控件共用。
@@ -55,18 +58,6 @@ export const PATTERN_BACKGROUND_MODE_LABELS: Record<PatternBackgroundMode, strin
   TRANSPARENT: "透明底",
 };
 
-/** 不支持透明底时的底板要求：白底，可由「提取」链路的分割模型再转成透明底。 */
-const FORGE_BACKGROUND_OPAQUE = "Flatten the artwork on a plain pure-white background with crisp clean edges, even lighting, no shadows and no perspective.";
-
-/**
- * 支持透明底时的底板要求。
- *
- * 透明要求同时写在提示词与请求参数（background: "transparent"）两处：参数保证 alpha 通道，
- * 提示词负责别让模型自己铺一块白底——只给参数时它仍可能那么做。明写 no drawn checkerboard，
- * 是因为画出来的棋盘格不是透明；那正是 worker 必须解码校验 alpha 的原因，一句祈使句不能替代校验。
- */
-const FORGE_BACKGROUND_TRANSPARENT = "Isolate the artwork on a fully transparent background: no white box, no paper texture, no drop shadow, no halos and no drawn checkerboard standing in for transparency. Crisp clean edges, even lighting, no perspective.";
-
 /**
  * 编译 AI 起稿 prompt：一张可直接入库的花型图稿。
  *
@@ -76,12 +67,15 @@ export function compilePatternForgePrompt(input: PatternForgeInput): string {
   const theme = input.theme.trim();
   const style = input.style?.trim();
   const composition = input.category ? CATEGORY_COMPOSITION[input.category] : undefined;
+  // 顺序固定为「媒介 → 主体 → 风格 → 构图 → 底版 → 排除项」：先定产物类别再描述内容，
+  // 是官方指南给出的稳定结构，也让提示词在日志里可以按段落扫读。
   return [
-    `Design an original print-ready pattern artwork: ${theme}.`,
-    style ? `Art style: ${style}.` : "",
+    PATTERN_FLAT_PRINT_REGISTER,
+    `Subject: one original print-ready pattern artwork of ${theme}.`,
+    style ? `Style: ${style}.` : "",
     composition ?? "",
-    input.background === "TRANSPARENT" ? FORGE_BACKGROUND_TRANSPARENT : FORGE_BACKGROUND_OPAQUE,
-    FORGE_NEGATIVE_CONSTRAINTS,
+    patternBackgroundClause(input.background),
+    PATTERN_NEGATIVE_CONSTRAINTS,
   ].filter(Boolean).join(" ");
 }
 
@@ -101,4 +95,39 @@ export function compilePatternExtractPrompt(brief?: string): string {
   const base = "the printed graphic artwork on the product: only the decorative pattern itself, not the product body, hardware, shadows or background";
   const hint = brief?.trim();
   return hint ? `${base}. Hints: ${hint}` : base;
+}
+
+/**
+ * 提取提示词版本：两种提取方式共用，必须进入任务指纹（api 侧）。
+ *
+ * 分割提示与生成提示任一措辞修订都要递增——指纹里没有版本时，改模板后同输入的旧任务会被
+ * 判为可复用，用户拿到旧模板的产物。该常量补上之前提取指纹不含提示词版本的缺口。
+ */
+export const PATTERN_EXTRACT_PROMPT_VERSION = "2026.10.2";
+
+export interface PatternGenerateExtractInput {
+  /** 补充描述（用户输入，中英皆可），原样透传为 Hints。 */
+  brief?: string;
+  /** 底版要求。能力判定（模型能不能给真透明底）不在这里做，调用方判定后把结论传进来。 */
+  background: Exclude<PatternBackgroundMode, "SOURCE">;
+}
+
+/**
+ * 编译生成式提取 prompt：让生图模型把商品实拍图上的图案摊平重绘成可入库的花型图稿。
+ *
+ * 与分割提取（compilePatternExtractPrompt）指向同一个目标物——商品上的印花图案本身，
+ * 但产物是模型重绘：实拍图上的透视、褶皱与光影是分割路线给不了干净图稿的原因，
+ * 生成路线按"正面平铺、完整图案"重画一遍。重绘允许重画呈现方式，但图案本身的颜色、
+ * 纹样与构图必须忠实于源图——这是提取（而非创作）的边界。底版与排除项复用共享片段：
+ * 生成提取的产物会与起稿/衍生的产物并排出现在同一个花型墙里，可印性约束必须一致。
+ */
+export function compilePatternGenerateExtractPrompt(input: PatternGenerateExtractInput): string {
+  const hint = input.brief?.trim();
+  return [
+    "Extract the printed graphic artwork from this product photo into one print-ready flat pattern: redraw the complete decorative pattern itself squared-up front view, not the product body, hardware, shadows, wrinkles or background.",
+    "Keep the artwork's own colors, motifs and composition faithful to the source photo.",
+    patternBackgroundClause(input.background),
+    PATTERN_NEGATIVE_CONSTRAINTS,
+    hint ? `Hints: ${hint}` : "",
+  ].filter(Boolean).join(" ");
 }

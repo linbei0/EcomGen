@@ -50,13 +50,14 @@
 }
 
 /*
- * 引用 chip 只能改不参与布局的属性：底色、圆角、下划线、box-shadow 的外扩都不影响字符位置，
- * 而内边距、字距、字号会——chip 是画在文字底下的，镜像一错位就和 textarea 的文字分家。
+ * chip 只能改不参与布局的属性：底色、圆角、下划线、box-shadow 的外扩都不影响字符位置，
+ * 而内边距、字距、字号、换行规则会——chip 是画在文字底下的，镜像一错位就和 textarea 的文字分家。
  * 底色取三成强调色（在真实 Chromium 渲染里比对过 20%/26%/32%/40%）：再淡像普通文字，
  * 再浓会盖过正文；圆角 5px 比胶囊形更贴合紧贴字形的方盒。
  */
 .refToken,
-.refTokenDangling {
+.refTokenDangling,
+.paletteToken {
   /* mark 有 UA 默认的黑字黄底，必须显式压掉，否则会和 textarea 的文字叠成双层。 */
   color: transparent;
   border-radius: 5px;
@@ -67,6 +68,12 @@
 .refToken {
   background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
+
+/*
+ * 色值 chip 的底色与描边不在这里：它们由色值本身算出来，从行内样式进（见 paletteTokenStyle），
+ * 上一组的圆角与透明文字已经够用。这样它同时表示"这是个 token"和"这是个什么颜色"，
+ * 与同一句话里的 `@图1` 靠色相区分，比靠两种中性色更清楚。
+ */
 
 /*
  * 指向已删除的参考图：提交会被拒绝，所以先在输入框里显形。
@@ -163,6 +170,64 @@
 .refPickerItem[data-active="true"] {
   background: var(--accent-subtle);
 }
+
+/*
+ * 颜色下拉：一排色块加一个自定义色。
+ *
+ * 色块的状态环一律用 box-shadow，理由同画布下方的标记色：浏览器的默认焦点环是 `outline: auto`，
+ * 画的是固定小圆角的方框、不跟随 border-radius，套在圆形色块外面就是一个方框。
+ */
+.colorPicker {
+  position: absolute;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-s);
+  background: var(--bg-3);
+  box-shadow: var(--shadow-pop);
+}
+
+.colorSwatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.colorSwatch:focus,
+.colorSwatch:focus-visible { outline: none; }
+.colorSwatch[data-active="true"],
+.colorSwatch:focus-visible { box-shadow: 0 0 0 2px var(--text-1); }
+
+.colorCustom {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  background: conic-gradient(#ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+}
+.colorCustom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.colorCustom input:focus,
+.colorCustom input:focus-visible { outline: none; }
+.colorCustom:has(input:focus-visible) { box-shadow: 0 0 0 2px var(--text-1); }
 
 .refPickerThumb {
   width: 22px;

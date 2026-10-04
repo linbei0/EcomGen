@@ -1,10 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Alert, App, Button, Image, Input, Modal, Popconfirm, Segmented, Select, Slider, Space, Tag, Tooltip } from "antd";
-import { ArrowLeft, Download, ImagePlus, Info, Layers, Palette, RefreshCw, Scissors, Sparkles, Trash2, Undo2, Wand2 } from "lucide-react";
+import { Alert, App, Button, Image, Input, Modal, Popconfirm, Segmented, Select, Slider, Space, Tag, Tooltip, Typography } from "antd";
+import { ArrowLeft, Download, ImagePlus, Info, Layers, MessageSquarePlus, MessageSquareText, Pencil, RefreshCw, Scissors, Sparkles, Trash2, Undo2, Wand2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
-import { PATTERN_DRAFT_MEDIA_MAX } from "@ecomgen/contracts";
+import { DRAFT_BACKGROUNDS, MAX_DRAFT_MEDIA_NOTES_LENGTH, PATTERN_DRAFT_REFERENCES_MAX } from "@ecomgen/contracts";
+import { defaultSketchNote } from "@ecomgen/ecom-skill";
 import { useProviders } from "../../api/hooks/useProviders";
 import {
   useCreateDraftBatch,
@@ -19,6 +20,7 @@ import {
   useFinalizeDraftCandidate,
   usePatternDraft,
   useRetryDraftBatch,
+  useUpdateDraftMedia,
   useUpdatePatternDraft,
   type CreateDraftBatchBody,
   type DraftBatch,
@@ -28,28 +30,39 @@ import {
   type PatternDraft,
 } from "../../api/hooks/usePatternDrafts";
 import { relativeTime } from "../../lib/format";
-import { DRAFT_COMPOSE_TYPE_OPTIONS, ImageModelSelect, POD_REPEAT_LAYOUT_OPTIONS, TileVerdict, statusLabel } from "../patterns/shared";
+import { BackgroundModeSelect, DRAFT_COMPOSE_TYPE_OPTIONS, ImageModelSelect, POD_REPEAT_LAYOUT_OPTIONS, TileVerdict, statusLabel } from "../patterns/shared";
 import { qk } from "../../api/queryKeys";
 import { ApiError } from "../../api/errors";
 import { errorText } from "../../lib/errorText";
 import { downloadOriginal } from "../../lib/downloadImage";
-import { parseModelKey, segmentationModelOptions } from "../../lib/modelOptions";
+import { modelOptions, parseModelKey, segmentationModelOptions } from "../../lib/modelOptions";
 import { useFileDropTarget } from "../../lib/fileDrop";
 import { randomUuid } from "../../lib/randomUuid";
-import { MaskEditorDialog } from "./MaskEditorDialog";
+import { DrawSurface, type DrawSurfaceHandle } from "./DrawSurface";
+import backdropStyles from "./backdrop.module.css";
+import { DraftEditPanel } from "./DraftEditPanel";
 import { ReferenceTextArea, type ReferenceOption } from "./ReferenceTextArea";
 import { RepeatPreview } from "./RepeatPreview";
+import { SketchDialog } from "./SketchDialog";
 import styles from "./PatternDraftWorkspacePage.module.css";
 
 const OPERATION_LABELS: Record<string, string> = {
   GENERATE: "生成",
-  EDIT_WHOLE: "整图修改",
-  EDIT_LOCAL: "局部修改",
+  EDIT: "改稿",
   RECOLOR: "调色",
-  PALETTE_VARIANT: "色板变体",
   CUTOUT: "去底",
   SEAM_EDIT: "接缝改稿",
 };
+
+/**
+ * 改稿画布的笔色。笔色在这里是**要表达的颜色**：它既指出要改哪里，也提示改成什么。
+ *
+ * 所以纯白与纯黑必须在列——"改成白色/黑色"是最常见的诉求，不提供就得让用户去取色器里自己找。
+ * 它们在个别底图上会看不清（白笔迹压在白色花朵上），那是用户一眼能看见并自己换色的事，
+ * 比"想改成黑色却挑不到黑色"轻得多。
+ * 定义在模块级而不是内联：内联数组每次渲染换身份，会让 DrawSurface 里挑默认色的 effect 每帧空跑。
+ */
+const EDIT_PAINT_COLORS = ["#e0503a", "#d9a441", "#3fa06a", "#4f7dc9", "#b45fd0", "#ffffff", "#000000"] as const;
 
 
 function isConflict(error: unknown): boolean {
@@ -99,6 +112,7 @@ export function PatternDraftWorkspacePage() {
   const updateDraft = useUpdatePatternDraft(draftId);
   const uploadMedia = useCreateDraftMedia(draftId);
   const deleteMedia = useDeleteDraftMedia(draftId);
+  const updateMedia = useUpdateDraftMedia(draftId);
   const createBatch = useCreateDraftBatch(draftId);
   const createEdit = useCreateDraftEdit(draftId);
   const retryBatch = useRetryDraftBatch(draftId);
@@ -207,6 +221,17 @@ export function PatternDraftWorkspacePage() {
   );
 
   const modelKey = local?.conditions.providerId && local.conditions.imageModelId ? `${local.conditions.providerId}::${local.conditions.imageModelId}` : null;
+  // 当前所选生图模型的能力项；底版选择据此禁用/退回「透明底」。
+  const imageModel = useMemo(
+    () => modelOptions(providersQuery.data?.items ?? [], "image").find((option) => option.value === modelKey),
+    [providersQuery.data, modelKey],
+  );
+  /**
+   * Provider 列表加载完成前按"支持"处理：加载窗口里的"不知道"不等于"不支持"，
+   * 否则刷新页面会把已保存的透明底在列表到达前的那一瞬间改写成白底。
+   * 列表到达后模型若真不支持，BackgroundModeSelect 会禁用该项并自动退回白底。
+   */
+  const transparentAvailable = imageModel ? imageModel.transparentBackground : true;
   // 引用编号由服务端分配，客户端只按编号展示与插入；没有编号的条目（老数据）不参与引用。
   // 两层都用 useMemo：输入框每次击键都会重渲染本页，逐击键重建数组会把下游 memo 全部打穿。
   const referenceMedia = useMemo(() => media.filter((item) => item.role === "REFERENCE"), [media]);
@@ -249,8 +274,18 @@ export function PatternDraftWorkspacePage() {
     }
   }, [batches, message]);
 
-  const submitBatch = async (operation: CreateDraftBatchBody["operation"], extras: Partial<CreateDraftBatchBody> = {}, parentCandidateId?: string): Promise<void> => {
-    if (!local) return;
+  /**
+   * 提交批次。返回是否被接受，供调用方决定要不要退出绘制态——画了半天的笔迹不该因为一次失败就丢掉。
+   *
+   * 参考图不由这里声明：下发哪些由服务端按操作与文本推导（起稿全发，改稿只发文本里 @ 到的）。
+   * 起稿的下发上限与参考图列表上限是同一个数值，所以这里只在超限时拦一道，给出比 400 更清楚的提示。
+   */
+  const submitBatch = async (operation: CreateDraftBatchBody["operation"], extras: Partial<CreateDraftBatchBody> = {}, parentCandidateId?: string): Promise<boolean> => {
+    if (!local) return false;
+    if (operation === "GENERATE" && referenceMedia.length > PATTERN_DRAFT_REFERENCES_MAX) {
+      message.error(`起稿一次最多下发 ${PATTERN_DRAFT_REFERENCES_MAX} 张参考图，请先删掉多余的参考图`);
+      return false;
+    }
     const { providerId, modelId } = modelKey ? parseModelKey(modelKey) : { providerId: "", modelId: "" };
     const clientKey = pendingKeyRef.current ?? randomUuid();
     pendingKeyRef.current = clientKey;
@@ -265,7 +300,6 @@ export function PatternDraftWorkspacePage() {
       aspectRatio: conditions.aspectRatio,
       background: conditions.background,
       ...(conditions.repeatLayout ? { repeatLayout: conditions.repeatLayout } : {}),
-      ...(referenceMedia.length ? { references: referenceMedia.map((item) => item.id) } : {}),
       ...(parentCandidateId ? { parentCandidateId } : {}),
       ...extras,
     };
@@ -274,8 +308,10 @@ export function PatternDraftWorkspacePage() {
       startedBatchesRef.current.add(result.batch.id);
       pendingKeyRef.current = null;
       message.success(result.reused ? "已复用同一提交的批次" : "已提交，可在右侧「生成记录」查看进度");
+      return true;
     } catch (error) {
       message.error(errorText(error));
+      return false;
     }
   };
 
@@ -286,13 +322,14 @@ export function PatternDraftWorkspacePage() {
       return;
     }
     // 上限在服务端强制；这里先按剩余额度截断，避免整批被拒后用户不知道哪几张没进去。
-    const room = PATTERN_DRAFT_MEDIA_MAX - referenceMedia.length;
+    // 计数与下发共用一个上限：上传能装下的张数，就是起稿发得出去的张数。
+    const room = PATTERN_DRAFT_REFERENCES_MAX - referenceMedia.length;
     if (room <= 0) {
-      message.warning(`参考图最多 ${PATTERN_DRAFT_MEDIA_MAX} 张`);
+      message.warning(`参考图最多 ${PATTERN_DRAFT_REFERENCES_MAX} 张`);
       return;
     }
     const accepted = images.slice(0, room);
-    if (accepted.length < images.length) message.warning(`参考图最多 ${PATTERN_DRAFT_MEDIA_MAX} 张，本次只加入 ${accepted.length} 张`);
+    if (accepted.length < images.length) message.warning(`参考图最多 ${PATTERN_DRAFT_REFERENCES_MAX} 张，本次只加入 ${accepted.length} 张`);
     for (const file of accepted) {
       try {
         await uploadMedia.mutateAsync({ file, role: "REFERENCE", source: "UPLOAD" });
@@ -301,6 +338,56 @@ export function PatternDraftWorkspacePage() {
       }
     }
   }, [referenceMedia.length, message, uploadMedia.mutateAsync]);
+
+  /** 参考图额度已满时不给开面板：让用户先删，好过画完一张再被服务端拒绝。 */
+  const referenceRoomFull = (): boolean => {
+    if (referenceMedia.length < PATTERN_DRAFT_REFERENCES_MAX) return false;
+    message.warning(`参考图最多 ${PATTERN_DRAFT_REFERENCES_MAX} 张，请先移除一张再添加`);
+    return true;
+  };
+
+  /** 草图落为一张参考图：备注按创作类型预填，用户可改可删——草图的语义就靠这条备注表达。 */
+  const submitSketch = async (blob: Blob): Promise<void> => {
+    try {
+      await uploadMedia.mutateAsync({
+        file: new File([blob], "sketch.png", { type: "image/png" }),
+        role: "REFERENCE",
+        source: "UPLOAD",
+        notes: draftQuery.data ? defaultSketchNote(draftQuery.data.composeType) : undefined,
+      });
+      setSketchBase(null);
+      message.success("草图已加入参考图，可在主题或改稿说明里用 @ 引用它");
+    } catch (error) {
+      message.error(`草图上传失败：${errorText(error)}`);
+    }
+  };
+
+  /**
+   * 提交改稿：画了笔迹就先把笔迹落成媒体再提交批次，没画就是整图改稿。
+   *
+   * 笔迹是"整图"与"按笔迹"唯一的分界——没有它，服务端就只有父候选可下发；有它，服务端会把笔迹
+   * 叠在父候选上再交给模型。所以它只在真的导出成功之后才写进请求。只有批次被接受才退出绘制态，
+   * 提交失败一次不用重画。
+   */
+  const submitEdit = async (instruction: string): Promise<void> => {
+    if (!editDraw) return;
+    const extras: Partial<CreateDraftBatchBody> = { instruction };
+    if (editHasAnnotation) {
+      const blob = await editSurfaceRef.current?.exportPng();
+      if (!blob) {
+        message.error("还没有画出笔迹");
+        return;
+      }
+      try {
+        const created = await uploadMedia.mutateAsync({ file: new File([blob], "marks.png", { type: "image/png" }), role: "ANNOTATION", source: "UPLOAD" });
+        extras.annotationMediaId = created.id;
+      } catch (error) {
+        message.error(`笔迹上传失败：${errorText(error)}`);
+        return;
+      }
+    }
+    if (await submitBatch("EDIT", extras, editDraw.candidateId)) setEditDraw(null);
+  };
 
   // 三个回调都要 useCallback：候选格与生成记录行是 memo 组件，回调每渲染换一次身份就等于没 memo。
   const handleSelectCandidate = useCallback((candidateId: string) => patchLocal({ selectedCandidateId: candidateId }), [patchLocal]);
@@ -340,13 +427,19 @@ export function PatternDraftWorkspacePage() {
     });
   }, [message, retryBatch]);
 
-  const [maskTarget, setMaskTarget] = useState<{ candidateId: string; imageUrl: string; forSeam: boolean } | null>(null);
+  // 改稿的绘制态：绘制层叠在主图区上而不是弹窗里，笔迹与结果才在同一视线内。
+  // REPEAT 草稿进入绘制态时切单块视图——笔迹坐标必须唯一，平铺预览上的一笔没有唯一归属。
+  const [editDraw, setEditDraw] = useState<{ candidateId: string; imageUrl: string; width: number | null; height: number | null } | null>(null);
+  const editSurfaceRef = useRef<DrawSurfaceHandle | null>(null);
+  const [editHasAnnotation, setEditHasAnnotation] = useState(false);
+  // 草图板：baseImageUrl 为空表示空白新建，非空表示在那张参考图上绘制。
+  const [sketchBase, setSketchBase] = useState<{ imageUrl: string | null } | null>(null);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   // 预览底色只改变看图方式，绝不写回候选文件；透明是否真实由候选的 hasAlpha 与去底结果决定。
   const [backdrop, setBackdrop] = useState<"checker" | "white" | "black">("checker");
 
-  // 参考图支持直接粘贴：只接管含图片的粘贴，纯文本不受影响；有弹窗时让位给弹窗。
-  const modalOpen = Boolean(maskTarget) || finalizeOpen;
+  // 参考图支持直接粘贴：只接管含图片的粘贴，纯文本不受影响；有弹窗或正在绘制时让位。
+  const modalOpen = Boolean(editDraw) || sketchBase !== null || finalizeOpen;
   useEffect(() => {
     if (modalOpen) return;
     const onPaste = (event: ClipboardEvent) => {
@@ -397,7 +490,6 @@ export function PatternDraftWorkspacePage() {
         </Space>
         <Space size="small">
           {busy ? <Tag color="processing">生成中</Tag> : null}
-          <Segmented size="small" value={local.conditions.background} options={[{ value: "WHITE", label: "白底" }, { value: "TRANSPARENT", label: "透明底" }]} onChange={(value) => patchLocal({ conditions: { ...local.conditions, background: value as DraftConditions["background"] } })} />
           <Button
             size="small"
             disabled={!selected}
@@ -419,7 +511,7 @@ export function PatternDraftWorkspacePage() {
               disabled
             />
           </Section>
-          <Section title="创作主题" hint="输入 @ 可引用参考图，插入后形如 @图1。编号在上传时固定，删除参考图不会重新编号；引用了已删除的编号会在提交时被拒绝。">
+          <Section title="创作主题" hint="输入 @ 引用参考图，插入后形如 @图1；输入 # 挑一个颜色，一次一种，直接落成 #c94f4f。编号在上传时固定，删除参考图不会重新编号；引用了已删除的编号会在提交时被拒绝。">
             <ReferenceTextArea
               value={local.conditions.theme}
               onChange={(theme) => patchLocal({ conditions: { ...local.conditions, theme } })}
@@ -429,15 +521,28 @@ export function PatternDraftWorkspacePage() {
               ariaLabel="创作主题"
             />
           </Section>
-          <Section title="参考图">
+          <Section title="参考图" hint="参考图仅在起稿时全部下发；改稿只下发说明里用 @ 引用到的那几张。草图也是一张参考图，靠它自己的备注说明用途。">
             <ReferenceList
               media={referenceMedia}
               onUpload={(files) => void onUploadReferences(files)}
               onRemove={(mediaId) => deleteMedia.mutate(mediaId)}
+              onSketch={(media) => { if (!referenceRoomFull()) setSketchBase({ imageUrl: media.url }); }}
+              onNote={(mediaId, notes) => updateMedia.mutate({ mediaId, body: { notes } })}
+              onDraw={() => { if (!referenceRoomFull()) setSketchBase({ imageUrl: null }); }}
               uploading={uploadMedia.isPending}
             />
           </Section>
-          <Section title="底版与比例">
+          <Section
+            title="底版与比例"
+            hint="底版决定下一批候选的背景，不动当前候选与预览底色；「透明底」需要模型支持真透明（模型名里会标注），不支持的模型会禁用该项并退回白底。"
+          >
+            <BackgroundModeSelect
+              value={local.conditions.background}
+              onChange={(background) => patchLocal({ conditions: { ...local.conditions, background } })}
+              modes={DRAFT_BACKGROUNDS}
+              fallback="WHITE"
+              transparentAvailable={transparentAvailable}
+            />
             <Select
               style={{ width: "100%" }}
               value={local.conditions.aspectRatio}
@@ -475,17 +580,8 @@ export function PatternDraftWorkspacePage() {
           <details className={styles.tools}>
             <summary>改稿工具</summary>
             <div className={styles.toolStack}>
-              <ToolBlock title="整图修改" hint="输入 @ 可引用参考图，指名以哪张参考图为准。">
-                <WholeEditTool references={referenceOptions} disabled={!selected || !modelKey} busy={createEdit.isPending} onSubmit={(instruction) => selected && void submitBatch("EDIT_WHOLE", { instruction }, selected.id)} />
-              </ToolBlock>
-              <ToolBlock title="局部修改" hint="选区外像素在合成时逐像素保持不变。">
-                <Button size="small" disabled={!selected || !modelKey} onClick={() => selected && setMaskTarget({ candidateId: selected.id, imageUrl: selected.url, forSeam: false })}>打开选区编辑器</Button>
-              </ToolBlock>
               <ToolBlock title="调色（本地）" hint="本地 HSL 调制，不承诺精确色值。">
                 <RecolorTool disabled={!selected} busy={createBatch.isPending} onSubmit={(recolor) => selected && void submitBatch("RECOLOR", { recolor }, selected.id)} />
-              </ToolBlock>
-              <ToolBlock title="色板变体" hint="色板表达配色意图，不保证严格等色。">
-                <PaletteTool disabled={!selected || !modelKey} busy={createEdit.isPending} onSubmit={(palette, instruction) => selected && void submitBatch("PALETTE_VARIANT", { palette, instruction }, selected.id)} />
               </ToolBlock>
               <ToolBlock title="去底（真实 alpha）" hint="去底使用分割模型产生真实 alpha，不是把预览底色换成棋盘格。">
                 <CutoutTool providers={providersQuery.data?.items ?? []} disabled={!selected} busy={createBatch.isPending} onSubmit={(providerId, modelId) => selected && void submitBatch("CUTOUT", { providerId, imageModelId: modelId }, selected.id)} />
@@ -505,30 +601,82 @@ export function PatternDraftWorkspacePage() {
 
         <main className={styles.center}>
           <div className={styles.centerToolbar}>
-            <span className={styles.hint}>预览底色</span>
-            <Segmented
-              size="small"
-              value={backdrop}
-              onChange={(value) => setBackdrop(value as "checker" | "white" | "black")}
-              options={[{ value: "checker", label: "棋盘" }, { value: "white", label: "白底" }, { value: "black", label: "黑底" }]}
-            />
-          </div>
-          <div className={`${styles.viewer} ${backdrop === "white" ? styles.backdropWhite : backdrop === "black" ? styles.backdropBlack : styles.backdropChecker}`}>
-            {selected ? (
-              compareCandidate ? (
-                <div className={styles.compareGrid}>
-                  <ComparePane label="当前候选" url={selected.url} />
-                  <ComparePane label="对照候选" url={compareCandidate.url} />
-                </div>
-              ) : draftQuery.data.composeType === "REPEAT" ? (
-                <RepeatPreview imageUrl={selected.url} layout={local.conditions.repeatLayout ?? "STRAIGHT"} tileable={selected.tileable} onTileCheck={() => tileCheck.mutate(selected.id)} checking={tileCheck.isPending} />
-              ) : (
-                <Image src={selected.url} alt="当前候选" className={styles.stageImg} preview={{ mask: <span>点击放大</span> }} />
-              )
+            {editDraw ? (
+              <>
+                <Segmented
+                  size="small"
+                  value={backdrop}
+                  onChange={(value) => setBackdrop(value as "checker" | "white" | "black")}
+                  options={[{ value: "checker", label: "棋盘" }, { value: "white", label: "白底" }, { value: "black", label: "黑底" }]}
+                />
+                <span className={styles.canvasHint}>在图上画出要改的地方，画好可拖动调整；不画即整图</span>
+                {draftQuery.data.composeType === "REPEAT" ? <span className={styles.canvasHint}>单块视图：四条边即对边，笔迹坐标就是单元坐标</span> : null}
+              </>
             ) : (
-              <div className={styles.emptyStage}>{busy ? "正在生成首批候选…" : "填写主题并添加参考后点击「生成」"}</div>
+              <>
+                <span className={styles.hint}>预览底色</span>
+                <Segmented
+                  size="small"
+                  value={backdrop}
+                  onChange={(value) => setBackdrop(value as "checker" | "white" | "black")}
+                  options={[{ value: "checker", label: "棋盘" }, { value: "white", label: "白底" }, { value: "black", label: "黑底" }]}
+                />
+                <Button
+                  size="small"
+                  icon={<Wand2 size={13} />}
+                  disabled={!selected || !modelKey}
+                  onClick={() => {
+                    if (!selected) return;
+                    setEditHasAnnotation(false);
+                    setEditDraw({ candidateId: selected.id, imageUrl: selected.url, width: selected.width, height: selected.height });
+                  }}
+                >改稿</Button>
+              </>
             )}
           </div>
+          {editDraw ? (
+            <div className={styles.editDraw}>
+              <DrawSurface
+                ref={editSurfaceRef}
+                mode="annotation"
+                size={editDraw.width && editDraw.height ? { width: editDraw.width, height: editDraw.height } : null}
+                imageUrl={editDraw.imageUrl}
+                brushColors={EDIT_PAINT_COLORS}
+                // 画笔放第一位：直接画是这里的默认动作，也默认被选中。
+                tools={["brush", "lasso", "rect", "ellipse", "erase"]}
+                stageHeight="fill"
+                stageBackdrop={backdrop}
+                underlayDisplay="overlay"
+                onDirtyChange={setEditHasAnnotation}
+              />
+              <div className={styles.editPanel}>
+                <DraftEditPanel
+                  references={referenceOptions}
+                  annotated={editHasAnnotation}
+                  busy={createEdit.isPending}
+                  onSubmit={(instruction) => void submitEdit(instruction)}
+                  onCancel={() => setEditDraw(null)}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className={`${styles.viewer} ${PREVIEW_BACKDROPS[backdrop]}`}>
+              {selected ? (
+                compareCandidate ? (
+                  <div className={styles.compareGrid}>
+                    <ComparePane label="当前候选" url={selected.url} />
+                    <ComparePane label="对照候选" url={compareCandidate.url} />
+                  </div>
+                ) : draftQuery.data.composeType === "REPEAT" ? (
+                  <RepeatPreview imageUrl={selected.url} layout={local.conditions.repeatLayout ?? "STRAIGHT"} tileable={selected.tileable} onTileCheck={() => tileCheck.mutate(selected.id)} checking={tileCheck.isPending} />
+                ) : (
+                  <Image src={selected.url} alt="当前候选" className={styles.stageImg} preview={{ mask: <span>点击放大</span> }} />
+                )
+              ) : (
+                <div className={styles.emptyStage}>{busy ? "正在生成首批候选…" : "填写主题并添加参考后点击「生成」"}</div>
+              )}
+            </div>
+          )}
         </main>
 
         <aside className={styles.right}>
@@ -586,17 +734,13 @@ export function PatternDraftWorkspacePage() {
       </div>
 
 
-      <MaskEditorDialog
-        open={Boolean(maskTarget)}
-        imageUrl={maskTarget?.imageUrl ?? null}
-        onCancel={() => setMaskTarget(null)}
-        onSubmit={async (blob) => {
-          if (!maskTarget) return;
-          const file = new File([blob], "mask.png", { type: "image/png" });
-          const created = await uploadMedia.mutateAsync({ file, role: "MASK", source: "UPLOAD" });
-          setMaskTarget(null);
-          await submitBatch("EDIT_LOCAL", { maskMediaId: created.id, instruction: "按选区修改" }, maskTarget.candidateId);
-        }}
+      <SketchDialog
+        open={sketchBase !== null}
+        aspectRatio={local.conditions.aspectRatio}
+        baseImageUrl={sketchBase?.imageUrl ?? null}
+        busy={uploadMedia.isPending}
+        onCancel={() => setSketchBase(null)}
+        onSubmit={submitSketch}
       />
 
       <FinalizeDialog
@@ -670,10 +814,107 @@ function ComparePane({ label, url }: { label: string; url: string }) {
   );
 }
 
-function ReferenceList({ media, onUpload, onRemove, uploading }: {
+/** 显式列全会用到的键，而不是 `backdropStyles[backdrop]`：键写错时这里会直接报缺键，字符串索引不会。 */
+const PREVIEW_BACKDROPS = {
+  checker: backdropStyles.checker,
+  white: backdropStyles.white,
+  black: backdropStyles.black,
+} satisfies Record<"checker" | "white" | "black", string | undefined>;
+
+/**
+ * 参考图备注：静止时按行截断显示，点编辑才换成自增高文本框。
+ *
+ * 此前是常驻一个单行输入框，在 300px 的侧栏里被挤到只剩几个字。备注通常是一整句话
+ * （草图预填的那句约 110 字），常驻输入框既读不出来也改不进去，等于没有。所以拆成两种状态：
+ * 静止按两行截断（antd 自己测量，没被截断就不出现"展开"，避免三行文字下面挂一个假的展开按钮），
+ * 编辑才换成自增高文本框。状态留在组件内部：提到页面上会让每次击键重渲染整页，
+ * 把候选格与生成记录一起打穿。
+ *
+ * 键盘约定沿用通行做法：回车保存、Shift+回车换行、Esc 取消、失焦保存。
+ * 回车必须避开输入法组词——中文输入法用回车确认候选词，那一下不能当成保存。
+ */
+function ReferenceNote({ mediaId, notes, onCommit }: { mediaId: string; notes: string | null; onCommit: (mediaId: string, notes: string) => void }) {
+  const text = notes ?? "";
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(text);
+  const composingRef = useRef(false);
+
+  // 服务端值变化（保存成功或重新加载）时同步草稿；正在编辑时不打断用户正在打的字。
+  useEffect(() => { if (!editing) setValue(text); }, [text, editing]);
+
+  const save = () => {
+    setEditing(false);
+    const next = value.trim();
+    if (next === text) return;
+    onCommit(mediaId, next);
+  };
+
+  if (editing) {
+    return (
+      <div className={styles.refNoteEdit}>
+        <Input.TextArea
+          autoFocus
+          size="small"
+          autoSize={{ minRows: 2, maxRows: 6 }}
+          maxLength={MAX_DRAFT_MEDIA_NOTES_LENGTH}
+          showCount
+          value={value}
+          placeholder="这张图用来做什么（会写进提示词）"
+          aria-label="参考图备注"
+          onChange={(event) => setValue(event.target.value)}
+          onCompositionStart={() => { composingRef.current = true; }}
+          onCompositionEnd={() => { composingRef.current = false; }}
+          onKeyDown={(event) => {
+            // 组词中的回车/Esc 归输入法：回车是确认候选词，Esc 是取消候选，都不能算这次编辑的结束。
+            const composing = composingRef.current || event.nativeEvent.isComposing;
+            if (event.key === "Escape") {
+              if (composing) return;
+              event.preventDefault();
+              setValue(text);
+              setEditing(false);
+              return;
+            }
+            if (event.key !== "Enter" || event.shiftKey) return;
+            if (composing) return;
+            event.preventDefault();
+            save();
+          }}
+          onBlur={save}
+        />
+        <span className={styles.refNoteHint}>回车保存，Shift+回车换行</span>
+      </div>
+    );
+  }
+
+  if (!text) {
+    return (
+      <Button size="small" type="text" className={styles.refNoteAdd} icon={<MessageSquarePlus size={12} />} onClick={() => setEditing(true)}>添加备注</Button>
+    );
+  }
+
+  return (
+    <div className={styles.refNote}>
+      <Typography.Paragraph
+        ellipsis={{ rows: 2, expandable: "collapsible", symbol: (expanded: boolean) => (expanded ? "收起" : "展开") }}
+      >
+        {text}
+      </Typography.Paragraph>
+      <Tooltip title="编辑备注">
+        <Button size="small" type="text" aria-label="编辑备注" icon={<MessageSquareText size={13} />} onClick={() => setEditing(true)} />
+      </Tooltip>
+    </div>
+  );
+}
+
+function ReferenceList({ media, onUpload, onRemove, onSketch, onNote, onDraw, uploading }: {
   media: DraftMedia[];
   onUpload: (files: File[]) => void;
   onRemove: (mediaId: string) => void;
+  /** 以这张参考图为底图打开草图板。 */
+  onSketch: (media: DraftMedia) => void;
+  onNote: (mediaId: string, notes: string) => void;
+  /** 空白新建一张草图。 */
+  onDraw: () => void;
   uploading: boolean;
 }) {
   const { dragging, dropProps } = useFileDropTarget(onUpload);
@@ -685,7 +926,7 @@ function ReferenceList({ media, onUpload, onRemove, uploading }: {
         data-dragging={dragging}
         role="button"
         tabIndex={0}
-        aria-label={`选择参考图，最多 ${PATTERN_DRAFT_MEDIA_MAX} 张，也可以直接拖入或粘贴图片`}
+        aria-label={`选择参考图，最多 ${PATTERN_DRAFT_REFERENCES_MAX} 张，也可以直接拖入或粘贴图片`}
         onClick={() => inputRef.current?.click()}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -708,27 +949,30 @@ function ReferenceList({ media, onUpload, onRemove, uploading }: {
         />
         <ImagePlus size={16} strokeWidth={1.6} aria-hidden />
         <span className={styles.dropTitle}>{uploading ? "正在上传…" : "拖入、粘贴或点击选择图片"}</span>
-        <span className={styles.dropHint}>{media.length} / {PATTERN_DRAFT_MEDIA_MAX} 张</span>
+        <span className={styles.dropHint}>{media.length} / {PATTERN_DRAFT_REFERENCES_MAX} 张</span>
       </div>
+      <Button size="small" block icon={<Pencil size={13} />} onClick={onDraw}>画一张草图</Button>
       {media.map((item) => (
+        // 两行结构：上行是编号、缩略图、文件名与操作，下行是整行宽度的备注。
+        // 备注独占一行才有可读宽度——挤在缩略图和按钮之间只剩几十像素，是它以前没法用的直接原因。
         <div key={item.id} className={styles.refItem}>
-          <span className={styles.refBadge} title="在主题或改稿说明里用 @ 引用这张图">{item.ordinal === null ? "—" : `图${item.ordinal}`}</span>
-          <img src={item.thumbUrl} alt={item.fileName} className={styles.refThumb} loading="lazy" />
-          <span className={styles.refName}>{item.fileName}</span>
-          <Button size="small" type="text" danger onClick={() => onRemove(item.id)}>移除</Button>
+          <div className={styles.refHead}>
+            <span className={styles.refBadge} title="在主题或改稿说明里用 @ 引用这张图">{item.ordinal === null ? "—" : `图${item.ordinal}`}</span>
+            <img src={item.thumbUrl} alt={item.fileName} className={styles.refThumb} loading="lazy" />
+            <span className={styles.refName} title={item.fileName}>{item.fileName}</span>
+            <span className={styles.refActions}>
+              <Tooltip title="在这张图上画草图">
+                <Button size="small" type="text" aria-label="在这张图上画草图" icon={<Pencil size={13} />} onClick={() => onSketch(item)} />
+              </Tooltip>
+              <Tooltip title="移除">
+                <Button size="small" type="text" danger aria-label="移除参考图" icon={<Trash2 size={13} />} onClick={() => onRemove(item.id)} />
+              </Tooltip>
+            </span>
+          </div>
+          <ReferenceNote mediaId={item.id} notes={item.notes} onCommit={onNote} />
         </div>
       ))}
     </div>
-  );
-}
-
-function WholeEditTool({ references, disabled, busy, onSubmit }: { references: ReferenceOption[]; disabled: boolean; busy: boolean; onSubmit: (instruction: string) => void }) {
-  const [instruction, setInstruction] = useState("");
-  return (
-    <>
-      <ReferenceTextArea references={references} rows={3} value={instruction} onChange={setInstruction} placeholder="描述整图修改意图" ariaLabel="整图修改说明" />
-      <Button size="small" icon={<Wand2 size={13} />} loading={busy} disabled={disabled || !instruction.trim()} onClick={() => onSubmit(instruction.trim())}>提交整图修改</Button>
-    </>
   );
 }
 
@@ -753,24 +997,6 @@ function SliderRow({ label, value, min, max, onChange }: { label: string; value:
       <Slider style={{ flex: 1 }} min={min} max={max} value={value} onChange={onChange} />
       <span>{value}</span>
     </div>
-  );
-}
-
-function PaletteTool({ disabled, busy, onSubmit }: { disabled: boolean; busy: boolean; onSubmit: (palette: string[], instruction: string) => void }) {
-  const [colors, setColors] = useState<string[]>(["#c94f4f", "#4f7dc9"]);
-  return (
-    <>
-      <Space wrap size="small">
-        {colors.map((color, index) => (
-          <span key={`${color}-${index}`} className={styles.swatch}>
-            <input type="color" value={color} onChange={(event) => setColors(colors.map((item, position) => (position === index ? event.target.value : item)))} aria-label={`色板 ${index + 1}`} />
-            <button type="button" className={styles.swatchRemove} aria-label={`删除色板 ${index + 1}`} disabled={colors.length <= 1} onClick={() => setColors(colors.filter((_, position) => position !== index))}>×</button>
-          </span>
-        ))}
-        <Button size="small" disabled={colors.length >= 8} onClick={() => setColors([...colors, "#888888"])}>加色</Button>
-      </Space>
-      <Button size="small" icon={<Palette size={13} />} loading={busy} disabled={disabled || !colors.length} onClick={() => onSubmit(colors, "按色板重配颜色")}>生成色板变体</Button>
-    </>
   );
 }
 
@@ -812,7 +1038,7 @@ function FinalizeDialog({ open, defaultName, candidate, onCancel, onSubmit, busy
   useEffect(() => { if (open) setName(`${defaultName} 定稿`); }, [open, defaultName]);
   return (
     <Modal open={open} title="定稿入库" okText="入库为正式花型" cancelText="取消" confirmLoading={busy} onCancel={onCancel} onOk={() => onSubmit(name.trim() || defaultName)}>
-      <Space direction="vertical" style={{ width: "100%" }}>
+      <Space orientation="vertical" style={{ width: "100%" }}>
         {candidate ? <img src={candidate.url} alt="待定稿候选" style={{ width: "100%", maxHeight: 320, objectFit: "contain", background: "#111" }} /> : null}
         <Input value={name} onChange={(event) => setName(event.target.value)} addonBefore="花型名称" />
         <span className={styles.hint}>定稿只复制这张候选进入正式花型库并保留其接缝状态，不会自动启动规格包或文案流水线；原稿下载保持该图分辨率与 alpha。</span>

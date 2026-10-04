@@ -3,7 +3,7 @@ import type { PodPrintSpec } from "./pod-schemas.js";
 /**
  * 印刷规格目录（v1，CENTERED 居中版式）。
  *
- * 数据来源为 Printful / Printify 公开模板尺寸（调研见 docs/reference/pod-domain-research.md 2.2），
+ * 数据来源为 Printful / Printify 公开模板尺寸，
  * 像素 = 英寸 × 300DPI。平台与工厂的模板会不定期修订：specVersion 进入每个规格包 manifest，
  * 修订目录时递增版本号；逐单生产前仍以目标工厂模板为准（notes 已随条目下发到前端）。
  *

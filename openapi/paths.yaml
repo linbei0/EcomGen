@@ -1974,7 +1974,7 @@ paths:
       operationId: listDraftMedia
       responses:
         "200":
-          description: Reference and mask media owned by the draft.
+          description: Reference and annotation media owned by the draft.
           content:
             application/json:
               schema:
@@ -1997,7 +1997,7 @@ paths:
                   type: string
                   enum:
                     - REFERENCE
-                    - MASK
+                    - ANNOTATION
                 source:
                   type: string
                   enum:
@@ -2224,7 +2224,7 @@ paths:
       operationId: downloadDraftMediaFile
       responses:
         "200":
-          description: Stored reference or mask image.
+          description: Stored reference or annotation image.
           content:
             image/png:
               schema:

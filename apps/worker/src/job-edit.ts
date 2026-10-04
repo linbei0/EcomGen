@@ -7,7 +7,7 @@ import type { CompositePolicy, EditExecutionMode, EditOperation, ImageResolution
 import { planImageEdit } from "@ecomgen/agent";
 import { buildReasoningModel } from "@ecomgen/providers";
 import { imageEditCapabilitiesFor } from "@ecomgen/providers";
-import { assertEditCapabilities, assertMaskDimensions, compositeMaskedEdit, compositeNaturalBlend, compositeOutpaint, createOutpaintCanvas, providerMaskFor } from "./edit-imaging.js";
+import { assertEditCapabilities, assertSameDimensions, compositeMaskedEdit, compositeNaturalBlend, compositeOutpaint, createOutpaintCanvas, providerMaskFor } from "./edit-imaging.js";
 import { generationKeyFor, outputDerivatives } from "./context.js";
 import { enqueue } from "@ecomgen/jobs";
 import type { WorkerContext } from "./context.js";
@@ -139,7 +139,7 @@ export async function executeEditGeneration(ctx: WorkerContext, job: JobRecord, 
   await updateJob(job, { progress: 30 });
   const sourceImage = await storage.read(source.storagePath);
   const mask = turn.editMaskPath ? await storage.read(turn.editMaskPath) : undefined;
-  if (mask) await assertMaskDimensions(sourceImage, mask);
+  if (mask) await assertSameDimensions(sourceImage, mask);
   const generator = imageGeneratorFor(provider, model);
   const assets = repository.listAssets(project.id);
   const temporaryAssets = repository.listEditReferenceAssets(turn.sessionId).filter((asset) => asset.expiresAt > new Date().toISOString());

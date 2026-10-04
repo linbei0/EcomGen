@@ -3962,14 +3962,27 @@ components:
           type: string
         modelId:
           minLength: 1
+          description: 提取模型；SEGMENT 指分割模型，GENERATE 指生图模型。
           type: string
+        mode:
+          description: 提取方式；缺省 SEGMENT。
+          type: string
+          enum:
+            - SEGMENT
+            - GENERATE
         protocol:
-          description: 分割协议；与 Provider 声明矛盾时拒绝。
+          description: 分割协议；仅 SEGMENT 生效，与 Provider 声明矛盾时拒绝。
           type: string
           enum:
             - fal
             - grounded_sam
             - gitee_sam3
+        background:
+          description: 生成提取的底版；缺省 TRANSPARENT，仅 GENERATE 生效。TRANSPARENT 要求模型支持。
+          type: string
+          enum:
+            - TRANSPARENT
+            - WHITE
         file:
           format: binary
           description: 带图案的商品实拍图。
@@ -4405,7 +4418,7 @@ components:
       type: string
       enum:
         - REFERENCE
-        - MASK
+        - ANNOTATION
     DraftMediaSource:
       type: string
       enum:
@@ -4420,10 +4433,8 @@ components:
       type: string
       enum:
         - GENERATE
-        - EDIT_WHOLE
-        - EDIT_LOCAL
+        - EDIT
         - RECOLOR
-        - PALETTE_VARIANT
         - CUTOUT
         - SEAM_EDIT
     DraftSlotStatus:
@@ -4910,32 +4921,17 @@ components:
           $ref: "#/components/schemas/DraftBackground"
         repeatLayout:
           $ref: "#/components/schemas/PodRepeatLayout"
-        references:
-          maxItems: 6
-          type: array
-          items:
-            format: uuid
-            type: string
         parentCandidateId:
           format: uuid
           type: string
         instruction:
           maxLength: 2000
           type: string
-        maskMediaId:
+        annotationMediaId:
           format: uuid
           type: string
-        invertMask:
-          type: boolean
         recolor:
           $ref: "#/components/schemas/DraftRecolorParams"
-        palette:
-          maxItems: 8
-          type: array
-          items:
-            minLength: 4
-            maxLength: 9
-            type: string
         seam:
           $ref: "#/components/schemas/DraftSeamEdit"
     DraftJobRef:

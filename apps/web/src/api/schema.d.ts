@@ -3121,12 +3121,23 @@ export interface components {
         CreatePatternExtractJobInput: {
             /** Format: uuid */
             providerId: string;
+            /** @description 提取模型；SEGMENT 指分割模型，GENERATE 指生图模型。 */
             modelId: string;
             /**
-             * @description 分割协议；与 Provider 声明矛盾时拒绝。
+             * @description 提取方式；缺省 SEGMENT。
+             * @enum {string}
+             */
+            mode?: "SEGMENT" | "GENERATE";
+            /**
+             * @description 分割协议；仅 SEGMENT 生效，与 Provider 声明矛盾时拒绝。
              * @enum {string}
              */
             protocol?: "fal" | "grounded_sam" | "gitee_sam3";
+            /**
+             * @description 生成提取的底版；缺省 TRANSPARENT，仅 GENERATE 生效。TRANSPARENT 要求模型支持。
+             * @enum {string}
+             */
+            background?: "TRANSPARENT" | "WHITE";
             /**
              * Format: binary
              * @description 带图案的商品实拍图。
@@ -3312,13 +3323,13 @@ export interface components {
         /** @enum {string} */
         DraftComposeType: "PLACEMENT" | "REPEAT";
         /** @enum {string} */
-        DraftMediaRole: "REFERENCE" | "MASK";
+        DraftMediaRole: "REFERENCE" | "ANNOTATION";
         /** @enum {string} */
         DraftMediaSource: "UPLOAD" | "PATTERN";
         /** @enum {string} */
         DraftBackground: "WHITE" | "TRANSPARENT";
         /** @enum {string} */
-        DraftBatchOperation: "GENERATE" | "EDIT_WHOLE" | "EDIT_LOCAL" | "RECOLOR" | "PALETTE_VARIANT" | "CUTOUT" | "SEAM_EDIT";
+        DraftBatchOperation: "GENERATE" | "EDIT" | "RECOLOR" | "CUTOUT" | "SEAM_EDIT";
         /** @enum {string} */
         DraftSlotStatus: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
         /** @enum {string} */
@@ -3484,15 +3495,12 @@ export interface components {
             aspectRatio?: components["schemas"]["ImageAspectRatio"];
             background?: components["schemas"]["DraftBackground"];
             repeatLayout?: components["schemas"]["PodRepeatLayout"];
-            references?: string[];
             /** Format: uuid */
             parentCandidateId?: string;
             instruction?: string;
             /** Format: uuid */
-            maskMediaId?: string;
-            invertMask?: boolean;
+            annotationMediaId?: string;
             recolor?: components["schemas"]["DraftRecolorParams"];
-            palette?: string[];
             seam?: components["schemas"]["DraftSeamEdit"];
         };
         DraftJobRef: {
@@ -6478,7 +6486,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Reference and mask media owned by the draft. */
+            /** @description Reference and annotation media owned by the draft. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6504,7 +6512,7 @@ export interface operations {
                     /** Format: binary */
                     file?: string;
                     /** @enum {string} */
-                    role: "REFERENCE" | "MASK";
+                    role: "REFERENCE" | "ANNOTATION";
                     /** @enum {string} */
                     source?: "UPLOAD" | "PATTERN";
                     /** Format: uuid */
@@ -6831,7 +6839,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Stored reference or mask image. */
+            /** @description Stored reference or annotation image. */
             200: {
                 headers: {
                     [name: string]: unknown;

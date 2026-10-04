@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import type { DraftBatchRecord, DraftCandidateRecord, DraftMediaRecord, DraftSlotRecord, JobRecord, PatternDraftRecord } from "@ecomgen/core";
-import type { EcomRepository } from "@ecomgen/core";
+import type { EcomRepository, LocalAssetStore } from "@ecomgen/core";
 import type { EcomJobKind } from "@ecomgen/jobs";
 import { DRAFT_PROMPT_VERSION } from "@ecomgen/ecom-skill";
 import {
@@ -13,16 +13,18 @@ import {
   DRAFT_SEAM_BAND_MAX,
   DRAFT_SEAM_EDGES,
   MAX_DRAFT_INSTRUCTION_LENGTH,
+  MAX_DRAFT_MEDIA_NOTES_LENGTH,
   MAX_PATTERN_BRIEF_LENGTH,
   MAX_PATTERN_DRAFT_NAME_LENGTH,
   PATTERN_DRAFT_CANDIDATES_MAX,
-  PATTERN_DRAFT_MEDIA_MAX,
+  PATTERN_DRAFT_ANNOTATIONS_MAX,
   PATTERN_DRAFT_REFERENCES_MAX,
   CreateDraftBatchInput,
   CreatePatternDraftInput,
   FinalizeDraftCandidateInput,
   UpdatePatternDraftInput,
   danglingDraftReferenceOrdinals,
+  dispatchedReferenceOrdinals,
   findDraftReferences,
 } from "@ecomgen/contracts";
 import type {
@@ -49,9 +51,7 @@ import { publicPattern } from "./patterns.js";
 /** 批次操作 → 任务类型与队列 kind；映射必须完整，否则新操作会静默落到错误队列。 */
 const DRAFT_JOB_BY_OPERATION: Record<DraftBatchOperation, { type: "PATTERN_DRAFT_GENERATE" | "PATTERN_DRAFT_EDIT" | "PATTERN_DRAFT_CUTOUT" | "PATTERN_DRAFT_PROCESS"; kind: EcomJobKind }> = {
   GENERATE: { type: "PATTERN_DRAFT_GENERATE", kind: "pattern_draft_generate" },
-  EDIT_WHOLE: { type: "PATTERN_DRAFT_EDIT", kind: "pattern_draft_edit" },
-  EDIT_LOCAL: { type: "PATTERN_DRAFT_EDIT", kind: "pattern_draft_edit" },
-  PALETTE_VARIANT: { type: "PATTERN_DRAFT_EDIT", kind: "pattern_draft_edit" },
+  EDIT: { type: "PATTERN_DRAFT_EDIT", kind: "pattern_draft_edit" },
   SEAM_EDIT: { type: "PATTERN_DRAFT_EDIT", kind: "pattern_draft_edit" },
   CUTOUT: { type: "PATTERN_DRAFT_CUTOUT", kind: "pattern_draft_cutout" },
   RECOLOR: { type: "PATTERN_DRAFT_PROCESS", kind: "pattern_draft_process" },
@@ -227,43 +227,121 @@ function ensureDraftMedia(repository: EcomRepository, draftId: string, mediaId: 
   return media;
 }
 
-/**
- * 参考快照：媒体存在性、角色与编号在这一刻固定下来；之后改参考只影响下一轮。
- *
- * 顺序由服务端按编号升序决定，客户端传参顺序不参与——模型看到的 Image 号必须和界面上
- * 的「图N」对得上，否则同一份输入换个提交顺序就会得到不同的提示词。
- */
-function resolveReferences(repository: EcomRepository, draft: PatternDraftRecord, mediaIds: string[] | undefined): Array<{ mediaId: string; ordinal: number; storagePath: string; mimeType: string; notes: string | null }> {
-  if (!mediaIds?.length) return [];
-  if (mediaIds.length > PATTERN_DRAFT_REFERENCES_MAX) throw new ApiError(400, "VALIDATION_ERROR", `最多同时使用 ${PATTERN_DRAFT_REFERENCES_MAX} 张参考图`);
-  if (new Set(mediaIds).size !== mediaIds.length) throw new ApiError(400, "VALIDATION_ERROR", "同一张参考图不能在一次提交里重复出现");
-  return mediaIds.map((mediaId) => {
-    const media = ensureDraftMedia(repository, draft.id, mediaId);
-    if (media.role !== "REFERENCE") throw new ApiError(400, "VALIDATION_ERROR", "只有参考图能进入批次快照");
-    if (media.ordinal === null) throw new ApiError(409, "CONFLICT", `参考图 ${media.originalName} 缺少引用编号，请重新上传后再提交`);
-    return { mediaId: media.id, ordinal: media.ordinal, storagePath: media.storagePath, mimeType: media.mimeType, notes: media.notes };
-  }).sort((left, right) => left.ordinal - right.ordinal);
+interface DraftReferenceRow {
+  media: DraftMediaRecord;
+  ordinal: number;
 }
 
 /**
- * 提交前的引用校验：文本里出现的 `@图N` 必须都能在本轮下发的参考图里找到。
+ * 草稿内全部可被引用的参考图。
+ *
+ * 参考图在创建时就拿到引用编号（笔迹不参与引用、编号为 null），缺失说明数据异常；
+ * 这里宁可拒绝也不静默少发——少发一张，提示词里的 Image 号就和界面上的「图N」对不上了。
+ */
+function draftReferenceRows(repository: EcomRepository, draft: PatternDraftRecord): DraftReferenceRow[] {
+  return repository.listDraftMedia(draft.id).flatMap((media) => {
+    if (media.role !== "REFERENCE") return [];
+    if (media.ordinal === null) throw new ApiError(409, "CONFLICT", `参考图 ${media.originalName} 缺少引用编号，请重新上传后再提交`);
+    return [{ media, ordinal: media.ordinal }];
+  });
+}
+
+/**
+ * 收掉已经用不到的改稿笔迹。
+ *
+ * 笔迹是提交一次改稿的中间物，界面上既看不到也删不掉，额度就只能自己回收——否则改到第 N 次
+ * 用户会撞上一句"最多保留 N 张"，却没有任何办法腾出位置。
+ *
+ * 判据是"还有没有任务会读它"：批次槽位全部走到 SUCCEEDED/CANCELLED 之后，补偿只领 FAILED 槽位，
+ * 这张笔迹不会再被任何一次重跑读到，可以从磁盘上撤走。反过来，只要有槽位在跑或还能补偿，
+ * 文件就必须留在原地——删了它，那次补偿会以"文件不存在"失败。
+ * 还没有任何批次引用的上传（提交失败留下的残留）同样收掉：界面上重试会重新上传一张。
+ *
+ * 这与媒体删除路由的「被快照引用就不删」是有意的分工：参考图是重跑的输入必须留，
+ * 笔迹是一次性中间物，批次全部终态后继续留着只会吃满改稿额度。
+ */
+async function pruneDraftAnnotations(repository: EcomRepository, storage: LocalAssetStore, draftId: string): Promise<void> {
+  const annotations = repository.listDraftMedia(draftId).filter((media) => media.role === "ANNOTATION");
+  if (!annotations.length) return;
+  const pendingPaths = new Set<string>();
+  for (const batch of repository.listDraftBatches(draftId)) {
+    const path = (batch.snapshot as { annotation?: { storagePath?: string } | null }).annotation?.storagePath;
+    if (!path) continue;
+    const stillNeeded = repository.listDraftSlots(batch.id).some((slot) => slot.status === "QUEUED" || slot.status === "RUNNING" || slot.status === "FAILED");
+    if (stillNeeded) pendingPaths.add(path);
+  }
+  for (const media of annotations) {
+    if (pendingPaths.has(media.storagePath)) continue;
+    repository.deleteDraftMedia(media.id);
+    await storage.delete(media.storagePath);
+  }
+}
+
+/**
+ * 参考快照：本轮实际下发的参考图，由操作与文本推导，调用方不参与选择。
+ *
+ * 顺序按编号升序，客户端传参顺序不参与——模型看到的 Image 号必须和界面上的「图N」对得上，
+ * 否则同一份输入换个提交顺序就会得到不同的提示词。引用编号在草稿里不存在时拒绝整次提交，
+ * 而不是静默丢弃，理由同上；一次下发超过上限也拒绝，因为按编号取舍等于替用户挑图。
+ */
+function resolveDispatchedReferences(rows: DraftReferenceRow[], body: CreateDraftBatchInput, operation: DraftBatchOperation): Array<{ mediaId: string; ordinal: number; storagePath: string; mimeType: string; notes: string | null }> {
+  const byOrdinal = new Map(rows.map((row) => [row.ordinal, row.media]));
+  const ordinals = dispatchedReferenceOrdinals({
+    operation,
+    instruction: body.instruction,
+    availableOrdinals: rows.map((row) => row.ordinal),
+  });
+  if (ordinals.length > PATTERN_DRAFT_REFERENCES_MAX) {
+    // 起稿下发的就是全部参考图，超限只能删图；改稿超限是说明里 @ 得太多，删图没有用。
+    const hint = operation === "EDIT" ? "请减少改稿说明里引用的参考图" : "请先删除多余的参考图";
+    throw new ApiError(400, "VALIDATION_ERROR", `一次最多下发 ${PATTERN_DRAFT_REFERENCES_MAX} 张参考图，${hint}`);
+  }
+  return ordinals.map((ordinal) => {
+    const media = byOrdinal.get(ordinal);
+    if (!media) throw new ApiError(400, "VALIDATION_ERROR", `引用的参考图不存在：@图${ordinal}，请从参考图列表里重新选择`);
+    return { mediaId: media.id, ordinal, storagePath: media.storagePath, mimeType: media.mimeType, notes: media.notes };
+  });
+}
+
+/**
+ * 提交前的引用校验：文本里出现的 `@图N` 必须在草稿里真实存在。
  *
  * 只在提交时校验，不在自动保存时校验——用户打出 `@图` 到从下拉里选完之间存在半成品状态，
  * 那时拒绝会让输入框没法用。这里失败要指名道姓说是哪个编号，用户才能改对。
  */
-function assertReferenceText(text: string | null | undefined, references: ReadonlyArray<{ ordinal: number }>): void {
-  const dangling = danglingDraftReferenceOrdinals(text ?? "", references.map((reference) => reference.ordinal));
+function assertReferenceText(text: string | null | undefined, availableOrdinals: readonly number[]): void {
+  const dangling = danglingDraftReferenceOrdinals(text ?? "", availableOrdinals);
   if (dangling.length) {
     throw new ApiError(400, "VALIDATION_ERROR", `引用的参考图不存在：${dangling.map((ordinal) => `@图${ordinal}`).join("、")}，请从参考图列表里重新选择`);
   }
 }
 
-/** 校验批次的操作级必填项；不做能力猜测，只拒绝结构上不可能成立的组合。 */
-function validateOperationInput(body: CreateDraftBatchInput): void {
-  const needsParent = body.operation !== "GENERATE";
-  if (needsParent && !body.parentCandidateId) throw new ApiError(400, "VALIDATION_ERROR", `${body.operation} 需要指定父候选`);
-  if (body.operation === "EDIT_LOCAL" && !body.maskMediaId) throw new ApiError(400, "VALIDATION_ERROR", "局部改稿需要提交已保存的选区蒙版");
-  if (body.operation === "PALETTE_VARIANT" && !(body.palette?.length)) throw new ApiError(400, "VALIDATION_ERROR", "色板变体需要至少一个色板色值");
+/**
+ * 尊重"候选数"滑杆的操作。
+ *
+ * 生成式改稿与起稿一样有随机性，多给几张才有得挑；RECOLOR 是确定性 HSL 调制、CUTOUT 是分割，
+ * 出 N 张等于同一张，固定 1 张，不做无谓的付费调用。
+ */
+const REPEATABLE_OPERATIONS = new Set<DraftBatchOperation>(["GENERATE", "EDIT", "SEAM_EDIT"]);
+
+/** 备注会逐条进提示词，长度必须与改稿指令一样有界；上限与前端计数器共用同一个常量。 */
+function assertNotesLength(notes: string | null): void {
+  if (notes && notes.length > MAX_DRAFT_MEDIA_NOTES_LENGTH) throw new ApiError(400, "VALIDATION_ERROR", `notes must be at most ${MAX_DRAFT_MEDIA_NOTES_LENGTH} characters`);
+}
+
+/**
+ * 校验批次的操作级必填项；不做能力猜测，只拒绝结构上不可能成立的组合。
+ *
+ * 父候选按**解析后**的值判断：改稿路由的父候选来自路径参数，只查 body 会让那条路由
+ * 依赖前端把 id 再抄一份进 body 才能通过，抄漏了就报"需要指定父候选"。
+ */
+function validateOperationInput(body: CreateDraftBatchInput, parentCandidateId: string | null): void {
+  if (body.operation !== "GENERATE" && !parentCandidateId) throw new ApiError(400, "VALIDATION_ERROR", `${body.operation} 需要指定父候选`);
+  // 笔迹是**可选**的：不给就是对整张图改稿，也就是过去的"整图修改"。曾经的 EDIT_WHOLE/EDIT_LOCAL
+  // 两个操作除这一点外行为一致，拆开只会让两侧各自漂移，所以合并成一个 EDIT。
+  if (body.operation === "EDIT" && !body.instruction?.trim()) throw new ApiError(400, "VALIDATION_ERROR", "改稿需要一句说明");
+  // 只有改稿读笔迹；其他操作带着它只会静默无效，快照里还会留一份误导性记录。
+  if (body.annotationMediaId && body.operation !== "EDIT") throw new ApiError(400, "VALIDATION_ERROR", "只有改稿操作接受笔迹，其他操作不会读取它");
   if (body.operation === "SEAM_EDIT" && !body.seam) throw new ApiError(400, "VALIDATION_ERROR", "接缝改稿需要指定目标边与带宽");
   if (body.seam && body.seam.band > DRAFT_SEAM_BAND_MAX) throw new ApiError(400, "VALIDATION_ERROR", `接缝带宽不能超过 ${DRAFT_SEAM_BAND_MAX}px`);
   if (body.instruction && body.instruction.length > MAX_DRAFT_INSTRUCTION_LENGTH) throw new ApiError(400, "VALIDATION_ERROR", `instruction must be at most ${MAX_DRAFT_INSTRUCTION_LENGTH} characters`);
@@ -338,7 +416,7 @@ export function registerPatternDraftRoutes(app: FastifyInstance, ctx: ApiContext
     return reply.code(204).send();
   });
 
-  // ---- 参考与蒙版媒体 ----
+  // ---- 参考与笔迹媒体 ----
   app.get("/api/v1/pattern-drafts/:draftId/media", async (request) => {
     const draft = ensureDraft(repository, parameter(request, "draftId"));
     return { items: repository.listDraftMedia(draft.id).map(publicMedia) };
@@ -350,8 +428,15 @@ export function registerPatternDraftRoutes(app: FastifyInstance, ctx: ApiContext
     const role = enumValue(fields.role, DRAFT_MEDIA_ROLES, "role");
     const source = fields.source === undefined ? "UPLOAD" : enumValue(fields.source, DRAFT_MEDIA_SOURCES, "source");
     const notes = readOptionalText(fields.notes) ?? null;
-    if (role === "REFERENCE" && repository.countDraftMedia(draft.id, "REFERENCE") >= PATTERN_DRAFT_MEDIA_MAX) {
-      throw new ApiError(400, "VALIDATION_ERROR", `草稿最多保留 ${PATTERN_DRAFT_MEDIA_MAX} 张参考/蒙版`);
+    assertNotesLength(notes);
+    if (role === "REFERENCE" && repository.countDraftMedia(draft.id, "REFERENCE") >= PATTERN_DRAFT_REFERENCES_MAX) {
+      throw new ApiError(400, "VALIDATION_ERROR", `草稿最多保留 ${PATTERN_DRAFT_REFERENCES_MAX} 张参考图`);
+    }
+    if (role === "ANNOTATION") {
+      await pruneDraftAnnotations(repository, storage, draft.id);
+      if (repository.countDraftMedia(draft.id, "ANNOTATION") >= PATTERN_DRAFT_ANNOTATIONS_MAX) {
+        throw new ApiError(400, "VALIDATION_ERROR", `草稿最多保留 ${PATTERN_DRAFT_ANNOTATIONS_MAX} 张改稿笔迹`);
+      }
     }
 
     let content: Buffer;
@@ -373,7 +458,7 @@ export function registerPatternDraftRoutes(app: FastifyInstance, ctx: ApiContext
       originalName = upload.filename;
       mimeType = upload.mimetype;
     }
-    // 统一归一化为 PNG：蒙版坐标与后续解码依赖可预测的容器，客户端声明的 mime 不可信。
+    // 统一归一化为 PNG：笔迹坐标与后续解码依赖可预测的容器，客户端声明的 mime 不可信。
     // 一次编码顺手取回宽高：再单独解一次图只为量尺寸，等于把同一张图解码两遍。
     const { data: png, info } = await sharp(content).png().toBuffer({ resolveWithObject: true });
     const stored = await storage.putDraftMedia(draft.id, role, originalName, png);
@@ -386,7 +471,11 @@ export function registerPatternDraftRoutes(app: FastifyInstance, ctx: ApiContext
     const media = ensureDraftMedia(repository, draft.id, parameter(request, "mediaId"));
     const body = readObject(request.body ?? {}, "body");
     const patch: { notes?: string | null } = {};
-    if (body.notes !== undefined) patch.notes = readPatchText(body.notes, "notes") ?? null;
+    if (body.notes !== undefined) {
+      const notes = readPatchText(body.notes, "notes") ?? null;
+      assertNotesLength(notes);
+      patch.notes = notes;
+    }
     const updated = repository.updateDraftMedia(media.id, patch);
     if (!updated) missing("draft media", media.id);
     return publicMedia(updated);
@@ -395,7 +484,9 @@ export function registerPatternDraftRoutes(app: FastifyInstance, ctx: ApiContext
   app.delete("/api/v1/pattern-drafts/:draftId/media/:mediaId", async (request, reply) => {
     const draft = ensureDraft(repository, parameter(request, "draftId"));
     const media = ensureDraftMedia(repository, draft.id, parameter(request, "mediaId"));
-    // 被任何已提交批次快照引用过的媒体文件不可物理删除：历史回放要能重现当时的输入。
+    // 被任何已提交批次快照引用过的文件不在这里物理删除：在途批次的重跑或补偿要重读它，
+    // 历史回放也要能重现当时下发的输入。笔迹额外的回收（批次全部终态后）由上传路由的
+    // pruneDraftAnnotations 负责，那是一次性中间物的额度回收，与这条规则是有意的分工。
     const referenced = repository.isDraftStoragePathReferenced(draft.id, media.storagePath);
     repository.deleteDraftMedia(media.id);
     if (!referenced) await storage.delete(media.storagePath);
@@ -541,10 +632,10 @@ export function registerPatternDraftRoutes(app: FastifyInstance, ctx: ApiContext
   async function submitDraftBatch(draft: PatternDraftRecord, body: CreateDraftBatchInput, parentOverride: string | undefined): Promise<CreateDraftBatchResponse> {
     const operation = enumValue(body.operation, DRAFT_BATCH_OPERATIONS, "operation");
     const parentCandidateId = parentOverride ?? body.parentCandidateId ?? null;
-    validateOperationInput(body);
+    validateOperationInput(body, parentCandidateId);
     if (parentCandidateId) ensureDraftCandidate(repository, draft.id, parentCandidateId);
     const requestedCount = typeof body.candidateCount === "number" && Number.isFinite(body.candidateCount) ? body.candidateCount : 1;
-    const candidateCount = operation === "GENERATE" || operation === "PALETTE_VARIANT" ? Math.min(PATTERN_DRAFT_CANDIDATES_MAX, Math.max(1, Math.round(requestedCount))) : 1;
+    const candidateCount = REPEATABLE_OPERATIONS.has(operation) ? Math.min(PATTERN_DRAFT_CANDIDATES_MAX, Math.max(1, Math.round(requestedCount))) : 1;
     const generative = operation !== "RECOLOR";
     let segmentation: { providerId: string; modelId: string; protocol: SegmentationProtocol } | null = null;
     if (operation === "CUTOUT") {
@@ -554,21 +645,28 @@ export function registerPatternDraftRoutes(app: FastifyInstance, ctx: ApiContext
       verifyModel(repository, body.providerId ?? null, body.imageModelId ?? null, "image");
       assertTransparentBackground(repository, body.providerId, body.imageModelId, body.background);
     }
-    const mask = body.maskMediaId ? (() => {
-      const media = ensureDraftMedia(repository, draft.id, body.maskMediaId!);
-      if (media.role !== "MASK") throw new ApiError(400, "VALIDATION_ERROR", "局部改稿的蒙版必须是蒙版类型媒体");
+    const referenceRows = draftReferenceRows(repository, draft);
+    const annotation = body.annotationMediaId ? (() => {
+      const media = ensureDraftMedia(repository, draft.id, body.annotationMediaId!);
+      if (media.role !== "ANNOTATION") throw new ApiError(400, "VALIDATION_ERROR", "改稿的笔迹必须是笔迹类型媒体");
       return { mediaId: media.id, storagePath: media.storagePath, mimeType: media.mimeType };
     })() : null;
-    const references = resolveReferences(repository, draft, body.references);
-    // 引用的校验按操作分开：起稿看主题，生成式改稿看说明；接缝改稿不下发参考图，
-    // 那里的 @图N 会让提示词写出一个并不存在的 Image 号，因此直接拒绝。
-    // RECOLOR / CUTOUT 不使用文本，不校验。
+    const references = resolveDispatchedReferences(referenceRows, body, operation);
+    /*
+     * 文本校验按操作分开：起稿看主题；RECOLOR / CUTOUT 不使用文本，不校验。
+     *
+     * 改稿不需要再查：它唯一的下发规则是"说明里 @ 到的"，悬空编号在解析下发集时
+     * （resolveDispatchedReferences）就已经拒绝，这里重查只会得到同一条件的第二次报错。
+     * 接缝改稿仍要单独拦一道：它走的是包裹画布，从不下发参考图，那里的 @图N 会写进提示词却
+     * 对应不上任何一张图。
+     *
+     * 配色不再有单独的校验：色值就是 `#d9a441` 这样的文本，写不成合法的十六进制就压根不是 token，
+     * 没有"写坏了的 token"这种中间状态可拒绝（见 draft-palettes.ts）。
+     */
     if (operation === "GENERATE") {
-      assertReferenceText(body.theme, references);
-    } else if (operation === "SEAM_EDIT") {
-      if (findDraftReferences(body.instruction ?? "").length) throw new ApiError(400, "VALIDATION_ERROR", "接缝改稿不下发参考图，改稿说明不能引用 @图N");
-    } else if (operation === "EDIT_WHOLE" || operation === "EDIT_LOCAL" || operation === "PALETTE_VARIANT") {
-      assertReferenceText(body.instruction, references);
+      assertReferenceText(body.theme, referenceRows.map((row) => row.ordinal));
+    } else if (operation === "SEAM_EDIT" && findDraftReferences(body.instruction ?? "").length) {
+      throw new ApiError(400, "VALIDATION_ERROR", "接缝改稿不下发参考图，改稿说明不能引用 @图N");
     }
     const snapshot = {
       operation,
@@ -581,12 +679,10 @@ export function registerPatternDraftRoutes(app: FastifyInstance, ctx: ApiContext
       background: body.background ?? "WHITE",
       repeatLayout: body.repeatLayout ?? null,
       instruction: body.instruction ?? null,
-      invertMask: body.invertMask ?? false,
       recolor: body.recolor ?? null,
-      palette: body.palette ?? null,
       seam: body.seam ?? null,
       references,
-      mask,
+      annotation,
       parentCandidateId,
       segmentation,
     };

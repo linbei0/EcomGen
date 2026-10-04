@@ -1,5 +1,7 @@
 import { PATTERN_VARIANT_PRESETS, type PatternBackgroundMode, type PatternVariantAxis, type PatternVariantPreset } from "@ecomgen/contracts";
 
+import { PATTERN_FLAT_PRINT_REGISTER, PATTERN_NEGATIVE_CONSTRAINTS } from "./pattern-prompt-fragments.js";
+
 /**
  * 生成式衍生（画风 / 构图）的确定性 prompt 编译层。
  *
@@ -68,7 +70,7 @@ export function presetBelongsToAxis(axis: PatternVariantAxis, preset: PatternVar
  * 衍生提示词版本：必须进入任务指纹（api 侧），理由同起稿——指纹含 axial/preset/extra 等输入，
  * 不含编译后的提示词，改模板不递增版本会让旧任务被复用成"新模板的产物"。
  */
-export const PATTERN_VARIANT_PROMPT_VERSION = "2026.10.2";
+export const PATTERN_VARIANT_PROMPT_VERSION = "2026.10.3";
 
 /**
  * 底版护栏：与轴向预设正交，按用户选定的底版模式取一条。三个模式互斥——挑了透明底就不能
@@ -78,9 +80,9 @@ export const PATTERN_VARIANT_PROMPT_VERSION = "2026.10.2";
  * 而用户选"跟随源图"的意思恰恰是不要动底。透明底的 alpha 保留必须明写，它不会被"保持原样"隐含。
  */
 const VARIANT_GUARDRAILS: Record<PatternBackgroundMode, string> = {
-  SOURCE: "Keep the artwork's theme, subject matter and overall color character: change only what the instruction asks for. Leave the background treatment exactly as it is in the reference: if the reference is transparent keep it transparent and preserve the alpha channel, and if the reference has a background fill keep that same fill.",
-  WHITE: "Keep the artwork's theme, subject matter and overall color character: change only what the instruction asks for. Keep the artwork on a plain pure-white background with crisp clean edges, no shadows, no perspective and no product mockup.",
-  TRANSPARENT: "Keep the artwork's theme, subject matter and overall color character: change only what the instruction asks for. Keep the artwork on a fully transparent background and preserve its alpha channel: no white box and no drawn checkerboard standing in for transparency. Crisp clean edges, no shadows, no perspective and no product mockup.",
+  SOURCE: "Change only what the instruction asks for; keep everything else the same: the artwork's theme, subject matter, motif positions, composition and overall color character all stay as they are, and no elements are added or removed. Leave the background treatment exactly as it is in the reference: if the reference is transparent keep it transparent and preserve the alpha channel, and if the reference has a background fill keep that same fill.",
+  WHITE: "Change only what the instruction asks for; keep everything else the same: the artwork's theme, subject matter, motif positions, composition and overall color character all stay as they are, and no elements are added or removed. Keep the artwork on a plain pure-white background with crisp clean edges and no shadows.",
+  TRANSPARENT: "Change only what the instruction asks for; keep everything else the same: the artwork's theme, subject matter, motif positions, composition and overall color character all stay as they are, and no elements are added or removed. Keep the artwork on a fully transparent background and preserve its alpha channel: no white box and no drawn checkerboard standing in for transparency, crisp clean edges and no shadows.",
 };
 
 export interface PatternVariantPromptInput {
@@ -99,10 +101,14 @@ export interface PatternVariantPromptInput {
 export function compilePatternVariantPrompt(input: PatternVariantPromptInput): string {
   const extra = input.extra?.trim();
   return [
+    // 只有一个图像输入，仍要按官方指南指明它的角色：不说清楚时模型可能把源图当成风格参考，
+    // 于是"改画风"变成"再画一张同风格的图"，主体与构图就跟着漂移。
+    "Image 1 is the source pattern artwork to repaint; the change below applies to that image.",
     PRESET_FRAGMENTS[input.preset],
     extra ?? "",
     VARIANT_GUARDRAILS[input.background ?? "SOURCE"],
-    "No watermark, no signature, no text or letters.",
+    PATTERN_FLAT_PRINT_REGISTER,
+    PATTERN_NEGATIVE_CONSTRAINTS,
   ].filter(Boolean).join(" ");
 }
 

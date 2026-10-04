@@ -88,7 +88,7 @@ export async function hasTransparentPixels(image: Buffer): Promise<boolean> {
  *
  * 产物在调用本函数前已落盘，所以这里只抛错、不删文件：钱已经花出去，图留在库里至少还能用。
  */
-export async function verifyPatternBackground(plan: PatternBackgroundPlan, image: Buffer, flow: "起稿" | "衍生"): Promise<void> {
+export async function verifyPatternBackground(plan: PatternBackgroundPlan, image: Buffer, flow: "起稿" | "衍生" | "提取"): Promise<void> {
   if (!plan.verifyTransparent) return;
   if (await hasTransparentPixels(image)) return;
   throw new Error(`${flow}要求透明底，但回来的图不是带 alpha 的透明图（模型也可能画了一块棋盘格当透明）。产物已保存，可改用支持透明底的模型重跑，或按白底花型继续。`);
