@@ -29,6 +29,18 @@ export const LibraryItemSource = Type.Enum({ UPLOADED: "UPLOADED", GENERATED: "G
 /** 资产库筛选类别：上传素材按用途分为商品/参考，生成结果、分层切图、花型与规格包各列一类。 */
 export const LibraryItemKind = Type.Enum({ PRODUCT: "PRODUCT", REFERENCE: "REFERENCE", GENERATED: "GENERATED", LAYER: "LAYER", MODEL: "MODEL", PATTERN: "PATTERN", PRINT_PACK: "PRINT_PACK" }, { $id: "#/components/schemas/LibraryItemKind" });
 export const ImageResolution = Type.Enum({ K1: "1K", K2: "2K", K4: "4K" }, { $id: "#/components/schemas/ImageResolution" });
+/** ImageResolution 的取值元组；与枚举同源维护，供运行时校验与遍历复用。 */
+export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
+/**
+ * 生图质量档位，语义对齐 gpt-image 的 quality 参数（成本与细节随档位升降）。
+ * 只有声明支持的模型才会真正收到该参数（见 image-model-params 的判定）；
+ * 其余模型收到也没有意义，请求保持原样。
+ */
+export const IMAGE_QUALITIES = ["auto", "low", "medium", "high"] as const;
+export const ImageQuality = stringEnumSchema(IMAGE_QUALITIES, "#/components/schemas/ImageQuality");
+/** 生成产物的图片容器格式。透明底只能配 png/webp——jpeg 装不下 alpha，由契约校验拦截。 */
+export const IMAGE_OUTPUT_FORMATS = ["png", "jpeg", "webp"] as const;
+export const ImageOutputFormat = stringEnumSchema(IMAGE_OUTPUT_FORMATS, "#/components/schemas/ImageOutputFormat");
 export const ImageAspectRatio = Type.Enum({ AUTO: "AUTO", SQUARE: "1:1", PORTRAIT_2_3: "2:3", LANDSCAPE_3_2: "3:2", PORTRAIT: "3:4", LANDSCAPE: "4:3", PORTRAIT_4_5: "4:5", LANDSCAPE_5_4: "5:4", PORTRAIT_9_16: "9:16", WIDE: "16:9", ULTRA_WIDE: "21:9" }, { $id: "#/components/schemas/ImageAspectRatio" });
 export const PlanningMode = Type.Enum({ AI: "AI", MANUAL: "MANUAL" }, { $id: "#/components/schemas/PlanningMode" });
 /** 套图来源：随仓库内置或由用户导入/目录投放。 */
@@ -65,6 +77,8 @@ export type LibraryItemSource = Static<typeof LibraryItemSource>;
 export type LibraryItemKind = Static<typeof LibraryItemKind>;
 export type ImageResolution = Static<typeof ImageResolution>;
 export type ImageAspectRatio = Static<typeof ImageAspectRatio>;
+export type ImageQuality = Static<typeof ImageQuality>;
+export type ImageOutputFormat = Static<typeof ImageOutputFormat>;
 export type PlanningMode = Static<typeof PlanningMode>;
 export type EcomSuiteOrigin = Static<typeof EcomSuiteOrigin>;
 export type CopywritingTarget = Static<typeof CopywritingTarget>;

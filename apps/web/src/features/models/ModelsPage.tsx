@@ -23,7 +23,7 @@ import {
   type ModelOptionDef,
   type ModelSpecLayerId,
 } from "@ecomgen/ecom-skill";
-import { MODEL_CAST_CANDIDATES_MAX, type ModelSpec } from "@ecomgen/contracts";
+import { IMAGE_OUTPUT_FORMATS, MODEL_CAST_CANDIDATES_MAX, imageParamSupportFor, type ModelSpec } from "@ecomgen/contracts";
 
 import {
   useCreateModelCastJob,
@@ -45,7 +45,7 @@ import { errorText } from "../../lib/errorText";
 import { jobErrorText } from "../../lib/jobError";
 import { formatShortDate } from "../../lib/format";
 import { MODEL_IDENTITY_FILTERS, matchesModelIdentity, type ModelIdentityFilters, type ModelIdentityKey } from "../../lib/modelIdentityFilters";
-import { modelOptions } from "../../lib/modelOptions";
+import { modelOptions, parseModelKey } from "../../lib/modelOptions";
 import { ModelDesigner } from "./ModelDesigner";
 import styles from "./ModelsPage.module.css";
 
@@ -97,6 +97,7 @@ export function ModelsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // 只有「新建」一种设计器入口：规格落库即定稿，身份基准不允许事后改写。
   const [creating, setCreating] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [castJobId, setCastJobId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [identityFilters, setIdentityFilters] = useState<ModelIdentityFilters>({});
@@ -140,7 +141,18 @@ export function ModelsPage() {
   const imageOptions = useMemo(() => modelOptions(providers, "image"), [providers]);
   const [modelPair, setModelPair] = useState<string>(imageOptions[0]?.value ?? "");
   const [aspectRatio, setAspectRatio] = useState<string>("AUTO");
+  // 出图参数缺省值与 Worker 侧一致（1K / high）；无真实档位的维度按能力矩阵直接不渲染。
+  const [imageResolution, setImageResolution] = useState<string>("1K");
+  const [quality, setQuality] = useState<string>("high");
+  const [outputFormat, setOutputFormat] = useState<string | undefined>(undefined);
   const [candidateCount, setCandidateCount] = useState(1);
+  // 所选模型真实支持哪些出图参数：判定与 worker 同源（contracts 的 imageParamSupportFor）。
+  const castModelSupport = useMemo(() => {
+    const { providerId, modelId } = parseModelKey(modelPair);
+    const kind = providers.find((provider) => provider.id === providerId)?.models.find((model) => model.id === modelId)?.imageApiKind ?? null;
+    return imageParamSupportFor(modelId, kind as "openai_images" | "gemini" | "custom" | null);
+  }, [modelPair, providers]);
+  const effectiveResolution = castModelSupport.resolutionTiers.includes(imageResolution as never) ? imageResolution : "1K";
   const pairRef = useRef(modelPair);
   pairRef.current = modelPair;
   // 参考脸上传入口挂在圆圈本身，需要用它去点隐藏的 file input。
@@ -182,7 +194,15 @@ export function ModelsPage() {
     try {
       const { job, reused } = await cast.mutateAsync({
         modelId: selected.id,
-        body: { providerId, imageModelId, aspectRatio: aspectRatio as never, candidateCount },
+        body: {
+          providerId,
+          imageModelId,
+          aspectRatio: aspectRatio as never,
+          imageResolution: effectiveResolution as never,
+          quality: quality as never,
+          ...(outputFormat ? { outputFormat: outputFormat as never } : {}),
+          candidateCount,
+        },
       });
       if (reused) {
         // 指纹命中了已成功的同参数任务：不会有新候选，也没有可轮询的任务，别报「已生成」骗人。
@@ -241,7 +261,7 @@ export function ModelsPage() {
 
   return (
     <div className={styles.page}>
-      <AppTopbar current="models" settingsOpen={false} onSettingsOpenChange={() => { }} />
+      <AppTopbar current="models" settingsOpen={settingsOpen} onSettingsOpenChange={setSettingsOpen} />
       <div className={styles.content}>
         <aside className={styles.listPane}>
           <div className={styles.listHeader}>
@@ -400,6 +420,46 @@ export function ModelsPage() {
                       options={MODEL_ASPECT_RATIOS.map((value) => ({ value, label: value }))}
                     />
                   </div>
+                  {castModelSupport.resolutionTiers.length > 1 ? (
+                    <div className={`${styles.castField} ${styles.castFieldSmall}`}>
+                      <span className={styles.castLabel}>分辨率</span>
+                      <Select
+                        style={{ width: "100%" }}
+                        value={effectiveResolution}
+                        onChange={setImageResolution}
+                        options={castModelSupport.resolutionTiers.map((value) => ({ value, label: value }))}
+                      />
+                    </div>
+                  ) : null}
+                  {castModelSupport.quality ? (
+                    <div className={`${styles.castField} ${styles.castFieldSmall}`}>
+                      <span className={styles.castLabel}>质量</span>
+                      <Select
+                        style={{ width: "100%" }}
+                        value={quality}
+                        onChange={setQuality}
+                        options={[
+                          { value: "auto", label: "自动" },
+                          { value: "low", label: "低" },
+                          { value: "medium", label: "中" },
+                          { value: "high", label: "高" },
+                        ]}
+                      />
+                    </div>
+                  ) : null}
+                  {castModelSupport.outputFormat ? (
+                    <div className={`${styles.castField} ${styles.castFieldSmall}`}>
+                      <span className={styles.castLabel}>格式</span>
+                      <Select
+                        style={{ width: "100%" }}
+                        allowClear
+                        placeholder="PNG"
+                        value={outputFormat}
+                        onChange={(value) => setOutputFormat(value ?? undefined)}
+                        options={IMAGE_OUTPUT_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))}
+                      />
+                    </div>
+                  ) : null}
                   <div className={`${styles.castField} ${styles.castFieldCount}`}>
                     <span className={styles.castLabel}>候选</span>
                     <Select

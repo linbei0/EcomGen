@@ -1,5 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { AssetRole, EditTurnStatus, ImageAspectRatio, ImageResolution, JobStatus, PlanningMode, PlatformTarget, ReferencePurpose, UserAssetKind } from "./enums.js";
+import { AssetRole, EditTurnStatus, ImageAspectRatio, ImageOutputFormat, ImageQuality, ImageResolution, JobStatus, PlanningMode, PlatformTarget, ReferencePurpose, UserAssetKind } from "./enums.js";
 import { EcomSuiteFile, EditReferenceAsset, EditTurn, Job, LayerBbox, ModelRef, PlanningConfigSnapshot, Project, ReferenceSelection } from "./api-schemas.js";
 import { MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MIN_SUITE_FORGE_SHOTS } from "./limits.js";
 import { schemaRef } from "./ref.js";
@@ -14,6 +14,8 @@ export const CreateGenerationJobInput = Type.Object({
   generationConfig: Type.Optional(Type.Object({
     imageResolution: Type.Optional(schemaRef(ImageResolution)),
     imageAspectRatio: Type.Optional(schemaRef(ImageAspectRatio)),
+    quality: Type.Optional(schemaRef(ImageQuality, { description: "生图质量档位；仅 gpt-image 家族消费。缺省 high。" })),
+    outputFormat: Type.Optional(schemaRef(ImageOutputFormat, { description: "产物图片格式；仅支持的模型会收到该参数，缺省 png。" })),
     candidateCount: Type.Optional(Type.Integer({ minimum: 1, maximum: 4 })),
     imageModel: Type.Optional(schemaRef(ModelRef)),
   })),

@@ -1,5 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { ImageAspectRatio, stringEnumSchema } from "./enums.js";
+import { ImageAspectRatio, ImageOutputFormat, ImageQuality, ImageResolution, stringEnumSchema } from "./enums.js";
 import { schemaRef } from "./ref.js";
 import { MAX_MODEL_NAME_LENGTH, MAX_MODEL_NOTES_LENGTH, MODEL_AURA_MAX, MODEL_CAST_CANDIDATES_MAX, MODEL_MARKS_MAX } from "./limits.js";
 
@@ -201,6 +201,9 @@ export const CreateModelCastJobInput = Type.Object({
   providerId: Type.String({ format: "uuid" }),
   imageModelId: Type.String({ minLength: 1 }),
   aspectRatio: schemaRef(ImageAspectRatio),
+  imageResolution: Type.Optional(schemaRef(ImageResolution, { description: "输出分辨率档位；仅当所选模型支持（Seedream/Gemini 3）时生效，gpt-image 固定 1K 输出。" })),
+  quality: Type.Optional(schemaRef(ImageQuality, { description: "生图质量档位；仅 gpt-image 家族消费，其余模型忽略。缺省 high。" })),
+  outputFormat: Type.Optional(schemaRef(ImageOutputFormat, { description: "产物图片格式；仅支持的模型（gpt-image / Seedream 4.5+）会收到该参数，缺省 png。" })),
   candidateCount: Type.Optional(Type.Integer({ minimum: 1, maximum: MODEL_CAST_CANDIDATES_MAX, default: 1 })),
 }, { $id: "#/components/schemas/CreateModelCastJobInput", description: "发起一次选角生成：按模特当前 spec 编译定妆照 prompt，产出 candidateCount 张候选。" });
 export type CreateModelCastJobInput = Static<typeof CreateModelCastJobInput>;

@@ -89,6 +89,19 @@ components:
         - 9:16
         - 16:9
         - 21:9
+    ImageQuality:
+      type: string
+      enum:
+        - auto
+        - low
+        - medium
+        - high
+    ImageOutputFormat:
+      type: string
+      enum:
+        - png
+        - jpeg
+        - webp
     PlanningMode:
       type: string
       enum:
@@ -1605,6 +1618,12 @@ components:
                   $ref: "#/components/schemas/ImageAspectRatio"
                 size:
                   type: string
+                quality:
+                  description: 本次请求实际下发的质量档位；不消费该参数的模型为空。
+                  $ref: "#/components/schemas/ImageQuality"
+                outputFormat:
+                  description: 本次请求实际请求的图片格式；不消费该参数的模型为空。
+                  $ref: "#/components/schemas/ImageOutputFormat"
                 candidateIndex:
                   minimum: 1
                   type: integer
@@ -2587,6 +2606,12 @@ components:
               $ref: "#/components/schemas/ImageResolution"
             imageAspectRatio:
               $ref: "#/components/schemas/ImageAspectRatio"
+            quality:
+              description: 生图质量档位；仅 gpt-image 家族消费。缺省 high。
+              $ref: "#/components/schemas/ImageQuality"
+            outputFormat:
+              description: 产物图片格式；仅支持的模型会收到该参数，缺省 png。
+              $ref: "#/components/schemas/ImageOutputFormat"
             candidateCount:
               minimum: 1
               maximum: 4
@@ -3622,6 +3647,15 @@ components:
           type: string
         aspectRatio:
           $ref: "#/components/schemas/ImageAspectRatio"
+        imageResolution:
+          description: 输出分辨率档位；仅当所选模型支持（Seedream/Gemini 3）时生效，gpt-image 固定 1K 输出。
+          $ref: "#/components/schemas/ImageResolution"
+        quality:
+          description: 生图质量档位；仅 gpt-image 家族消费，其余模型忽略。缺省 high。
+          $ref: "#/components/schemas/ImageQuality"
+        outputFormat:
+          description: 产物图片格式；仅支持的模型（gpt-image / Seedream 4.5+）会收到该参数，缺省 png。
+          $ref: "#/components/schemas/ImageOutputFormat"
         candidateCount:
           minimum: 1
           maximum: 4
@@ -3970,6 +4004,9 @@ components:
           enum:
             - SEGMENT
             - GENERATE
+        imageResolution:
+          description: 输出分辨率档位；仅 GENERATE 生效，且仅 Seedream/Gemini 3 真正消费。SEGMENT 像素取自原图，与分辨率无关。
+          $ref: "#/components/schemas/ImageResolution"
         protocol:
           description: 分割协议；仅 SEGMENT 生效，与 Provider 声明矛盾时拒绝。
           type: string
@@ -4030,6 +4067,9 @@ components:
           maxLength: 60
           description: 风格画种，例如 watercolor / line art / geometric。
           type: string
+        imageResolution:
+          description: 输出分辨率档位；仅 Seedream/Gemini 3 真正消费，gpt-image 固定 1K 输出。
+          $ref: "#/components/schemas/ImageResolution"
         category:
           description: 目标承印品类；只影响构图建议，不改变出图像素。
           $ref: "#/components/schemas/PodPrintCategory"
@@ -4147,6 +4187,9 @@ components:
         preset:
           description: 轴向预设；必须属于 axis 对应的预设集合，否则路由拒绝。
           $ref: "#/components/schemas/PatternVariantPreset"
+        imageResolution:
+          description: 输出分辨率档位；仅 Seedream/Gemini 3 真正消费，gpt-image 编辑按源图自适应尺寸。
+          $ref: "#/components/schemas/ImageResolution"
         extra:
           maxLength: 60
           description: 补充描述，附加在固化模板之后。
@@ -4499,6 +4542,12 @@ components:
           type: string
         aspectRatio:
           $ref: "#/components/schemas/ImageAspectRatio"
+        imageResolution:
+          description: 输出分辨率档位；仅 Seedream/Gemini 3 真正消费。改稿/接缝保持父候选几何，不消费该字段。
+          $ref: "#/components/schemas/ImageResolution"
+        quality:
+          description: 生图质量档位；仅 gpt-image 家族消费。缺省 high。
+          $ref: "#/components/schemas/ImageQuality"
         background:
           $ref: "#/components/schemas/DraftBackground"
         candidateCount:
@@ -4917,6 +4966,12 @@ components:
           type: string
         aspectRatio:
           $ref: "#/components/schemas/ImageAspectRatio"
+        imageResolution:
+          description: 输出分辨率档位；仅生成（GENERATE）消费，改稿/接缝保持父候选几何。
+          $ref: "#/components/schemas/ImageResolution"
+        quality:
+          description: 生图质量档位；仅 gpt-image 家族消费，仅生成批次生效。
+          $ref: "#/components/schemas/ImageQuality"
         background:
           $ref: "#/components/schemas/DraftBackground"
         repeatLayout:

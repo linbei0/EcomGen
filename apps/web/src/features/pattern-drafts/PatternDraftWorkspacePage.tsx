@@ -4,7 +4,7 @@ import { ArrowLeft, Download, ImagePlus, Info, Layers, MessageSquarePlus, Messag
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
-import { DRAFT_BACKGROUNDS, MAX_DRAFT_MEDIA_NOTES_LENGTH, PATTERN_DRAFT_REFERENCES_MAX } from "@ecomgen/contracts";
+import { DRAFT_BACKGROUNDS, IMAGE_QUALITIES, MAX_DRAFT_MEDIA_NOTES_LENGTH, PATTERN_DRAFT_REFERENCES_MAX, imageParamSupportFor } from "@ecomgen/contracts";
 import { defaultSketchNote } from "@ecomgen/ecom-skill";
 import { useProviders } from "../../api/hooks/useProviders";
 import {
@@ -53,6 +53,9 @@ const OPERATION_LABELS: Record<string, string> = {
   CUTOUT: "去底",
   SEAM_EDIT: "接缝改稿",
 };
+
+/** quality 档位的展示名；取值元组在 contracts 单源维护，这里只做中文标注。 */
+const QUALITY_LABELS: Record<string, string> = { auto: "自动", low: "低", medium: "中", high: "高" };
 
 /**
  * 改稿画布的笔色。笔色在这里是**要表达的颜色**：它既指出要改哪里，也提示改成什么。
@@ -232,6 +235,17 @@ export function PatternDraftWorkspacePage() {
    * 列表到达后模型若真不支持，BackgroundModeSelect 会禁用该项并自动退回白底。
    */
   const transparentAvailable = imageModel ? imageModel.transparentBackground : true;
+  // 所选模型真实可调的出图参数：判定与 worker 同源（contracts 的 imageParamSupportFor）。
+  // 没有真实档位的维度不渲染选择器，避免"选了也不生效"的假开关。
+  const modelSupport = useMemo(() => {
+    if (!modelKey) return null;
+    const { providerId, modelId } = parseModelKey(modelKey);
+    const kind = providersQuery.data?.items.find((provider) => provider.id === providerId)?.models.find((model) => model.id === modelId)?.imageApiKind ?? null;
+    return imageParamSupportFor(modelId, kind as "openai_images" | "gemini" | "custom" | null);
+  }, [modelKey, providersQuery.data]);
+  const effectiveResolution = modelSupport && modelSupport.resolutionTiers.length > 1 && modelSupport.resolutionTiers.includes((local?.conditions.imageResolution ?? "1K") as never)
+    ? local?.conditions.imageResolution ?? "1K"
+    : "1K";
   // 引用编号由服务端分配，客户端只按编号展示与插入；没有编号的条目（老数据）不参与引用。
   // 两层都用 useMemo：输入框每次击键都会重渲染本页，逐击键重建数组会把下游 memo 全部打穿。
   const referenceMedia = useMemo(() => media.filter((item) => item.role === "REFERENCE"), [media]);
@@ -298,6 +312,8 @@ export function PatternDraftWorkspacePage() {
       ...(modelId ? { imageModelId: modelId } : {}),
       theme: conditions.theme,
       aspectRatio: conditions.aspectRatio,
+      imageResolution: effectiveResolution,
+      ...(conditions.quality ? { quality: conditions.quality } : {}),
       background: conditions.background,
       ...(conditions.repeatLayout ? { repeatLayout: conditions.repeatLayout } : {}),
       ...(parentCandidateId ? { parentCandidateId } : {}),
@@ -549,6 +565,22 @@ export function PatternDraftWorkspacePage() {
               onChange={(value) => patchLocal({ conditions: { ...local.conditions, aspectRatio: value } })}
               options={["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"].map((value) => ({ value, label: value }))}
             />
+            {modelSupport && modelSupport.resolutionTiers.length > 1 ? (
+              <Select
+                style={{ width: "100%" }}
+                value={effectiveResolution}
+                onChange={(value) => patchLocal({ conditions: { ...local.conditions, imageResolution: value } })}
+                options={modelSupport.resolutionTiers.map((value) => ({ value, label: `分辨率 ${value}` }))}
+              />
+            ) : null}
+            {modelSupport?.quality ? (
+              <Select
+                style={{ width: "100%" }}
+                value={local.conditions.quality ?? "high"}
+                onChange={(value) => patchLocal({ conditions: { ...local.conditions, quality: value } })}
+                options={IMAGE_QUALITIES.map((value) => ({ value, label: `质量 ${QUALITY_LABELS[value]}` }))}
+              />
+            ) : null}
             {draftQuery.data.composeType === "REPEAT" ? (
               <Select
                 allowClear

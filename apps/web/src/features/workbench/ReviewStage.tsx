@@ -15,6 +15,7 @@ import { groupOutputsByGenerationBatch } from "../../lib/review";
 import { formatDateTime } from "../../lib/format";
 import styles from "./workbench.module.css";
 import type { GenerationJobInput } from "../../api/serializeGenerationBody";
+import { IMAGE_OUTPUT_FORMATS, IMAGE_QUALITIES, imageParamSupportFor } from "@ecomgen/contracts";
 import { RESOLUTION_LABEL } from "../../lib/roles";
 import { ASPECT_SELECT_OPTIONS, renderAspectOption } from "./aspectOptions";
 import { modelOptions } from "../../lib/modelOptions";
@@ -370,9 +371,18 @@ function LightboxModal({
   const [retryOpen, setRetryOpen] = useState(false);
   const [resolution, setResolution] = useState<NonNullable<GenerationJobInput["generationConfig"]>["imageResolution"]>(item?.imageResolution ?? "1K");
   const [aspectRatio, setAspectRatio] = useState<NonNullable<GenerationJobInput["generationConfig"]>["imageAspectRatio"]>(item?.imageAspectRatio ?? "AUTO");
+  const [quality, setQuality] = useState<NonNullable<GenerationJobInput["generationConfig"]>["quality"]>("high");
+  const [outputFormat, setOutputFormat] = useState<NonNullable<GenerationJobInput["generationConfig"]>["outputFormat"]>(undefined);
   const [candidateCount, setCandidateCount] = useState(item?.candidateCount ?? 1);
   const [modelKey, setModelKey] = useState(item?.imageProviderId && item.imageModelId ? `${item.imageProviderId}::${item.imageModelId}` : undefined);
   const imageOptions = modelOptions(providers.data?.items ?? [], "image");
+  // 所选模型真实支持的出图参数：没有可调空间的维度不渲染选择器（判定与 worker 同源）。
+  const retryModelSupport = useMemo(() => {
+    if (!modelKey) return null;
+    const [providerId, modelId] = modelKey.split("::");
+    const kind = providers.data?.items.find((provider) => provider.id === providerId)?.models.find((model) => model.id === modelId)?.imageApiKind ?? null;
+    return imageParamSupportFor(modelId ?? "", kind as "openai_images" | "gemini" | "custom" | null);
+  }, [modelKey, providers.data]);
   const defaultModelKey = item?.imageProviderId && item.imageModelId ? `${item.imageProviderId}::${item.imageModelId}` : undefined;
   const positionLabel = position ? `${position.index} / ${position.total}` : undefined;
   // 重试配置弹层压在上面时不抢方向键
@@ -388,6 +398,8 @@ function LightboxModal({
   const openRetry = () => {
     setResolution(item?.imageResolution ?? "1K");
     setAspectRatio(item?.imageAspectRatio ?? "AUTO");
+    setQuality("high");
+    setOutputFormat(undefined);
     setCandidateCount(item?.candidateCount ?? 1);
     setModelKey(defaultModelKey && imageOptions.some((option) => option.value === defaultModelKey) ? defaultModelKey : imageOptions[0]?.value);
     setRetryOpen(true);
@@ -396,7 +408,7 @@ function LightboxModal({
     if (!modelKey) return;
     const [providerId, modelId] = modelKey.split("::");
     if (!providerId || !modelId) return;
-    onRetry({ imageResolution: resolution, imageAspectRatio: aspectRatio, candidateCount, imageModel: { providerId, modelId } });
+    onRetry({ imageResolution: resolution, imageAspectRatio: aspectRatio, quality, outputFormat, candidateCount, imageModel: { providerId, modelId } });
     setRetryOpen(false);
   };
   return (
@@ -442,6 +454,12 @@ function LightboxModal({
         <div className={styles.inspectorSettingGrid}>
           <label className={styles.fieldLabel}>图片比例<Select value={aspectRatio} options={ASPECT_SELECT_OPTIONS} optionRender={renderAspectOption} onChange={setAspectRatio} /></label>
           <label className={styles.fieldLabel}>分辨率<Select value={resolution} options={Object.entries(RESOLUTION_LABEL).map(([value, label]) => ({ value, label }))} onChange={setResolution} /></label>
+          {retryModelSupport?.quality ? (
+            <label className={styles.fieldLabel}>质量<Select value={quality} options={IMAGE_QUALITIES.map((value) => ({ value, label: { auto: "自动", low: "低", medium: "中", high: "高" }[value] }))} onChange={setQuality} /></label>
+          ) : null}
+          {retryModelSupport?.outputFormat ? (
+            <label className={styles.fieldLabel}>格式<Select allowClear placeholder="PNG（默认）" value={outputFormat} options={IMAGE_OUTPUT_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => setOutputFormat(value ?? undefined)} /></label>
+          ) : null}
           <label className={styles.fieldLabel}>候选数<InputNumber min={1} max={4} value={candidateCount} onChange={(value) => setCandidateCount(value ?? 1)} /></label>
           <label className={styles.fieldLabel}>生图模型<Select value={modelKey} options={imageOptions} placeholder="选择生图模型" onChange={setModelKey} /></label>
         </div>

@@ -77,10 +77,10 @@ export class LocalAssetStore {
     return { path: relativePath, hash };
   }
 
-  /** 模选定妆照：不入项目，按模特与 job 聚合；文件随模特删除级联清理。 */
-  public async putModelPortrait(modelId: string, jobId: string, content: Buffer): Promise<{ path: string; hash: string }> {
+  /** 模选定妆照：不入项目，按模特与 job 聚合；文件随模特删除级联清理。扩展名跟随产物真实格式。 */
+  public async putModelPortrait(modelId: string, jobId: string, content: Buffer, extension = ".png"): Promise<{ path: string; hash: string }> {
     const hash = createHash("sha256").update(content).digest("hex");
-    const relativePath = join("models", modelId, "casts", jobId, `${randomUUID()}-${hash.slice(0, 12)}.png`);
+    const relativePath = join("models", modelId, "casts", jobId, `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(extension) || ".png"}`);
     await this.write(relativePath, content);
     return { path: relativePath, hash };
   }

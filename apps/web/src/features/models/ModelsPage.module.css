@@ -360,6 +360,10 @@
   flex: 0 0 88px;
 }
 
+.castFieldSmall {
+  flex: 0 0 92px;
+}
+
 .castLabel {
   font-size: 11px;
   letter-spacing: 0.08em;

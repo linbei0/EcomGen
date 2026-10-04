@@ -1,6 +1,7 @@
 import type { Static } from "@sinclair/typebox";
 
 export * from "./enums.js";
+export * from "./image-model-params.js";
 export * from "./ref.js";
 export * from "./limits.js";
 export * from "./segmentation.js";
@@ -10,7 +11,7 @@ export * from "./draft-references.js";
 export * from "./draft-palettes.js";
 import type { AssetRole, ImageAspectRatio, ImageResolution, UserAssetKind } from "./enums.js";
 
-export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
+// IMAGE_RESOLUTIONS 与 ImageResolution 枚举同源，定义在 enums.ts 并经顶部 `export *` 导出。
 export const IMAGE_ASPECT_RATIOS = ["AUTO", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"] as const;
 export const MAX_CANDIDATES_PER_TYPE = 4;
 export const MAX_PRODUCT_IMAGE_ASSETS = 6;
@@ -24,22 +25,7 @@ export const DEFAULT_IMAGE_RESOLUTION = "1K" as const;
 export const DEFAULT_IMAGE_ASPECT_RATIO = "AUTO" as const;
 export const DEFAULT_CANDIDATES_PER_TYPE = 1;
 
-/**
- * 项目级允许值映射到当前 OpenAI-compatible Images 尺寸。
- * 2K/4K 仍走 1024 家族，避免按模型名猜测更大尺寸；
- * 细分比例按方向折叠到 OpenAI 支持的三档尺寸，Gemini 则原生透传比例。
- */
-export function resolveImageSize(
-  resolution: Static<typeof ImageResolution>,
-  aspectRatio: Static<typeof ImageAspectRatio>,
-  templateDefault: string
-): string {
-  void resolution;
-  if (aspectRatio === "AUTO") return templateDefault;
-  if (aspectRatio === "1:1") return "1024x1024";
-  const [width, height] = aspectRatio.split(":").map(Number);
-  return width > height ? "1536x1024" : "1024x1536";
-}
+// resolveImageSize 与按模型分流的 resolveOpenAiImageSize 同主题，实现移至 image-model-params.ts 并经顶部 `export *` 导出。
 
 export function userAssetKindForRole(role: Static<typeof AssetRole>): Static<typeof UserAssetKind> {
   return role === "PRODUCT_TRUTH" ? "PRODUCT" : "REFERENCE";

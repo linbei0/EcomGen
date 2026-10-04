@@ -134,10 +134,10 @@ export function registerModelRoutes(app: FastifyInstance, ctx: ApiContext): void
     verifyModel(repository, body.providerId, body.imageModelId, "image");
     const candidateCount = body.candidateCount ?? 1;
     const idempotencyKey = (request.headers["idempotency-key"] as string | undefined) ?? null;
-    const fingerprint = requestFingerprint({ type: "MODEL_CAST", modelId: model.id, spec: model.spec, notes: model.notes, referenceFaceHash: model.referenceFaceHash, providerId: body.providerId, imageModelId: body.imageModelId, aspectRatio: body.aspectRatio, candidateCount, idempotencyKey });
+    const fingerprint = requestFingerprint({ type: "MODEL_CAST", modelId: model.id, spec: model.spec, notes: model.notes, referenceFaceHash: model.referenceFaceHash, providerId: body.providerId, imageModelId: body.imageModelId, aspectRatio: body.aspectRatio, imageResolution: body.imageResolution ?? null, quality: body.quality ?? null, outputFormat: body.outputFormat ?? null, candidateCount, idempotencyKey });
     const existing = repository.findJobByFingerprint(null, fingerprint);
     if (existing && reusableFingerprintedJob(existing, repository.listModelPortraitsByJobId(existing.id).length > 0)) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
-    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "MODEL_CAST", input: { modelId: model.id, aspectRatio: body.aspectRatio, candidateCount, spec: model.spec, notes: model.notes, referenceFacePath: model.referenceFacePath }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "MODEL_CAST", input: { modelId: model.id, aspectRatio: body.aspectRatio, imageResolution: body.imageResolution ?? null, quality: body.quality ?? null, outputFormat: body.outputFormat ?? null, candidateCount, spec: model.spec, notes: model.notes, referenceFacePath: model.referenceFacePath }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueueOrMarkFailed(job, "model_cast");
     return reply.code(202).send(job);
   });

@@ -1,5 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { ImageAspectRatio } from "./enums.js";
+import { ImageAspectRatio, ImageQuality, ImageResolution } from "./enums.js";
 import { stringEnumSchema } from "./enums.js";
 import { schemaRef } from "./ref.js";
 import {
@@ -86,6 +86,8 @@ export type DraftSeamEdit = Static<typeof DraftSeamEdit>;
 export const DraftConditions = Type.Object({
   theme: Type.String({ maxLength: MAX_PATTERN_BRIEF_LENGTH, default: "" }),
   aspectRatio: schemaRef(ImageAspectRatio),
+  imageResolution: Type.Optional(schemaRef(ImageResolution, { description: "输出分辨率档位；仅 Seedream/Gemini 3 真正消费。改稿/接缝保持父候选几何，不消费该字段。" })),
+  quality: Type.Optional(schemaRef(ImageQuality, { description: "生图质量档位；仅 gpt-image 家族消费。缺省 high。" })),
   background: schemaRef(DraftBackground),
   candidateCount: Type.Integer({ minimum: 1, maximum: PATTERN_DRAFT_CANDIDATES_MAX, default: 1 }),
   providerId: Type.Optional(Type.String({ format: "uuid" })),
@@ -232,6 +234,8 @@ export const CreateDraftBatchInput = Type.Object({
   imageModelId: Type.Optional(Type.String({ minLength: 1 })),
   theme: Type.Optional(Type.String({ maxLength: MAX_PATTERN_BRIEF_LENGTH })),
   aspectRatio: Type.Optional(schemaRef(ImageAspectRatio)),
+  imageResolution: Type.Optional(schemaRef(ImageResolution, { description: "输出分辨率档位；仅生成（GENERATE）消费，改稿/接缝保持父候选几何。" })),
+  quality: Type.Optional(schemaRef(ImageQuality, { description: "生图质量档位；仅 gpt-image 家族消费，仅生成批次生效。" })),
   background: Type.Optional(schemaRef(DraftBackground)),
   repeatLayout: Type.Optional(schemaRef(PodRepeatLayout)),
   parentCandidateId: Type.Optional(Type.String({ format: "uuid" })),

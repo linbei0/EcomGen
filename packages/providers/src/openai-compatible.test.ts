@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor, OpenAiCompatibleImageProvider } from "./openai-compatible.js";
+import { highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor, OpenAiCompatibleImageProvider, sniffImageMimeType } from "./openai-compatible.js";
 
 describe("OpenAI-compatible image editing", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -240,5 +240,54 @@ describe("生图请求的取消传播", () => {
     // 修复前该下载既无超时也无取消，可能永久挂起。
     expect(downloadSignal).toBeDefined();
     expect(downloadSignal?.aborted).toBe(false);
+  });
+});
+
+describe("生图响应格式识别与 Seedream 域参数", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("b64 响应按字节签名识别 JPEG，不再一律标成 PNG", async () => {
+    // Seedream 的 b64_json 实际返回 JPEG 字节；修复前被硬编码标注为 image/png，
+    // 落盘扩展名与 API 回传 Content-Type 随之失真。
+    const jpegBytes = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32, 0x11)]);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ data: [{ b64_json: jpegBytes.toString("base64") }] }), { status: 200 })));
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await expect(provider.generate({ model: "doubao-seedream-4-0-250828", prompt: "cup" })).resolves.toMatchObject({ mimeType: "image/jpeg" });
+  });
+
+  it("watermark 仅在调用方提供时下发", async () => {
+    let requestBody: string | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: URL, init?: RequestInit) => {
+      requestBody = init?.body as string;
+      return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("generated").toString("base64") }] }), { status: 200 });
+    }));
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await provider.generate({ model: "doubao-seedream-4-0-250828", prompt: "cup", watermark: false });
+    expect(JSON.parse(requestBody!)).toMatchObject({ watermark: false });
+    requestBody = undefined;
+    await provider.generate({ model: "gpt-image-1", prompt: "cup" });
+    expect(JSON.parse(requestBody!)).not.toHaveProperty("watermark");
+  });
+
+  it("response_format 仅发给非 gpt-image 模型（官方文档：GPT image 模型不支持该参数）", async () => {
+    let requestBody: string | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: URL, init?: RequestInit) => {
+      requestBody = init?.body as string;
+      return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("generated").toString("base64") }] }), { status: 200 });
+    }));
+    const provider = new OpenAiCompatibleImageProvider({ baseUrl: "https://example.test/v1", apiKey: "secret" });
+    await provider.generate({ model: "gpt-image-2", prompt: "cup" });
+    expect(JSON.parse(requestBody!)).not.toHaveProperty("response_format");
+    requestBody = undefined;
+    await provider.generate({ model: "doubao-seedream-4-0-250828", prompt: "cup" });
+    expect(JSON.parse(requestBody!)).toMatchObject({ response_format: "b64_json" });
+  });
+
+  it("sniffImageMimeType 覆盖 png/jpeg/webp 签名，未知字节返回 null", () => {
+    expect(sniffImageMimeType(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01]))).toBe("image/png");
+    expect(sniffImageMimeType(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]))).toBe("image/jpeg");
+    expect(sniffImageMimeType(Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(4, 0), Buffer.from("WEBP"), Buffer.alloc(4)]))).toBe("image/webp");
+    expect(sniffImageMimeType(Buffer.from("not an image"))).toBeNull();
+    expect(sniffImageMimeType(Buffer.alloc(0))).toBeNull();
   });
 });

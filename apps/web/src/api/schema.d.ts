@@ -1759,6 +1759,10 @@ export interface components {
         /** @enum {string} */
         ImageAspectRatio: "AUTO" | "1:1" | "2:3" | "3:2" | "3:4" | "4:3" | "4:5" | "5:4" | "9:16" | "16:9" | "21:9";
         /** @enum {string} */
+        ImageQuality: "auto" | "low" | "medium" | "high";
+        /** @enum {string} */
+        ImageOutputFormat: "png" | "jpeg" | "webp";
+        /** @enum {string} */
         PlanningMode: "AI" | "MANUAL";
         /** @enum {string} */
         CopywritingTarget: "PRODUCT_DESCRIPTION" | "PLANNING_INSTRUCTION" | "LISTING";
@@ -2320,6 +2324,10 @@ export interface components {
                 resolution?: components["schemas"]["ImageResolution"];
                 aspectRatio?: components["schemas"]["ImageAspectRatio"];
                 size?: string;
+                /** @description 本次请求实际下发的质量档位；不消费该参数的模型为空。 */
+                quality?: components["schemas"]["ImageQuality"];
+                /** @description 本次请求实际请求的图片格式；不消费该参数的模型为空。 */
+                outputFormat?: components["schemas"]["ImageOutputFormat"];
                 candidateIndex?: number;
                 revision?: string;
             } | null;
@@ -2661,6 +2669,10 @@ export interface components {
             generationConfig?: {
                 imageResolution?: components["schemas"]["ImageResolution"];
                 imageAspectRatio?: components["schemas"]["ImageAspectRatio"];
+                /** @description 生图质量档位；仅 gpt-image 家族消费。缺省 high。 */
+                quality?: components["schemas"]["ImageQuality"];
+                /** @description 产物图片格式；仅支持的模型会收到该参数，缺省 png。 */
+                outputFormat?: components["schemas"]["ImageOutputFormat"];
                 candidateCount?: number;
                 imageModel?: components["schemas"]["ModelRef"];
             };
@@ -2993,6 +3005,12 @@ export interface components {
             providerId: string;
             imageModelId: string;
             aspectRatio: components["schemas"]["ImageAspectRatio"];
+            /** @description 输出分辨率档位；仅当所选模型支持（Seedream/Gemini 3）时生效，gpt-image 固定 1K 输出。 */
+            imageResolution?: components["schemas"]["ImageResolution"];
+            /** @description 生图质量档位；仅 gpt-image 家族消费，其余模型忽略。缺省 high。 */
+            quality?: components["schemas"]["ImageQuality"];
+            /** @description 产物图片格式；仅支持的模型（gpt-image / Seedream 4.5+）会收到该参数，缺省 png。 */
+            outputFormat?: components["schemas"]["ImageOutputFormat"];
             /** @default 1 */
             candidateCount: number;
         };
@@ -3128,6 +3146,8 @@ export interface components {
              * @enum {string}
              */
             mode?: "SEGMENT" | "GENERATE";
+            /** @description 输出分辨率档位；仅 GENERATE 生效，且仅 Seedream/Gemini 3 真正消费。SEGMENT 像素取自原图，与分辨率无关。 */
+            imageResolution?: components["schemas"]["ImageResolution"];
             /**
              * @description 分割协议；仅 SEGMENT 生效，与 Provider 声明矛盾时拒绝。
              * @enum {string}
@@ -3159,6 +3179,8 @@ export interface components {
             theme: string;
             /** @description 风格画种，例如 watercolor / line art / geometric。 */
             style?: string;
+            /** @description 输出分辨率档位；仅 Seedream/Gemini 3 真正消费，gpt-image 固定 1K 输出。 */
+            imageResolution?: components["schemas"]["ImageResolution"];
             /** @description 目标承印品类；只影响构图建议，不改变出图像素。 */
             category?: components["schemas"]["PodPrintCategory"];
             /** @default 1 */
@@ -3212,6 +3234,8 @@ export interface components {
             axis: components["schemas"]["PatternVariantAxis"];
             /** @description 轴向预设；必须属于 axis 对应的预设集合，否则路由拒绝。 */
             preset: components["schemas"]["PatternVariantPreset"];
+            /** @description 输出分辨率档位；仅 Seedream/Gemini 3 真正消费，gpt-image 编辑按源图自适应尺寸。 */
+            imageResolution?: components["schemas"]["ImageResolution"];
             /** @description 补充描述，附加在固化模板之后。 */
             extra?: string;
             /** @description 底版；缺省 SOURCE（跟随源图）。TRANSPARENT 要求所选模型支持，否则路由拒绝。 */
@@ -3351,6 +3375,10 @@ export interface components {
             /** @default  */
             theme: string;
             aspectRatio: components["schemas"]["ImageAspectRatio"];
+            /** @description 输出分辨率档位；仅 Seedream/Gemini 3 真正消费。改稿/接缝保持父候选几何，不消费该字段。 */
+            imageResolution?: components["schemas"]["ImageResolution"];
+            /** @description 生图质量档位；仅 gpt-image 家族消费。缺省 high。 */
+            quality?: components["schemas"]["ImageQuality"];
             background: components["schemas"]["DraftBackground"];
             /** @default 1 */
             candidateCount: number;
@@ -3493,6 +3521,10 @@ export interface components {
             imageModelId?: string;
             theme?: string;
             aspectRatio?: components["schemas"]["ImageAspectRatio"];
+            /** @description 输出分辨率档位；仅生成（GENERATE）消费，改稿/接缝保持父候选几何。 */
+            imageResolution?: components["schemas"]["ImageResolution"];
+            /** @description 生图质量档位；仅 gpt-image 家族消费，仅生成批次生效。 */
+            quality?: components["schemas"]["ImageQuality"];
             background?: components["schemas"]["DraftBackground"];
             repeatLayout?: components["schemas"]["PodRepeatLayout"];
             /** Format: uuid */

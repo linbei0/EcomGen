@@ -82,6 +82,8 @@ function normalizeConditions(input: DraftConditions): DraftConditions {
   return {
     theme: bounded(input.theme, MAX_PATTERN_BRIEF_LENGTH, "conditions.theme"),
     aspectRatio: input.aspectRatio,
+    ...(input.imageResolution ? { imageResolution: input.imageResolution } : {}),
+    ...(input.quality ? { quality: input.quality } : {}),
     background: input.background,
     candidateCount,
     ...(input.providerId ? { providerId: input.providerId } : {}),
@@ -676,6 +678,8 @@ export function registerPatternDraftRoutes(app: FastifyInstance, ctx: ApiContext
       candidateCount,
       theme: body.theme ?? null,
       aspectRatio: body.aspectRatio ?? "1:1",
+      imageResolution: body.imageResolution ?? null,
+      quality: body.quality ?? null,
       background: body.background ?? "WHITE",
       repeatLayout: body.repeatLayout ?? null,
       instruction: body.instruction ?? null,

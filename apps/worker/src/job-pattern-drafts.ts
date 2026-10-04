@@ -6,12 +6,14 @@ import {
   DRAFT_SEAM_BAND_MAX,
   TILEABILITY_ALGORITHM_VERSION,
   isSegmentationProtocol,
-  resolveImageSize,
+  DEFAULT_IMAGE_QUALITY,
+  resolveOpenAiImageSize,
 } from "@ecomgen/contracts";
 import type {
   DraftBatchOperation,
   DraftSeamEdge,
   ImageAspectRatio,
+  ImageQuality,
   ImageResolution,
   SegmentationProtocol,
 } from "@ecomgen/contracts";
@@ -25,6 +27,7 @@ import { decodeRgba, maskHasForeground, normalizeMask, pngFromRgba } from "./mas
 import { multiplyAlpha } from "./layer-composite.js";
 import { createSegmentationProvider, highInputFidelityForOpenAiImageModel, imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { JobCancelled, generationKeyFor, mimeForStoragePath, outputDerivatives } from "./context.js";
+import { openAiImageRequestParams, qualityFromSnapshot, resolutionFromSnapshot } from "./image-params.js";
 import type { WorkerContext } from "./context.js";
 
 /**
@@ -53,6 +56,9 @@ interface DraftSnapshot {
   candidateCount: number;
   theme?: string;
   aspectRatio?: ImageAspectRatio;
+  /** 生成批次的分辨率档位与质量；仅 GENERATE 消费（改稿/接缝必须保持父候选几何）。 */
+  imageResolution?: ImageResolution;
+  quality?: ImageQuality;
   background?: "WHITE" | "TRANSPARENT";
   instruction?: string;
   recolor?: RecolorParams;
@@ -232,11 +238,13 @@ export async function executeDraftGenerate(ctx: WorkerContext, job: JobRecord, s
     references: referenceHints(snapshot),
   });
   const aspectRatio = snapshot.aspectRatio ?? "1:1";
-  const size = resolveImageSize("1K", aspectRatio, "1024x1024");
+  const resolution = resolutionFromSnapshot(snapshot.imageResolution);
+  const quality = qualityFromSnapshot(snapshot.quality) ?? DEFAULT_IMAGE_QUALITY;
+  const size = resolveOpenAiImageSize(model.id, resolution, aspectRatio, "1024x1024");
   await runDraftSlots(ctx, job, batch, snapshot, async (slotIndex) => {
     const result = await runPaidDraftCall(ctx, job, () => generator.generate(model.imageApiKind === "gemini"
-      ? { model: model.id, prompt, ...(references.length ? { images: references } : {}), imageAspectRatio: (aspectRatio === "AUTO" ? "1:1" : aspectRatio) as ImageAspectRatio, imageResolution: "1K" as ImageResolution, idempotencyKey: generationKeyFor(job.id, slotIndex), signal }
-      : { model: model.id, prompt, size, quality: "high", ...(references.length ? { images: references } : {}), ...(backgroundPlan.transparent ?? {}), idempotencyKey: generationKeyFor(job.id, slotIndex), signal }));
+      ? { model: model.id, prompt, ...(references.length ? { images: references } : {}), imageAspectRatio: (aspectRatio === "AUTO" ? "1:1" : aspectRatio) as ImageAspectRatio, imageResolution: resolution, idempotencyKey: generationKeyFor(job.id, slotIndex), signal }
+      : { model: model.id, prompt, ...openAiImageRequestParams(model.id, resolution, aspectRatio, "1024x1024", { quality }), ...(references.length ? { images: references } : {}), ...(backgroundPlan.transparent ?? {}), idempotencyKey: generationKeyFor(job.id, slotIndex), signal }));
     let warning: string | undefined;
     try { await verifyPatternBackground(backgroundPlan, result.image, "起稿"); } catch (error) { warning = errorMessage(error); }
     return { image: result.image, warning };
@@ -260,10 +268,13 @@ export async function executeDraftEdit(ctx: WorkerContext, job: JobRecord, signa
   const parentTransparent = await hasTransparentPixels(parentImage);
   const background = snapshot.background ?? (parentTransparent ? "TRANSPARENT" : "WHITE");
   const backgroundPlan = resolvePatternBackground({ mode: background, model, sourceTransparent: parentTransparent });
+  const inputFidelity = highInputFidelityForOpenAiImageModel(model.id);
   const common = {
     model: model.id,
+    // 分辨率/质量只在生成（executeDraftGenerate）消费：改稿与接缝的结果要叠回父候选做校验与合成，
+    // 画布尺寸必须跟随父候选，贸然换档位会让坐标与验缝全部失配。
     ...(model.imageApiKind === "gemini" ? { imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: "1K" as ImageResolution } : {}),
-    ...(highInputFidelityForOpenAiImageModel(model.id) ? { inputFidelity: "high" as const } : {}),
+    ...(inputFidelity ? { inputFidelity } : {}),
     ...(backgroundPlan.transparent ?? {}),
     signal,
   };

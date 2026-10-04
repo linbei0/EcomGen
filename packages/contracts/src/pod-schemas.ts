@@ -1,5 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { stringEnumSchema } from "./enums.js";
+import { ImageResolution, stringEnumSchema } from "./enums.js";
 import { Job } from "./api-schemas.js";
 import { schemaRef } from "./ref.js";
 import { SEGMENTATION_PROTOCOLS } from "./segmentation.js";
@@ -200,6 +200,7 @@ export const CreatePatternExtractJobInput = Type.Object({
   providerId: Type.String({ format: "uuid" }),
   modelId: Type.String({ minLength: 1, description: "提取模型；SEGMENT 指分割模型，GENERATE 指生图模型。" }),
   mode: Type.Optional(Type.Union(PATTERN_EXTRACT_MODES.map((value) => Type.Literal(value)), { description: "提取方式；缺省 SEGMENT。" })),
+  imageResolution: Type.Optional(schemaRef(ImageResolution, { description: "输出分辨率档位；仅 GENERATE 生效，且仅 Seedream/Gemini 3 真正消费。SEGMENT 像素取自原图，与分辨率无关。" })),
   protocol: Type.Optional(Type.Union(PATTERN_EXTRACT_PROTOCOLS.map((value) => Type.Literal(value)), { description: "分割协议；仅 SEGMENT 生效，与 Provider 声明矛盾时拒绝。" })),
   background: Type.Optional(Type.Union(PATTERN_EXTRACT_BACKGROUNDS.map((value) => Type.Literal(value)), { description: "生成提取的底版；缺省 TRANSPARENT，仅 GENERATE 生效。TRANSPARENT 要求模型支持。" })),
   file: Type.String({ format: "binary", description: "带图案的商品实拍图。" }),
@@ -217,6 +218,7 @@ export const CreatePatternForgeJobInput = Type.Object({
   imageModelId: Type.String({ minLength: 1 }),
   theme: Type.String({ minLength: 1, maxLength: MAX_PATTERN_BRIEF_LENGTH, description: "图案主题描述，例如「水彩野花束、奶油色底」。" }),
   style: Type.Optional(Type.String({ maxLength: MAX_PATTERN_STYLE_LENGTH, description: "风格画种，例如 watercolor / line art / geometric。" })),
+  imageResolution: Type.Optional(schemaRef(ImageResolution, { description: "输出分辨率档位；仅 Seedream/Gemini 3 真正消费，gpt-image 固定 1K 输出。" })),
   category: Type.Optional(schemaRef(PodPrintCategory, { description: "目标承印品类；只影响构图建议，不改变出图像素。" })),
   candidateCount: Type.Optional(Type.Integer({ minimum: 1, maximum: PATTERN_FORGE_CANDIDATES_MAX, default: 1 })),
   // 起稿没有源图，所以收窄掉 SOURCE：能选的只有白底与透明底。
@@ -281,6 +283,7 @@ export const CreatePatternVariantJobInput = Type.Object({
   imageModelId: Type.String({ minLength: 1 }),
   axis: schemaRef(PatternVariantAxis),
   preset: schemaRef(PatternVariantPreset, { description: "轴向预设；必须属于 axis 对应的预设集合，否则路由拒绝。" }),
+  imageResolution: Type.Optional(schemaRef(ImageResolution, { description: "输出分辨率档位；仅 Seedream/Gemini 3 真正消费，gpt-image 编辑按源图自适应尺寸。" })),
   extra: Type.Optional(Type.String({ maxLength: MAX_PATTERN_STYLE_LENGTH, description: "补充描述，附加在固化模板之后。" })),
   background: Type.Optional(schemaRef(PatternBackgroundMode, { description: "底版；缺省 SOURCE（跟随源图）。TRANSPARENT 要求所选模型支持，否则路由拒绝。" })),
   candidateCount: Type.Optional(Type.Integer({ minimum: 1, maximum: PATTERN_VARIANT_CANDIDATES_MAX, default: 1 })),

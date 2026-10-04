@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { App, Button, Image, Input, Popconfirm, Popover, Progress, Select, Skeleton, Slider, Tooltip } from "antd";
 import { ArrowLeft, ChevronRight, Download, Info, Package, Pencil, Trash2 } from "lucide-react";
-import { TILEABILITY_ALGORITHM_VERSION, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESETS } from "@ecomgen/contracts";
+import { TILEABILITY_ALGORITHM_VERSION, PATTERN_VARIANT_CANDIDATES_MAX, PATTERN_VARIANT_PRESETS, imageParamSupportFor, type ImageResolution } from "@ecomgen/contracts";
 import { PATTERN_VARIANT_AXIS_LABELS, PATTERN_VARIANT_PRESET_LABELS } from "@ecomgen/ecom-skill";
 
 import {
@@ -595,10 +595,18 @@ function DeriveSection({ pattern, onDerived }: { pattern: Pattern; onDerived: (d
   // 底版缺省"跟随源图"：源透明就保住透明底，源有底色就保留底色。这是最不容易出错的一档——
   // 替用户改底（以前是自动的）会把源花型的透明底换成白底，那种降级在预览里几乎看不出来。
   const [background, setBackground] = useState<PatternBackgroundMode>("SOURCE");
+  const [imageResolution, setImageResolution] = useState<ImageResolution | null>(null);
   const variantModel = useMemo(
     () => modelOptions(providersQuery.data?.items ?? [], "image").find((option) => option.value === variantModelKey),
     [providersQuery.data, variantModelKey],
   );
+  // 衍生模型支持哪些出图档位：判定与 worker 同源（contracts 的 imageParamSupportFor）。
+  const variantModelSupport = useMemo(() => {
+    if (!variantModelKey) return null;
+    const { providerId, modelId } = parseModelKey(variantModelKey);
+    const kind = providersQuery.data?.items.find((provider) => provider.id === providerId)?.models.find((model) => model.id === modelId)?.imageApiKind ?? null;
+    return imageParamSupportFor(modelId, kind as "openai_images" | "gemini" | "custom" | null);
+  }, [variantModelKey, providersQuery.data]);
 
   // 衍生任务终态结算：失败报错撤卡；成功失效列表让版本栈长出新节点。
   useEffect(() => {
@@ -644,6 +652,7 @@ function DeriveSection({ pattern, onDerived }: { pattern: Pattern; onDerived: (d
           preset,
           ...(extra.trim() ? { extra: extra.trim() } : {}),
           background,
+          ...(variantModelSupport && variantModelSupport.resolutionTiers.length > 1 && imageResolution ? { imageResolution: imageResolution } : {}),
           candidateCount,
         },
       },
@@ -729,6 +738,16 @@ function DeriveSection({ pattern, onDerived }: { pattern: Pattern; onDerived: (d
           fallback="SOURCE"
           transparentAvailable={Boolean(variantModel?.transparentBackground)}
         />
+        {variantModelSupport && variantModelSupport.resolutionTiers.length > 1 ? (
+          <Select
+            size="small"
+            style={{ width: "100%" }}
+            aria-label="衍生分辨率"
+            value={imageResolution ?? variantModelSupport.resolutionTiers[0]}
+            onChange={(value) => setImageResolution(value)}
+            options={variantModelSupport.resolutionTiers.map((value) => ({ value, label: `分辨率 ${value}` }))}
+          />
+        ) : null}
         <Input size="small" placeholder="补充描述（可选）" value={extra} maxLength={60} onChange={(event) => setExtra(event.target.value)} aria-label="衍生补充描述" />
         <Select
           size="small"

@@ -1,4 +1,5 @@
-import type { EditOperation, ModelCapabilities } from "@ecomgen/contracts";
+import type { EditOperation, ImageQuality, ModelCapabilities } from "@ecomgen/contracts";
+import { isGptImageModel } from "@ecomgen/contracts";
 
 import { requestSignal } from "./abort.js";
 
@@ -17,7 +18,8 @@ export interface ImageGenerationInput {
   imageAspectRatio?: string;
   /** Gemini 使用的输出分辨率（1K/2K/4K）；OpenAI Images 适配器不读取此字段。 */
   imageResolution?: string;
-  quality?: "low" | "medium" | "high";
+  /** 质量档位（gpt-image 语义）；调用方负责只在认识该参数的模型上提供。 */
+  quality?: ImageQuality;
   images?: Array<{ data: Buffer; filename: string; mimeType: string }>;
   mask?: { data: Buffer; filename: string; mimeType: string };
   inputFidelity?: "low" | "high";
@@ -28,6 +30,11 @@ export interface ImageGenerationInput {
    */
   background?: "transparent" | "opaque" | "auto";
   outputFormat?: "png" | "webp" | "jpeg";
+  /**
+   * 火山方舟图片接口的域名专属参数，缺省不下发。Seedream 默认给图片加“AI生成”水印，
+   * 电商成图必须显式关闭；其他模型收到未知字段有被拒风险，所以只有调用方明确提供才携带。
+   */
+  watermark?: boolean;
   operation?: EditOperation;
   /** 调用方取消信号；中断会真正断开在途请求，避免取消后继续等待并按次计费。 */
   signal?: AbortSignal;
@@ -44,7 +51,7 @@ export interface ImageEditInput {
   prompt: string;
   /** 同一业务执行重试时保持不变，供兼容 Provider 去重。 */
   idempotencyKey?: string;
-  quality?: "low" | "medium" | "high";
+  quality?: ImageQuality;
   size?: string;
   imageAspectRatio?: string;
   imageResolution?: string;
@@ -100,9 +107,15 @@ export interface ImageGenerationResult {
 
 export interface ProviderProbeResult { latencyMs: number; models: string[] | null; }
 
-/** GPT Image 1 系列支持 input_fidelity；gpt-image-2 已默认使用高保真输入。 */
-export function highInputFidelityForOpenAiImageModel(modelId: string): "high" | undefined {
-  return /^(gpt-image-1|gpt-image-1-mini|gpt-image-1\.5)$/i.test(modelId.trim()) ? "high" : undefined;
+/**
+ * input_fidelity 支持矩阵（OpenAI API Reference）：gpt-image-1 / 1.5 支持 low|high，
+ * gpt-image-1-mini 仅 low；gpt-image-2 必须省略该参数（默认即高保真）。
+ */
+export function highInputFidelityForOpenAiImageModel(modelId: string): "high" | "low" | undefined {
+  const id = modelId.trim();
+  if (/^gpt-image-1-mini$/i.test(id)) return "low";
+  if (/^(gpt-image-1|gpt-image-1\.5)$/i.test(id)) return "high";
+  return undefined;
 }
 
 // gpt-image high 档带参考图的 edits 请求经常超过 2 分钟；超时过短会把本可完成的
@@ -130,6 +143,20 @@ function isTransientImageRequestError(error: unknown): boolean {
   return name === "TimeoutError" || name === "TypeError";
 }
 
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_SIGNATURE = Buffer.from([0xff, 0xd8, 0xff]);
+
+/**
+ * 按字节签名识别 PNG/JPEG/WEBP。b64 响应不带格式声明，兼容 Provider（如 Seedream）实际
+ * 返回 JPEG；URL 分支的 content-type 也可能缺失或失真，字节签名优先。
+ */
+export function sniffImageMimeType(buffer: Buffer): "image/png" | "image/jpeg" | "image/webp" | null {
+  if (buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return "image/png";
+  if (buffer.subarray(0, JPEG_SIGNATURE.length).equals(JPEG_SIGNATURE)) return "image/jpeg";
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("latin1") === "RIFF" && buffer.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  return null;
+}
+
 export class OpenAiCompatibleImageProvider {
   public constructor(private readonly connection: ProviderConnection) { }
 
@@ -143,10 +170,13 @@ export class OpenAiCompatibleImageProvider {
       prompt: input.prompt,
       size: input.size,
       quality: input.quality,
-      response_format: "b64_json",
-      // 只在调用方明确要求时下发：默认请求保持原样，不带 background/output_format。
+      // GPT image 模型永远返回 b64_json，官方标注 response_format 为 Unsupported（仅退役的 DALL·E 系需要）；
+      // 其余兼容实现（Seedream 等）需要它来拿 base64 而不是 24 小时过期的 URL。
+      ...(isGptImageModel(input.model) ? {} : { response_format: "b64_json" as const }),
+      // 只在调用方明确要求时下发：默认请求保持原样，不带 background/output_format/watermark。
       ...(input.background ? { background: input.background } : {}),
       ...(input.outputFormat ? { output_format: input.outputFormat } : {}),
+      ...(input.watermark !== undefined ? { watermark: input.watermark } : {}),
       n: 1
     }), input.signal);
     return this.readImageResponse(response, input.signal);
@@ -182,7 +212,7 @@ export class OpenAiCompatibleImageProvider {
     const form = new FormData();
     form.set("model", input.model);
     form.set("prompt", input.prompt);
-    form.set("response_format", "b64_json");
+    if (!isGptImageModel(input.model)) form.set("response_format", "b64_json");
     if (input.operation) form.set("operation", input.operation);
     if (input.size) form.set("size", input.size);
     if (input.quality) form.set("quality", input.quality);
@@ -224,12 +254,20 @@ export class OpenAiCompatibleImageProvider {
     if (!response.ok) throw new ProviderError(await response.text(), response.status);
     const body = await response.json() as { data?: Array<{ b64_json?: string; url?: string }>; task_id?: string; id?: string };
     const result = body.data?.[0];
-    if (result?.b64_json) return { image: Buffer.from(result.b64_json, "base64"), mimeType: "image/png", providerTaskId: body.task_id ?? body.id };
+    if (result?.b64_json) {
+      const image = Buffer.from(result.b64_json, "base64");
+      // b64 响应不声明格式：按字节签名识别。Seedream 等兼容 Provider 返回的是 JPEG，
+      // 一律按 PNG 标注会让落盘扩展名与回传 Content-Type 全部失真。
+      return { image, mimeType: sniffImageMimeType(image) ?? "image/png", providerTaskId: body.task_id ?? body.id };
+    }
     if (result?.url) {
       const imageResponse = await fetch(result.url, { signal: requestSignal(cancel, IMAGE_DOWNLOAD_TIMEOUT_MS) });
       if (!imageResponse.ok) throw new ProviderError("Provider returned an unreadable image URL", imageResponse.status);
-      const mimeType = imageResponse.headers.get("content-type")?.split(";")[0] ?? "image/png";
-      return { image: Buffer.from(await imageResponse.arrayBuffer()), mimeType, providerTaskId: body.task_id ?? body.id };
+      const image = Buffer.from(await imageResponse.arrayBuffer());
+      const mimeType = sniffImageMimeType(image)
+        ?? imageResponse.headers.get("content-type")?.split(";")[0]
+        ?? "image/png";
+      return { image, mimeType, providerTaskId: body.task_id ?? body.id };
     }
     throw new ProviderError("Provider response does not contain an image", 502);
   }

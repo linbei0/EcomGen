@@ -101,59 +101,46 @@
   text-align: center;
 }
 
+/* 首屏加载骨架的占位网格：真实列表由 react-photo-album 等高行布局接管 */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 14px;
 }
 
-.card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
+/* 卡片外壳：类名附加在 react-photo-album 默认 wrapper 上，盒子尺寸由等高行布局给出。
+   用内描边代替边框，避免挤压布局引擎算好的图片盒。 */
+.photoCard {
   overflow: hidden;
-  padding: 0;
-  border: 1px solid var(--line-1);
   border-radius: var(--radius-m);
   background: var(--bg-2);
-  transition: border-color 150ms ease, transform 150ms ease;
-  /* 视口外卡片跳过布局与绘制；contain-intrinsic-size 用估高占位，避免滚动条跳动 */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 240px;
+  box-shadow: inset 0 0 0 1px var(--line-1);
+  transition: box-shadow 150ms ease;
 }
 
-.card:hover {
-  border-color: var(--line-2);
+.photoCard:hover {
+  box-shadow: inset 0 0 0 1px var(--line-2);
 }
 
-.card[data-selected="true"] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-line);
-}
-
-.thumbWrap {
-  position: relative;
-  overflow: hidden;
-  background: var(--bg-3);
-}
-
-.thumbWrap :global(.ant-image) {
-  display: block;
-  width: 100%;
-  height: 100%;
+.photoSelected {
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    0 0 0 1px var(--accent-line);
 }
 
 .thumb {
   display: block;
   width: 100%;
-  height: 100%;
   object-fit: cover;
+  background: var(--bg-3);
+  cursor: zoom-in;
 }
 
 .check {
   position: absolute;
   top: 8px;
   left: 8px;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -167,28 +154,45 @@
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 
-.card[data-selected="true"] .check {
+.photoSelected .check {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--bg-0);
 }
 
-.badge {
+/* 名称、徽章与来源信息收进 hover 覆盖层：等高行里图片宽度不一，常显文字会参差不齐 */
+.overlay {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  padding: 2px 7px;
+  inset: auto 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 28px 10px 8px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--bg-0) 85%, transparent), transparent);
+  opacity: 0;
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+
+.photoCard:hover .overlay,
+.photoSelected .overlay {
+  opacity: 1;
+}
+
+.overlayRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
   border-radius: var(--radius-s);
   background: color-mix(in srgb, var(--bg-0) 82%, transparent);
   color: var(--text-2);
   font-size: 11px;
-}
-
-.meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 9px 10px;
 }
 
 .name {
@@ -202,7 +206,6 @@
 
 .sub {
   overflow: hidden;
-  margin: 0;
   color: var(--text-3);
   font-size: 11px;
   text-overflow: ellipsis;
@@ -213,6 +216,7 @@
   position: absolute;
   right: 8px;
   top: 8px;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -225,7 +229,7 @@
   transition: opacity 150ms ease, color 150ms ease;
 }
 
-.card:hover .download {
+.photoCard:hover .download {
   opacity: 1;
 }
 

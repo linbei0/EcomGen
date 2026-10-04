@@ -2,6 +2,8 @@ import { App, Button, DatePicker, Empty, Image, Input, Segmented, Select, Skelet
 import { Check, Download, LibraryBig, RefreshCw, Search } from "lucide-react";
 import { motion } from "motion/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RowsPhotoAlbum, type Photo } from "react-photo-album";
+import "react-photo-album/styles.css";
 
 import {
   LIBRARY_KIND_OPTIONS,
@@ -33,49 +35,48 @@ function badgeLabel(source: string, kind: string): string {
   return kind === "PRODUCT" ? "商品" : "参考";
 }
 
+/** 布局引擎只消费宽高比；元数据缺失时按 1:1 兜底，仅影响占位比例，预览仍是原图。 */
+interface LibraryPhoto extends Photo {
+  item: LibraryItem;
+}
+
 interface LibraryCardProps {
   item: LibraryItem;
   selected: boolean;
   onToggle: (itemId: string) => void;
 }
 
-// 卡片独立 memo：分页追加与选中变化只重渲染受影响的卡片，长列表滚动更稳。
-const LibraryCard = memo(function LibraryCard({ item, selected, onToggle }: LibraryCardProps) {
+// 卡片外壳与图片几何由 react-photo-album 的默认 wrapper 负责（自带行内宽度与
+// position: relative，覆盖它会破坏等高行布局），这里只渲染绝对定位的交互与信息层。
+// memo：选中变化与分页追加只重渲染受影响的卡片，长列表滚动更稳。
+const LibraryPhotoExtras = memo(function LibraryPhotoExtras({ item, selected, onToggle }: LibraryCardProps) {
   return (
-    <article className={styles.card} data-selected={selected}>
-      <div className={styles.thumbWrap}>
-        <Image
-          src={item.thumbnailUrl}
-          alt={item.name}
-          preview={{ src: item.url, mask: "查看" }}
-          className={styles.thumb}
-          loading="lazy"
-        />
-        <button
-          type="button"
-          className={styles.check}
-          aria-pressed={selected}
-          aria-label={selected ? `取消选择 ${item.name}` : `选择 ${item.name}`}
-          onClick={() => onToggle(item.id)}
-        >
-          <Check size={14} strokeWidth={2.5} />
-        </button>
-        <a className={styles.download} href={item.url} download aria-label={`下载 ${item.name}`}>
-          <Download size={14} strokeWidth={1.75} />
-        </a>
-      </div>
-      <div className={styles.meta}>
+    <>
+      <button
+        type="button"
+        className={styles.check}
+        aria-pressed={selected}
+        aria-label={selected ? `取消选择 ${item.name}` : `选择 ${item.name}`}
+        onClick={() => onToggle(item.id)}
+      >
+        <Check size={14} strokeWidth={2.5} />
+      </button>
+      <a className={styles.download} href={item.url} download aria-label={`下载 ${item.name}`}>
+        <Download size={14} strokeWidth={1.75} />
+      </a>
+      {/* 名称与徽章改挂在 hover 覆盖层：等高行里图片宽度不一，常显文字会参差不齐 */}
+      <div className={styles.overlay}>
         <p className={styles.name} title={item.name}>
           {item.name}
         </p>
-        <div className={styles.metaBottom}>
+        <div className={styles.overlayRow}>
           <span className={styles.badge}>{badgeLabel(item.source, item.kind)}</span>
           <span className={styles.sub} title={item.projectName}>
             {item.projectName} · {formatShortDate(item.createdAt)}
           </span>
         </div>
       </div>
-    </article>
+    </>
   );
 });
 
@@ -89,6 +90,8 @@ export function LibraryPage() {
   const [dateRange, setDateRange] = useState<LibraryDateRange>(null);
   const [modelIdentity, setModelIdentity] = useState<ModelIdentityFilters>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // 全库共用一个受控预览组：缩略图点击按序号打开，可在全尺寸大图间左右翻页。
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [targetProjectId, setTargetProjectId] = useState<string>();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const copy = useCopyLibraryAssetToProject();
@@ -110,6 +113,19 @@ export function LibraryPage() {
   // 总数取服务端首个分页的筛选后总数，不随已加载页增长，避免“40 张跳 100 张”。
   const total = library.data?.pages[0]?.total ?? 0;
   const projectItems = projects.data?.items ?? [];
+  const photos = useMemo<LibraryPhoto[]>(
+    () =>
+      items.map((item) => ({
+        src: item.thumbnailUrl,
+        key: item.id,
+        alt: item.name,
+        width: item.width ?? 1,
+        height: item.height ?? 1,
+        item,
+      })),
+    [items],
+  );
+  const previewItems = useMemo(() => items.map((item) => item.url), [items]);
   const filterActive = hasActiveLibraryFilters(filters);
 
   // 筛选变化后旧的选中项可能已不在列表里，清空避免误加。
@@ -350,11 +366,32 @@ export function LibraryPage() {
           </div>
         ) : (
           <>
-            <div className={styles.grid}>
-              {items.map((item) => (
-                <LibraryCard key={item.id} item={item} selected={selected.has(item.id)} onToggle={toggle} />
-              ))}
-            </div>
+            {/* 等高行（justified）布局：按原始宽高比定宽、行两端对齐，混合尺寸也能排满不留空底 */}
+            <RowsPhotoAlbum
+              photos={photos}
+              spacing={14}
+              targetRowHeight={190}
+              componentsProps={{
+                container: { "aria-label": "资产库" },
+                // className 与库的默认 wrapper 类合并；选中态走 class，便于驱动描边与覆盖层常显
+                wrapper: ({ photo }) => ({
+                  className: selected.has(photo.item.id) ? `${styles.photoCard} ${styles.photoSelected}` : styles.photoCard,
+                }),
+              }}
+              render={{
+                // 盒子比例已由布局引擎给出，cover 只吸收行计算的像素级舍入
+                image: (props, { index }) => (
+                  <img
+                    {...props}
+                    className={props.className ? `${props.className} ${styles.thumb}` : styles.thumb}
+                    onClick={() => setPreviewIndex(index)}
+                  />
+                ),
+                extras: (_, { photo }) => (
+                  <LibraryPhotoExtras item={photo.item} selected={selected.has(photo.item.id)} onToggle={toggle} />
+                ),
+              }}
+            />
             <div ref={sentinelRef} className={styles.sentinel} />
             <div className={styles.moreState}>
               {library.isFetchingNextPage ? "正在加载更多…" : library.hasNextPage ? "向下滚动加载更多" : "已经到底了"}
@@ -362,6 +399,16 @@ export function LibraryPage() {
           </>
         )}
       </motion.main>
+
+      <Image.PreviewGroup
+        items={previewItems}
+        preview={{
+          open: previewIndex !== null,
+          current: previewIndex ?? 0,
+          onOpenChange: (open, { current }) => setPreviewIndex(open ? current : null),
+          onChange: (current) => setPreviewIndex(current),
+        }}
+      />
 
       {selected.size > 0 ? (
         <div className={styles.actionBar}>

@@ -8,9 +8,11 @@ import {
   CreateGenerationJobInput,
   UpdateStoryboardItemInput,
   IMAGE_ASPECT_RATIOS,
+  IMAGE_OUTPUT_FORMATS,
+  IMAGE_QUALITIES,
   IMAGE_RESOLUTIONS,
 } from "@ecomgen/contracts";
-import type { ImageAspectRatio, ImageResolution, StoryboardMode } from "@ecomgen/contracts";
+import type { ImageAspectRatio, ImageOutputFormat, ImageQuality, ImageResolution, StoryboardMode } from "@ecomgen/contracts";
 import type { ApiContext } from "../context.js";
 import { ApiError } from "../errors.js";
 import { candidatesPerType, clampCandidates, ensureProject, missing, verifyModel } from "../helpers.js";
@@ -91,6 +93,8 @@ export function registerStoryboardRoutes(app: FastifyInstance, ctx: ApiContext):
       : randomUUID());
     const overrideResolution = config?.imageResolution === undefined ? undefined : enumValue<ImageResolution>(config.imageResolution, IMAGE_RESOLUTIONS, "generationConfig.imageResolution");
     const overrideAspect = config?.imageAspectRatio === undefined ? undefined : enumValue<ImageAspectRatio>(config.imageAspectRatio, IMAGE_ASPECT_RATIOS, "generationConfig.imageAspectRatio");
+    const overrideQuality = config?.quality === undefined ? undefined : enumValue<ImageQuality>(config.quality, IMAGE_QUALITIES, "generationConfig.quality");
+    const overrideOutputFormat = config?.outputFormat === undefined ? undefined : enumValue<ImageOutputFormat>(config.outputFormat, IMAGE_OUTPUT_FORMATS, "generationConfig.outputFormat");
     const overrideCandidates = config?.candidateCount === undefined ? undefined : candidatesPerType(config.candidateCount);
     const overrideModel = config?.imageModel;
     const overrideProviderId = overrideModel ? readText(overrideModel.providerId, "generationConfig.imageModel.providerId") : undefined;
@@ -116,7 +120,9 @@ export function registerStoryboardRoutes(app: FastifyInstance, ctx: ApiContext):
             generationBatchId,
             candidateIndex: index + 1,
             imageResolution: overrideResolution ?? item.imageResolution,
-            imageAspectRatio: overrideAspect ?? item.imageAspectRatio
+            imageAspectRatio: overrideAspect ?? item.imageAspectRatio,
+            quality: overrideQuality,
+            outputFormat: overrideOutputFormat
           };
           const { generationBatchId: _generationBatchId, ...fingerprintInput } = input;
           const fingerprint = requestFingerprint({ type: "GENERATE", projectId, itemId: item.id, storyboardVersion: storyboard.version, itemUpdatedAt: item.updatedAt, providerId: effectiveProviderId, modelId: effectiveModelId, input: fingerprintInput, idempotencyKey: request.headers["idempotency-key"] ?? null });

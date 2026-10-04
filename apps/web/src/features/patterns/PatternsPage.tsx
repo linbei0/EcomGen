@@ -42,7 +42,7 @@ import { qk } from "../../api/queryKeys";
 import { AppTopbar } from "../../components/AppTopbar";
 import { errorText } from "../../lib/errorText";
 import { jobErrorText } from "../../lib/jobError";
-import { PATTERN_EXTRACT_BACKGROUNDS } from "@ecomgen/contracts";
+import { PATTERN_EXTRACT_BACKGROUNDS, imageParamSupportFor, type ImageResolution } from "@ecomgen/contracts";
 import { parseModelKey, modelOptions, segmentationModelOptions } from "../../lib/modelOptions";
 import { relativeTime } from "../../lib/format";
 import { panelBackdrop, placeholderBackdrop } from "./heroPatterns";
@@ -796,6 +796,7 @@ function ExtractDialog({
   const [mode, setMode] = useState<"SEGMENT" | "GENERATE">("SEGMENT");
   const [modelKey, setModelKey] = useState<string | null>(null);
   const [imageModelKey, setImageModelKey] = useState<string | null>(null);
+  const [imageResolution, setImageResolution] = useState<ImageResolution | null>(null);
   const [background, setBackground] = useState<"TRANSPARENT" | "WHITE">("TRANSPARENT");
   const [name, setName] = useState("");
   const [brief, setBrief] = useState("");
@@ -815,6 +816,13 @@ function ExtractDialog({
   // Provider 列表加载完成前按"支持透明底"处理：加载窗口里的"不知道"不等于"不支持"，
   // 否则刚打开弹窗就会把默认的透明底改写成白底。
   const transparentAvailable = imageOptions.find((option) => option.value === imageModelKey)?.transparentBackground ?? true;
+  // 生成重绘的模型支持哪些出图档位：判定与 worker 同源（contracts 的 imageParamSupportFor）。
+  const extractModelSupport = useMemo(() => {
+    if (mode !== "GENERATE" || !imageModelKey) return null;
+    const { providerId, modelId } = parseModelKey(imageModelKey);
+    const kind = providersQuery.data?.items.find((provider) => provider.id === providerId)?.models.find((model) => model.id === modelId)?.imageApiKind ?? null;
+    return imageParamSupportFor(modelId, kind as "openai_images" | "gemini" | "custom" | null);
+  }, [mode, imageModelKey, providersQuery.data]);
 
   const submit = () => {
     if (!file) {
@@ -845,6 +853,7 @@ function ExtractDialog({
           modelId,
           mode,
           ...(mode === "GENERATE" ? { background } : {}),
+          ...(mode === "GENERATE" && extractModelSupport && extractModelSupport.resolutionTiers.length > 1 && imageResolution ? { imageResolution: imageResolution } : {}),
           ...(name.trim() ? { name: name.trim() } : {}),
           ...(brief.trim() ? { brief: brief.trim() } : {}),
           ...(answers ? { pipeline: answers } : {}),
@@ -919,6 +928,15 @@ function ExtractDialog({
               transparentAvailable={transparentAvailable}
             />
           </div>
+          {extractModelSupport && extractModelSupport.resolutionTiers.length > 1 ? (
+            <Select
+              style={{ width: "100%", marginTop: 12 }}
+              aria-label="输出分辨率"
+              value={imageResolution ?? extractModelSupport.resolutionTiers[0]}
+              onChange={(value) => setImageResolution(value)}
+              options={extractModelSupport.resolutionTiers.map((value) => ({ value, label: `分辨率 ${value}` }))}
+            />
+          ) : null}
         </>
       )}
       <Input

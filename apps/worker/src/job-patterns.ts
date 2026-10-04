@@ -9,7 +9,8 @@ import {
   PATTERN_VARIANT_PRESET_IDS,
   TILEABILITY_ALGORITHM_VERSION,
   isSegmentationProtocol,
-  resolveImageSize,
+  DEFAULT_IMAGE_QUALITY,
+  resolveOpenAiImageSize,
 } from "@ecomgen/contracts";
 import type {
   ImageAspectRatio,
@@ -35,6 +36,7 @@ import { applyRecolor, type RecolorParams } from "./pattern-derive.js";
 import { verifyTileable } from "./tile-verify.js";
 import { decodeRgba, maskHasForeground, normalizeMask, pngFromRgba } from "./mask-utils.js";
 import { mimeForStoragePath, outputDerivatives, generationKeyFor } from "./context.js";
+import { openAiEditSize, openAiImageQuality, openAiImageRequestParams, resolutionFromSnapshot } from "./image-params.js";
 import { multiplyAlpha } from "./layer-composite.js";
 import type { WorkerContext } from "./context.js";
 
@@ -43,7 +45,7 @@ export async function executePatternExtract(ctx: WorkerContext, job: JobRecord, 
   throwIfCancelled(job);
   // 提取快照与源图路径都在入队时写入 input；执行只认快照，排队后改配置不影响本次执行。
   // mode 缺省按 SEGMENT 处理：与契约的缺省语义一致。
-  const input = job.input as { patternId?: unknown; sourcePath?: unknown; brief?: unknown; mode?: unknown; background?: unknown; protocol?: unknown; segmentationProviderId?: unknown; segmentationModelId?: unknown };
+  const input = job.input as { patternId?: unknown; sourcePath?: unknown; brief?: unknown; mode?: unknown; background?: unknown; imageResolution?: unknown; protocol?: unknown; segmentationProviderId?: unknown; segmentationModelId?: unknown };
   const pattern = repository.getPattern(typeof input.patternId === "string" ? input.patternId : "");
   if (!pattern) throw new Error(`Pattern record missing for extract job ${job.id}`);
   const sourcePath = typeof input.sourcePath === "string" ? input.sourcePath : "";
@@ -62,14 +64,19 @@ export async function executePatternExtract(ctx: WorkerContext, job: JobRecord, 
     const generator = imageGeneratorFor(provider, model);
     const background = input.background === "WHITE" ? "WHITE" : "TRANSPARENT";
     const backgroundPlan = resolvePatternBackground({ mode: background, model });
+    // 提取重绘是编辑类调用：gpt-image 按源图自适应尺寸（不下发 size），Seedream 显式下发档位像素。
+    const resolution = resolutionFromSnapshot(input.imageResolution);
+    const editSize = openAiEditSize(model.id, resolution, "1:1", undefined);
+    const inputFidelity = highInputFidelityForOpenAiImageModel(model.id);
     const prompt = compilePatternGenerateExtractPrompt({ brief: typeof input.brief === "string" ? input.brief : undefined, background });
     await updateJob(job, { progress: 15, providerTaskId: EXTERNAL_REQUEST_STARTED });
     const result = await generator.editImage({
       model: model.id,
       prompt,
       sourceImage: { data: source, filename: "product.png", mimeType: mimeForStoragePath(sourcePath) },
-      ...(model.imageApiKind === "gemini" ? { imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: "1K" as ImageResolution } : {}),
-      ...(highInputFidelityForOpenAiImageModel(model.id) ? { inputFidelity: "high" as const } : {}),
+      ...(model.imageApiKind === "gemini" ? { imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: resolution } : {}),
+      ...(editSize ? { size: editSize } : {}),
+      ...(inputFidelity ? { inputFidelity } : {}),
       ...(backgroundPlan.transparent ?? {}),
       idempotencyKey: generationKeyFor(job.id, 1),
       signal,
@@ -167,7 +174,7 @@ function completedPatternCandidates(ctx: WorkerContext, job: JobRecord): number 
 export async function executePatternForge(ctx: WorkerContext, job: JobRecord, signal: AbortSignal): Promise<void> {
   const { repository, storage, updateJob, throwIfCancelled, imageModelForJob, imageGeneratorFor } = ctx;
   throwIfCancelled(job);
-  const input = job.input as { theme?: unknown; style?: unknown; category?: unknown; background?: unknown; candidateCount?: unknown; name?: unknown };
+  const input = job.input as { theme?: unknown; style?: unknown; category?: unknown; background?: unknown; imageResolution?: unknown; candidateCount?: unknown; name?: unknown };
   const theme = typeof input.theme === "string" ? input.theme.trim() : "";
   if (!theme) throw new Error("Pattern forge job has no theme snapshot");
   const category = typeof input.category === "string" && (POD_PRINT_CATEGORIES as readonly string[]).includes(input.category) ? (input.category as PodPrintCategory) : undefined;
@@ -181,15 +188,15 @@ export async function executePatternForge(ctx: WorkerContext, job: JobRecord, si
   const background: Exclude<PatternBackgroundMode, "SOURCE"> = input.background === "TRANSPARENT" ? "TRANSPARENT" : "WHITE";
   const backgroundPlan = resolvePatternBackground({ mode: background, model });
   const prompt = compilePatternForgePrompt({ theme, style: typeof input.style === "string" && input.style.trim() ? input.style.trim() : undefined, category, background });
-  const size = resolveImageSize("1K", "1:1", "1024x1024");
+  const resolution = resolutionFromSnapshot(input.imageResolution);
   const completed = completedPatternCandidates(ctx, job);
   for (let candidateIndex = completed + 1; candidateIndex <= candidateCount; candidateIndex += 1) {
     throwIfCancelled(job);
     await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED, progress: 20 + Math.round(((candidateIndex - 1) / candidateCount) * 60) });
     const idempotencyKey = generationKeyFor(job.id, candidateIndex);
     const result = await generator.generate(model.imageApiKind === "gemini"
-      ? { model: model.id, prompt, imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: "1K" as ImageResolution, idempotencyKey, signal }
-      : { model: model.id, prompt, size, quality: "high", ...(backgroundPlan.transparent ?? {}), idempotencyKey, signal });
+      ? { model: model.id, prompt, imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: resolution, idempotencyKey, signal }
+      : { model: model.id, prompt, ...openAiImageRequestParams(model.id, resolution, "1:1", "1024x1024", { quality: DEFAULT_IMAGE_QUALITY }), ...(backgroundPlan.transparent ?? {}), idempotencyKey, signal });
     throwIfCancelled(job);
     await storePatternCandidate(ctx, job, result.image, { baseName, index: candidateIndex, total: candidateCount }, { sourceType: "GENERATED", sourceAssetHash: null, parentPatternId: null, tags: [] });
     // 产物先入库再裁决：钱已经花出去了，图就留着；但"要了透明却拿到不透明"必须当场说清楚，
@@ -247,7 +254,7 @@ export async function executePatternDerive(ctx: WorkerContext, job: JobRecord): 
 export async function executePatternVariant(ctx: WorkerContext, job: JobRecord, signal: AbortSignal): Promise<void> {
   const { repository, storage, updateJob, throwIfCancelled, imageModelForJob, imageGeneratorFor } = ctx;
   throwIfCancelled(job);
-  const input = job.input as { patternId?: unknown; axis?: unknown; preset?: unknown; extra?: unknown; background?: unknown; candidateCount?: unknown; name?: unknown };
+  const input = job.input as { patternId?: unknown; axis?: unknown; preset?: unknown; extra?: unknown; background?: unknown; imageResolution?: unknown; candidateCount?: unknown; name?: unknown };
   const source = repository.getPattern(typeof input.patternId === "string" ? input.patternId : "");
   if (!source?.storagePath || !source.fileHash) throw new Error("Variant source pattern artwork is missing");
   const axis: PatternVariantAxis | null = input.axis === "STYLE" || input.axis === "COMPOSITION" ? input.axis : null;
@@ -271,16 +278,21 @@ export async function executePatternVariant(ctx: WorkerContext, job: JobRecord, 
     extra: typeof input.extra === "string" && input.extra.trim() ? input.extra.trim() : undefined,
     background,
   });
+  // 衍生是编辑类调用：gpt-image 按源图自适应尺寸（不下发 size），Seedream 显式下发档位像素。
+  const resolution = resolutionFromSnapshot(input.imageResolution);
   const completed = completedPatternCandidates(ctx, job);
   for (let candidateIndex = completed + 1; candidateIndex <= candidateCount; candidateIndex += 1) {
     throwIfCancelled(job);
     await updateJob(job, { providerTaskId: EXTERNAL_REQUEST_STARTED, progress: 20 + Math.round(((candidateIndex - 1) / candidateCount) * 60) });
+    const editSize = openAiEditSize(model.id, resolution, "1:1", undefined);
+    const inputFidelity = highInputFidelityForOpenAiImageModel(model.id);
     const result = await generator.editImage({
       model: model.id,
       prompt,
       sourceImage: { data: sourceImage, filename: "pattern.png", mimeType: "image/png" },
-      ...(model.imageApiKind === "gemini" ? { imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: "1K" as ImageResolution } : {}),
-      ...(highInputFidelityForOpenAiImageModel(model.id) ? { inputFidelity: "high" as const } : {}),
+      ...(model.imageApiKind === "gemini" ? { imageAspectRatio: "1:1" as ImageAspectRatio, imageResolution: resolution } : {}),
+      ...(editSize ? { size: editSize } : {}),
+      ...(inputFidelity ? { inputFidelity } : {}),
       ...(backgroundPlan.transparent ?? {}),
       idempotencyKey: generationKeyFor(job.id, candidateIndex),
       signal,

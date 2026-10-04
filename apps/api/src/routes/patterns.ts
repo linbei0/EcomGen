@@ -18,6 +18,7 @@ import {
   PATTERN_EXTRACT_BACKGROUNDS,
   PATTERN_EXTRACT_MODES,
   PATTERN_TAGS_MAX,
+  IMAGE_RESOLUTIONS,
   POD_MOCKUP_SCENE_VERSION,
   POD_PRINT_SPECS,
   POD_PRINT_SPEC_VERSION,
@@ -145,6 +146,10 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     const background = mode === "GENERATE"
       ? (fields.background === undefined ? "TRANSPARENT" : enumValue(fields.background, PATTERN_EXTRACT_BACKGROUNDS, "background"))
       : null;
+    // 分辨率只在生成式提取（GENERATE）里有意义：SEGMENT 像素取自原图，与生图分辨率无关。
+    const imageResolution = mode === "GENERATE" && fields.imageResolution !== undefined
+      ? enumValue(fields.imageResolution, IMAGE_RESOLUTIONS, "imageResolution")
+      : null;
     const brief = optionalBoundedText(readOptionalText(fields.brief), MAX_PATTERN_BRIEF_LENGTH, "brief");
     const name = optionalBoundedText(readOptionalText(fields.name), MAX_PATTERN_NAME_LENGTH, "name");
     const tags = parsePatternTags(readOptionalText(fields.tags));
@@ -160,7 +165,7 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     }
     const sourceHash = contentHash(upload.buffer);
     // promptVersion 进指纹：提取提示词修订后，同输入的旧任务不再被判为可复用。
-    const fingerprint = requestFingerprint({ type: "PATTERN_EXTRACT", mode, background, promptVersion: PATTERN_EXTRACT_PROMPT_VERSION, providerId, modelId, protocol, sourceHash, brief: brief ?? null, name: name ?? null, tags, idempotencyKey });
+    const fingerprint = requestFingerprint({ type: "PATTERN_EXTRACT", mode, background, imageResolution, promptVersion: PATTERN_EXTRACT_PROMPT_VERSION, providerId, modelId, protocol, sourceHash, brief: brief ?? null, name: name ?? null, tags, idempotencyKey });
     const existing = repository.findJobByFingerprint(null, fingerprint);
     // 在途照常复用；SUCCEEDED 花型被删后按同指纹重提必须新建，否则只会复用一个不再产出花型的旧任务。
     if (existing && reusableFingerprintedJob(existing, repository.hasPatternArtifactsByJobId(existing.id))) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
@@ -168,7 +173,7 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     const patternId = randomUUID();
     // 源图先落 patterns/<id>/ 作为血缘留痕：提取成功后与花型同目录，删除花型时一并清理。
     const storedSource = await storage.putPatternSource(patternId, upload.filename, upload.buffer);
-    const job = repository.createJob({ id: jobId, projectId: null, storyboardItemId: null, type: "PATTERN_EXTRACT", input: { patternId, sourcePath: storedSource.path, sourceHash: storedSource.hash, name: name ?? null, brief: brief ?? null, tags, mode, protocol, background, segmentationProviderId: mode === "SEGMENT" ? providerId : null, segmentationModelId: mode === "SEGMENT" ? modelId : null, imageProviderId: mode === "GENERATE" ? providerId : null, imageModelId: mode === "GENERATE" ? modelId : null }, requestFingerprint: fingerprint, providerId, modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const job = repository.createJob({ id: jobId, projectId: null, storyboardItemId: null, type: "PATTERN_EXTRACT", input: { patternId, sourcePath: storedSource.path, sourceHash: storedSource.hash, name: name ?? null, brief: brief ?? null, tags, mode, protocol, background, imageResolution, segmentationProviderId: mode === "SEGMENT" ? providerId : null, segmentationModelId: mode === "SEGMENT" ? modelId : null, imageProviderId: mode === "GENERATE" ? providerId : null, imageModelId: mode === "GENERATE" ? modelId : null }, requestFingerprint: fingerprint, providerId, modelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     repository.createPattern({ id: patternId, name: name ?? defaultPatternName(brief ?? upload.filename.replace(/\.[^.]+$/, "")), sourceType: "EXTRACTED", sourceJobId: jobId, sourceAssetHash: storedSource.hash, parentPatternId: null, storagePath: null, fileHash: null, width: null, height: null, tags });
     // 流水线必须在入队之前建好并绑上 SOURCE 步骤：Worker 可能在本请求返回前就完成提取，
     // 那时若还没有步骤行，推进就找不到落点，整条链永远不会启动。
@@ -207,12 +212,12 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     assertTransparentBackground(repository, body.providerId, body.imageModelId, background);
     const candidateCount = body.candidateCount ?? 1;
     const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
-    // background 进指纹：它改的是编译后的提示词，不进指纹就会让"同主题不同底版"的两个请求互相复用。
-    const fingerprint = requestFingerprint({ type: "PATTERN_FORGE", providerId: body.providerId, imageModelId: body.imageModelId, theme: body.theme, style: body.style ?? null, category: body.category ?? null, background, candidateCount, name: body.name ?? null, promptVersion: PATTERN_FORGE_PROMPT_VERSION, idempotencyKey });
+    // background / imageResolution 进指纹：它们改变实际请求参数，不进指纹就会让"同主题不同档位"的请求互相复用。
+    const fingerprint = requestFingerprint({ type: "PATTERN_FORGE", providerId: body.providerId, imageModelId: body.imageModelId, theme: body.theme, style: body.style ?? null, category: body.category ?? null, background, imageResolution: body.imageResolution ?? null, candidateCount, name: body.name ?? null, promptVersion: PATTERN_FORGE_PROMPT_VERSION, idempotencyKey });
     const existing = repository.findJobByFingerprint(null, fingerprint);
     // 在途照常复用（起稿的花型随候选完成才落库，不能要求在途已有产物）；产物被删光后同指纹重提必须新建。
     if (existing && reusableFingerprintedJob(existing, repository.hasPatternArtifactsByJobId(existing.id))) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
-    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PATTERN_FORGE", input: { theme: body.theme, style: body.style ?? null, category: body.category ?? null, background, candidateCount, name: body.name ?? null }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PATTERN_FORGE", input: { theme: body.theme, style: body.style ?? null, category: body.category ?? null, background, imageResolution: body.imageResolution ?? null, candidateCount, name: body.name ?? null }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     // 与提取同理：流水线先建好再入队，Worker 找得到 SOURCE 步骤；多候选时由第一张有产物的候选起链。
     if (body.pipeline) await startPatternPipeline(ctx, { patternId: null, patternHash: null, answers: body.pipeline, sourceJobId: job.id, idempotencyKey });
     await enqueueOrMarkFailed(job, "pattern_forge", { onFail: (failedJobId) => settlePipelineStep(repository, failedJobId, "FAILED", { code: "QUEUE_UNAVAILABLE", message: "任务已创建但队列暂不可用" }) });
@@ -275,11 +280,11 @@ export function registerPatternRoutes(app: FastifyInstance, ctx: ApiContext): vo
     assertTransparentBackground(repository, body.providerId, body.imageModelId, background);
     const candidateCount = body.candidateCount ?? 1;
     const idempotencyKey = body.idempotencyKey ?? (request.headers["idempotency-key"] as string | undefined) ?? null;
-    const fingerprint = requestFingerprint({ type: "PATTERN_VARIANT", patternId: pattern.id, patternHash: pattern.fileHash, axis: body.axis, preset: body.preset, extra: body.extra ?? null, background, providerId: body.providerId, imageModelId: body.imageModelId, candidateCount, name: body.name ?? null, promptVersion: PATTERN_VARIANT_PROMPT_VERSION, idempotencyKey });
+    const fingerprint = requestFingerprint({ type: "PATTERN_VARIANT", patternId: pattern.id, patternHash: pattern.fileHash, axis: body.axis, preset: body.preset, extra: body.extra ?? null, background, imageResolution: body.imageResolution ?? null, providerId: body.providerId, imageModelId: body.imageModelId, candidateCount, name: body.name ?? null, promptVersion: PATTERN_VARIANT_PROMPT_VERSION, idempotencyKey });
     const existing = repository.findJobByFingerprint(null, fingerprint);
     // 候选随完成才落库，在途照常复用；产物被删光后同指纹重提必须新建，不再复用孤儿任务。
     if (existing && reusableFingerprintedJob(existing, repository.hasPatternArtifactsByJobId(existing.id))) return reply.code(existing.status === "SUCCEEDED" ? 200 : 202).send(existing);
-    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PATTERN_VARIANT", input: { patternId: pattern.id, axis: body.axis, preset: body.preset, extra: body.extra ?? null, background, candidateCount, name: body.name ?? null }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
+    const job = repository.createJob({ id: randomUUID(), projectId: null, storyboardItemId: null, type: "PATTERN_VARIANT", input: { patternId: pattern.id, axis: body.axis, preset: body.preset, extra: body.extra ?? null, background, imageResolution: body.imageResolution ?? null, candidateCount, name: body.name ?? null }, requestFingerprint: fingerprint, providerId: body.providerId, modelId: body.imageModelId, estimatedCost: { status: "UNKNOWN", unit: "provider-defined" } });
     await enqueueOrMarkFailed(job, "pattern_variant");
     return reply.code(202).send(job);
   });

@@ -8,7 +8,8 @@ import { planImageEdit } from "@ecomgen/agent";
 import { buildReasoningModel } from "@ecomgen/providers";
 import { imageEditCapabilitiesFor } from "@ecomgen/providers";
 import { assertEditCapabilities, assertSameDimensions, compositeMaskedEdit, compositeNaturalBlend, compositeOutpaint, createOutpaintCanvas, providerMaskFor } from "./edit-imaging.js";
-import { generationKeyFor, outputDerivatives } from "./context.js";
+import { generationKeyFor, mimeForStoragePath, outputDerivatives } from "./context.js";
+import { openAiEditSize, openAiImageQuality } from "./image-params.js";
 import { enqueue } from "@ecomgen/jobs";
 import type { WorkerContext } from "./context.js";
 
@@ -165,7 +166,8 @@ export async function executeEditGeneration(ctx: WorkerContext, job: JobRecord, 
     const editInput = {
       model: model.id,
       prompt: plan.prompt,
-      sourceImage: { data: inputImage, filename: "source.png", mimeType: "image/png" },
+      // 源产物可能是 webp/jpeg（格式兜底转码后落盘）：按存储路径标注真实 MIME，硬标 png 会被按声明校验的渠道拒收。
+      sourceImage: { data: inputImage, filename: `source${mimeForStoragePath(source.storagePath).replace("image/", ".")}`, mimeType: mimeForStoragePath(source.storagePath) },
       referenceImages: references,
       mask: providerMask ? { data: providerMask, filename: "edit-mask.png", mimeType: "image/png" } : undefined,
       operation: plan.operation as EditOperation,
@@ -173,7 +175,14 @@ export async function executeEditGeneration(ctx: WorkerContext, job: JobRecord, 
     };
     const result = await generator.editImage(model.imageApiKind === "gemini"
       ? { ...editInput, imageAspectRatio: project.imageAspectRatio, imageResolution: config.imageResolution, signal }
-      : { ...editInput, quality: "high", size: resolveImageSize(config.imageResolution, project.imageAspectRatio, "1024x1024"), inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined, signal });
+      : {
+        ...editInput,
+        quality: openAiImageQuality(model.id, undefined),
+        // Seedream 按档位 × 比例下发显式像素；其余模型维持原折叠值（AUTO 折叠为模板缺省尺寸）。
+        size: openAiEditSize(model.id, config.imageResolution, project.imageAspectRatio, resolveImageSize(config.imageResolution, project.imageAspectRatio, "1024x1024")),
+        inputFidelity: capabilities.supportsInputFidelity ? "high" : undefined,
+        signal
+      });
     throwIfCancelled(job);
     await updateJob(job, { progress: 30 + Math.round((candidateIndex / config.candidateCount) * 45), providerTaskId: result.providerTaskId ?? EXTERNAL_REQUEST_STARTED });
     const composed = plan.executionMode === "MASKED" && plan.compositePolicy === "MASK_LOCKED" && mask
