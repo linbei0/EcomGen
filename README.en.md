@@ -20,17 +20,17 @@ EcomGen is a local-first AI e-commerce image suite workbench for individual sell
 - **Three planning modes**: `AI planning`, `manual selection`, and `suite`, with recent-config snapshots for one-click reuse of previous planning parameters.
 - **Pi Agent storyboard planning**: reads built-in e-commerce templates, suites, and platform guidance to produce final prompts for the image model; includes an optional web visual-research toggle.
 - **25 built-in e-commerce templates**: a customized `ecom-details-image` catalog covering hero, lifestyle, infographic, packaging, comparison, social media, and more, plus importable custom templates.
-- **Suite system**: a reusable, category-classified storyboard of 5–12 shots. Ships 3 built-in suites with 22 shots total, covering 24 L1 categories and 169 L2 categories.
+- **Suite system**: a reusable, category-classified storyboard of 5–12 shots. Ships 1,100+ built-in suites, covering 24 L1 categories and 169 L2 categories.
 - **Suite Forge**: upload a set of viral reference images and let the Agent reverse-engineer a Campaign Style Lock, shot order, and per-shot prompt templates into a reusable suite template.
 - **8 shot roles**: HERO / PAIN_POINT / COMPARISON / SCENE / DETAIL / TRUST / VARIANT / CTA, keeping a suite diverse across the conversion funnel.
 - **Product truth & pixel protection**: distinguishes `PRODUCT_TRUTH`, packaging, and reference images; `PIXEL_PROTECTED` mode requires the current project's product-truth assets.
 - **Async generation & auditability**: BullMQ Workers handle planning, copywriting, generation, editing, layering, and export jobs, persisting `compiledPrompt`, generation snapshots, and job status.
-- **Provider management**: configure reasoning, image-generation, and image-segmentation providers covering OpenAI-compatible Images, Google Gemini native image generation (Nano Banana), and multiple segmentation protocols. API keys are encrypted, and the frontend never talks to providers, Redis, or SQLite directly.
+- **Provider management**: configure reasoning, image-generation, and image-segmentation providers covering OpenAI-compatible Images, Google Gemini native image generation (Nano Banana), and multiple segmentation protocols; image resolution, quality, and output format parameters are dispatched per model capability. API keys are encrypted, and the frontend never talks to providers, Redis, or SQLite directly.
 - **Editing workbench**: output-branch editing with masked inpaint, product replacement, scene adjust, outpaint, references, and versioned edit sessions.
 - **AI layering & multi-format export**: automatically recognize elements and export per-layer PNG, ZIP, and PSD files with visibility toggling, ordering, and history.
 - **Global asset library**: browse uploads, generated outputs, and layer files across all projects, and reuse any of them in another project.
 - **Model library**: create model identities (gender, age, heritage, stature, build) and cast them into consistent multi-pose portraits and scene shots.
-- **Pattern Studio**: extract a pattern from a product photo, forge one from a prompt, or upload your own POD pattern asset; supports deterministic recoloring, style/composition variants, **local tiling verification** (a pixel-comparison verdict of tileable / visible seam that never modifies the artwork), 300DPI print packs with mockups per print spec, and vision-based cross-border listing copy.
+- **Pattern Studio**: extract a pattern from a product photo, forge one from a prompt (reference images and hand-drawn sketches supported), or upload your own POD pattern asset; supports deterministic recoloring, style/composition variants, **local tiling verification** (a pixel-comparison verdict of tileable / visible seam that never modifies the artwork), 300DPI print packs with mockups per print spec, and vision-based cross-border listing copy.
 - **Packaging pipeline**: answer three questions (print spec, layout, target platform) and the chain from tiling check to print pack to listing copy runs on its own, leaving a per-step receipt that can be re-run individually; a full-bleed print with a failed tiling check stops for a user decision instead of silently downgrading.
 - **Review & export**: manually review results, then package everything into a ZIP with a `manifest.json`.
 
@@ -152,13 +152,14 @@ docker compose logs -f api worker
 docker compose down
 ```
 
-When deploying Web separately, `VITE_API_BASE_URL` is a **build-time** variable: set it to a browser-reachable API URL (e.g. `http://<server-ip>:8787/api/v1`) before `pnpm --filter @ecomgen/web build`; it cannot be changed afterwards. If unset, it defaults to the same-origin path `/api/v1` (proxied by Vite in local development).
+When deploying Web separately, `VITE_API_BASE_URL` is a **build-time** variable: set it to a browser-reachable API URL (e.g. `http://<server-ip>:8787/api/v1`) before `pnpm --filter @ecomgen/web build`; it cannot be changed afterwards. You must also set `ECOMGEN_CORS_ORIGINS` (comma-separated origin allowlist) — the API only accepts explicitly listed frontend origins. If unset, it defaults to the same-origin path `/api/v1` (proxied by Vite in local development).
 
 ## Common commands
 
 ```bash
 pnpm build             # Build all workspace packages
 pnpm test              # Run all Vitest tests
+pnpm test:affected     # Validate only changed packages and their dependents (daily default)
 pnpm test:e2e:mock     # Run the full Mock API/Worker acceptance flow
 pnpm verify-contracts  # Verify OpenAPI contract and generated artifacts
 pnpm lint:openapi      # Lint the OpenAPI contract only

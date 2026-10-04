@@ -26,7 +26,7 @@ pnpm --filter @ecomgen/web gen:api # 由根目录 openapi.yaml 重新生成 src/
 ## 结构约定
 
 - `src/api`：openapi-fetch client、错误规范化、query key 工厂、SSE 失效映射与运行时适配层（后端响应与 OpenAPI 的差异集中在此，组件不感知）。
-- `src/features`：按阶段组织（home / projects / providers / workbench）。
+- `src/features`：按功能域组织（home / projects / providers / workbench / library / models / patterns / pattern-drafts / suite-forge）。
 - `src/lib`：纯函数（成本文案、阶段推导、分组等），优先测试。
 - `src/design`：设计 tokens、AntD 主题、动效预设；唯一强调色与 z-index 尺度在此维护。
 - 契约变更流程：先改根目录 `openapi.yaml` → `gen:api` 重新生成 → 同步 `src/test/msw/handlers.ts`（手写、严格按契约）。

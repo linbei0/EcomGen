@@ -6,11 +6,13 @@ EcomGen 是面向个人卖家的电商 AI 生成套图工具。当前后端优�
 
 - `apps/api`：Fastify HTTP API、文件上传、Provider 配置、SSE 事件。
 - `apps/web`：React + Vite 桌面优先工作台；经 `VITE_API_BASE_URL` 访问 API，不直连 Redis/SQLite/Provider。
-- `apps/worker`：BullMQ 消费者、Pi Agent 分镜规划、OpenAI 兼容生图、审核结果和 ZIP 导出。
+- `apps/worker`：BullMQ 消费者、Pi Agent 分镜规划、生图/分割/分层任务执行、审核结果和 ZIP 导出。
 - `packages/core`：SQLite 持久化、本地文件存储、密钥加密、任务指纹。
 - `packages/agent`：Pi Agent 规划适配器。
 - `packages/ecom-skill`：已内置改造后的 `ecom-details-image` 模板与 Prompt 合约；运行时不依赖外部 Skill 仓库。
-- `packages/providers`：OpenAI-compatible Provider 和连通性探测。
+- `packages/ecom-suite`：套图目录、类目分类与内置套图数据。
+- `packages/ecom-suite-forge`：套图工坊反推工作流与系统提示。
+- `packages/providers`：OpenAI-compatible / Gemini / 分割 Provider 适配和连通性探测。
 - `packages/contracts`：跨应用共享的领域类型。
 - `packages/jobs`：Redis、BullMQ 队列和 Redis Pub/Sub 事件总线。
 
@@ -137,5 +139,4 @@ pnpm build:affected   # 改动包 + 上游依赖（构建要先有上游 dist）
 - [TypeScript JSDoc 支持](https://www.typescriptlang.org/docs/handbook/jsdoc-supported-types.html)
 - [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html)
 - [API 契约](openapi.yaml)
-- [运行时架构与不变量](ARCHITECTURE.md)
 

@@ -27,7 +27,7 @@ flowchart LR
 | `packages/agent` | Pi Agent、只读业务工具、受控视觉研究、规划输出校验、Prompt 改写 | 访问文件、Shell、浏览器、任意 URL 抓取；直接保存数据库 |
 | `packages/ecom-skill` | 固定来源的模板目录和结构化视觉规范 | 运行模型调用；向生图 Provider 发送请求 |
 | `apps/worker` | BullMQ 消费、取消检查、资源/状态检查、尺寸计算、Provider 调用、导出 | 把模板字符串、Campaign Style Lock 或隐含规则追加到 Prompt |
-| `packages/providers` | Provider 配置、能力声明和 OpenAI-compatible 适配 | 修改业务 Prompt 语义 |
+| `packages/providers` | Provider 配置、能力声明和 OpenAI-compatible / Gemini / 分割适配 | 修改业务 Prompt 语义 |
 | `packages/core` | SQLite、文件存储、密钥加密和领域状态 | 了解具体模型 Prompt 规则 |
 
 ## Prompt 生命周期
@@ -61,7 +61,7 @@ Worker 执行以下顺序：
 1. 检查任务未取消，且分镜属于当前项目。
 2. 检查 Provider、模型、模型能力和模板 ID。
 3. 检查 `PIXEL_PROTECTED` 是否有当前项目的 `PRODUCT_TRUTH` 图片。
-4. 根据项目参数和模板默认尺寸计算输出尺寸。
+4. 根据项目参数、模型能力和模板默认尺寸计算输出尺寸；分辨率、质量与输出格式由 `packages/contracts/src/image-model-params.ts` 的模型画像分流，未知模型走最保守请求形状，请求与历史行为等价。
 5. 无 revision 时，将 `item.promptInstruction.trim()` 作为最终 Prompt；有 revision 时，调用 Pi Agent 的 Prompt 改写函数得到最终 Prompt。
 6. 选中图片素材时，Worker 按实际请求顺序在 Prompt 前固定追加图片角色说明（`withGenerationAssetRoles`），并标注由角色加确定性排序派生的短指代（`P1`、`R1`）；未选素材时保持原样。真实素材 ID 不进入规划或生图模型上下文，规划输出中的 handle 引用由 Worker 代码解析回素材 ID。
 7. 把实际发送的完整文本保存到 `compiledPrompt`，用于结果追溯和导出 manifest。

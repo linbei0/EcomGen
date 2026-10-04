@@ -11,7 +11,7 @@ Worker 消费 BullMQ 任务。它是“执行器”，不是 Prompt 编译器。
 3. 检查 Provider、图像模型和已声明的 `openai_images` 或 `gemini` 能力。
 4. 检查 `assetType` 是否能映射到 `ecom-skill` 模板。
 5. 检查像素保护所需的商品真值图片。
-6. 解析分辨率、比例和候选序号。
+6. 解析分辨率、质量、输出格式、比例和候选序号；这些参数按 `packages/contracts/src/image-model-params.ts` 的模型画像分流，未知模型走最保守请求形状。
 7. 取得最终 Prompt：普通任务原样使用 `promptInstruction`；revision 任务调用 Pi Agent 改写。
 8. 保存 `compiledPrompt`，调用 Provider，保存输出并发布事件。
 
