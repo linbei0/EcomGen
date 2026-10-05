@@ -61,6 +61,7 @@ describe("adapters", () => {
       platformTargets: ["TAOBAO"],
       targetMarket: null,
       copyLanguage: null,
+      promptLanguage: "ENGLISH",
       reasoningProviderId: "r",
       reasoningModelId: "m",
       imageProviderId: "i",
@@ -85,6 +86,7 @@ describe("adapters", () => {
     expect(detail.imageResolution).toBe("1K");
     expect(detail.imageAspectRatio).toBe("AUTO");
     expect(detail.candidatesPerType).toBe(1);
+    expect(detail.promptLanguage).toBe("ENGLISH");
     expect(detail.segmentationModel).toEqual({ providerId: "s", modelId: "sam-3", protocol: "seedream_layerize" });
     expect(detail.assets[0]?.url).toContain("/files/assets/a1");
     expect(detail.assets[0]?.kind).toBe("PRODUCT");

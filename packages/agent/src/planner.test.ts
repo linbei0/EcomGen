@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ streamMock: vi.fn(), options: undefined as { onPayload?: (payload: unknown, model: { id: string; baseUrl: string }) => unknown; streamFn?: (...args: unknown[]) => unknown; initialState?: { thinkingLevel?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", images: [] as unknown[], errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, referencedAssets: [] as string[], editResponse: undefined as Record<string, unknown> | undefined, responseText: undefined as string | undefined, promptCount: 0, firstResponseText: undefined as string | undefined }));
+const captured = vi.hoisted(() => ({ streamMock: vi.fn(), options: undefined as { onPayload?: (payload: unknown, model: { id: string; baseUrl: string }) => unknown; streamFn?: (...args: unknown[]) => unknown; initialState?: { thinkingLevel?: string; systemPrompt?: string; model?: { compat?: Record<string, unknown>; reasoning?: boolean }; tools?: Array<{ name: string; execute: (id: string, params: unknown) => Promise<unknown> }> } } | undefined, prompt: "", images: [] as unknown[], errorMessage: undefined as string | undefined, simulateResearchFailure: false, itemCount: 1, referencedAssets: [] as string[], editResponse: undefined as Record<string, unknown> | undefined, responseText: undefined as string | undefined, promptCount: 0, firstResponseText: undefined as string | undefined }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
@@ -73,6 +73,7 @@ const input: PlannerInput = {
   platformTargets: ["TAOBAO"],
   targetMarket: null,
   copyLanguage: null,
+  promptLanguage: "CHINESE",
   defaultMode: "CREATIVE",
   assets: [],
   planningMode: "AI",
@@ -142,6 +143,14 @@ describe("planStoryboard", () => {
     expect(captured.prompt).not.toContain("ja-JP");
     expect(captured.prompt).not.toContain("日本");
     expect(captured.prompt).toContain("product category/family first");
+  });
+
+  it("carries the final-prompt language into the payload and mandates it in the system prompt", async () => {
+    await planStoryboard({ ...input, promptLanguage: "ENGLISH" });
+
+    expect(captured.prompt).toContain('"promptLanguage":"ENGLISH"');
+    // 只锚定字段名，不断言提示词原文：措辞可改，语种强制必须存在
+    expect(captured.options?.initialState?.systemPrompt).toContain("promptLanguage");
   });
 
   it("passes handle-based visual attachments and resolves referenced handles to asset ids", async () => {

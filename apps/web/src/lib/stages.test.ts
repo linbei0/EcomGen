@@ -10,6 +10,7 @@ function detail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     platformTargets: ["TAOBAO"],
     targetMarket: null,
     copyLanguage: null,
+    promptLanguage: "CHINESE",
     reasoningProviderId: "r",
     reasoningModelId: "m",
     imageProviderId: "i",

@@ -1,10 +1,12 @@
-import type { PlatformTarget, TargetMarket } from "@ecomgen/contracts";
+import type { PlatformTarget, PromptLanguage, TargetMarket } from "@ecomgen/contracts";
 import { resolveProductFamily } from "@ecomgen/ecom-skill";
 
 export interface MarketGuidanceContext {
   platformTargets: readonly PlatformTarget[];
   targetMarket: TargetMarket | null;
   copyLanguage: string | null;
+  /** 分镜最终生图提示词的书写语种；规划工具上下文可选，缺省视为未指定。 */
+  promptLanguage?: PromptLanguage;
   productCategory?: string | null;
 }
 
@@ -100,6 +102,7 @@ export function readPlatformGuidance(context: MarketGuidanceContext) {
     market: market ? { id: context.targetMarket, name: market.name } : null,
     effectiveCopyLanguage: context.copyLanguage ?? market?.defaultCopyLanguage ?? null,
     copyLanguageSource: context.copyLanguage ? "explicit" : market ? "market-default" : "none",
+    promptLanguage: context.promptLanguage ?? null,
     product: {
       category: context.productCategory ?? null,
       family

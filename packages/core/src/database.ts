@@ -86,6 +86,13 @@ function addJobProgressDetail(database: SqliteDatabase): void {
   database.exec("ALTER TABLE jobs ADD COLUMN progress_detail_json TEXT");
 }
 
+/** 旧库补齐 projects.prompt_language 列；存量项目落产品默认值（中文提示词）。 */
+function addProjectPromptLanguage(database: SqliteDatabase): void {
+  const tables = tableNames(database);
+  if (!tables.has("projects") || columnNames(database, "projects").has("prompt_language")) return;
+  database.exec("ALTER TABLE projects ADD COLUMN prompt_language TEXT NOT NULL DEFAULT 'CHINESE'");
+}
+
 /** Provider 可随时删除：旧库的 projects.provider 引用列为 NOT NULL，重建表放宽为可空（删除 Provider 时级联置空）。 */
 function makeProjectProviderReferencesNullable(database: SqliteDatabase): void {
   const columns = database.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string; notnull: number }>;
@@ -234,6 +241,7 @@ function migrate(database: SqliteDatabase): void {
   makeJobsProjectNullable(database);
   addStoryboardItemShotRole(database);
   addJobProgressDetail(database);
+  addProjectPromptLanguage(database);
   database.exec(`
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
@@ -272,6 +280,7 @@ function migrate(database: SqliteDatabase): void {
       platform_targets_json TEXT NOT NULL,
       target_market TEXT,
       copy_language TEXT,
+      prompt_language TEXT NOT NULL DEFAULT 'CHINESE',
       reasoning_provider_id TEXT,
       reasoning_model_id TEXT,
       image_provider_id TEXT,

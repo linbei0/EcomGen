@@ -48,7 +48,9 @@ export function buildReasoningModel(input: ReasoningModelInput): Model<"openai-c
     // 多个分镜的完整最终 Prompt，8K 容易被截断成非法 JSON，因此提高上限并留出余量。
     maxTokens: 16_384,
     compat: resolveReasoningProfile(input.protocol),
-    ecomgenSupportsStructuredOutput: input.supportsStructuredOutput === true && input.protocol !== "dashscope_qwen",
+    // 是否注入 response_format 由模型能力声明决定；DeepSeek/DashScope/GLM 等只认
+    // json_object 的上游在 withStructuredOutput 里按模型家族降级，不按协议硬禁用。
+    ecomgenSupportsStructuredOutput: input.supportsStructuredOutput === true,
   };
 }
 

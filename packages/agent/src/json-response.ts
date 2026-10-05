@@ -21,15 +21,6 @@ export function parseJsonResponse(value: string): unknown {
   throw firstError;
 }
 
-/** DeepSeek 的 JSON Output 只支持 object 模式；其他兼容 Provider 不强行发送该字段。 */
-export function withJsonObjectResponse(payload: unknown, model: { id: string; baseUrl: string }): unknown {
-  const modelId = model.id.toLowerCase();
-  const baseUrl = model.baseUrl.toLowerCase();
-  const isDeepSeek = modelId.includes("deepseek") || baseUrl.includes("api.deepseek.com");
-  if (!isDeepSeek || !payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
-  return { ...(payload as Record<string, unknown>), response_format: { type: "json_object" } };
-}
-
 function candidateStarts(value: string): number[] {
   const starts: number[] = [];
   for (let index = 0; index < value.length; index += 1) {

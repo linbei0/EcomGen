@@ -1,10 +1,10 @@
 import { App, AutoComplete, Button, Input, Popover, Select, Switch, Tooltip } from "antd";
-import { ChevronDown, Globe2, History, Images, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store, WandSparkles } from "lucide-react";
+import { ChevronDown, Globe2, History, Images, Languages, Layers3, MapPin, Package, SlidersHorizontal, Sparkles, Store, Type, WandSparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useSuiteSummaries } from "../../api/hooks/useSuites";
 import { loadSuiteShots, saveSuiteShots } from "../../lib/suiteSelection";
 
-import type { ProjectDetail, TargetMarket, UpdateProjectInput } from "../../api/adapters/projectDetail";
+import type { ProjectDetail, PromptLanguage, TargetMarket, UpdateProjectInput } from "../../api/adapters/projectDetail";
 import { useApplyPlanningConfigSnapshot, usePlanningConfigSnapshots } from "../../api/hooks/usePlanningConfigSnapshots";
 import { useCreatePlanningJob } from "../../api/hooks/usePlanning";
 import { useCopywritingResult, useCreateCopywritingJob, type CopywritingTarget } from "../../api/hooks/useCopywriting";
@@ -91,6 +91,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
   const [activeCopywritingJob, setActiveCopywritingJob] = useState<{ id: string; target: CopywritingTarget } | undefined>(undefined);
   const [copyLanguage, setCopyLanguage] = useState(copyLanguageLabel(detail.copyLanguage));
   const [savedCopyLanguage, setSavedCopyLanguage] = useState(detail.copyLanguage ?? "");
+  const [promptLanguage, setPromptLanguage] = useState<PromptLanguage>(detail.promptLanguage);
   const [platformTarget, setPlatformTarget] = useState(detail.platformTargets[0]);
   const [targetMarket, setTargetMarket] = useState(detail.targetMarket ?? undefined);
   const [defaultMode, setDefaultMode] = useState(detail.defaultMode);
@@ -116,6 +117,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
     setCopyLanguage(copyLanguageLabel(next));
     setSavedCopyLanguage(next);
   }, [detail.copyLanguage]);
+  useEffect(() => setPromptLanguage(detail.promptLanguage), [detail.promptLanguage]);
   useEffect(() => setPlatformTarget(detail.platformTargets[0]), [detail.platformTargets]);
   useEffect(() => setTargetMarket(detail.targetMarket ?? undefined), [detail.targetMarket]);
   useEffect(() => setDefaultMode(detail.defaultMode), [detail.defaultMode]);
@@ -353,6 +355,7 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
       setName(project.name); setDescription(project.productDescription ?? "");
       setFacts(toLines(project.verifiedFacts)); setClaims(toLines(project.prohibitedClaims));
       setCopyLanguage(copyLanguageLabel(project.copyLanguage)); setSavedCopyLanguage(project.copyLanguage ?? "");
+      setPromptLanguage(project.promptLanguage ?? "CHINESE");
       setPlatformTarget(project.platformTargets[0]); setTargetMarket(project.targetMarket ?? undefined);
       setDefaultMode(project.defaultMode); setReasoningKeyDraft(modelKey(project.reasoningProviderId, project.reasoningModelId));
       setImageKeyDraft(modelKey(project.imageProviderId, project.imageModelId)); setImageResolution(project.imageResolution);
@@ -453,6 +456,18 @@ export function SetupPanel({ detail }: { detail: ProjectDetail }) {
               onSelect={(value) => commitCopyLanguage(value)}
               onBlur={() => commitCopyLanguage(copyLanguage)}
               onClear={() => commitCopyLanguage("")}
+            />
+          </label>
+          <label className={styles.fieldLabel}>
+            <span className={styles.fieldLabelTitle}><Type size={13} strokeWidth={1.75} aria-hidden />提示词语种</span>
+            <Select
+              aria-label="提示词语种"
+              value={promptLanguage}
+              options={[
+                { value: "CHINESE", label: "中文提示词" },
+                { value: "ENGLISH", label: "英文提示词" },
+              ]}
+              onChange={(value: PromptLanguage) => void saveOptimistic(value, setPromptLanguage, promptLanguage, { promptLanguage: value }, "保存提示词语种失败")}
             />
           </label>
           <label className={styles.fieldLabel}>

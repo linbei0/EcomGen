@@ -231,6 +231,22 @@ export function modelSupportsStructuredOutput(model: Model<"openai-completions" 
   return (model as Model<"openai-completions" | "openai-responses"> & { ecomgenSupportsStructuredOutput?: boolean }).ecomgenSupportsStructuredOutput === true;
 }
 
+/**
+ * 官方 OpenAI-compatible 端点只接受 response_format.type = "json_object" 的模型家族
+ * （DeepSeek 文档明确只列 text/json_object，DashScope 与智谱 GLM 同族），发 json_schema
+ * 会被 400 拒绝。中转站即便把这些模型换到支持 json_schema 的算力栈上，json_object 也
+ * 仍是各方都接受的安全取值，因此按模型家族降级；schema 硬约束由本地解析与校验回环兜底。
+ */
+function prefersJsonObjectResponse(model: { id: string; baseUrl: string }): boolean {
+  const id = model.id.toLowerCase();
+  const baseUrl = model.baseUrl.toLowerCase();
+  return (
+    id.includes("deepseek") || baseUrl.includes("deepseek")
+    || id.includes("qwen") || baseUrl.includes("dashscope.aliyuncs.com")
+    || id.includes("glm") || baseUrl.includes("bigmodel.cn") || baseUrl.includes("zhipu")
+  );
+}
+
 export function withStructuredOutput(
   payload: unknown,
   model: Model<"openai-completions" | "openai-responses">,
@@ -239,6 +255,9 @@ export function withStructuredOutput(
   if (!modelSupportsStructuredOutput(model) || !payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
   if (model.api === "openai-responses") {
     return { ...(payload as Record<string, unknown>), text: { format: { type: "json_schema", name: output.name, schema: output.schema, strict: true } } };
+  }
+  if (prefersJsonObjectResponse(model)) {
+    return { ...(payload as Record<string, unknown>), response_format: { type: "json_object" } };
   }
   return { ...(payload as Record<string, unknown>), response_format: { type: "json_schema", json_schema: { name: output.name, schema: output.schema, strict: true } } };
 }

@@ -37,11 +37,14 @@ describe("reasoning protocol profiles", () => {
       protocol: "dashscope_qwen",
       supportsVision: false,
       supportsThinking: true,
+      // 结构化输出不再按协议硬禁用：json_object 降级由 agent 层按模型家族处理
+      supportsStructuredOutput: true,
     });
 
     expect(model.reasoning).toBe(true);
     expect(model.input).toEqual(["text"]);
     expect(model.maxTokens).toBe(16_384);
     expect(model.compat).toEqual({ maxTokensField: "max_tokens", thinkingFormat: "qwen", supportsDeveloperRole: false });
+    expect(model.ecomgenSupportsStructuredOutput).toBe(true);
   });
 });

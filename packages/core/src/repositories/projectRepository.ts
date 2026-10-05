@@ -3,6 +3,7 @@ import type {
   ImageAspectRatio,
   ImageResolution,
   PlatformTarget,
+  PromptLanguage,
   SegmentationModelRef,
   StoryboardMode,
   TargetMarket,
@@ -22,6 +23,8 @@ export interface ProjectRecord {
   platformTargets: PlatformTarget[];
   targetMarket: TargetMarket | null;
   copyLanguage: string | null;
+  // 分镜最终生图提示词的书写语种；与文案语种独立，旧库行经迁移落到默认值 CHINESE
+  promptLanguage: PromptLanguage;
   // 引用可空：Provider 可随时删除，删除时级联置空，项目进入"待重新选择模型"状态
   reasoningProviderId: string | null;
   reasoningModelId: string | null;
@@ -56,6 +59,8 @@ export interface PlanningConfigSnapshotPayload {
     platformTargets: PlatformTarget[];
     targetMarket: TargetMarket | null;
     copyLanguage: string | null;
+    // 旧快照无此字段，保持可选以兼容历史数据；套用快照时由 API 层落到默认值
+    promptLanguage?: PromptLanguage;
     // 与 ProjectRecord 一致可空：快照可能来自引用被置空的项目，应用快照前由 API 层校验
     reasoningProviderId: string | null;
     reasoningModelId: string | null;
@@ -99,7 +104,7 @@ export interface ProjectCoverSummary {
  */
 const PLANNING_REVISION_FIELDS = [
   "category", "productDescription", "verifiedFacts", "prohibitedClaims", "brandGuidelines",
-  "platformTargets", "targetMarket", "copyLanguage",
+  "platformTargets", "targetMarket", "copyLanguage", "promptLanguage",
   "reasoningProviderId", "reasoningModelId", "imageProviderId", "imageModelId", "segmentationModel",
   "defaultMode", "imageResolution", "imageAspectRatio", "candidatesPerType", "webResearchEnabled",
 ] as const;
@@ -162,17 +167,17 @@ export class ProjectRepository {
     return covers;
   }
   public getProject(id: string): ProjectRecord | undefined { const row = this.db.prepare("SELECT * FROM projects WHERE id = ?").get(id); return row ? mapProject(row as Row) : undefined; }
-  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled" | "archivedAt" | "planningRevision" | "segmentationModel"> & Partial<Pick<ProjectRecord, "webResearchEnabled" | "archivedAt">> & { segmentationModel?: { providerId: string; modelId: string; protocol?: NonNullable<SegmentationModelRef["protocol"]> } | null }): ProjectRecord {
-    const record: ProjectRecord = { ...input, webResearchEnabled: input.webResearchEnabled ?? false, archivedAt: input.archivedAt ?? null, planningRevision: 0, segmentationModel: input.segmentationModel ? { ...input.segmentationModel, protocol: input.segmentationModel.protocol ?? "fal" } : null, id: randomUUID(), createdAt: now(), updatedAt: now() };
-    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,segmentation_provider_id,segmentation_model_id,segmentation_protocol,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,planning_revision,created_at,updated_at)
-      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@segmentationProviderId,@segmentationModelId,@segmentationProtocol,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@archivedAt,@planningRevision,@createdAt,@updatedAt)`)
+  public createProject(input: Omit<ProjectRecord, "id" | "createdAt" | "updatedAt" | "webResearchEnabled" | "archivedAt" | "planningRevision" | "segmentationModel" | "promptLanguage"> & Partial<Pick<ProjectRecord, "webResearchEnabled" | "archivedAt" | "promptLanguage">> & { segmentationModel?: { providerId: string; modelId: string; protocol?: NonNullable<SegmentationModelRef["protocol"]> } | null }): ProjectRecord {
+    const record: ProjectRecord = { ...input, promptLanguage: input.promptLanguage ?? "CHINESE", webResearchEnabled: input.webResearchEnabled ?? false, archivedAt: input.archivedAt ?? null, planningRevision: 0, segmentationModel: input.segmentationModel ? { ...input.segmentationModel, protocol: input.segmentationModel.protocol ?? "fal" } : null, id: randomUUID(), createdAt: now(), updatedAt: now() };
+    this.db.prepare(`INSERT INTO projects (id,name,category,product_description,verified_facts_json,prohibited_claims_json,brand_guidelines_json,platform_targets_json,target_market,copy_language,prompt_language,reasoning_provider_id,reasoning_model_id,image_provider_id,image_model_id,segmentation_provider_id,segmentation_model_id,segmentation_protocol,default_mode,image_resolution,image_aspect_ratio,candidates_per_type,web_research_enabled,archived_at,planning_revision,created_at,updated_at)
+      VALUES (@id,@name,@category,@productDescription,@verifiedFacts,@prohibitedClaims,@brandGuidelines,@platformTargets,@targetMarket,@copyLanguage,@promptLanguage,@reasoningProviderId,@reasoningModelId,@imageProviderId,@imageModelId,@segmentationProviderId,@segmentationModelId,@segmentationProtocol,@defaultMode,@imageResolution,@imageAspectRatio,@candidatesPerType,@webResearchEnabled,@archivedAt,@planningRevision,@createdAt,@updatedAt)`)
       .run({ ...record, webResearchEnabled: record.webResearchEnabled ? 1 : 0, platformTargets: json(record.platformTargets), verifiedFacts: json(record.verifiedFacts), prohibitedClaims: json(record.prohibitedClaims), brandGuidelines: json(record.brandGuidelines), segmentationProviderId: record.segmentationModel?.providerId ?? null, segmentationModelId: record.segmentationModel?.modelId ?? null, segmentationProtocol: record.segmentationModel?.protocol ?? null });
     return record;
   }
   public updateProject(id: string, patch: Partial<Omit<ProjectRecord, "id" | "createdAt">>): ProjectRecord | undefined {
     const current = this.getProject(id); if (!current) return undefined;
     const next = { ...current, ...patch, planningRevision: nextPlanningRevision(current, patch), updatedAt: now() };
-    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,segmentation_provider_id=@segmentationProviderId,segmentation_model_id=@segmentationModelId,segmentation_protocol=@segmentationProtocol,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,archived_at=@archivedAt,planning_revision=@planningRevision,updated_at=@updatedAt WHERE id=@id`)
+    this.db.prepare(`UPDATE projects SET name=@name,category=@category,product_description=@productDescription,verified_facts_json=@verifiedFacts,prohibited_claims_json=@prohibitedClaims,brand_guidelines_json=@brandGuidelines,platform_targets_json=@platformTargets,target_market=@targetMarket,copy_language=@copyLanguage,prompt_language=@promptLanguage,reasoning_provider_id=@reasoningProviderId,reasoning_model_id=@reasoningModelId,image_provider_id=@imageProviderId,image_model_id=@imageModelId,segmentation_provider_id=@segmentationProviderId,segmentation_model_id=@segmentationModelId,segmentation_protocol=@segmentationProtocol,default_mode=@defaultMode,image_resolution=@imageResolution,image_aspect_ratio=@imageAspectRatio,candidates_per_type=@candidatesPerType,web_research_enabled=@webResearchEnabled,archived_at=@archivedAt,planning_revision=@planningRevision,updated_at=@updatedAt WHERE id=@id`)
       .run({ ...next, webResearchEnabled: next.webResearchEnabled ? 1 : 0, platformTargets: json(next.platformTargets), verifiedFacts: json(next.verifiedFacts), prohibitedClaims: json(next.prohibitedClaims), brandGuidelines: json(next.brandGuidelines), segmentationProviderId: next.segmentationModel?.providerId ?? null, segmentationModelId: next.segmentationModel?.modelId ?? null, segmentationProtocol: next.segmentationModel?.protocol ?? null });
     return next;
   }
@@ -216,6 +221,7 @@ function mapProject(row: Row): ProjectRecord {  return {
     platformTargets: parse(row.platform_targets_json),
     targetMarket: row.target_market ? row.target_market as TargetMarket : null,
     copyLanguage: row.copy_language ? String(row.copy_language) : null,
+    promptLanguage: row.prompt_language === "ENGLISH" ? "ENGLISH" : "CHINESE",
     reasoningProviderId: row.reasoning_provider_id ? String(row.reasoning_provider_id) : null,
     reasoningModelId: row.reasoning_model_id ? String(row.reasoning_model_id) : null,
     imageProviderId: row.image_provider_id ? String(row.image_provider_id) : null,

@@ -791,6 +791,28 @@ describe("segmentation model declarations & refs", () => {
   });
 });
 
+describe("项目提示词语种 promptLanguage", () => {
+  it("创建缺省为 CHINESE，可改为 ENGLISH，非法取值返回 400", async () => {
+    const provider = saveProvider();
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/projects",
+      payload: { name: "cup", reasoningProviderId: provider.id, reasoningModelId: "reasoner", imageProviderId: provider.id, imageModelId: "image", defaultMode: "CREATIVE" },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ promptLanguage: "CHINESE" });
+
+    const projectId = created.json<{ id: string }>().id;
+    const patched = await app.inject({ method: "PATCH", url: `/api/v1/projects/${projectId}`, payload: { promptLanguage: "ENGLISH" } });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json()).toMatchObject({ promptLanguage: "ENGLISH" });
+    expect(repository.getProject(projectId)?.promptLanguage).toBe("ENGLISH");
+
+    const invalid = await app.inject({ method: "PATCH", url: `/api/v1/projects/${projectId}`, payload: { promptLanguage: "FRENCH" } });
+    expect(invalid.statusCode).toBe(400);
+  });
+});
+
 describe("DELETE /api/v1/projects/:projectId 路径穿越防御", () => {
   it.each(["..", encodeURIComponent("../evil"), encodeURIComponent("C:\Windows")])("拒绝非 UUID 的项目 ID：%s", async (encoded) => {
     // 与被测 API 共享 dataDir：穿越参数若抵达存储层会删除目录内容，这里预置一个受害者文件

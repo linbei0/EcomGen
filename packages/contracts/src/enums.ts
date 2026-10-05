@@ -14,6 +14,8 @@ export const PLATFORM_TARGETS = ["TAOBAO", "JD", "PDD", "DOUYIN", "AMAZON", "SHO
 export const PlatformTarget = Type.Enum({ TAOBAO: "TAOBAO", JD: "JD", PDD: "PDD", DOUYIN: "DOUYIN", AMAZON: "AMAZON", SHOPIFY: "SHOPIFY" }, { $id: "#/components/schemas/PlatformTarget" });
 export const TargetMarket = Type.Enum({ CHINA_MAINLAND: "CHINA_MAINLAND", HONG_KONG: "HONG_KONG", MACAU: "MACAU", TAIWAN: "TAIWAN", UNITED_STATES: "UNITED_STATES", UNITED_KINGDOM: "UNITED_KINGDOM", GERMANY: "GERMANY", FRANCE: "FRANCE", ITALY: "ITALY", SPAIN: "SPAIN", JAPAN: "JAPAN", SOUTH_KOREA: "SOUTH_KOREA" }, { $id: "#/components/schemas/TargetMarket" });
 export const StoryboardMode = Type.Enum({ CREATIVE: "CREATIVE", PIXEL_PROTECTED: "PIXEL_PROTECTED" }, { $id: "#/components/schemas/StoryboardMode" });
+/** 分镜最终生图提示词（promptInstruction）的书写语种；与文案语种（copyLanguage）相互独立。 */
+export const PromptLanguage = Type.Enum({ CHINESE: "CHINESE", ENGLISH: "ENGLISH" }, { $id: "#/components/schemas/PromptLanguage" });
 /** 分镜的视觉任务语义；同一角色在套图中重复时必须使用不同模板，防止信息重复。 */
 export const StoryboardShotRole = Type.Enum({ HERO: "HERO", PAIN_POINT: "PAIN_POINT", COMPARISON: "COMPARISON", SCENE: "SCENE", DETAIL: "DETAIL", TRUST: "TRUST", VARIANT: "VARIANT", CTA: "CTA" }, { $id: "#/components/schemas/StoryboardShotRole" });
 /** 上传素材的用途取值元组；API 查询校验与契约 schema 共用，避免路由再抄一份允许列表。 */
@@ -70,6 +72,7 @@ export const ErrorCode = Type.Enum({ VALIDATION_ERROR: "VALIDATION_ERROR", NOT_F
 export type PlatformTarget = Static<typeof PlatformTarget>;
 export type TargetMarket = Static<typeof TargetMarket>;
 export type StoryboardMode = Static<typeof StoryboardMode>;
+export type PromptLanguage = Static<typeof PromptLanguage>;
 export type StoryboardShotRole = Static<typeof StoryboardShotRole>;
 export type AssetRole = Static<typeof AssetRole>;
 export type UserAssetKind = Static<typeof UserAssetKind>;

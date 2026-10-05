@@ -1745,6 +1745,8 @@ export interface components {
         /** @enum {string} */
         StoryboardMode: "CREATIVE" | "PIXEL_PROTECTED";
         /** @enum {string} */
+        PromptLanguage: "CHINESE" | "ENGLISH";
+        /** @enum {string} */
         StoryboardShotRole: "HERO" | "PAIN_POINT" | "COMPARISON" | "SCENE" | "DETAIL" | "TRUST" | "VARIANT" | "CTA";
         /** @enum {string} */
         AssetRole: "PRODUCT_TRUTH" | "PACKAGING" | "STYLE_REFERENCE" | "LAYOUT_REFERENCE";
@@ -1898,6 +1900,8 @@ export interface components {
             platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
             targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
             copyLanguage?: string | null;
+            /** @description Language of the final image-generation prompts produced by planning; defaults to CHINESE. */
+            promptLanguage?: components["schemas"]["PromptLanguage"];
             /** Format: uuid */
             reasoningProviderId: string;
             reasoningModelId: string;
@@ -2368,6 +2372,8 @@ export interface components {
             platformTargets: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
             targetMarket: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
             copyLanguage: string | null;
+            /** @description Language of the final image-generation prompts produced by planning. */
+            promptLanguage: components["schemas"]["PromptLanguage"];
             reasoningProviderId: string | null;
             reasoningModelId: string | null;
             imageProviderId: string | null;
@@ -2543,6 +2549,7 @@ export interface components {
             platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
             targetMarket?: "CHINA_MAINLAND" | "HONG_KONG" | "MACAU" | "TAIWAN" | "UNITED_STATES" | "UNITED_KINGDOM" | "GERMANY" | "FRANCE" | "ITALY" | "SPAIN" | "JAPAN" | "SOUTH_KOREA" | null;
             copyLanguage?: string | null;
+            promptLanguage?: components["schemas"]["PromptLanguage"];
             reasoningModel?: components["schemas"]["ModelRef"];
             imageModel?: components["schemas"]["ModelRef"];
             segmentationModel?: components["schemas"]["SegmentationModelRef"] | null;

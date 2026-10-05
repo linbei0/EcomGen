@@ -94,7 +94,7 @@ export function createPlanningTools(context: MarketGuidanceContext, webResearch?
   const readPlatform: AgentTool<typeof readPlatformParameters> = {
     name: "read_platform_guidance",
     label: "读取市场与平台规范",
-    description: "读取当前项目的目标市场、文案语种、商品品类和目标平台的版式、文字与合规约束。只返回业务规则，最终 Prompt 必须把它们改写成生图模型能直接执行的自然语言。",
+    description: "读取当前项目的目标市场、文案语种、提示词语种（promptLanguage，最终生图 Prompt 的书写语种）、商品品类和目标平台的版式、文字与合规约束。只返回业务规则，最终 Prompt 必须把它们改写成生图模型能直接执行的自然语言。",
     parameters: readPlatformParameters,
     execute: async (_toolCallId: string, _params: ReadPlatformParameters): Promise<AgentToolResult<unknown>> => {
       return textResult(readPlatformGuidance(context));

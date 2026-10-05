@@ -29,6 +29,7 @@ import type {
   LibraryItemKind,
   PlanningMode,
   PlatformTarget,
+  PromptLanguage,
   StoryboardMode,
   TargetMarket,
 } from "@ecomgen/contracts";
@@ -86,6 +87,10 @@ function copyLanguageValue(value: unknown): string | null {
   const language = readText(value, "copyLanguage");
   if (language.length > 64) throw new ApiError(400, "VALIDATION_ERROR", "copyLanguage must contain 1 to 64 characters");
   return language;
+}
+
+function promptLanguageValue(value: unknown): PromptLanguage {
+  return enumValue<PromptLanguage>(value, ["CHINESE", "ENGLISH"], "promptLanguage");
 }
 
 /** 可选日期时间查询参数：解析失败返回 400，不把非法值静默当成「不限时间」；统一规范化为 UTC ISO 以便与 created_at 字典序比较。 */
@@ -167,6 +172,7 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ApiContext): vo
       platformTargets,
       targetMarket: targetMarketValue(body.targetMarket),
       copyLanguage: copyLanguageValue(body.copyLanguage),
+      promptLanguage: body.promptLanguage === undefined ? "CHINESE" : promptLanguageValue(body.promptLanguage),
       reasoningProviderId,
       reasoningModelId: readText(body.reasoningModelId, "reasoningModelId"),
       imageProviderId,
@@ -192,6 +198,7 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ApiContext): vo
     if (body.platformTargets !== undefined) update.platformTargets = platformTargetsValue(body.platformTargets);
     if (body.targetMarket !== undefined) update.targetMarket = targetMarketValue(body.targetMarket);
     if (body.copyLanguage !== undefined) update.copyLanguage = copyLanguageValue(body.copyLanguage);
+    if (body.promptLanguage !== undefined) update.promptLanguage = promptLanguageValue(body.promptLanguage);
     if (body.defaultMode !== undefined) update.defaultMode = enumValue<StoryboardMode>(body.defaultMode, ["CREATIVE", "PIXEL_PROTECTED"], "defaultMode");
     if (body.imageResolution !== undefined) update.imageResolution = enumValue<ImageResolution>(body.imageResolution, IMAGE_RESOLUTIONS, "imageResolution");
     if (body.imageAspectRatio !== undefined) update.imageAspectRatio = enumValue<ImageAspectRatio>(body.imageAspectRatio, IMAGE_ASPECT_RATIOS, "imageAspectRatio");
@@ -321,6 +328,8 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ApiContext): vo
       name: project.name, category: project.category, productDescription: project.productDescription,
       verifiedFacts: project.verifiedFacts, prohibitedClaims: project.prohibitedClaims, brandGuidelines: project.brandGuidelines,
       platformTargets: project.platformTargets, targetMarket: project.targetMarket, copyLanguage: project.copyLanguage,
+      // 旧快照 payload 没有 promptLanguage，落到与创建时一致的默认值
+      promptLanguage: project.promptLanguage ?? "CHINESE",
       reasoningProviderId: project.reasoningProviderId, reasoningModelId: project.reasoningModelId,
       imageProviderId: project.imageProviderId, imageModelId: project.imageModelId, defaultMode: project.defaultMode,
       imageResolution: project.imageResolution, imageAspectRatio: project.imageAspectRatio,

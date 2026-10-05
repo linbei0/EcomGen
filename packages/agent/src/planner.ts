@@ -1,6 +1,6 @@
 import type { Agent } from "@earendil-works/pi-agent-core";
 import type { ImageContent } from "@earendil-works/pi-ai";
-import type { CompositePolicy, EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, StoryboardMode, StoryboardShotRole, TargetMarket } from "@ecomgen/contracts";
+import type { CompositePolicy, EditExecutionMode, EditOperation, PlanningMode, PlatformTarget, PromptLanguage, StoryboardMode, StoryboardShotRole, TargetMarket } from "@ecomgen/contracts";
 import { DEFAULT_TARGET_IMAGE_COUNT, EDIT_EXECUTION_MODES, EDIT_OPERATIONS, EDIT_OPERATION_CAPABILITIES, MAX_CANDIDATES_PER_TYPE, MAX_GENERATION_REFERENCE_IMAGES, MAX_TARGET_IMAGE_COUNT, MIN_TARGET_IMAGE_COUNT, compositePolicyFor, requiresConfirmationFor } from "@ecomgen/contracts";
 import { ECOM_DETAILS_IMAGE_SOURCE, ECOM_TEMPLATES, getTemplate, resolveTemplatesWithUser, type EcomTemplate } from "@ecomgen/ecom-skill";
 import type { SuiteDefinition } from "@ecomgen/ecom-suite";
@@ -22,6 +22,8 @@ export interface PlannerInput {
   platformTargets: PlatformTarget[];
   targetMarket: TargetMarket | null;
   copyLanguage: string | null;
+  /** 分镜最终生图提示词（promptInstruction）的书写语种；项目级设置，用户可指定中文或英文。 */
+  promptLanguage: PromptLanguage;
   defaultMode: StoryboardMode;
   // handle（P1/R1）是素材在模型上下文中的唯一指代；id 仅供 validatePlan 解析，
   // planStoryboard 构造 payload 时必须剥离，保证真实素材 ID 不进入模型上下文。
@@ -112,13 +114,14 @@ Output only valid JSON matching the requested schema. No Markdown.
 
 # Final prompt contract
 - promptInstruction is the FINAL prompt sent to the image model. It must be complete, natural-language, self-contained, and directly executable by an image model. Do not leave planning notes for another worker to compile.
+- Write each promptInstruction in the language declared by the payload's promptLanguage field: CHINESE means natural Simplified Chinese, ENGLISH means natural English. Never mix the two prose languages inside one prompt. This governs the prompt prose only; visible in-image copy still follows the effective copy language. Keep product names, brand names, and verbatim style-lock tokens (including hex codes) unchanged, and keep displayName a Chinese scene title regardless of promptLanguage.
 - Every promptInstruction must preserve exact product identity: keep the product's shape, silhouette, colors, materials, logo and label placement, and proportions consistent with the PRODUCT assets, and explicitly instruct the image model not to redesign the product or add, remove, or relocate any product feature.
 - Write each final prompt in this order: product truth and reference-image semantics; conversion intent and target platform; composition and subject placement; camera and lens perspective; lighting, material rendering, palette, and background; blank zones; pixel-protection constraints when needed; explicit negative constraints.
 - Refer to supplied images only by their handles (P1, R1), and only handles that the same item lists in referencedAssets; unselected images are not attached at generation time, so referencing them leaves the instruction unresolvable. The runtime resolves each handle to the actual input image. Never mention internal asset IDs, file names, or attachment indexes.
 - The final prompt must be complete enough to execute without hidden context. Never include citations, URLs, tool names, template metadata, or research prose in it.`;
 
 export async function planStoryboard(input: PlannerInput): Promise<PlannedStoryboard> {
-  const marketContext = { platformTargets: input.platformTargets, targetMarket: input.targetMarket, copyLanguage: input.copyLanguage, productCategory: input.productCategory };
+  const marketContext = { platformTargets: input.platformTargets, targetMarket: input.targetMarket, copyLanguage: input.copyLanguage, promptLanguage: input.promptLanguage, productCategory: input.productCategory };
   const selectedTemplates = resolveTemplatesWithUser(input.requestedTypes, input.userTemplates ?? []);
   // AI 自动选片不暴露自定义模板与套图：工具目录只在 MANUAL 模式合并，避免诱导未授权的 assetType
   const manualMode = input.planningMode === "MANUAL";

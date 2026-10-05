@@ -6,6 +6,7 @@ import type { components } from "../schema.d.ts";
 
 export type Project = components["schemas"]["Project"];
 export type TargetMarket = Project["targetMarket"];
+export type PromptLanguage = Project["promptLanguage"];
 export type ProjectCover = components["schemas"]["ProjectCover"];
 export type Asset = components["schemas"]["Asset"];
 export type AssetRole = components["schemas"]["AssetRole"];
@@ -27,7 +28,8 @@ export interface PlanningConfigSnapshot {
   projectId: string;
   sourceJobId: string;
   payload: {
-    project: Pick<Project, "name" | "category" | "productDescription" | "verifiedFacts" | "prohibitedClaims" | "brandGuidelines" | "platformTargets" | "targetMarket" | "copyLanguage" | "reasoningProviderId" | "reasoningModelId" | "imageProviderId" | "imageModelId" | "segmentationModel" | "defaultMode" | "imageResolution" | "imageAspectRatio" | "candidatesPerType" | "webResearchEnabled">;
+    // promptLanguage 后于其他字段加入：旧快照没有它，保持可选，套用时由调用方落到默认值
+    project: Pick<Project, "name" | "category" | "productDescription" | "verifiedFacts" | "prohibitedClaims" | "brandGuidelines" | "platformTargets" | "targetMarket" | "copyLanguage" | "reasoningProviderId" | "reasoningModelId" | "imageProviderId" | "imageModelId" | "segmentationModel" | "defaultMode" | "imageResolution" | "imageAspectRatio" | "candidatesPerType" | "webResearchEnabled"> & { promptLanguage?: Project["promptLanguage"] };
     planning: { planningMode: PlanningMode; requestedTypes: string[]; requestedSuiteShots?: string[]; targetImageCount: number | null; userInstruction: string | null };
   };
   createdAt: string;
@@ -331,6 +333,7 @@ function adaptProjectCore(raw: Record<string, unknown>): Project | null {
     platformTargets: platforms,
     targetMarket: TARGET_MARKETS.has(raw.targetMarket as Exclude<TargetMarket, null>) ? raw.targetMarket as Exclude<TargetMarket, null> : null,
     copyLanguage: asString(raw.copyLanguage) ?? null,
+    promptLanguage: raw.promptLanguage === "ENGLISH" ? "ENGLISH" : "CHINESE",
     reasoningProviderId,
     reasoningModelId,
     imageProviderId,

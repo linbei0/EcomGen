@@ -24,6 +24,7 @@ export const PROJECT_FIXTURE = {
   platformTargets: ["TAOBAO"] as ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[],
   targetMarket: null,
   copyLanguage: null,
+  promptLanguage: "CHINESE" as const,
   reasoningProviderId: PROVIDER_ID,
   reasoningModelId: "gpt-4o",
   imageProviderId: PROVIDER_ID,

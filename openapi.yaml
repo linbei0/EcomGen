@@ -2449,6 +2449,11 @@ components:
       enum:
         - CREATIVE
         - PIXEL_PROTECTED
+    PromptLanguage:
+      type: string
+      enum:
+        - CHINESE
+        - ENGLISH
     StoryboardShotRole:
       type: string
       enum:
@@ -2981,6 +2986,9 @@ components:
               maxLength: 64
               type: string
             - type: "null"
+        promptLanguage:
+          description: Language of the final image-generation prompts produced by planning; defaults to CHINESE.
+          $ref: "#/components/schemas/PromptLanguage"
         reasoningProviderId:
           format: uuid
           type: string
@@ -4114,6 +4122,7 @@ components:
         - platformTargets
         - targetMarket
         - copyLanguage
+        - promptLanguage
         - reasoningProviderId
         - reasoningModelId
         - imageProviderId
@@ -4196,6 +4205,9 @@ components:
               maxLength: 64
               type: string
             - type: "null"
+        promptLanguage:
+          description: Language of the final image-generation prompts produced by planning.
+          $ref: "#/components/schemas/PromptLanguage"
         reasoningProviderId:
           anyOf:
             - format: uuid
@@ -4717,6 +4729,8 @@ components:
               maxLength: 64
               type: string
             - type: "null"
+        promptLanguage:
+          $ref: "#/components/schemas/PromptLanguage"
         reasoningModel:
           $ref: "#/components/schemas/ModelRef"
         imageModel:

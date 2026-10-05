@@ -1,6 +1,6 @@
 import {
   AssetRole, CompositePolicy, CopywritingTarget, EcomSuiteOrigin, EditExecutionMode, EditOperation, EditSessionStatus, EditTurnStatus,
-  ErrorCode, ImageAspectRatio, ImageOutputFormat, ImageQuality, ImageResolution, JobStatus, JobType, PlanningMode, PlatformTarget,
+  ErrorCode, ImageAspectRatio, ImageOutputFormat, ImageQuality, ImageResolution, JobStatus, JobType, PlanningMode, PlatformTarget, PromptLanguage,
   ReasoningProtocolProfile, ReferencePurpose, ReferenceSource, SearchSourceKind, StoryboardMode,
   StoryboardShotRole, TargetMarket, UserAssetKind, LibraryItemSource, LibraryItemKind
 } from "./enums.js";
@@ -32,7 +32,7 @@ import { EventEnvelope, ModelCapabilities, ModelDefinition } from "./legacy-sche
 
 /** All schemas emitted into OpenAPI components.schemas. */
 export const API_SCHEMA_REGISTRY = {
-  PlatformTarget, TargetMarket, StoryboardMode, StoryboardShotRole, AssetRole, UserAssetKind, LibraryItemSource, LibraryItemKind, ImageResolution, ImageAspectRatio, ImageQuality, ImageOutputFormat,
+  PlatformTarget, TargetMarket, StoryboardMode, PromptLanguage, StoryboardShotRole, AssetRole, UserAssetKind, LibraryItemSource, LibraryItemKind, ImageResolution, ImageAspectRatio, ImageQuality, ImageOutputFormat,
   PlanningMode, CopywritingTarget, JobType, JobStatus, ReasoningProtocolProfile, SearchSourceKind,
   EcomSuiteOrigin,
   EditOperation, EditExecutionMode, CompositePolicy, ReferenceSource, ReferencePurpose, EditTurnStatus, EditSessionStatus,

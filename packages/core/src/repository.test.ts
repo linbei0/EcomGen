@@ -359,6 +359,8 @@ describe("EcomRepository", () => {
     const provider = seedProvider(repository);
     const project = repository.createProject(makeProjectInput(provider));
     expect(project.planningRevision).toBe(0);
+    // 提示词语种缺省落 CHINESE；它参与规划提示词，变化必须递增 planningRevision
+    expect(project.promptLanguage).toBe("CHINESE");
     expect(repository.updateProject(project.id, { name: "renamed" })?.planningRevision).toBe(0);
     expect(repository.updateProject(project.id, { archivedAt: "2026-08-01T01:00:00.000Z" })?.planningRevision).toBe(0);
     expect(repository.updateProject(project.id, { verifiedFacts: ["304 不锈钢"] })?.planningRevision).toBe(1);
@@ -367,6 +369,9 @@ describe("EcomRepository", () => {
     expect(repository.updateProject(project.id, { brandGuidelines: guidelines })?.planningRevision).toBe(2);
     expect(repository.updateProject(project.id, { brandGuidelines: { scene: "厨房", tone: "专业" } })?.planningRevision).toBe(2);
     expect(repository.updateProject(project.id, { brandGuidelines: { scene: "客厅", tone: "专业" } })?.planningRevision).toBe(3);
+    const languageChanged = repository.updateProject(project.id, { promptLanguage: "ENGLISH" });
+    expect(languageChanged?.planningRevision).toBe(4);
+    expect(languageChanged?.promptLanguage).toBe("ENGLISH");
     database.close();
   });
 
@@ -408,7 +413,8 @@ describe("EcomRepository", () => {
 
       const migrated = openDatabase(filename);
       const project = new EcomRepository(migrated).getProject("legacy-project");
-      expect(project).toMatchObject({ platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null });
+      // 旧库补列后存量项目落到默认提示词语种
+      expect(project).toMatchObject({ platformTargets: ["TAOBAO"], targetMarket: null, copyLanguage: null, promptLanguage: "CHINESE" });
       migrated.close();
     } finally {
       rmSync(directory, { recursive: true, force: true });
