@@ -27,7 +27,10 @@ describe("LocalAssetStore", () => {
       await store.initialize();
       const asset = await store.putAsset("archived", "product.png", Buffer.from("asset"));
       const output = await store.putOutput("archived", Buffer.from("output"));
-      const exported = await store.putExport("archived", Buffer.from("export"));
+      const exported = await store.putExportStream("archived", (destination) => new Promise<void>((resolve, reject) => {
+        destination.once("error", reject);
+        destination.end(Buffer.from("export"), () => resolve());
+      }));
       const edit = await store.putEditArtifact("archived", "session", "turn", "mask.png", Buffer.from("edit"));
       const retained = await store.putAsset("active", "product.png", Buffer.from("retained"));
 

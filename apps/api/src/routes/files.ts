@@ -5,6 +5,17 @@ import { parameter } from "../input-normalizers.js";
 
 export function registerFileRoutes(app: FastifyInstance, ctx: ApiContext): void {
   const { repository, storage } = ctx;
+  // 缩略图惰性生成的单飞去重：同 hash 并发首访只解码/生成一次，后续请求复用同一 Promise。
+  const inflightThumbnails = new Map<string, Promise<void>>();
+  const renderThumbnailOnce = (hash: string, sourcePath: string): Promise<void> => {
+    const pending = inflightThumbnails.get(hash);
+    if (pending) return pending;
+    const created = (async () => {
+      await storage.putThumbnail(hash, await renderThumbnail(await storage.read(sourcePath)));
+    })().finally(() => inflightThumbnails.delete(hash));
+    inflightThumbnails.set(hash, created);
+    return created;
+  };
   app.get("/api/v1/files/assets/:assetId", async (request, reply) => sendStored(request, reply, storage, repository.getAsset(parameter(request, "assetId")), "asset", parameter(request, "assetId")));
   app.get("/api/v1/files/edit-reference-assets/:referenceAssetId", async (request, reply) => sendStored(request, reply, storage, repository.getEditReferenceAsset(parameter(request, "referenceAssetId")), "reference asset", parameter(request, "referenceAssetId")));
   app.get("/api/v1/files/outputs/:outputId", async (request, reply) => sendStored(request, reply, storage, repository.getOutput(parameter(request, "outputId")), "output", parameter(request, "outputId")));
@@ -15,7 +26,7 @@ export function registerFileRoutes(app: FastifyInstance, ctx: ApiContext): void 
     if (!(await storage.exists(thumbnailPath))) {
       const sourcePath = repository.findImageSourcePath(hash);
       if (!sourcePath) missing("image", hash);
-      await storage.putThumbnail(hash, await renderThumbnail(await storage.read(sourcePath)));
+      await renderThumbnailOnce(hash, sourcePath);
     }
     return sendStored(request, reply, storage, { storagePath: thumbnailPath, mimeType: "image/webp", hash }, "thumbnail", hash);
   });

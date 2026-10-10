@@ -10,6 +10,9 @@ export function registerMetaRoutes(app: FastifyInstance, ctx: ApiContext): void 
   app.get("/api/v1/ecom-templates", async () => ({ source: ECOM_DETAILS_IMAGE_SOURCE, items: ECOM_TEMPLATES }));
   app.get("/api/v1/events", { sse: "only" }, async (request, reply) => {
     const projectId = typeof request.query === "object" && request.query && "projectId" in request.query ? String((request.query as Record<string, unknown>).projectId) : ""; if (!projectId) throw new ApiError(400, "VALIDATION_ERROR", "projectId query parameter is required"); ensureProject(repository, projectId);
-    reply.sse.keepAlive(); const unsubscribe = await events.subscribe(projectId, (event) => { void reply.sse.send({ id: event.id, event: event.type, data: event }); }); reply.sse.onClose(() => { void unsubscribe(); }); await reply.sse.send({ event: "connected", data: { projectId } });
+    reply.sse.keepAlive(); const unsubscribe = await events.subscribe(projectId, (event) => {
+      // 连接断开后的 send 失败属预期，显式吞掉避免 unhandled rejection
+      void reply.sse.send({ id: event.id, event: event.type, data: event }).catch(() => undefined);
+    }); reply.sse.onClose(() => { void unsubscribe(); }); await reply.sse.send({ event: "connected", data: { projectId } });
   });
 }

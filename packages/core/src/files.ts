@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { createReadStream, createWriteStream, type WriteStream } from "node:fs";
 import { mkdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
@@ -32,11 +32,15 @@ export class LocalAssetStore {
     return { path: relativePath, hash };
   }
 
-  public async putExport(projectId: string, content: Buffer, extension = ".zip"): Promise<{ path: string; hash: string }> {
-    const hash = createHash("sha256").update(content).digest("hex");
-    const relativePath = join("exports", projectId, `${randomUUID()}-${hash.slice(0, 12)}${this.safeExtension(extension)}`);
-    await this.write(relativePath, content);
-    return { path: relativePath, hash };
+  /**
+   * 流式导出：ZIP 等大体量产物边生成边落盘，不再把全部内容聚合进内存。
+   * 调用方在 open 回调中向可写流灌数据，须在数据全部写完（流 close/finish）后才 resolve；
+   * 失败时由 writeStream 清理临时文件，不残留半成品。
+   */
+  public async putExportStream(projectId: string, open: (destination: WriteStream) => Promise<void>): Promise<{ path: string }> {
+    const relativePath = join("exports", projectId, `${randomUUID()}.zip`);
+    await this.writeStream(relativePath, open);
+    return { path: relativePath };
   }
 
   public async putEditArtifact(projectId: string, sessionId: string, turnId: string, name: string, content: Buffer): Promise<{ path: string; hash: string }> {
@@ -230,6 +234,22 @@ export class LocalAssetStore {
     await mkdir(dirname(destination), { recursive: true });
     const temporary = join(this.root, "tmp", randomUUID());
     await writeFile(temporary, content);
+    await rename(temporary, destination);
+  }
+
+  /** 与 write() 同样的 tmp+rename 原子落位，但内容以可写流灌入；open 抛错时销毁流并清理临时文件。 */
+  private async writeStream(relativePath: string, open: (destination: WriteStream) => Promise<void>): Promise<void> {
+    const destination = this.absolute(relativePath);
+    await mkdir(dirname(destination), { recursive: true });
+    const temporary = join(this.root, "tmp", randomUUID());
+    const stream = createWriteStream(temporary);
+    try {
+      await open(stream);
+    } catch (error) {
+      stream.destroy();
+      await rm(temporary, { force: true });
+      throw error;
+    }
     await rename(temporary, destination);
   }
 
