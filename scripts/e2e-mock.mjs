@@ -348,6 +348,17 @@ try {
   const archive = Buffer.from(await zip.arrayBuffer());
   assert.equal(archive.subarray(0, 2).toString("utf8"), "PK");
   assert.match(archive.toString("binary"), /manifest\.json/);
+  // 长图导出：配置进指纹（与普通导出不复用任务），ZIP 内含 long-image/ 产物
+  const longImageExport = await requestJson(`${base}/projects/${project.id}/export-jobs`, "POST", { outputIds: [outputs[0].id], longImage: { targetWidth: 750, sliceHeight: 960 } });
+  assert.notEqual(longImageExport.job.id, queuedExport.job.id);
+  const duplicateLongImage = await requestJson(`${base}/projects/${project.id}/export-jobs`, "POST", { outputIds: [outputs[0].id], longImage: { targetWidth: 750, sliceHeight: 960 } });
+  assert.equal(duplicateLongImage.job.id, longImageExport.job.id);
+  const longImageJob = await waitJob(base, longImageExport.job.id);
+  assert.equal(longImageJob.status, "SUCCEEDED");
+  const longImageRecord = await requestJson(`${base}/exports/${longImageExport.export.id}`, "GET");
+  const longImageZip = await fetch(`${base}/files/exports/${longImageRecord.id}`);
+  const longImageArchive = Buffer.from(await longImageZip.arrayBuffer());
+  assert.match(longImageArchive.toString("binary"), /long-image\//);
   // 分层导出链路：PATCH 分割模型 → vision 识别元素 → SAM 分割 → 图层 PNG / 背景层 / PSD 下载
   await requestJson(`${base}/projects/${project.id}`, "PATCH", { segmentationModel: { providerId: provider.id, modelId: "sam-3" } });
   assert.deepEqual((await requestJson(`${base}/projects/${project.id}`, "GET")).segmentationModel, { providerId: provider.id, modelId: "sam-3", protocol: "fal" });

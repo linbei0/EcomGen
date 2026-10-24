@@ -1868,11 +1868,12 @@ export interface components {
             regenerationKey: string;
         };
         CreateExportJobInput: {
+            /** @description 数组顺序即长图拼接顺序（用户可在导出时调整）；缺省时按分镜顺序拼接。 */
             outputIds?: string[];
             filenamePrefix?: string;
             platformTargets?: ("TAOBAO" | "JD" | "PDD" | "DOUYIN" | "AMAZON" | "SHOPIFY")[];
-            /** @default false */
-            includeDetailPageSlices: boolean;
+            /** @description 携带时导出额外包含长图与可选切片。 */
+            longImage?: components["schemas"]["LongImageExportConfig"];
         };
         CreatePlanningJobInput: {
             planningMode?: components["schemas"]["PlanningMode"];
@@ -2295,6 +2296,12 @@ export interface components {
             /** @description Item count after applying filters to source rows and deduplicating by content hash; independent of the current page cursor. */
             total: number;
         };
+        LongImageExportConfig: {
+            /** @description 长图统一宽度：750=手机端详情页通用，790=淘宝/京东 PC 端，1200=拼多多高清档。各屏等比缩放到该宽度。 */
+            targetWidth: 750 | 790 | 1200;
+            /** @description 切片目标高度（px）；缺省不切片。切点只落在屏边界，永不裁穿单屏内容；整图不超过该高度时不产出切片。 */
+            sliceHeight?: number;
+        };
         ModelCapability: {
             id: string;
             supportsVision: boolean;
@@ -2320,6 +2327,8 @@ export interface components {
             storyboardItemId: string;
             /** Format: uuid */
             jobId: string;
+            /** @description Content hash of the image; addresses the 512px webp thumbnail at GET /files/thumbnails/{hash}. */
+            hash: string;
             candidateIndex?: number;
             generationSnapshot?: {
                 /** Format: uuid */
@@ -2663,10 +2672,12 @@ export interface components {
             referenceSelections?: string;
         };
         CreateExportJobRequest: {
+            /** @description 数组顺序即长图拼接顺序（用户可在导出时调整）；缺省时按分镜顺序拼接。 */
             outputIds?: string[];
             filenamePrefix?: string;
             platformTargets?: components["schemas"]["PlatformTarget"][];
-            includeDetailPageSlices?: boolean;
+            /** @description 携带时导出额外包含长图与可选切片。 */
+            longImage?: components["schemas"]["LongImageExportConfig"];
         };
         CreateGenerationJobInput: {
             storyboardItemIds: string[];

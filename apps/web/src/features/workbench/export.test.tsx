@@ -41,12 +41,13 @@ function renderExport(outputs = [OUTPUT_FIXTURE, OUTPUT_B_FIXTURE]) {
   );
 }
 
-/** 两个用例共用的结果区操作：全选图片后打包下载。 */
+/** 两个用例共用的结果区操作：全选图片后打开导出弹窗并确认。 */
 async function submitExport() {
   const user = userEvent.setup();
   renderExport();
   await user.click(await screen.findByRole("button", { name: "全选图片" }));
   await user.click(await screen.findByRole("button", { name: /打包下载/ }));
+  await user.click(await screen.findByRole("button", { name: "开始导出" }));
 }
 
 describe("工作台 · 导出", () => {
@@ -63,8 +64,47 @@ describe("工作台 · 导出", () => {
       expect(captured).toMatchObject({
         outputIds: [OUTPUT_ID, OUTPUT_ID_B],
         platformTargets: ["TAOBAO"],
-        includeDetailPageSlices: false,
       });
+    });
+  });
+
+  it("导出弹窗选择合成长图后请求携带 longImage 配置", async () => {
+    let captured: unknown;
+    server.use(
+      http.post(`${BASE}/projects/:projectId/export-jobs`, async ({ request }) => {
+        captured = await request.json();
+        return HttpResponse.json({ job: EXPORT_JOB_FIXTURE, export: EXPORT_FIXTURE }, { status: 202 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderExport();
+    await user.click(await screen.findByRole("button", { name: "全选图片" }));
+    await user.click(await screen.findByRole("button", { name: /打包下载/ }));
+    await user.click(await screen.findByRole("radio", { name: /合成长图/ }));
+    await user.click(await screen.findByRole("checkbox", { name: /切片/ }));
+    await user.click(await screen.findByRole("button", { name: "开始导出" }));
+    await waitFor(() => {
+      expect(captured).toMatchObject({ longImage: { targetWidth: 750, sliceHeight: 960 } });
+    });
+  });
+
+  it("调整拼接顺序后按新顺序提交 outputIds", async () => {
+    let captured: unknown;
+    server.use(
+      http.post(`${BASE}/projects/:projectId/export-jobs`, async ({ request }) => {
+        captured = await request.json();
+        return HttpResponse.json({ job: EXPORT_JOB_FIXTURE, export: EXPORT_FIXTURE }, { status: 202 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderExport();
+    await user.click(await screen.findByRole("button", { name: "全选图片" }));
+    await user.click(await screen.findByRole("button", { name: /打包下载/ }));
+    await user.click(await screen.findByRole("radio", { name: /合成长图/ }));
+    await user.click(await screen.findByRole("button", { name: "下移第 1 屏" }));
+    await user.click(await screen.findByRole("button", { name: "开始导出" }));
+    await waitFor(() => {
+      expect(captured).toMatchObject({ outputIds: [OUTPUT_ID_B, OUTPUT_ID] });
     });
   });
 

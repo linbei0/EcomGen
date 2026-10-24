@@ -17,3 +17,9 @@ export function outputPreviewUrl(output: { id: string; url?: string | null }): s
   if (typeof output.url === "string" && isBrowserUrl(output.url)) return output.url;
   return `${API_BASE_URL}/files/outputs/${output.id}`;
 }
+
+/** 输出的 512px webp 缩略图；没有 hash 或缩略图缺失时调用方回退 outputPreviewUrl。 */
+export function outputThumbnailUrl(output: { hash?: string | null }): string | null {
+  if (typeof output.hash !== "string" || output.hash.length === 0) return null;
+  return `${API_BASE_URL}/files/thumbnails/${output.hash}`;
+}

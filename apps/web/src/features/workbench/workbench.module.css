@@ -303,6 +303,177 @@
   justify-content: flex-end;
 }
 
+/* 导出弹窗：左侧选项、右侧长图拼接顺序预览（Canva 式导出对话框布局），屏幕间隙对应导出时的 divider。 */
+.exportDialog {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.exportDialogForm {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.exportDialogModes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.exportModeTitle {
+  display: block;
+  color: var(--text-1);
+}
+
+.exportModeDesc {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.exportDialogFields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.exportDialogField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exportDialogLabel {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.exportDialogHint {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.exportDialogPreview {
+  flex: 0 0 128px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exportDialogScreens {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: min(520px, 62vh);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-s);
+  background: var(--bg-1);
+  scrollbar-gutter: stable;
+  /* 弹层底色为 bg-3，全局滚动条 thumb 同为 bg-3 会隐形，这里单独提亮（与 snapshotList 同口径） */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+.exportDialogScreens::-webkit-scrollbar {
+  width: 8px;
+}
+
+.exportDialogScreens::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 8px;
+}
+
+.exportDialogScreens::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.exportDialogScreen {
+  position: relative;
+  margin: 0;
+  /* 滚动列里的 flex 子项默认 flex-shrink: 1，超高时会被压扁而不是触发滚动 */
+  flex-shrink: 0;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  background: var(--bg-0);
+  cursor: grab;
+  /* 指针拖拽接管触摸手势（桌面优先，箭头按钮始终可用） */
+  touch-action: none;
+}
+
+.exportDialogScreens[data-sorting="true"] {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.exportDialogScreenPlaceholder {
+  flex-shrink: 0;
+  border: 1.5px dashed var(--accent-line);
+  border-radius: var(--radius-s);
+  background: var(--accent-subtle);
+}
+
+.exportDialogScreen[data-hidden="true"] {
+  display: none;
+}
+
+.exportDialogScreen img {
+  display: block;
+  width: 100%;
+}
+
+.exportDialogScreenIndex {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--bg-0) 76%, transparent);
+}
+
+.exportDialogScreenTools {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.exportDialogScreenTools button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--bg-0) 76%, transparent);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.exportDialogScreenTools button:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.exportDialogScreenTools button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .sectionTitle {
   display: inline-flex;
   align-items: center;

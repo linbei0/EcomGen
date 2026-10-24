@@ -1,6 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { AssetRole, EditTurnStatus, ImageAspectRatio, ImageOutputFormat, ImageQuality, ImageResolution, JobStatus, PlanningMode, PlatformTarget, ReferencePurpose, UserAssetKind } from "./enums.js";
-import { EcomSuiteFile, EditReferenceAsset, EditTurn, Job, LayerBbox, ModelRef, PlanningConfigSnapshot, Project, ReferenceSelection } from "./api-schemas.js";
+import { EcomSuiteFile, EditReferenceAsset, EditTurn, Job, LayerBbox, LongImageExportConfig, ModelRef, PlanningConfigSnapshot, Project, ReferenceSelection } from "./api-schemas.js";
 import { MAX_SUITE_FORGE_INSTRUCTION_LENGTH, MAX_SUITE_FORGE_NAME_LENGTH, MAX_SUITE_FORGE_SHOTS, MAX_SUITE_FORGE_SOURCES, MIN_SUITE_FORGE_SHOTS } from "./limits.js";
 import { schemaRef } from "./ref.js";
 
@@ -34,7 +34,7 @@ export type ManualPlanningInput = Static<typeof ManualPlanningInput>;
 export const AiPlanningInput = Type.Object({ planningMode: Type.Optional(schemaRef(PlanningMode)), requestedTypes: Type.Optional(Type.Array(Type.String())), requestedSuiteShots: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 12 })), imageTypes: Type.Optional(Type.Array(Type.String())), userInstruction: Type.Optional(Type.String({ maxLength: 4000 })), candidatesPerType: Type.Optional(Type.Integer({ minimum: 1, maximum: 4 })), targetImageCount: Type.Optional(Type.Integer({ minimum: 1, maximum: 12 })), imageResolution: Type.Optional(schemaRef(ImageResolution)), imageAspectRatio: Type.Optional(schemaRef(ImageAspectRatio)), regenerationKey: Type.Optional(Type.String({ minLength: 1 })) }, { $id: "#/components/schemas/AiPlanningInput" });
 export type AiPlanningInput = Static<typeof AiPlanningInput>;
 
-export const CreateExportJobRequest = Type.Object({ outputIds: Type.Optional(Type.Array(Type.String({ format: "uuid" }))), filenamePrefix: Type.Optional(Type.String()), platformTargets: Type.Optional(Type.Array(schemaRef(PlatformTarget))), includeDetailPageSlices: Type.Optional(Type.Boolean()) }, { $id: "#/components/schemas/CreateExportJobRequest" });
+export const CreateExportJobRequest = Type.Object({ outputIds: Type.Optional(Type.Array(Type.String({ format: "uuid" }), { description: "数组顺序即长图拼接顺序（用户可在导出时调整）；缺省时按分镜顺序拼接。" })), filenamePrefix: Type.Optional(Type.String()), platformTargets: Type.Optional(Type.Array(schemaRef(PlatformTarget))), longImage: Type.Optional(schemaRef(LongImageExportConfig, { description: "携带时导出额外包含长图与可选切片。" })) }, { $id: "#/components/schemas/CreateExportJobRequest" });
 export type CreateExportJobRequest = Static<typeof CreateExportJobRequest>;
 
 export const EditGenerationConfigInput = Type.Object({ reasoningProviderId: Type.String({ format: "uuid" }), reasoningModelId: Type.String({ minLength: 1 }), imageProviderId: Type.String({ format: "uuid" }), imageModelId: Type.String({ minLength: 1 }), imageResolution: Type.Optional(schemaRef(ImageResolution)), candidateCount: Type.Optional(Type.Integer({ minimum: 1, maximum: 4 })) }, { $id: "#/components/schemas/EditGenerationConfigInput" });

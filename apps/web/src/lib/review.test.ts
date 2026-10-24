@@ -4,7 +4,7 @@ import type { Output, StoryboardItem } from "../api/adapters/projectDetail";
 import { groupOutputsByGenerationBatch, groupOutputsByItem } from "./review";
 
 function output(id: string, itemId: string, createdAt: string): Output {
-  return { id, storyboardItemId: itemId, jobId: `job-${id}`, url: `/files/outputs/${id}`, createdAt };
+  return { id, storyboardItemId: itemId, jobId: `job-${id}`, hash: `hash-${id}`, url: `/files/outputs/${id}`, createdAt };
 }
 
 function item(id: string, assetType = "hero-image"): StoryboardItem {

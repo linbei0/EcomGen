@@ -989,6 +989,28 @@ describe("POST /api/v1/projects/:projectId/generation-jobs 批次与指纹", () 
   });
 });
 
+describe("POST /api/v1/projects/:projectId/export-jobs 长图指纹", () => {
+  it("longImage 进任务输入与指纹：改配置产生新任务，相同请求复用", async () => {
+    const project = seedProject("export-long-image");
+    const items = seedConfirmedStoryboard(project.id);
+    const job = repository.createJob({ id: randomUUID(), projectId: project.id, storyboardItemId: null, type: "GENERATE", input: {} });
+    const output = repository.createOutput({ projectId: project.id, storyboardItemId: items[0].id, jobId: job.id, candidateIndex: 1, generationSnapshot: null, storagePath: "outputs/seed.png", hash: "hash-1" });
+
+    const plain = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/export-jobs`, payload: { outputIds: [output.id] } });
+    expect(plain.statusCode).toBe(202);
+
+    // 指纹不含长图配置时会错误复用第一个任务，拿到不含长图的旧包
+    const withLongImage = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/export-jobs`, payload: { outputIds: [output.id], longImage: { targetWidth: 750, sliceHeight: 960 } } });
+    expect(withLongImage.statusCode).toBe(202);
+    const bundle = withLongImage.json<{ job: { id: string; input: { longImage: unknown } } }>();
+    expect(bundle.job.id).not.toBe(plain.json<{ job: { id: string } }>().job.id);
+    expect(bundle.job.input.longImage).toEqual({ targetWidth: 750, sliceHeight: 960 });
+
+    const repeat = await app.inject({ method: "POST", url: `/api/v1/projects/${project.id}/export-jobs`, payload: { outputIds: [output.id], longImage: { targetWidth: 750, sliceHeight: 960 } } });
+    expect(repeat.json<{ job: { id: string } }>().job.id).toBe(bundle.job.id);
+  });
+});
+
 describe("POST /api/v1/projects/:projectId/planning-jobs 规划指纹", () => {
   it("项目规划事实变化后相同请求创建新任务，不复用旧规划", async () => {
     const project = seedProject("revision");

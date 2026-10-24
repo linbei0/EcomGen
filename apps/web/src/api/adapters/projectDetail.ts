@@ -149,6 +149,7 @@ function adaptOutput(raw: unknown): Output | null {
     storyboardItemId,
     jobId,
     createdAt,
+    hash: asString(raw.hash) ?? "",
     candidateIndex: asNumber(raw.candidateIndex),
     generationBatchId: asString(raw.generationBatchId) ?? null,
     generationSnapshot: snapshot,

@@ -2849,6 +2849,7 @@ components:
       type: object
       properties:
         outputIds:
+          description: 数组顺序即长图拼接顺序（用户可在导出时调整）；缺省时按分镜顺序拼接。
           type: array
           items:
             format: uuid
@@ -2866,9 +2867,9 @@ components:
               - DOUYIN
               - AMAZON
               - SHOPIFY
-        includeDetailPageSlices:
-          default: false
-          type: boolean
+        longImage:
+          description: 携带时导出额外包含长图与可选切片。
+          $ref: "#/components/schemas/LongImageExportConfig"
     CreatePlanningJobInput:
       type: object
       properties:
@@ -3963,6 +3964,25 @@ components:
           minimum: 0
           description: Item count after applying filters to source rows and deduplicating by content hash; independent of the current page cursor.
           type: integer
+    LongImageExportConfig:
+      type: object
+      required:
+        - targetWidth
+      properties:
+        targetWidth:
+          description: 长图统一宽度：750=手机端详情页通用，790=淘宝/京东 PC 端，1200=拼多多高清档。各屏等比缩放到该宽度。
+          anyOf:
+            - const: 750
+              type: number
+            - const: 790
+              type: number
+            - const: 1200
+              type: number
+        sliceHeight:
+          minimum: 320
+          maximum: 2000
+          description: 切片目标高度（px）；缺省不切片。切点只落在屏边界，永不裁穿单屏内容；整图不超过该高度时不产出切片。
+          type: integer
     ModelCapability:
       type: object
       required:
@@ -4016,6 +4036,7 @@ components:
         - id
         - storyboardItemId
         - jobId
+        - hash
         - createdAt
       properties:
         id:
@@ -4026,6 +4047,9 @@ components:
           type: string
         jobId:
           format: uuid
+          type: string
+        hash:
+          description: Content hash of the image; addresses the 512px webp thumbnail at GET /files/thumbnails/{hash}.
           type: string
         candidateIndex:
           minimum: 1
@@ -5004,6 +5028,7 @@ components:
       type: object
       properties:
         outputIds:
+          description: 数组顺序即长图拼接顺序（用户可在导出时调整）；缺省时按分镜顺序拼接。
           type: array
           items:
             format: uuid
@@ -5014,8 +5039,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PlatformTarget"
-        includeDetailPageSlices:
-          type: boolean
+        longImage:
+          description: 携带时导出额外包含长图与可选切片。
+          $ref: "#/components/schemas/LongImageExportConfig"
     CreateGenerationJobInput:
       type: object
       required:
