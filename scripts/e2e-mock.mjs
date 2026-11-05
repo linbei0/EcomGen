@@ -262,6 +262,11 @@ try {
   // 分割探测只做零费用连通性检查
   const segmentationProbe = await requestJson(`${base}/providers/${provider.id}/test`, "POST", { modelId: "sam-3", kind: "segmentation" });
   assert.equal(segmentationProbe.ok, true);
+  // 模型发现：显式凭据与已保存 providerId 两种来源都必须命中 mock 的 /v1/models
+  const discovered = await requestJson(`${base}/providers/discover-models`, "POST", { baseUrl: `http://127.0.0.1:${mockPort}/v1`, apiKey: "mock-key" });
+  assert.deepEqual(discovered.models, ["mock-image", "mock-reasoner"]);
+  const discoveredStored = await requestJson(`${base}/providers/discover-models`, "POST", { providerId: provider.id });
+  assert.deepEqual(discoveredStored.models, ["mock-image", "mock-reasoner"]);
   const project = await requestJson(`${base}/projects`, "POST", {
     name: "Travel cup",
     category: "home",

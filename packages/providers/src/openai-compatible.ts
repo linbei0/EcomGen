@@ -123,6 +123,8 @@ export function highInputFidelityForOpenAiImageModel(modelId: string): "high" | 
 const DEFAULT_IMAGE_REQUEST_TIMEOUT_MS = 300_000;
 /** 下载 Provider 返回的图片 URL；该请求与生图请求同源受控，同样需要超时与取消。 */
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 120_000;
+/** 模型列表探测（GET /models）超时；挂起的上游不能让连通性测试或模型发现无限等待。 */
+export const MODEL_LIST_TIMEOUT_MS = 15_000;
 const IMAGE_REQUEST_RETRIES = 1;
 const RETRYABLE_IMAGE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
@@ -202,7 +204,7 @@ export class OpenAiCompatibleImageProvider {
   public async probe(): Promise<ProviderProbeResult> {
     // 只读取 /models，不调用生图接口，避免“测试连接”产生模型费用或副作用。
     const started = Date.now();
-    const response = await fetch(new URL("models", this.baseUrl()), { headers: this.headers() });
+    const response = await fetch(new URL("models", this.baseUrl()), { headers: this.headers(), signal: AbortSignal.timeout(MODEL_LIST_TIMEOUT_MS) });
     if (!response.ok) throw new ProviderError(`Provider models endpoint returned HTTP ${response.status}`, response.status);
     const body = await response.json() as { data?: Array<{ id?: string }> };
     return { latencyMs: Date.now() - started, models: Array.isArray(body.data) ? body.data.flatMap((entry) => typeof entry.id === "string" ? [entry.id] : []) : null };

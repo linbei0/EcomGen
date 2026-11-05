@@ -7,6 +7,22 @@ import { schemaRef } from "./ref.js";
 export const TestProviderInput = Type.Object({ modelId: Type.String({ minLength: 1 }), kind: Type.Optional(Type.Union([Type.Literal("reasoning"), Type.Literal("image"), Type.Literal("segmentation")], { description: "segmentation probes the declared segmentation API with zero cost." })) }, { $id: "#/components/schemas/TestProviderInput" });
 export type TestProviderInput = Static<typeof TestProviderInput>;
 
+// 保存前的模型列表发现：providerId 命中已保存 Provider 时，缺省的 baseUrl/apiKey 读取存储值
+// （编辑表单不必回显密钥即可拉取）；显式提供的 baseUrl/apiKey 覆盖存储值，用于未保存或已改动
+// 的连接信息。两种来源都没有完整凭据时拒绝请求。
+export const DiscoverProviderModelsInput = Type.Object({
+  providerId: Type.Optional(Type.String({ format: "uuid", description: "Saved provider whose stored credentials should be used." })),
+  baseUrl: Type.Optional(Type.String({ format: "uri", description: "Overrides the saved provider's base URL." })),
+  apiKey: Type.Optional(Type.String({ minLength: 1, description: "Overrides the saved provider's key; never returned in responses." })),
+}, { $id: "#/components/schemas/DiscoverProviderModelsInput" });
+export type DiscoverProviderModelsInput = Static<typeof DiscoverProviderModelsInput>;
+
+export const DiscoverProviderModelsResult = Type.Object({
+  models: Type.Array(Type.String(), { description: "Model IDs advertised by the provider's models endpoint, deduplicated and sorted." }),
+  latencyMs: Type.Number(),
+}, { $id: "#/components/schemas/DiscoverProviderModelsResult" });
+export type DiscoverProviderModelsResult = Static<typeof DiscoverProviderModelsResult>;
+
 export const CreateGenerationJobInput = Type.Object({
   storyboardItemIds: Type.Array(Type.String({ format: "uuid" }), { minItems: 1 }),
   generationBatchId: Type.Optional(Type.String({ format: "uuid" })),

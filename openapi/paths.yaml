@@ -309,6 +309,28 @@ paths:
                 $ref: "#/components/schemas/ProviderConfig"
         "400":
           $ref: "#/components/responses/ValidationError"
+  /providers/discover-models:
+    post:
+      operationId: discoverProviderModels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoverProviderModelsInput"
+      responses:
+        "200":
+          description: Model IDs advertised by the provider.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverProviderModelsResult"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/ProviderError"
   /providers/{providerId}:
     parameters:
       - $ref: "#/components/parameters/ProviderId"

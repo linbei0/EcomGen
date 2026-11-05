@@ -8,3 +8,4 @@ export * from "./gitee-sam3.js";
 export * from "./segmentation.js";
 export * from "./reasoning-profile.js";
 export * from "./reasoning-probe.js";
+export * from "./model-discovery.js";

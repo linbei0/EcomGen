@@ -1,9 +1,10 @@
 import { App, Button, Form, Input, Select, Switch, Tooltip } from "antd";
-import { CircleCheck, CircleX, PlugZap, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { CircleCheck, CircleX, ClipboardPaste, ListPlus, PlugZap, Plus, Trash2 } from "lucide-react";
+import { useState, type ClipboardEvent } from "react";
 
 import {
   useCreateProvider,
+  useDiscoverProviderModels,
   useTestProvider,
   useUpdateProvider,
   type ModelCapability,
@@ -12,6 +13,8 @@ import {
 } from "../../api/hooks/useProviders";
 import { errorText } from "../../lib/errorText";
 import { SEGMENTATION_PROTOCOL_LABELS, type SegmentationProtocolValue } from "../../lib/modelOptions";
+import { ModelPickerModal } from "./ModelPickerModal";
+import { parseConnectionText, type ProviderConnectionDraft } from "./parseConnectionText";
 import styles from "./providers.module.css";
 
 type ImageApiKindValue = NonNullable<ModelCapability["imageApiKind"]>;
@@ -40,6 +43,12 @@ type TestRowState =
   | { state: "ok"; latencyMs: number; modelAvailable: boolean | null }
   | { state: "fail"; text: string };
 
+type DiscoveryState =
+  | { state: "idle" }
+  | { state: "loading" }
+  | { state: "fail"; text: string }
+  | { state: "done"; models: string[]; latencyMs: number };
+
 const EMPTY_MODEL_ROW: ModelFormRow = {
   id: "",
   supportsVision: false,
@@ -52,6 +61,12 @@ const EMPTY_MODEL_ROW: ModelFormRow = {
 function isSegmentationKind(kind: ModelFormRow["kind"]): kind is SegmentationKindValue {
   // 从协议标签表派生：新增分割协议时只改 contracts 的能力注册表（segmentation.ts），表单自动跟上
   return Object.hasOwn(SEGMENTATION_PROTOCOL_LABELS, kind);
+}
+
+function connectionAppliedTitle(draft: ProviderConnectionDraft): string {
+  if (draft.baseUrl && draft.apiKey) return "已识别连接信息，地址与密钥已填入";
+  if (draft.apiKey) return "识别到密钥，已填入 API Key";
+  return "识别到地址，已填入 Base URL";
 }
 
 function toModelCapability(row: ModelFormRow): ModelCapability {
@@ -79,12 +94,17 @@ export function ProviderFormView({ view, onDone }: Props) {
   const editing = view.kind === "edit" ? view.provider : null;
   const [form] = Form.useForm<ProviderFormValues>();
   const models = Form.useWatch("models", form);
+  const baseUrlValue = Form.useWatch("baseUrl", form);
+  const apiKeyValue = Form.useWatch("apiKey", form);
   const createProvider = useCreateProvider();
   const updateProvider = useUpdateProvider();
   const testProvider = useTestProvider();
+  const discoverModels = useDiscoverProviderModels();
   const { notification } = App.useApp();
   const [testRows, setTestRows] = useState<Record<number, TestRowState>>({});
   const [modelKinds, setModelKinds] = useState<Record<number, ModelFormRow["kind"]>>({});
+  const [discovery, setDiscovery] = useState<DiscoveryState>({ state: "idle" });
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const initialValues: ProviderFormValues = editing
     ? {
@@ -171,6 +191,99 @@ export function ProviderFormView({ view, onDone }: Props) {
     }
   };
 
+  const baseUrlFilled = (baseUrlValue ?? "").trim() !== "";
+  const apiKeyFilled = (apiKeyValue ?? "").trim() !== "";
+  // 编辑态留空密钥时后端回退到已保存密钥，因此只要有 baseUrl 就能拉取
+  const discoverReady = baseUrlFilled && (Boolean(editing) || apiKeyFilled);
+  const discoverHint = !baseUrlFilled
+    ? "填写 Base URL 后可获取"
+    : !apiKeyFilled && !editing
+      ? "填写 API Key 后可获取"
+      : "从 Provider 的模型列表端点拉取，不消耗生图额度";
+
+  const runDiscoverModels = async () => {
+    const baseUrl = (form.getFieldValue("baseUrl") as string | undefined)?.trim() ?? "";
+    const apiKey = (form.getFieldValue("apiKey") as string | undefined)?.trim() ?? "";
+    if (baseUrl === "" || (!editing && apiKey === "")) return;
+    setDiscovery({ state: "loading" });
+    try {
+      const result = await discoverModels.mutateAsync({
+        baseUrl,
+        // 编辑态留空密钥：后端读取已保存密钥，密钥从不回显到前端
+        ...(apiKey === "" ? {} : { apiKey }),
+        ...(editing ? { providerId: editing.id } : {}),
+      });
+      setDiscovery({ state: "done", models: result.models, latencyMs: result.latencyMs });
+      setPickerOpen(true);
+    } catch (error) {
+      setDiscovery({ state: "fail", text: errorText(error) });
+    }
+  };
+
+  const handlePickModels = (ids: string[]) => {
+    const rows = (form.getFieldValue("models") as ModelFormRow[] | undefined) ?? [];
+    // 首行仍是未填写的空行时直接替换，避免选中模型后面跟着一个必填报错的空行
+    const base = rows.length === 1 && rows[0]!.id.trim() === "" ? [] : rows;
+    form.setFieldValue("models", [...base, ...ids.map((id) => ({ ...EMPTY_MODEL_ROW, id }))]);
+    setPickerOpen(false);
+  };
+
+  const existingModelIds = new Set((models ?? []).map((row) => row.id.trim()).filter((id) => id !== ""));
+
+  // Docker http 部署不是安全上下文，clipboard API 缺失时按钮自动隐藏，Ctrl+V 粘贴始终可用
+  const canReadClipboard = typeof navigator.clipboard?.readText === "function";
+
+  const applyConnectionDraft = (draft: ProviderConnectionDraft) => {
+    const updates: Partial<ProviderFormValues> = {};
+    if (draft.baseUrl) updates.baseUrl = draft.baseUrl;
+    if (draft.apiKey) updates.apiKey = draft.apiKey;
+    // 名称仍为空时用主机名预填：粘贴后通常只剩选模型这一步
+    if (draft.baseUrl && (form.getFieldValue("name") ?? "").trim() === "") {
+      try {
+        updates.name = new URL(draft.baseUrl).hostname;
+      } catch {
+        // 走到这里的地址都经过规范化，仅防御
+      }
+    }
+    form.setFieldsValue(updates);
+  };
+
+  const handleConnectionPaste = (target: "baseUrl" | "apiKey") => (event: ClipboardEvent<HTMLInputElement>) => {
+    const text = event.clipboardData.getData("text");
+    if (text === "") return;
+    const draft = parseConnectionText(text);
+    if (!draft) return;
+    const ownValue = target === "baseUrl" ? draft.baseUrl : draft.apiKey;
+    const hasOther = target === "baseUrl" ? Boolean(draft.apiKey) : Boolean(draft.baseUrl);
+    // 整段连接信息或贴错字段（往 URL 框贴纯密钥）才接管粘贴；普通内容放行默认行为
+    if (hasOther || !ownValue) {
+      event.preventDefault();
+      applyConnectionDraft(draft);
+      notification.success({ title: connectionAppliedTitle(draft) });
+      return;
+    }
+    // 只有当前字段自己的值：规范化有变化（补 /v1、剥引号）时同样接管，避免贴出原始串
+    if (target === "baseUrl" && draft.baseUrl !== text.trim()) {
+      event.preventDefault();
+      form.setFieldsValue({ baseUrl: draft.baseUrl });
+    }
+  };
+
+  const readClipboardConnection = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const draft = text === "" ? null : parseConnectionText(text);
+      if (!draft || (!draft.baseUrl && !draft.apiKey)) {
+        notification.info({ title: "剪贴板中未识别到连接信息" });
+        return;
+      }
+      applyConnectionDraft(draft);
+      notification.success({ title: connectionAppliedTitle(draft) });
+    } catch {
+      notification.warning({ title: "无法读取剪贴板", description: "点击 Base URL 输入框后按 Ctrl+V 粘贴即可自动识别" });
+    }
+  };
+
   return (
     <Form
       form={form}
@@ -194,8 +307,27 @@ export function ProviderFormView({ view, onDone }: Props) {
           { required: true, whitespace: true, message: "填写 Base URL" },
           { type: "url", message: "Base URL 需为合法 URL" },
         ]}
+        extra="支持直接粘贴中转站复制的连接信息，自动拆分地址与密钥"
       >
-        <Input placeholder="https://api.openai.com/v1" className="font-mono" />
+        <Input
+          placeholder="https://api.openai.com/v1"
+          className="font-mono"
+          onPaste={handleConnectionPaste("baseUrl")}
+          suffix={
+            canReadClipboard ? (
+              <Tooltip title="读取剪贴板中的连接信息">
+                <button
+                  type="button"
+                  aria-label="读取剪贴板连接信息"
+                  className={styles.pasteTrigger}
+                  onClick={() => void readClipboardConnection()}
+                >
+                  <ClipboardPaste size={14} strokeWidth={1.75} />
+                </button>
+              </Tooltip>
+            ) : undefined
+          }
+        />
       </Form.Item>
 
       <Form.Item name="reasoningProtocol" label="推理协议">
@@ -218,13 +350,36 @@ export function ProviderFormView({ view, onDone }: Props) {
             : "密钥仅通过 API 加密保存，任何响应都不会回传。"
         }
       >
-        <Input.Password placeholder={editing ? "留空保留原密钥" : "sk-..."} autoComplete="off" />
+        <Input.Password
+          placeholder={editing ? "留空保留原密钥" : "sk-..."}
+          autoComplete="off"
+          onPaste={handleConnectionPaste("apiKey")}
+        />
       </Form.Item>
 
       <div className={styles.modelsHeader}>
-        <span className={styles.modelsLabel}>模型（至少 1 个）</span>
-        <span className={styles.modelsHint}>能力标签用于模型选择时的前置拦截</span>
+        <div className={styles.modelsHeaderText}>
+          <span className={styles.modelsLabel}>模型（至少 1 个）</span>
+          <span className={styles.modelsHint}>能力标签用于模型选择时的前置拦截</span>
+        </div>
+        <Tooltip title={discoverHint}>
+          <Button
+            size="small"
+            icon={<ListPlus size={14} strokeWidth={1.75} />}
+            disabled={!discoverReady}
+            loading={discovery.state === "loading"}
+            onClick={() => void runDiscoverModels()}
+          >
+            获取模型列表
+          </Button>
+        </Tooltip>
       </div>
+      {discovery.state === "fail" && (
+        <p className={styles.testFail}>
+          <CircleX size={14} aria-hidden />
+          获取失败：{discovery.text}
+        </p>
+      )}
 
       <Form.List name="models">
         {(fields, { add, remove }) => (
@@ -355,6 +510,15 @@ export function ProviderFormView({ view, onDone }: Props) {
           {editing ? "保存" : "添加"}
         </Button>
       </div>
+
+      <ModelPickerModal
+        open={pickerOpen}
+        models={discovery.state === "done" ? discovery.models : []}
+        latencyMs={discovery.state === "done" ? discovery.latencyMs : undefined}
+        existingIds={existingModelIds}
+        onCancel={() => setPickerOpen(false)}
+        onConfirm={handlePickModels}
+      />
     </Form>
   );
 }

@@ -204,6 +204,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/providers/discover-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["discoverProviderModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/providers/{providerId}": {
         parameters: {
             query?: never;
@@ -2738,6 +2754,25 @@ export interface components {
             userInstruction?: string;
             idempotencyKey?: string;
         };
+        DiscoverProviderModelsInput: {
+            /**
+             * Format: uuid
+             * @description Saved provider whose stored credentials should be used.
+             */
+            providerId?: string;
+            /**
+             * Format: uri
+             * @description Overrides the saved provider's base URL.
+             */
+            baseUrl?: string;
+            /** @description Overrides the saved provider's key; never returned in responses. */
+            apiKey?: string;
+        };
+        DiscoverProviderModelsResult: {
+            /** @description Model IDs advertised by the provider's models endpoint, deduplicated and sorted. */
+            models: string[];
+            latencyMs: number;
+        };
         EcomTemplateItem: {
             id: string;
             upstreamNumber: number;
@@ -4106,6 +4141,33 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationError"];
+        };
+    };
+    discoverProviderModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscoverProviderModelsInput"];
+            };
+        };
+        responses: {
+            /** @description Model IDs advertised by the provider. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoverProviderModelsResult"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["ProviderError"];
         };
     };
     deleteProvider: {

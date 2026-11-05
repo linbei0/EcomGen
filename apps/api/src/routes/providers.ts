@@ -5,11 +5,12 @@ import {
   ProviderError,
   SeedreamLayerizeProvider,
   createSegmentationProvider,
+  discoverProviderModels,
   probeReasoning,
   type PromptSegmentationProtocol,
 } from "@ecomgen/providers";
 import type { ProviderRecord } from "@ecomgen/core";
-import { CreateProviderInput, TestProviderInput, UpdateProviderInput } from "@ecomgen/contracts";
+import { CreateProviderInput, DiscoverProviderModelsInput, TestProviderInput, UpdateProviderInput } from "@ecomgen/contracts";
 import type { ReasoningProtocolProfile } from "@ecomgen/contracts";
 import type { ApiContext } from "../context.js";
 import { ApiError } from "../errors.js";
@@ -36,6 +37,26 @@ export function registerProviderRoutes(app: FastifyInstance, ctx: ApiContext): v
     const reasoningProtocol = body.reasoningProtocol === undefined ? current.reasoningProtocol : enumValue<ReasoningProtocolProfile>(body.reasoningProtocol, ["openai", "dashscope_qwen", "openai_responses"], "reasoningProtocol");
     const record = repository.saveProvider({ id, name: readOptionalText(body.name) ?? current.name, baseUrl: readOptionalText(body.baseUrl) ?? current.baseUrl, reasoningProtocol, encryptedApiKey: body.apiKey ? secrets.encrypt(readText(body.apiKey, "apiKey")) : current.encryptedApiKey, models: body.models ? normalizeModels(body.models) : current.models });
     await events.publish("system", "provider.updated", publicProvider(record)); return publicProvider(record);
+  });
+  app.post("/api/v1/providers/discover-models", async (request) => {
+    const body = parseBody(DiscoverProviderModelsInput, request.body);
+    // providerId 命中已保存记录时允许省略 baseUrl/apiKey（编辑表单不回显密钥也能拉取）；
+    // 显式提供的值覆盖存储值，覆盖的是表单里已修改但尚未保存的连接信息。
+    let baseUrl = readOptionalText(body.baseUrl);
+    let apiKey = readOptionalText(body.apiKey);
+    if (body.providerId !== undefined) {
+      const providerId = readText(body.providerId, "providerId");
+      const provider = repository.getProvider(providerId);
+      if (!provider) missing("provider", providerId);
+      baseUrl = baseUrl ?? provider.baseUrl;
+      apiKey = apiKey ?? secrets.decrypt(provider.encryptedApiKey);
+    }
+    if (!baseUrl) throw new ApiError(400, "VALIDATION_ERROR", "baseUrl is required when providerId is absent");
+    if (!apiKey) throw new ApiError(400, "VALIDATION_ERROR", "apiKey is required when providerId is absent");
+    // 零费用 GET /models，与 test 路由一样在 API 内同步完成，不经过队列
+    try {
+      return await discoverProviderModels({ baseUrl, apiKey });
+    } catch (error) { if (error instanceof ProviderError) throw new ApiError(502, "PROVIDER_ERROR", error.message); throw error; }
   });
   app.post("/api/v1/providers/:providerId/test", async (request) => {
     const providerId = parameter(request, "providerId"); const provider = repository.getProvider(providerId); if (!provider) missing("provider", providerId);

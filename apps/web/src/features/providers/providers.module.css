@@ -106,11 +106,32 @@
 
 /* ---- 表单 ---- */
 
+.pasteTrigger {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.pasteTrigger:hover {
+  color: var(--text-1);
+}
+
 .modelsHeader {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin: 4px 0 8px;
+}
+
+.modelsHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .modelsLabel {
@@ -192,6 +213,53 @@
 
 .testFail {
   color: var(--danger);
+}
+
+/* ---- 模型选择弹窗 ---- */
+
+.pickerMeta {
+  margin: 0 0 10px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.pickerList {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-1);
+}
+
+.pickerRow {
+  margin: 0;
+  padding: 7px 2px;
+  border-bottom: 1px dashed var(--line-1);
+}
+
+.pickerList .pickerRow:last-child {
+  border-bottom: none;
+}
+
+.pickerRow:global(.ant-checkbox-wrapper) {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.pickerTag:global(.ant-tag) {
+  margin-inline-start: 8px;
+  margin-inline-end: 0;
+  font-size: 11px;
+}
+
+.pickerEmpty {
+  margin: 16px 0 4px;
+  color: var(--text-3);
+  font-size: 12px;
 }
 
 .formFooter {

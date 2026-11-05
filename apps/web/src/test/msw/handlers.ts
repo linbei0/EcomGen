@@ -173,6 +173,13 @@ export const handlers = [
 
   http.delete(`${BASE}/providers/:providerId`, () => new HttpResponse(null, { status: 204 })),
 
+  http.post(`${BASE}/providers/discover-models`, async () =>
+    HttpResponse.json({
+      models: ["claude-sonnet-4", "gpt-4o", "gpt-image-1", "gemini-2.5-flash-image"],
+      latencyMs: 42,
+    }),
+  ),
+
   http.post(`${BASE}/providers/:providerId/test`, async ({ request, params }) => {
     const body = (await request.json()) as { modelId: string; kind?: "reasoning" | "image" };
     return HttpResponse.json({

@@ -2760,6 +2760,34 @@ components:
         idempotencyKey:
           minLength: 1
           type: string
+    DiscoverProviderModelsInput:
+      type: object
+      properties:
+        providerId:
+          format: uuid
+          description: Saved provider whose stored credentials should be used.
+          type: string
+        baseUrl:
+          format: uri
+          description: Overrides the saved provider's base URL.
+          type: string
+        apiKey:
+          minLength: 1
+          description: Overrides the saved provider's key; never returned in responses.
+          type: string
+    DiscoverProviderModelsResult:
+      type: object
+      required:
+        - models
+        - latencyMs
+      properties:
+        models:
+          description: Model IDs advertised by the provider's models endpoint, deduplicated and sorted.
+          type: array
+          items:
+            type: string
+        latencyMs:
+          type: number
     EcomTemplateItem:
       type: object
       required:

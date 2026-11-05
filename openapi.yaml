@@ -318,6 +318,28 @@ paths:
                 $ref: "#/components/schemas/ProviderConfig"
         "400":
           $ref: "#/components/responses/ValidationError"
+  /providers/discover-models:
+    post:
+      operationId: discoverProviderModels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoverProviderModelsInput"
+      responses:
+        "200":
+          description: Model IDs advertised by the provider.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverProviderModelsResult"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/ProviderError"
   /providers/{providerId}:
     parameters:
       - $ref: "#/components/parameters/ProviderId"
@@ -5179,6 +5201,34 @@ components:
         idempotencyKey:
           minLength: 1
           type: string
+    DiscoverProviderModelsInput:
+      type: object
+      properties:
+        providerId:
+          format: uuid
+          description: Saved provider whose stored credentials should be used.
+          type: string
+        baseUrl:
+          format: uri
+          description: Overrides the saved provider's base URL.
+          type: string
+        apiKey:
+          minLength: 1
+          description: Overrides the saved provider's key; never returned in responses.
+          type: string
+    DiscoverProviderModelsResult:
+      type: object
+      required:
+        - models
+        - latencyMs
+      properties:
+        models:
+          description: Model IDs advertised by the provider's models endpoint, deduplicated and sorted.
+          type: array
+          items:
+            type: string
+        latencyMs:
+          type: number
     EcomTemplateItem:
       type: object
       required:

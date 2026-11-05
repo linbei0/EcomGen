@@ -58,6 +58,7 @@ const operationSchemaRefs = {
   updateUserTemplate: { request: "UpdateUserTemplateInput", response: { "200": "UserTemplateItem" } },
   listUserTemplates: { response: { "200": "UserTemplateList" } },
   testProviderConnection: { request: "TestProviderInput", response: { "200": "TestProviderConnectionResult" } },
+  discoverProviderModels: { request: "DiscoverProviderModelsInput", response: { "200": "DiscoverProviderModelsResult" } },
   uploadAsset: { request: "UploadAssetInput" },
   updateAsset: { request: "UpdateAssetInput" },
   listLibraryAssets: { response: { "200": "LibraryAssetList" } },

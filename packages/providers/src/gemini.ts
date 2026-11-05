@@ -1,6 +1,6 @@
 import { requestSignal } from "./abort.js";
 import type { ImageEditInput, ImageGenerationInput, ImageGenerationResult, ImageInput, ProviderConnection, ProviderProbeResult } from "./openai-compatible.js";
-import { ProviderError } from "./openai-compatible.js";
+import { MODEL_LIST_TIMEOUT_MS, ProviderError } from "./openai-compatible.js";
 
 const GEMINI_REQUEST_TIMEOUT_MS = 120_000;
 
@@ -18,7 +18,7 @@ export class GeminiImageProvider {
 
   public async probe(): Promise<ProviderProbeResult> {
     const started = Date.now();
-    const response = await fetch(new URL("models", this.baseUrl()), { headers: this.headers() });
+    const response = await fetch(new URL("models", this.baseUrl()), { headers: this.headers(), signal: AbortSignal.timeout(MODEL_LIST_TIMEOUT_MS) });
     if (!response.ok) throw new ProviderError(`Gemini models endpoint returned HTTP ${response.status}`, response.status);
     const body = await response.json() as { models?: Array<{ name?: string }> };
     const models = Array.isArray(body.models)

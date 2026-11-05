@@ -8,6 +8,9 @@ export type ProviderConfig = components["schemas"]["ProviderConfig"];
 export type ModelCapability = components["schemas"]["ModelCapability"];
 export type CreateProviderInput = components["schemas"]["CreateProviderInput"];
 export type UpdateProviderInput = components["schemas"]["UpdateProviderInput"];
+export type DiscoverProviderModelsInput = components["schemas"]["DiscoverProviderModelsInput"];
+export type DiscoverProviderModelsResult =
+  operations["discoverProviderModels"]["responses"]["200"]["content"]["application/json"];
 export type TestProviderResult =
   operations["testProviderConnection"]["responses"]["200"]["content"]["application/json"];
 
@@ -62,5 +65,13 @@ export function useTestProvider() {
           body: { modelId, kind },
         }),
       ),
+  });
+}
+
+/** 保存前从 /models 拉取模型 ID 列表（契约 discoverProviderModels）；编辑态省略 apiKey 时服务端读取已存密钥。 */
+export function useDiscoverProviderModels() {
+  return useMutation({
+    mutationFn: (body: DiscoverProviderModelsInput) =>
+      unwrap(api.POST("/providers/discover-models", { body })),
   });
 }

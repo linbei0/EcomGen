@@ -744,6 +744,36 @@ describe("GET /api/v1/suites 分页与筛选", () => {
   });
 });
 
+describe("POST /api/v1/providers/discover-models", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("providerId 与 baseUrl+apiKey 都缺失时返回 400", async () => {
+    const response = await app.inject({ method: "POST", url: "/api/v1/providers/discover-models", payload: {} });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("仅凭 providerId 时使用存储 baseUrl 与解密后的密钥", async () => {
+    // 经 POST /providers 创建，密钥走真实加密；saveProvider 助手塞的占位密文无法解密
+    const created = await app.inject({ method: "POST", url: "/api/v1/providers", payload: { name: "gateway", baseUrl: "https://stored.test/v1", reasoningProtocol: "openai", apiKey: "stored-key", models: [{ id: "m", supportsVision: false, supportsThinking: false, supportsTools: false, supportsStructuredOutput: false, imageApiKind: null }] } });
+    const providerId = created.json<{ id: string }>().id;
+    const fetchMock = vi.fn(async (_url: URL, _init?: RequestInit) => new Response(JSON.stringify({ data: [{ id: "stored-model" }] }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await app.inject({ method: "POST", url: "/api/v1/providers/discover-models", payload: { providerId } });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ models: ["stored-model"] });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe("https://stored.test/v1/models");
+    expect(new Headers(init?.headers).get("authorization")).toBe("Bearer stored-key");
+  });
+
+  it("未知 providerId 返回 404", async () => {
+    const response = await app.inject({ method: "POST", url: "/api/v1/providers/discover-models", payload: { providerId: randomUUID() } });
+    expect(response.statusCode).toBe(404);
+  });
+});
+
 describe("segmentation model declarations & refs", () => {
   function seedSegmentationProvider() {
     const provider = saveProvider([
