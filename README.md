@@ -156,6 +156,10 @@ docker compose down
 
 前后端分开部署时还必须设置 `ECOMGEN_CORS_ORIGINS`（逗号分隔的来源白名单，如 `https://workbench.example.com`）：API 只接受显式列出的前端来源，未配置时默认仅允许本机 dev server（`http://localhost:5173`、`http://127.0.0.1:5173`），通配符与非法来源会在启动时报错。API 自托管 Web 的 Compose 部署是同源请求，无需该配置。
 
+## 一键部署
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/EcomGen/)
+
 ## 常用命令
 
 ```bash
